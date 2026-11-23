@@ -1,0 +1,6037 @@
+{
+  "scope": "Experimental readable branches only; no production codec changes or CPU claims",
+  "corpus_sha256": "d511feee9ecf3b68c596e9cb457ec054596c239c93e87b3d546ce4869aac2939",
+  "corpus_metadata_sha256": "bca49a7d311068e07a7e00414f34bed1087a3257e18cd40963a9bbce3f6113a3",
+  "historical_corpus_sha256": "1c2c627635f7ecae0aadf8d9e94658fd25a4e6939e6a10df2aa8086b5cd4080b",
+  "experiment_source_sha256": {
+    "benchmark.py": "0d904ebcae5254c00806e3b31af62c57cc4e8dbf89e5c09505db6608e84d2a2d",
+    "expansion_benchmark.py": "270c479b04891d8c6af166e5a35a9318bcdc8d4e165fce18c23d45933b0624e4",
+    "expand_corpus.py": "04715a94bc754c158a5f3ff0afb38e9a28b3ca9d069d8bf55d706568347cd843"
+  },
+  "codec_source_sha256": {
+    "libraries/psio/include/psio/compress_name.hpp": "6f57da2a2c4523fde1c665b774687a65fb7085c992040b4271134fd296b1596f",
+    "rust/psibase_names/src/constants.rs": "d94fa5448fae654c8cfcdb988f78c2a34ffeed90f7c16587cc58124ea1ad0da6",
+    "rust/psibase_names/src/method_to_number_converter.rs": "cb619588fdc122f1d4c98a687e081375e86cd7a9d568a9e7b8913e12e1ea8837"
+  },
+  "split": {
+    "family_rule": "source:split_group SHA256 modulo5, residue0 held out",
+    "leave_out_ecosystem": "cpp",
+    "leave_out_provider": null,
+    "training_records": 49269,
+    "heldout_records": 10487,
+    "novel_records": 7535,
+    "novel_names": 4289,
+    "novel_definition": "No lowercase spelling in ANY expanded training source",
+    "shared_evaluation_across_profiles": true,
+    "psibase_and_preferred_names_excluded_from_all_training": true
+  },
+  "balance": {
+    "rule": "Equal ecosystems > equal providers > equal sources > equal distinct spellings",
+    "source_mass": {
+      "bitcoin-rpc": {
+        "ecosystem": "blockchain",
+        "provider": "Bitcoin Core",
+        "mass": 0.041666666666666664,
+        "spellings": 170
+      },
+      "cometbft-rpc": {
+        "ecosystem": "blockchain",
+        "provider": "CometBFT",
+        "mass": 0.041666666666666664,
+        "spellings": 31
+      },
+      "cosmos-rpc": {
+        "ecosystem": "blockchain",
+        "provider": "Cosmos SDK",
+        "mass": 0.041666666666666664,
+        "spellings": 141
+      },
+      "polkadot-rpc": {
+        "ecosystem": "blockchain",
+        "provider": "Parity",
+        "mass": 0.041666666666666664,
+        "spellings": 107
+      },
+      "solana-rpc": {
+        "ecosystem": "blockchain",
+        "provider": "Solana Labs",
+        "mass": 0.041666666666666664,
+        "spellings": 69
+      },
+      "ethereum": {
+        "ecosystem": "blockchain",
+        "provider": "ethereum",
+        "mass": 0.041666666666666664,
+        "spellings": 93
+      },
+      "ccxt": {
+        "ecosystem": "javascript",
+        "provider": "ccxt",
+        "mass": 0.08333333333333333,
+        "spellings": 208
+      },
+      "ethers": {
+        "ecosystem": "javascript",
+        "provider": "ethers",
+        "mass": 0.08333333333333333,
+        "spellings": 31
+      },
+      "typescript-dom": {
+        "ecosystem": "javascript",
+        "provider": "microsoft",
+        "mass": 0.041666666666666664,
+        "spellings": 1153
+      },
+      "typescript-es": {
+        "ecosystem": "javascript",
+        "provider": "microsoft",
+        "mass": 0.041666666666666664,
+        "spellings": 306
+      },
+      "rust-clap": {
+        "ecosystem": "rust",
+        "provider": "clap-rs",
+        "mass": 0.03125,
+        "spellings": 427
+      },
+      "rust-crossbeam": {
+        "ecosystem": "rust",
+        "provider": "crossbeam-rs",
+        "mass": 0.03125,
+        "spellings": 137
+      },
+      "rust-diesel": {
+        "ecosystem": "rust",
+        "provider": "diesel-rs",
+        "mass": 0.03125,
+        "spellings": 514
+      },
+      "rust-rayon": {
+        "ecosystem": "rust",
+        "provider": "rayon-rs",
+        "mass": 0.03125,
+        "spellings": 197
+      },
+      "rust-futures": {
+        "ecosystem": "rust",
+        "provider": "rust-lang",
+        "mass": 0.010416666666666666,
+        "spellings": 293
+      },
+      "rust-regex": {
+        "ecosystem": "rust",
+        "provider": "rust-lang",
+        "mass": 0.010416666666666666,
+        "spellings": 59
+      },
+      "rust-stdlib": {
+        "ecosystem": "rust",
+        "provider": "rust-lang",
+        "mass": 0.010416666666666666,
+        "spellings": 1845
+      },
+      "rust-reqwest": {
+        "ecosystem": "rust",
+        "provider": "seanmonstar",
+        "mass": 0.03125,
+        "spellings": 236
+      },
+      "rust-serde": {
+        "ecosystem": "rust",
+        "provider": "serde-rs",
+        "mass": 0.03125,
+        "spellings": 126
+      },
+      "rust-axum": {
+        "ecosystem": "rust",
+        "provider": "tokio-rs",
+        "mass": 0.015625,
+        "spellings": 184
+      },
+      "rust-tokio": {
+        "ecosystem": "rust",
+        "provider": "tokio-rs",
+        "mass": 0.015625,
+        "spellings": 676
+      },
+      "aws-sdk": {
+        "ecosystem": "service-api",
+        "provider": "Amazon",
+        "mass": 0.05,
+        "spellings": 12117
+      },
+      "github-sdk": {
+        "ecosystem": "service-api",
+        "provider": "GitHub/Octokit",
+        "mass": 0.05,
+        "spellings": 927
+      },
+      "stripe-sdk": {
+        "ecosystem": "service-api",
+        "provider": "Stripe",
+        "mass": 0.05,
+        "spellings": 170
+      },
+      "googleapis": {
+        "ecosystem": "service-api",
+        "provider": "google",
+        "mass": 0.05,
+        "spellings": 6686
+      },
+      "kubernetes": {
+        "ecosystem": "service-api",
+        "provider": "kubernetes",
+        "mass": 0.05,
+        "spellings": 1175
+      }
+    }
+  },
+  "source_info": {
+    "aws-sdk": {
+      "ecosystem": "service-api",
+      "provider": "Amazon"
+    },
+    "bitcoin-rpc": {
+      "ecosystem": "blockchain",
+      "provider": "Bitcoin Core"
+    },
+    "boost-algorithm": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-asio": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-beast": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-container": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-filesystem": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-json": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-math": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-multi_index": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-unordered": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-url": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "ccxt": {
+      "ecosystem": "javascript",
+      "provider": "ccxt"
+    },
+    "cometbft-rpc": {
+      "ecosystem": "blockchain",
+      "provider": "CometBFT"
+    },
+    "cosmos-rpc": {
+      "ecosystem": "blockchain",
+      "provider": "Cosmos SDK"
+    },
+    "ethereum": {
+      "ecosystem": "blockchain",
+      "provider": "ethereum"
+    },
+    "ethers": {
+      "ecosystem": "javascript",
+      "provider": "ethers"
+    },
+    "github-sdk": {
+      "ecosystem": "service-api",
+      "provider": "GitHub/Octokit"
+    },
+    "googleapis": {
+      "ecosystem": "service-api",
+      "provider": "google"
+    },
+    "kubernetes": {
+      "ecosystem": "service-api",
+      "provider": "kubernetes"
+    },
+    "libcxx": {
+      "ecosystem": "cpp",
+      "provider": "llvm"
+    },
+    "polkadot-rpc": {
+      "ecosystem": "blockchain",
+      "provider": "Parity"
+    },
+    "qt-core": {
+      "ecosystem": "cpp",
+      "provider": "qt"
+    },
+    "qt-network": {
+      "ecosystem": "cpp",
+      "provider": "qt"
+    },
+    "rust-axum": {
+      "ecosystem": "rust",
+      "provider": "tokio-rs"
+    },
+    "rust-clap": {
+      "ecosystem": "rust",
+      "provider": "clap-rs"
+    },
+    "rust-crossbeam": {
+      "ecosystem": "rust",
+      "provider": "crossbeam-rs"
+    },
+    "rust-diesel": {
+      "ecosystem": "rust",
+      "provider": "diesel-rs"
+    },
+    "rust-futures": {
+      "ecosystem": "rust",
+      "provider": "rust-lang"
+    },
+    "rust-rayon": {
+      "ecosystem": "rust",
+      "provider": "rayon-rs"
+    },
+    "rust-regex": {
+      "ecosystem": "rust",
+      "provider": "rust-lang"
+    },
+    "rust-reqwest": {
+      "ecosystem": "rust",
+      "provider": "seanmonstar"
+    },
+    "rust-serde": {
+      "ecosystem": "rust",
+      "provider": "serde-rs"
+    },
+    "rust-stdlib": {
+      "ecosystem": "rust",
+      "provider": "rust-lang"
+    },
+    "rust-tokio": {
+      "ecosystem": "rust",
+      "provider": "tokio-rs"
+    },
+    "solana-rpc": {
+      "ecosystem": "blockchain",
+      "provider": "Solana Labs"
+    },
+    "stripe-sdk": {
+      "ecosystem": "service-api",
+      "provider": "Stripe"
+    },
+    "typescript-dom": {
+      "ecosystem": "javascript",
+      "provider": "microsoft"
+    },
+    "typescript-es": {
+      "ecosystem": "javascript",
+      "provider": "microsoft"
+    }
+  },
+  "baseline_current_cpp": {
+    "heldout_all": {
+      "names": 4767,
+      "readable": 3100,
+      "percent": 65.03,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 2181,
+          "readable": 2175,
+          "fit_percent": 99.72
+        },
+        {
+          "length": "11-15",
+          "names": 1314,
+          "readable": 916,
+          "fit_percent": 69.71
+        },
+        {
+          "length": "16-20",
+          "names": 793,
+          "readable": 9,
+          "fit_percent": 1.13
+        },
+        {
+          "length": "21-25",
+          "names": 318,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 144,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 17,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "novel_all": {
+      "names": 4289,
+      "readable": 2639,
+      "percent": 61.53,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 1747,
+          "readable": 1741,
+          "fit_percent": 99.66
+        },
+        {
+          "length": "11-15",
+          "names": 1276,
+          "readable": 889,
+          "fit_percent": 69.67
+        },
+        {
+          "length": "16-20",
+          "names": 788,
+          "readable": 9,
+          "fit_percent": 1.14
+        },
+        {
+          "length": "21-25",
+          "names": 317,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 144,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 17,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "preferred_descriptive_probes": {
+      "names": 21,
+      "readable": 1,
+      "percent": 4.76,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "11-15",
+          "names": 1,
+          "readable": 1,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "16-20",
+          "names": 4,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 11,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 5,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "psibase_compatibility": {
+      "names": 528,
+      "readable": 473,
+      "percent": 89.58,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 363,
+          "readable": 356,
+          "fit_percent": 98.07
+        },
+        {
+          "length": "11-15",
+          "names": 153,
+          "readable": 116,
+          "fit_percent": 75.82
+        },
+        {
+          "length": "16-20",
+          "names": 10,
+          "readable": 1,
+          "fit_percent": 10.0
+        },
+        {
+          "length": "21-25",
+          "names": 2,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:boost-algorithm": {
+      "names": 194,
+      "readable": 104,
+      "percent": 53.61,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 66,
+          "readable": 66,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 71,
+          "readable": 38,
+          "fit_percent": 53.52
+        },
+        {
+          "length": "16-20",
+          "names": 41,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 12,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 4,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "source:boost-algorithm": {
+      "names": 172,
+      "readable": 83,
+      "percent": 48.26,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 49,
+          "readable": 49,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 66,
+          "readable": 34,
+          "fit_percent": 51.52
+        },
+        {
+          "length": "16-20",
+          "names": 41,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 12,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 4,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:boost-asio": {
+      "names": 152,
+      "readable": 100,
+      "percent": 65.79,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 79,
+          "readable": 79,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 40,
+          "readable": 21,
+          "fit_percent": 52.5
+        },
+        {
+          "length": "16-20",
+          "names": 18,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 12,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 3,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "source:boost-asio": {
+      "names": 105,
+      "readable": 53,
+      "percent": 50.48,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 32,
+          "readable": 32,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 40,
+          "readable": 21,
+          "fit_percent": 52.5
+        },
+        {
+          "length": "16-20",
+          "names": 18,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 12,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 3,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:boost-beast": {
+      "names": 139,
+      "readable": 117,
+      "percent": 84.17,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 94,
+          "readable": 94,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 35,
+          "readable": 23,
+          "fit_percent": 65.71
+        },
+        {
+          "length": "16-20",
+          "names": 9,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 1,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "source:boost-beast": {
+      "names": 89,
+      "readable": 68,
+      "percent": 76.4,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 46,
+          "readable": 46,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 33,
+          "readable": 22,
+          "fit_percent": 66.67
+        },
+        {
+          "length": "16-20",
+          "names": 9,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 1,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:boost-container": {
+      "names": 129,
+      "readable": 54,
+      "percent": 41.86,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 44,
+          "readable": 44,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 25,
+          "readable": 10,
+          "fit_percent": 40.0
+        },
+        {
+          "length": "16-20",
+          "names": 39,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 13,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 6,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 2,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "source:boost-container": {
+      "names": 103,
+      "readable": 29,
+      "percent": 28.16,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 19,
+          "readable": 19,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 24,
+          "readable": 10,
+          "fit_percent": 41.67
+        },
+        {
+          "length": "16-20",
+          "names": 39,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 13,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 6,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 2,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "heldout-source:boost-filesystem": {
+      "names": 17,
+      "readable": 13,
+      "percent": 76.47,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 8,
+          "readable": 8,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 7,
+          "readable": 5,
+          "fit_percent": 71.43
+        },
+        {
+          "length": "16-20",
+          "names": 2,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "source:boost-filesystem": {
+      "names": 10,
+      "readable": 6,
+      "percent": 60.0,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 2,
+          "readable": 2,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 6,
+          "readable": 4,
+          "fit_percent": 66.67
+        },
+        {
+          "length": "16-20",
+          "names": 2,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:boost-json": {
+      "names": 99,
+      "readable": 88,
+      "percent": 88.89,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 78,
+          "readable": 78,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 15,
+          "readable": 10,
+          "fit_percent": 66.67
+        },
+        {
+          "length": "16-20",
+          "names": 4,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 1,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 1,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "source:boost-json": {
+      "names": 67,
+      "readable": 57,
+      "percent": 85.07,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 47,
+          "readable": 47,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 14,
+          "readable": 10,
+          "fit_percent": 71.43
+        },
+        {
+          "length": "16-20",
+          "names": 4,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 1,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 1,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "heldout-source:boost-math": {
+      "names": 184,
+      "readable": 126,
+      "percent": 68.48,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 111,
+          "readable": 111,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 26,
+          "readable": 15,
+          "fit_percent": 57.69
+        },
+        {
+          "length": "16-20",
+          "names": 32,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 10,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 4,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 1,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "source:boost-math": {
+      "names": 150,
+      "readable": 92,
+      "percent": 61.33,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 77,
+          "readable": 77,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 26,
+          "readable": 15,
+          "fit_percent": 57.69
+        },
+        {
+          "length": "16-20",
+          "names": 32,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 10,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 4,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 1,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "heldout-source:boost-multi_index": {
+      "names": 73,
+      "readable": 65,
+      "percent": 89.04,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 53,
+          "readable": 53,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 15,
+          "readable": 12,
+          "fit_percent": 80.0
+        },
+        {
+          "length": "16-20",
+          "names": 5,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "source:boost-multi_index": {
+      "names": 39,
+      "readable": 32,
+      "percent": 82.05,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 22,
+          "readable": 22,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 12,
+          "readable": 10,
+          "fit_percent": 83.33
+        },
+        {
+          "length": "16-20",
+          "names": 5,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:boost-unordered": {
+      "names": 77,
+      "readable": 46,
+      "percent": 59.74,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 32,
+          "readable": 32,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 17,
+          "readable": 14,
+          "fit_percent": 82.35
+        },
+        {
+          "length": "16-20",
+          "names": 21,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 7,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "source:boost-unordered": {
+      "names": 61,
+      "readable": 30,
+      "percent": 49.18,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 16,
+          "readable": 16,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 17,
+          "readable": 14,
+          "fit_percent": 82.35
+        },
+        {
+          "length": "16-20",
+          "names": 21,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 7,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:boost-url": {
+      "names": 64,
+      "readable": 56,
+      "percent": 87.5,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 44,
+          "readable": 44,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 18,
+          "readable": 12,
+          "fit_percent": 66.67
+        },
+        {
+          "length": "16-20",
+          "names": 2,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "source:boost-url": {
+      "names": 31,
+      "readable": 24,
+      "percent": 77.42,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 15,
+          "readable": 15,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 14,
+          "readable": 9,
+          "fit_percent": 64.29
+        },
+        {
+          "length": "16-20",
+          "names": 2,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:libcxx": {
+      "names": 1180,
+      "readable": 951,
+      "percent": 80.59,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 837,
+          "readable": 835,
+          "fit_percent": 99.76
+        },
+        {
+          "length": "11-15",
+          "names": 197,
+          "readable": 116,
+          "fit_percent": 58.88
+        },
+        {
+          "length": "16-20",
+          "names": 97,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 33,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 12,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 4,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "source:libcxx": {
+      "names": 951,
+      "readable": 733,
+      "percent": 77.08,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 631,
+          "readable": 629,
+          "fit_percent": 99.68
+        },
+        {
+          "length": "11-15",
+          "names": 176,
+          "readable": 104,
+          "fit_percent": 59.09
+        },
+        {
+          "length": "16-20",
+          "names": 96,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 32,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 12,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 4,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "heldout-source:qt-core": {
+      "names": 2479,
+      "readable": 1634,
+      "percent": 65.91,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 1074,
+          "readable": 1070,
+          "fit_percent": 99.63
+        },
+        {
+          "length": "11-15",
+          "names": 741,
+          "readable": 556,
+          "fit_percent": 75.03
+        },
+        {
+          "length": "16-20",
+          "names": 412,
+          "readable": 8,
+          "fit_percent": 1.94
+        },
+        {
+          "length": "21-25",
+          "names": 166,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 77,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 9,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "source:qt-core": {
+      "names": 2231,
+      "readable": 1392,
+      "percent": 62.39,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 841,
+          "readable": 837,
+          "fit_percent": 99.52
+        },
+        {
+          "length": "11-15",
+          "names": 730,
+          "readable": 547,
+          "fit_percent": 74.93
+        },
+        {
+          "length": "16-20",
+          "names": 408,
+          "readable": 8,
+          "fit_percent": 1.96
+        },
+        {
+          "length": "21-25",
+          "names": 166,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 77,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 9,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "heldout-source:qt-network": {
+      "names": 621,
+      "readable": 337,
+      "percent": 54.27,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 195,
+          "readable": 195,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 191,
+          "readable": 141,
+          "fit_percent": 73.82
+        },
+        {
+          "length": "16-20",
+          "names": 128,
+          "readable": 1,
+          "fit_percent": 0.78
+        },
+        {
+          "length": "21-25",
+          "names": 66,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 39,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 2,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "source:qt-network": {
+      "names": 549,
+      "readable": 265,
+      "percent": 48.27,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 126,
+          "readable": 126,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 188,
+          "readable": 138,
+          "fit_percent": 73.4
+        },
+        {
+          "length": "16-20",
+          "names": 128,
+          "readable": 1,
+          "fit_percent": 0.78
+        },
+        {
+          "length": "21-25",
+          "names": 66,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 39,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 2,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "macro": {
+      "ecosystem_macro_percent": {
+        "cpp": 64.75
+      },
+      "balanced_macro_percent": 64.75
+    },
+    "heldout_macro": {
+      "ecosystem_macro_percent": {
+        "cpp": 70.75
+      },
+      "balanced_macro_percent": 70.75
+    }
+  },
+  "profiles": {
+    "expanded_balanced": {
+      "training_unique_spellings": 26879,
+      "training_sources": [
+        "aws-sdk",
+        "bitcoin-rpc",
+        "ccxt",
+        "cometbft-rpc",
+        "cosmos-rpc",
+        "ethereum",
+        "ethers",
+        "github-sdk",
+        "googleapis",
+        "kubernetes",
+        "polkadot-rpc",
+        "rust-axum",
+        "rust-clap",
+        "rust-crossbeam",
+        "rust-diesel",
+        "rust-futures",
+        "rust-rayon",
+        "rust-regex",
+        "rust-reqwest",
+        "rust-serde",
+        "rust-stdlib",
+        "rust-tokio",
+        "solana-rpc",
+        "stripe-sdk",
+        "typescript-dom",
+        "typescript-es"
+      ],
+      "models": {
+        "char2": {
+          "model": {
+            "kind": "character",
+            "order": 2,
+            "symbols_including_eos": 38,
+            "observed_context_rows": 844,
+            "evaluated_cdf_rows": 1328,
+            "evaluated_cdf_u16_bytes": 103584
+          },
+          "metrics": {
+            "heldout_all": {
+              "names": 4767,
+              "readable": 3684,
+              "percent": 77.28,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 2181,
+                  "readable": 2153,
+                  "fit_percent": 98.72
+                },
+                {
+                  "length": "11-15",
+                  "names": 1314,
+                  "readable": 1177,
+                  "fit_percent": 89.57
+                },
+                {
+                  "length": "16-20",
+                  "names": 793,
+                  "readable": 337,
+                  "fit_percent": 42.5
+                },
+                {
+                  "length": "21-25",
+                  "names": 318,
+                  "readable": 17,
+                  "fit_percent": 5.35
+                },
+                {
+                  "length": "26-35",
+                  "names": 144,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 17,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "novel_all": {
+              "names": 4289,
+              "readable": 3207,
+              "percent": 74.77,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 1747,
+                  "readable": 1719,
+                  "fit_percent": 98.4
+                },
+                {
+                  "length": "11-15",
+                  "names": 1276,
+                  "readable": 1139,
+                  "fit_percent": 89.26
+                },
+                {
+                  "length": "16-20",
+                  "names": 788,
+                  "readable": 332,
+                  "fit_percent": 42.13
+                },
+                {
+                  "length": "21-25",
+                  "names": 317,
+                  "readable": 17,
+                  "fit_percent": 5.36
+                },
+                {
+                  "length": "26-35",
+                  "names": 144,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 17,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "preferred_descriptive_probes": {
+              "names": 21,
+              "readable": 9,
+              "percent": 42.86,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "11-15",
+                  "names": 1,
+                  "readable": 1,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 4,
+                  "readable": 3,
+                  "fit_percent": 75.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 5,
+                  "fit_percent": 45.45
+                },
+                {
+                  "length": "26-35",
+                  "names": 5,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "psibase_compatibility": {
+              "names": 528,
+              "readable": 516,
+              "percent": 97.73,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 363,
+                  "readable": 362,
+                  "fit_percent": 99.72
+                },
+                {
+                  "length": "11-15",
+                  "names": 153,
+                  "readable": 147,
+                  "fit_percent": 96.08
+                },
+                {
+                  "length": "16-20",
+                  "names": 10,
+                  "readable": 7,
+                  "fit_percent": 70.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-algorithm": {
+              "names": 194,
+              "readable": 144,
+              "percent": 74.23,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 66,
+                  "readable": 66,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 71,
+                  "readable": 61,
+                  "fit_percent": 85.92
+                },
+                {
+                  "length": "16-20",
+                  "names": 41,
+                  "readable": 17,
+                  "fit_percent": 41.46
+                },
+                {
+                  "length": "21-25",
+                  "names": 12,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-algorithm": {
+              "names": 172,
+              "readable": 122,
+              "percent": 70.93,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 49,
+                  "readable": 49,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 66,
+                  "readable": 56,
+                  "fit_percent": 84.85
+                },
+                {
+                  "length": "16-20",
+                  "names": 41,
+                  "readable": 17,
+                  "fit_percent": 41.46
+                },
+                {
+                  "length": "21-25",
+                  "names": 12,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-asio": {
+              "names": 152,
+              "readable": 128,
+              "percent": 84.21,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 79,
+                  "readable": 79,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 40,
+                  "readable": 39,
+                  "fit_percent": 97.5
+                },
+                {
+                  "length": "16-20",
+                  "names": 18,
+                  "readable": 8,
+                  "fit_percent": 44.44
+                },
+                {
+                  "length": "21-25",
+                  "names": 12,
+                  "readable": 2,
+                  "fit_percent": 16.67
+                },
+                {
+                  "length": "26-35",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-asio": {
+              "names": 105,
+              "readable": 81,
+              "percent": 77.14,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 32,
+                  "readable": 32,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 40,
+                  "readable": 39,
+                  "fit_percent": 97.5
+                },
+                {
+                  "length": "16-20",
+                  "names": 18,
+                  "readable": 8,
+                  "fit_percent": 44.44
+                },
+                {
+                  "length": "21-25",
+                  "names": 12,
+                  "readable": 2,
+                  "fit_percent": 16.67
+                },
+                {
+                  "length": "26-35",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-beast": {
+              "names": 139,
+              "readable": 131,
+              "percent": 94.24,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 94,
+                  "readable": 94,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 35,
+                  "readable": 34,
+                  "fit_percent": 97.14
+                },
+                {
+                  "length": "16-20",
+                  "names": 9,
+                  "readable": 3,
+                  "fit_percent": 33.33
+                },
+                {
+                  "length": "21-25",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-beast": {
+              "names": 89,
+              "readable": 81,
+              "percent": 91.01,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 46,
+                  "readable": 46,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 33,
+                  "readable": 32,
+                  "fit_percent": 96.97
+                },
+                {
+                  "length": "16-20",
+                  "names": 9,
+                  "readable": 3,
+                  "fit_percent": 33.33
+                },
+                {
+                  "length": "21-25",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-container": {
+              "names": 129,
+              "readable": 97,
+              "percent": 75.19,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 44,
+                  "readable": 44,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 25,
+                  "readable": 25,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 39,
+                  "readable": 28,
+                  "fit_percent": 71.79
+                },
+                {
+                  "length": "21-25",
+                  "names": 13,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 6,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:boost-container": {
+              "names": 103,
+              "readable": 71,
+              "percent": 68.93,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 19,
+                  "readable": 19,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 24,
+                  "readable": 24,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 39,
+                  "readable": 28,
+                  "fit_percent": 71.79
+                },
+                {
+                  "length": "21-25",
+                  "names": 13,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 6,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:boost-filesystem": {
+              "names": 17,
+              "readable": 17,
+              "percent": 100.0,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 8,
+                  "readable": 8,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 7,
+                  "readable": 7,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 2,
+                  "readable": 2,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-filesystem": {
+              "names": 10,
+              "readable": 10,
+              "percent": 100.0,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 2,
+                  "readable": 2,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 6,
+                  "readable": 6,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 2,
+                  "readable": 2,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-json": {
+              "names": 99,
+              "readable": 95,
+              "percent": 95.96,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 78,
+                  "readable": 78,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 15,
+                  "readable": 15,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 4,
+                  "readable": 2,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:boost-json": {
+              "names": 67,
+              "readable": 63,
+              "percent": 94.03,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 47,
+                  "readable": 47,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 14,
+                  "readable": 14,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 4,
+                  "readable": 2,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:boost-math": {
+              "names": 184,
+              "readable": 131,
+              "percent": 71.2,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 111,
+                  "readable": 110,
+                  "fit_percent": 99.1
+                },
+                {
+                  "length": "11-15",
+                  "names": 26,
+                  "readable": 17,
+                  "fit_percent": 65.38
+                },
+                {
+                  "length": "16-20",
+                  "names": 32,
+                  "readable": 4,
+                  "fit_percent": 12.5
+                },
+                {
+                  "length": "21-25",
+                  "names": 10,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:boost-math": {
+              "names": 150,
+              "readable": 97,
+              "percent": 64.67,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 77,
+                  "readable": 76,
+                  "fit_percent": 98.7
+                },
+                {
+                  "length": "11-15",
+                  "names": 26,
+                  "readable": 17,
+                  "fit_percent": 65.38
+                },
+                {
+                  "length": "16-20",
+                  "names": 32,
+                  "readable": 4,
+                  "fit_percent": 12.5
+                },
+                {
+                  "length": "21-25",
+                  "names": 10,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:boost-multi_index": {
+              "names": 73,
+              "readable": 71,
+              "percent": 97.26,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 53,
+                  "readable": 53,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 15,
+                  "readable": 15,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 5,
+                  "readable": 3,
+                  "fit_percent": 60.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-multi_index": {
+              "names": 39,
+              "readable": 37,
+              "percent": 94.87,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 22,
+                  "readable": 22,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 12,
+                  "readable": 12,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 5,
+                  "readable": 3,
+                  "fit_percent": 60.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-unordered": {
+              "names": 77,
+              "readable": 55,
+              "percent": 71.43,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 32,
+                  "readable": 32,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 17,
+                  "readable": 17,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 6,
+                  "fit_percent": 28.57
+                },
+                {
+                  "length": "21-25",
+                  "names": 7,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-unordered": {
+              "names": 61,
+              "readable": 39,
+              "percent": 63.93,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 16,
+                  "readable": 16,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 17,
+                  "readable": 17,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 6,
+                  "fit_percent": 28.57
+                },
+                {
+                  "length": "21-25",
+                  "names": 7,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-url": {
+              "names": 64,
+              "readable": 63,
+              "percent": 98.44,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 44,
+                  "readable": 44,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 18,
+                  "readable": 18,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 2,
+                  "readable": 1,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-url": {
+              "names": 31,
+              "readable": 30,
+              "percent": 96.77,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 15,
+                  "readable": 15,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 14,
+                  "readable": 14,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 2,
+                  "readable": 1,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:libcxx": {
+              "names": 1180,
+              "readable": 1047,
+              "percent": 88.73,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 837,
+                  "readable": 822,
+                  "fit_percent": 98.21
+                },
+                {
+                  "length": "11-15",
+                  "names": 197,
+                  "readable": 189,
+                  "fit_percent": 95.94
+                },
+                {
+                  "length": "16-20",
+                  "names": 97,
+                  "readable": 36,
+                  "fit_percent": 37.11
+                },
+                {
+                  "length": "21-25",
+                  "names": 33,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 12,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:libcxx": {
+              "names": 951,
+              "readable": 819,
+              "percent": 86.12,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 631,
+                  "readable": 616,
+                  "fit_percent": 97.62
+                },
+                {
+                  "length": "11-15",
+                  "names": 176,
+                  "readable": 168,
+                  "fit_percent": 95.45
+                },
+                {
+                  "length": "16-20",
+                  "names": 96,
+                  "readable": 35,
+                  "fit_percent": 36.46
+                },
+                {
+                  "length": "21-25",
+                  "names": 32,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 12,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:qt-core": {
+              "names": 2479,
+              "readable": 1887,
+              "percent": 76.12,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 1074,
+                  "readable": 1062,
+                  "fit_percent": 98.88
+                },
+                {
+                  "length": "11-15",
+                  "names": 741,
+                  "readable": 646,
+                  "fit_percent": 87.18
+                },
+                {
+                  "length": "16-20",
+                  "names": 412,
+                  "readable": 174,
+                  "fit_percent": 42.23
+                },
+                {
+                  "length": "21-25",
+                  "names": 166,
+                  "readable": 5,
+                  "fit_percent": 3.01
+                },
+                {
+                  "length": "26-35",
+                  "names": 77,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 9,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:qt-core": {
+              "names": 2231,
+              "readable": 1639,
+              "percent": 73.46,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 841,
+                  "readable": 829,
+                  "fit_percent": 98.57
+                },
+                {
+                  "length": "11-15",
+                  "names": 730,
+                  "readable": 635,
+                  "fit_percent": 86.99
+                },
+                {
+                  "length": "16-20",
+                  "names": 408,
+                  "readable": 170,
+                  "fit_percent": 41.67
+                },
+                {
+                  "length": "21-25",
+                  "names": 166,
+                  "readable": 5,
+                  "fit_percent": 3.01
+                },
+                {
+                  "length": "26-35",
+                  "names": 77,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 9,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:qt-network": {
+              "names": 621,
+              "readable": 448,
+              "percent": 72.14,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 195,
+                  "readable": 195,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 191,
+                  "readable": 178,
+                  "fit_percent": 93.19
+                },
+                {
+                  "length": "16-20",
+                  "names": 128,
+                  "readable": 65,
+                  "fit_percent": 50.78
+                },
+                {
+                  "length": "21-25",
+                  "names": 66,
+                  "readable": 10,
+                  "fit_percent": 15.15
+                },
+                {
+                  "length": "26-35",
+                  "names": 39,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:qt-network": {
+              "names": 549,
+              "readable": 376,
+              "percent": 68.49,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 126,
+                  "readable": 126,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 188,
+                  "readable": 175,
+                  "fit_percent": 93.09
+                },
+                {
+                  "length": "16-20",
+                  "names": 128,
+                  "readable": 65,
+                  "fit_percent": 50.78
+                },
+                {
+                  "length": "21-25",
+                  "names": 66,
+                  "readable": 10,
+                  "fit_percent": 15.15
+                },
+                {
+                  "length": "26-35",
+                  "names": 39,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "macro": {
+              "ecosystem_macro_percent": {
+                "cpp": 79.77
+              },
+              "balanced_macro_percent": 79.77
+            },
+            "heldout_macro": {
+              "ecosystem_macro_percent": {
+                "cpp": 83.03
+              },
+              "balanced_macro_percent": 83.03
+            }
+          },
+          "probes": {
+            "acceptPendingTokenTransfer": {
+              "fits": false,
+              "bits": 84
+            },
+            "addMarketLiquidity": {
+              "fits": true,
+              "bits": 61
+            },
+            "assignSymbolToToken": {
+              "fits": false,
+              "bits": 85
+            },
+            "cancelMarketplaceListing": {
+              "fits": false,
+              "bits": 75
+            },
+            "cancelPendingTokenTransfer": {
+              "fits": false,
+              "bits": 75
+            },
+            "cancelStopLossOrder": {
+              "fits": true,
+              "bits": 61
+            },
+            "completeAccountRecovery": {
+              "fits": false,
+              "bits": 67
+            },
+            "createAccountWithRecoveryPartner": {
+              "fits": false,
+              "bits": 97
+            },
+            "depositIntoSubaccount": {
+              "fits": true,
+              "bits": 60
+            },
+            "getBalanceConfiguration": {
+              "fits": true,
+              "bits": 50
+            },
+            "liquidateMarginPosition": {
+              "fits": true,
+              "bits": 51
+            },
+            "listAccountNameForSale": {
+              "fits": false,
+              "bits": 71
+            },
+            "placeLimitOrder": {
+              "fits": true,
+              "bits": 45
+            },
+            "purchaseMarketplaceListing": {
+              "fits": false,
+              "bits": 86
+            },
+            "registerEventIndex": {
+              "fits": true,
+              "bits": 55
+            },
+            "requestAccountRecovery": {
+              "fits": true,
+              "bits": 58
+            },
+            "setAuthenticationService": {
+              "fits": true,
+              "bits": 60
+            },
+            "setPublicKeyWithRecoveryPartner": {
+              "fits": false,
+              "bits": 102
+            },
+            "setSystemResourceToken": {
+              "fits": false,
+              "bits": 75
+            },
+            "withdrawFromSubaccount": {
+              "fits": false,
+              "bits": 67
+            },
+            "withdrawMarketLiquidity": {
+              "fits": false,
+              "bits": 73
+            }
+          }
+        },
+        "words2048": {
+          "model": {
+            "kind": "global_component_dictionary_viterbi_unigram",
+            "symbols_including_eos": 2048,
+            "dictionary_utf8_bytes": 14334,
+            "cdf_u16_bytes": 4098
+          },
+          "metrics": {
+            "heldout_all": {
+              "names": 4767,
+              "readable": 3861,
+              "percent": 80.99,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 2181,
+                  "readable": 2145,
+                  "fit_percent": 98.35
+                },
+                {
+                  "length": "11-15",
+                  "names": 1314,
+                  "readable": 1084,
+                  "fit_percent": 82.5
+                },
+                {
+                  "length": "16-20",
+                  "names": 793,
+                  "readable": 498,
+                  "fit_percent": 62.8
+                },
+                {
+                  "length": "21-25",
+                  "names": 318,
+                  "readable": 116,
+                  "fit_percent": 36.48
+                },
+                {
+                  "length": "26-35",
+                  "names": 144,
+                  "readable": 18,
+                  "fit_percent": 12.5
+                },
+                {
+                  "length": "36+",
+                  "names": 17,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "novel_all": {
+              "names": 4289,
+              "readable": 3392,
+              "percent": 79.09,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 1747,
+                  "readable": 1712,
+                  "fit_percent": 98.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 1276,
+                  "readable": 1054,
+                  "fit_percent": 82.6
+                },
+                {
+                  "length": "16-20",
+                  "names": 788,
+                  "readable": 493,
+                  "fit_percent": 62.56
+                },
+                {
+                  "length": "21-25",
+                  "names": 317,
+                  "readable": 115,
+                  "fit_percent": 36.28
+                },
+                {
+                  "length": "26-35",
+                  "names": 144,
+                  "readable": 18,
+                  "fit_percent": 12.5
+                },
+                {
+                  "length": "36+",
+                  "names": 17,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "preferred_descriptive_probes": {
+              "names": 21,
+              "readable": 15,
+              "percent": 71.43,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "11-15",
+                  "names": 1,
+                  "readable": 1,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 4,
+                  "readable": 3,
+                  "fit_percent": 75.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 8,
+                  "fit_percent": 72.73
+                },
+                {
+                  "length": "26-35",
+                  "names": 5,
+                  "readable": 3,
+                  "fit_percent": 60.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "psibase_compatibility": {
+              "names": 528,
+              "readable": 497,
+              "percent": 94.13,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 363,
+                  "readable": 355,
+                  "fit_percent": 97.8
+                },
+                {
+                  "length": "11-15",
+                  "names": 153,
+                  "readable": 135,
+                  "fit_percent": 88.24
+                },
+                {
+                  "length": "16-20",
+                  "names": 10,
+                  "readable": 6,
+                  "fit_percent": 60.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 2,
+                  "readable": 1,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-algorithm": {
+              "names": 194,
+              "readable": 145,
+              "percent": 74.74,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 66,
+                  "readable": 63,
+                  "fit_percent": 95.45
+                },
+                {
+                  "length": "11-15",
+                  "names": 71,
+                  "readable": 53,
+                  "fit_percent": 74.65
+                },
+                {
+                  "length": "16-20",
+                  "names": 41,
+                  "readable": 27,
+                  "fit_percent": 65.85
+                },
+                {
+                  "length": "21-25",
+                  "names": 12,
+                  "readable": 2,
+                  "fit_percent": 16.67
+                },
+                {
+                  "length": "26-35",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-algorithm": {
+              "names": 172,
+              "readable": 123,
+              "percent": 71.51,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 49,
+                  "readable": 46,
+                  "fit_percent": 93.88
+                },
+                {
+                  "length": "11-15",
+                  "names": 66,
+                  "readable": 48,
+                  "fit_percent": 72.73
+                },
+                {
+                  "length": "16-20",
+                  "names": 41,
+                  "readable": 27,
+                  "fit_percent": 65.85
+                },
+                {
+                  "length": "21-25",
+                  "names": 12,
+                  "readable": 2,
+                  "fit_percent": 16.67
+                },
+                {
+                  "length": "26-35",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-asio": {
+              "names": 152,
+              "readable": 132,
+              "percent": 86.84,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 79,
+                  "readable": 79,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 40,
+                  "readable": 37,
+                  "fit_percent": 92.5
+                },
+                {
+                  "length": "16-20",
+                  "names": 18,
+                  "readable": 12,
+                  "fit_percent": 66.67
+                },
+                {
+                  "length": "21-25",
+                  "names": 12,
+                  "readable": 3,
+                  "fit_percent": 25.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 3,
+                  "readable": 1,
+                  "fit_percent": 33.33
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-asio": {
+              "names": 105,
+              "readable": 85,
+              "percent": 80.95,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 32,
+                  "readable": 32,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 40,
+                  "readable": 37,
+                  "fit_percent": 92.5
+                },
+                {
+                  "length": "16-20",
+                  "names": 18,
+                  "readable": 12,
+                  "fit_percent": 66.67
+                },
+                {
+                  "length": "21-25",
+                  "names": 12,
+                  "readable": 3,
+                  "fit_percent": 25.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 3,
+                  "readable": 1,
+                  "fit_percent": 33.33
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-beast": {
+              "names": 139,
+              "readable": 135,
+              "percent": 97.12,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 94,
+                  "readable": 94,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 35,
+                  "readable": 33,
+                  "fit_percent": 94.29
+                },
+                {
+                  "length": "16-20",
+                  "names": 9,
+                  "readable": 7,
+                  "fit_percent": 77.78
+                },
+                {
+                  "length": "21-25",
+                  "names": 1,
+                  "readable": 1,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-beast": {
+              "names": 89,
+              "readable": 85,
+              "percent": 95.51,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 46,
+                  "readable": 46,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 33,
+                  "readable": 31,
+                  "fit_percent": 93.94
+                },
+                {
+                  "length": "16-20",
+                  "names": 9,
+                  "readable": 7,
+                  "fit_percent": 77.78
+                },
+                {
+                  "length": "21-25",
+                  "names": 1,
+                  "readable": 1,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-container": {
+              "names": 129,
+              "readable": 106,
+              "percent": 82.17,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 44,
+                  "readable": 44,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 25,
+                  "readable": 21,
+                  "fit_percent": 84.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 39,
+                  "readable": 36,
+                  "fit_percent": 92.31
+                },
+                {
+                  "length": "21-25",
+                  "names": 13,
+                  "readable": 4,
+                  "fit_percent": 30.77
+                },
+                {
+                  "length": "26-35",
+                  "names": 6,
+                  "readable": 1,
+                  "fit_percent": 16.67
+                },
+                {
+                  "length": "36+",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:boost-container": {
+              "names": 103,
+              "readable": 81,
+              "percent": 78.64,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 19,
+                  "readable": 19,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 24,
+                  "readable": 21,
+                  "fit_percent": 87.5
+                },
+                {
+                  "length": "16-20",
+                  "names": 39,
+                  "readable": 36,
+                  "fit_percent": 92.31
+                },
+                {
+                  "length": "21-25",
+                  "names": 13,
+                  "readable": 4,
+                  "fit_percent": 30.77
+                },
+                {
+                  "length": "26-35",
+                  "names": 6,
+                  "readable": 1,
+                  "fit_percent": 16.67
+                },
+                {
+                  "length": "36+",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:boost-filesystem": {
+              "names": 17,
+              "readable": 15,
+              "percent": 88.24,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 8,
+                  "readable": 8,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 7,
+                  "readable": 6,
+                  "fit_percent": 85.71
+                },
+                {
+                  "length": "16-20",
+                  "names": 2,
+                  "readable": 1,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-filesystem": {
+              "names": 10,
+              "readable": 8,
+              "percent": 80.0,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 2,
+                  "readable": 2,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 6,
+                  "readable": 5,
+                  "fit_percent": 83.33
+                },
+                {
+                  "length": "16-20",
+                  "names": 2,
+                  "readable": 1,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-json": {
+              "names": 99,
+              "readable": 95,
+              "percent": 95.96,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 78,
+                  "readable": 78,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 15,
+                  "readable": 13,
+                  "fit_percent": 86.67
+                },
+                {
+                  "length": "16-20",
+                  "names": 4,
+                  "readable": 4,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:boost-json": {
+              "names": 67,
+              "readable": 64,
+              "percent": 95.52,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 47,
+                  "readable": 47,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 14,
+                  "readable": 13,
+                  "fit_percent": 92.86
+                },
+                {
+                  "length": "16-20",
+                  "names": 4,
+                  "readable": 4,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:boost-math": {
+              "names": 184,
+              "readable": 120,
+              "percent": 65.22,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 111,
+                  "readable": 104,
+                  "fit_percent": 93.69
+                },
+                {
+                  "length": "11-15",
+                  "names": 26,
+                  "readable": 11,
+                  "fit_percent": 42.31
+                },
+                {
+                  "length": "16-20",
+                  "names": 32,
+                  "readable": 5,
+                  "fit_percent": 15.62
+                },
+                {
+                  "length": "21-25",
+                  "names": 10,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:boost-math": {
+              "names": 150,
+              "readable": 86,
+              "percent": 57.33,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 77,
+                  "readable": 70,
+                  "fit_percent": 90.91
+                },
+                {
+                  "length": "11-15",
+                  "names": 26,
+                  "readable": 11,
+                  "fit_percent": 42.31
+                },
+                {
+                  "length": "16-20",
+                  "names": 32,
+                  "readable": 5,
+                  "fit_percent": 15.62
+                },
+                {
+                  "length": "21-25",
+                  "names": 10,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:boost-multi_index": {
+              "names": 73,
+              "readable": 70,
+              "percent": 95.89,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 53,
+                  "readable": 53,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 15,
+                  "readable": 13,
+                  "fit_percent": 86.67
+                },
+                {
+                  "length": "16-20",
+                  "names": 5,
+                  "readable": 4,
+                  "fit_percent": 80.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-multi_index": {
+              "names": 39,
+              "readable": 37,
+              "percent": 94.87,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 22,
+                  "readable": 22,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 12,
+                  "readable": 11,
+                  "fit_percent": 91.67
+                },
+                {
+                  "length": "16-20",
+                  "names": 5,
+                  "readable": 4,
+                  "fit_percent": 80.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-unordered": {
+              "names": 77,
+              "readable": 67,
+              "percent": 87.01,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 32,
+                  "readable": 32,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 17,
+                  "readable": 15,
+                  "fit_percent": 88.24
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 17,
+                  "fit_percent": 80.95
+                },
+                {
+                  "length": "21-25",
+                  "names": 7,
+                  "readable": 3,
+                  "fit_percent": 42.86
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-unordered": {
+              "names": 61,
+              "readable": 51,
+              "percent": 83.61,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 16,
+                  "readable": 16,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 17,
+                  "readable": 15,
+                  "fit_percent": 88.24
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 17,
+                  "fit_percent": 80.95
+                },
+                {
+                  "length": "21-25",
+                  "names": 7,
+                  "readable": 3,
+                  "fit_percent": 42.86
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-url": {
+              "names": 64,
+              "readable": 57,
+              "percent": 89.06,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 44,
+                  "readable": 44,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 18,
+                  "readable": 13,
+                  "fit_percent": 72.22
+                },
+                {
+                  "length": "16-20",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-url": {
+              "names": 31,
+              "readable": 25,
+              "percent": 80.65,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 15,
+                  "readable": 15,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 14,
+                  "readable": 10,
+                  "fit_percent": 71.43
+                },
+                {
+                  "length": "16-20",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:libcxx": {
+              "names": 1180,
+              "readable": 1041,
+              "percent": 88.22,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 837,
+                  "readable": 828,
+                  "fit_percent": 98.92
+                },
+                {
+                  "length": "11-15",
+                  "names": 197,
+                  "readable": 157,
+                  "fit_percent": 79.7
+                },
+                {
+                  "length": "16-20",
+                  "names": 97,
+                  "readable": 49,
+                  "fit_percent": 50.52
+                },
+                {
+                  "length": "21-25",
+                  "names": 33,
+                  "readable": 7,
+                  "fit_percent": 21.21
+                },
+                {
+                  "length": "26-35",
+                  "names": 12,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:libcxx": {
+              "names": 951,
+              "readable": 818,
+              "percent": 86.01,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 631,
+                  "readable": 622,
+                  "fit_percent": 98.57
+                },
+                {
+                  "length": "11-15",
+                  "names": 176,
+                  "readable": 142,
+                  "fit_percent": 80.68
+                },
+                {
+                  "length": "16-20",
+                  "names": 96,
+                  "readable": 48,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 32,
+                  "readable": 6,
+                  "fit_percent": 18.75
+                },
+                {
+                  "length": "26-35",
+                  "names": 12,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:qt-core": {
+              "names": 2479,
+              "readable": 1999,
+              "percent": 80.64,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 1074,
+                  "readable": 1057,
+                  "fit_percent": 98.42
+                },
+                {
+                  "length": "11-15",
+                  "names": 741,
+                  "readable": 615,
+                  "fit_percent": 83.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 412,
+                  "readable": 257,
+                  "fit_percent": 62.38
+                },
+                {
+                  "length": "21-25",
+                  "names": 166,
+                  "readable": 62,
+                  "fit_percent": 37.35
+                },
+                {
+                  "length": "26-35",
+                  "names": 77,
+                  "readable": 8,
+                  "fit_percent": 10.39
+                },
+                {
+                  "length": "36+",
+                  "names": 9,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:qt-core": {
+              "names": 2231,
+              "readable": 1754,
+              "percent": 78.62,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 841,
+                  "readable": 825,
+                  "fit_percent": 98.1
+                },
+                {
+                  "length": "11-15",
+                  "names": 730,
+                  "readable": 606,
+                  "fit_percent": 83.01
+                },
+                {
+                  "length": "16-20",
+                  "names": 408,
+                  "readable": 253,
+                  "fit_percent": 62.01
+                },
+                {
+                  "length": "21-25",
+                  "names": 166,
+                  "readable": 62,
+                  "fit_percent": 37.35
+                },
+                {
+                  "length": "26-35",
+                  "names": 77,
+                  "readable": 8,
+                  "fit_percent": 10.39
+                },
+                {
+                  "length": "36+",
+                  "names": 9,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:qt-network": {
+              "names": 621,
+              "readable": 496,
+              "percent": 79.87,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 195,
+                  "readable": 192,
+                  "fit_percent": 98.46
+                },
+                {
+                  "length": "11-15",
+                  "names": 191,
+                  "readable": 167,
+                  "fit_percent": 87.43
+                },
+                {
+                  "length": "16-20",
+                  "names": 128,
+                  "readable": 93,
+                  "fit_percent": 72.66
+                },
+                {
+                  "length": "21-25",
+                  "names": 66,
+                  "readable": 36,
+                  "fit_percent": 54.55
+                },
+                {
+                  "length": "26-35",
+                  "names": 39,
+                  "readable": 8,
+                  "fit_percent": 20.51
+                },
+                {
+                  "length": "36+",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:qt-network": {
+              "names": 549,
+              "readable": 424,
+              "percent": 77.23,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 126,
+                  "readable": 123,
+                  "fit_percent": 97.62
+                },
+                {
+                  "length": "11-15",
+                  "names": 188,
+                  "readable": 164,
+                  "fit_percent": 87.23
+                },
+                {
+                  "length": "16-20",
+                  "names": 128,
+                  "readable": 93,
+                  "fit_percent": 72.66
+                },
+                {
+                  "length": "21-25",
+                  "names": 66,
+                  "readable": 36,
+                  "fit_percent": 54.55
+                },
+                {
+                  "length": "26-35",
+                  "names": 39,
+                  "readable": 8,
+                  "fit_percent": 20.51
+                },
+                {
+                  "length": "36+",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "macro": {
+              "ecosystem_macro_percent": {
+                "cpp": 81.93
+              },
+              "balanced_macro_percent": 81.93
+            },
+            "heldout_macro": {
+              "ecosystem_macro_percent": {
+                "cpp": 84.9
+              },
+              "balanced_macro_percent": 84.9
+            }
+          },
+          "probes": {
+            "acceptPendingTokenTransfer": {
+              "fits": true,
+              "bits": 48
+            },
+            "addMarketLiquidity": {
+              "fits": false,
+              "bits": 91
+            },
+            "assignSymbolToToken": {
+              "fits": true,
+              "bits": 48
+            },
+            "cancelMarketplaceListing": {
+              "fits": true,
+              "bits": 62
+            },
+            "cancelPendingTokenTransfer": {
+              "fits": true,
+              "bits": 46
+            },
+            "cancelStopLossOrder": {
+              "fits": true,
+              "bits": 41
+            },
+            "completeAccountRecovery": {
+              "fits": true,
+              "bits": 40
+            },
+            "createAccountWithRecoveryPartner": {
+              "fits": true,
+              "bits": 55
+            },
+            "depositIntoSubaccount": {
+              "fits": true,
+              "bits": 44
+            },
+            "getBalanceConfiguration": {
+              "fits": true,
+              "bits": 27
+            },
+            "liquidateMarginPosition": {
+              "fits": false,
+              "bits": 76
+            },
+            "listAccountNameForSale": {
+              "fits": false,
+              "bits": 64
+            },
+            "placeLimitOrder": {
+              "fits": true,
+              "bits": 34
+            },
+            "purchaseMarketplaceListing": {
+              "fits": false,
+              "bits": 100
+            },
+            "registerEventIndex": {
+              "fits": true,
+              "bits": 36
+            },
+            "requestAccountRecovery": {
+              "fits": true,
+              "bits": 37
+            },
+            "setAuthenticationService": {
+              "fits": true,
+              "bits": 35
+            },
+            "setPublicKeyWithRecoveryPartner": {
+              "fits": false,
+              "bits": 68
+            },
+            "setSystemResourceToken": {
+              "fits": true,
+              "bits": 40
+            },
+            "withdrawFromSubaccount": {
+              "fits": true,
+              "bits": 44
+            },
+            "withdrawMarketLiquidity": {
+              "fits": false,
+              "bits": 93
+            }
+          }
+        },
+        "mixture": {
+          "model": {
+            "kind": "tagged_readable_mixture",
+            "tag_bits": 2,
+            "payload_bits": 62,
+            "modes": [
+              "char2",
+              "component_dictionary",
+              "bijective_base37_literal"
+            ],
+            "fallback": "not implemented"
+          },
+          "metrics": {
+            "heldout_all": {
+              "names": 4767,
+              "readable": 4122,
+              "percent": 86.47,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 2181,
+                  "readable": 2181,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 1314,
+                  "readable": 1259,
+                  "fit_percent": 95.81
+                },
+                {
+                  "length": "16-20",
+                  "names": 793,
+                  "readable": 547,
+                  "fit_percent": 68.98
+                },
+                {
+                  "length": "21-25",
+                  "names": 318,
+                  "readable": 118,
+                  "fit_percent": 37.11
+                },
+                {
+                  "length": "26-35",
+                  "names": 144,
+                  "readable": 17,
+                  "fit_percent": 11.81
+                },
+                {
+                  "length": "36+",
+                  "names": 17,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "novel_all": {
+              "names": 4289,
+              "readable": 3644,
+              "percent": 84.96,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 1747,
+                  "readable": 1747,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 1276,
+                  "readable": 1221,
+                  "fit_percent": 95.69
+                },
+                {
+                  "length": "16-20",
+                  "names": 788,
+                  "readable": 542,
+                  "fit_percent": 68.78
+                },
+                {
+                  "length": "21-25",
+                  "names": 317,
+                  "readable": 117,
+                  "fit_percent": 36.91
+                },
+                {
+                  "length": "26-35",
+                  "names": 144,
+                  "readable": 17,
+                  "fit_percent": 11.81
+                },
+                {
+                  "length": "36+",
+                  "names": 17,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "preferred_descriptive_probes": {
+              "names": 21,
+              "readable": 17,
+              "percent": 80.95,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "11-15",
+                  "names": 1,
+                  "readable": 1,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 4,
+                  "readable": 4,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 9,
+                  "fit_percent": 81.82
+                },
+                {
+                  "length": "26-35",
+                  "names": 5,
+                  "readable": 3,
+                  "fit_percent": 60.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "psibase_compatibility": {
+              "names": 528,
+              "readable": 523,
+              "percent": 99.05,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 363,
+                  "readable": 363,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 153,
+                  "readable": 151,
+                  "fit_percent": 98.69
+                },
+                {
+                  "length": "16-20",
+                  "names": 10,
+                  "readable": 8,
+                  "fit_percent": 80.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 2,
+                  "readable": 1,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-algorithm": {
+              "names": 194,
+              "readable": 159,
+              "percent": 81.96,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 66,
+                  "readable": 66,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 71,
+                  "readable": 65,
+                  "fit_percent": 91.55
+                },
+                {
+                  "length": "16-20",
+                  "names": 41,
+                  "readable": 26,
+                  "fit_percent": 63.41
+                },
+                {
+                  "length": "21-25",
+                  "names": 12,
+                  "readable": 2,
+                  "fit_percent": 16.67
+                },
+                {
+                  "length": "26-35",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-algorithm": {
+              "names": 172,
+              "readable": 137,
+              "percent": 79.65,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 49,
+                  "readable": 49,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 66,
+                  "readable": 60,
+                  "fit_percent": 90.91
+                },
+                {
+                  "length": "16-20",
+                  "names": 41,
+                  "readable": 26,
+                  "fit_percent": 63.41
+                },
+                {
+                  "length": "21-25",
+                  "names": 12,
+                  "readable": 2,
+                  "fit_percent": 16.67
+                },
+                {
+                  "length": "26-35",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-asio": {
+              "names": 152,
+              "readable": 139,
+              "percent": 91.45,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 79,
+                  "readable": 79,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 40,
+                  "readable": 40,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 18,
+                  "readable": 14,
+                  "fit_percent": 77.78
+                },
+                {
+                  "length": "21-25",
+                  "names": 12,
+                  "readable": 5,
+                  "fit_percent": 41.67
+                },
+                {
+                  "length": "26-35",
+                  "names": 3,
+                  "readable": 1,
+                  "fit_percent": 33.33
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-asio": {
+              "names": 105,
+              "readable": 92,
+              "percent": 87.62,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 32,
+                  "readable": 32,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 40,
+                  "readable": 40,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 18,
+                  "readable": 14,
+                  "fit_percent": 77.78
+                },
+                {
+                  "length": "21-25",
+                  "names": 12,
+                  "readable": 5,
+                  "fit_percent": 41.67
+                },
+                {
+                  "length": "26-35",
+                  "names": 3,
+                  "readable": 1,
+                  "fit_percent": 33.33
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-beast": {
+              "names": 139,
+              "readable": 136,
+              "percent": 97.84,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 94,
+                  "readable": 94,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 35,
+                  "readable": 34,
+                  "fit_percent": 97.14
+                },
+                {
+                  "length": "16-20",
+                  "names": 9,
+                  "readable": 7,
+                  "fit_percent": 77.78
+                },
+                {
+                  "length": "21-25",
+                  "names": 1,
+                  "readable": 1,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-beast": {
+              "names": 89,
+              "readable": 86,
+              "percent": 96.63,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 46,
+                  "readable": 46,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 33,
+                  "readable": 32,
+                  "fit_percent": 96.97
+                },
+                {
+                  "length": "16-20",
+                  "names": 9,
+                  "readable": 7,
+                  "fit_percent": 77.78
+                },
+                {
+                  "length": "21-25",
+                  "names": 1,
+                  "readable": 1,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-container": {
+              "names": 129,
+              "readable": 110,
+              "percent": 85.27,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 44,
+                  "readable": 44,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 25,
+                  "readable": 25,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 39,
+                  "readable": 36,
+                  "fit_percent": 92.31
+                },
+                {
+                  "length": "21-25",
+                  "names": 13,
+                  "readable": 4,
+                  "fit_percent": 30.77
+                },
+                {
+                  "length": "26-35",
+                  "names": 6,
+                  "readable": 1,
+                  "fit_percent": 16.67
+                },
+                {
+                  "length": "36+",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:boost-container": {
+              "names": 103,
+              "readable": 84,
+              "percent": 81.55,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 19,
+                  "readable": 19,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 24,
+                  "readable": 24,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 39,
+                  "readable": 36,
+                  "fit_percent": 92.31
+                },
+                {
+                  "length": "21-25",
+                  "names": 13,
+                  "readable": 4,
+                  "fit_percent": 30.77
+                },
+                {
+                  "length": "26-35",
+                  "names": 6,
+                  "readable": 1,
+                  "fit_percent": 16.67
+                },
+                {
+                  "length": "36+",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:boost-filesystem": {
+              "names": 17,
+              "readable": 17,
+              "percent": 100.0,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 8,
+                  "readable": 8,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 7,
+                  "readable": 7,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 2,
+                  "readable": 2,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-filesystem": {
+              "names": 10,
+              "readable": 10,
+              "percent": 100.0,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 2,
+                  "readable": 2,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 6,
+                  "readable": 6,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 2,
+                  "readable": 2,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-json": {
+              "names": 99,
+              "readable": 97,
+              "percent": 97.98,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 78,
+                  "readable": 78,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 15,
+                  "readable": 15,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 4,
+                  "readable": 4,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:boost-json": {
+              "names": 67,
+              "readable": 65,
+              "percent": 97.01,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 47,
+                  "readable": 47,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 14,
+                  "readable": 14,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 4,
+                  "readable": 4,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:boost-math": {
+              "names": 184,
+              "readable": 140,
+              "percent": 76.09,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 111,
+                  "readable": 111,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 26,
+                  "readable": 23,
+                  "fit_percent": 88.46
+                },
+                {
+                  "length": "16-20",
+                  "names": 32,
+                  "readable": 6,
+                  "fit_percent": 18.75
+                },
+                {
+                  "length": "21-25",
+                  "names": 10,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:boost-math": {
+              "names": 150,
+              "readable": 106,
+              "percent": 70.67,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 77,
+                  "readable": 77,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 26,
+                  "readable": 23,
+                  "fit_percent": 88.46
+                },
+                {
+                  "length": "16-20",
+                  "names": 32,
+                  "readable": 6,
+                  "fit_percent": 18.75
+                },
+                {
+                  "length": "21-25",
+                  "names": 10,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:boost-multi_index": {
+              "names": 73,
+              "readable": 72,
+              "percent": 98.63,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 53,
+                  "readable": 53,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 15,
+                  "readable": 15,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 5,
+                  "readable": 4,
+                  "fit_percent": 80.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-multi_index": {
+              "names": 39,
+              "readable": 38,
+              "percent": 97.44,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 22,
+                  "readable": 22,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 12,
+                  "readable": 12,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 5,
+                  "readable": 4,
+                  "fit_percent": 80.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-unordered": {
+              "names": 77,
+              "readable": 68,
+              "percent": 88.31,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 32,
+                  "readable": 32,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 17,
+                  "readable": 17,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 17,
+                  "fit_percent": 80.95
+                },
+                {
+                  "length": "21-25",
+                  "names": 7,
+                  "readable": 2,
+                  "fit_percent": 28.57
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-unordered": {
+              "names": 61,
+              "readable": 52,
+              "percent": 85.25,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 16,
+                  "readable": 16,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 17,
+                  "readable": 17,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 17,
+                  "fit_percent": 80.95
+                },
+                {
+                  "length": "21-25",
+                  "names": 7,
+                  "readable": 2,
+                  "fit_percent": 28.57
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:boost-url": {
+              "names": 64,
+              "readable": 63,
+              "percent": 98.44,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 44,
+                  "readable": 44,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 18,
+                  "readable": 18,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 2,
+                  "readable": 1,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:boost-url": {
+              "names": 31,
+              "readable": 30,
+              "percent": 96.77,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 15,
+                  "readable": 15,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 14,
+                  "readable": 14,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 2,
+                  "readable": 1,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:libcxx": {
+              "names": 1180,
+              "readable": 1091,
+              "percent": 92.46,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 837,
+                  "readable": 837,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 197,
+                  "readable": 192,
+                  "fit_percent": 97.46
+                },
+                {
+                  "length": "16-20",
+                  "names": 97,
+                  "readable": 55,
+                  "fit_percent": 56.7
+                },
+                {
+                  "length": "21-25",
+                  "names": 33,
+                  "readable": 7,
+                  "fit_percent": 21.21
+                },
+                {
+                  "length": "26-35",
+                  "names": 12,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:libcxx": {
+              "names": 951,
+              "readable": 862,
+              "percent": 90.64,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 631,
+                  "readable": 631,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 176,
+                  "readable": 171,
+                  "fit_percent": 97.16
+                },
+                {
+                  "length": "16-20",
+                  "names": 96,
+                  "readable": 54,
+                  "fit_percent": 56.25
+                },
+                {
+                  "length": "21-25",
+                  "names": 32,
+                  "readable": 6,
+                  "fit_percent": 18.75
+                },
+                {
+                  "length": "26-35",
+                  "names": 12,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:qt-core": {
+              "names": 2479,
+              "readable": 2140,
+              "percent": 86.33,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 1074,
+                  "readable": 1074,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 741,
+                  "readable": 708,
+                  "fit_percent": 95.55
+                },
+                {
+                  "length": "16-20",
+                  "names": 412,
+                  "readable": 288,
+                  "fit_percent": 69.9
+                },
+                {
+                  "length": "21-25",
+                  "names": 166,
+                  "readable": 63,
+                  "fit_percent": 37.95
+                },
+                {
+                  "length": "26-35",
+                  "names": 77,
+                  "readable": 7,
+                  "fit_percent": 9.09
+                },
+                {
+                  "length": "36+",
+                  "names": 9,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:qt-core": {
+              "names": 2231,
+              "readable": 1892,
+              "percent": 84.81,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 841,
+                  "readable": 841,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 730,
+                  "readable": 697,
+                  "fit_percent": 95.48
+                },
+                {
+                  "length": "16-20",
+                  "names": 408,
+                  "readable": 284,
+                  "fit_percent": 69.61
+                },
+                {
+                  "length": "21-25",
+                  "names": 166,
+                  "readable": 63,
+                  "fit_percent": 37.95
+                },
+                {
+                  "length": "26-35",
+                  "names": 77,
+                  "readable": 7,
+                  "fit_percent": 9.09
+                },
+                {
+                  "length": "36+",
+                  "names": 9,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:qt-network": {
+              "names": 621,
+              "readable": 525,
+              "percent": 84.54,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 195,
+                  "readable": 195,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 191,
+                  "readable": 184,
+                  "fit_percent": 96.34
+                },
+                {
+                  "length": "16-20",
+                  "names": 128,
+                  "readable": 102,
+                  "fit_percent": 79.69
+                },
+                {
+                  "length": "21-25",
+                  "names": 66,
+                  "readable": 36,
+                  "fit_percent": 54.55
+                },
+                {
+                  "length": "26-35",
+                  "names": 39,
+                  "readable": 8,
+                  "fit_percent": 20.51
+                },
+                {
+                  "length": "36+",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:qt-network": {
+              "names": 549,
+              "readable": 453,
+              "percent": 82.51,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 126,
+                  "readable": 126,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 188,
+                  "readable": 181,
+                  "fit_percent": 96.28
+                },
+                {
+                  "length": "16-20",
+                  "names": 128,
+                  "readable": 102,
+                  "fit_percent": 79.69
+                },
+                {
+                  "length": "21-25",
+                  "names": 66,
+                  "readable": 36,
+                  "fit_percent": 54.55
+                },
+                {
+                  "length": "26-35",
+                  "names": 39,
+                  "readable": 8,
+                  "fit_percent": 20.51
+                },
+                {
+                  "length": "36+",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "macro": {
+              "ecosystem_macro_percent": {
+                "cpp": 87.85
+              },
+              "balanced_macro_percent": 87.85
+            },
+            "heldout_macro": {
+              "ecosystem_macro_percent": {
+                "cpp": 89.83
+              },
+              "balanced_macro_percent": 89.83
+            }
+          },
+          "probes": {
+            "acceptPendingTokenTransfer": {
+              "fits": true,
+              "bits": 48
+            },
+            "addMarketLiquidity": {
+              "fits": true,
+              "bits": 61
+            },
+            "assignSymbolToToken": {
+              "fits": true,
+              "bits": 48
+            },
+            "cancelMarketplaceListing": {
+              "fits": true,
+              "bits": 62
+            },
+            "cancelPendingTokenTransfer": {
+              "fits": true,
+              "bits": 46
+            },
+            "cancelStopLossOrder": {
+              "fits": true,
+              "bits": 41
+            },
+            "completeAccountRecovery": {
+              "fits": true,
+              "bits": 40
+            },
+            "createAccountWithRecoveryPartner": {
+              "fits": true,
+              "bits": 55
+            },
+            "depositIntoSubaccount": {
+              "fits": true,
+              "bits": 44
+            },
+            "getBalanceConfiguration": {
+              "fits": true,
+              "bits": 27
+            },
+            "liquidateMarginPosition": {
+              "fits": true,
+              "bits": 51
+            },
+            "listAccountNameForSale": {
+              "fits": false,
+              "bits": 64
+            },
+            "placeLimitOrder": {
+              "fits": true,
+              "bits": 34
+            },
+            "purchaseMarketplaceListing": {
+              "fits": false,
+              "bits": 86
+            },
+            "registerEventIndex": {
+              "fits": true,
+              "bits": 36
+            },
+            "requestAccountRecovery": {
+              "fits": true,
+              "bits": 37
+            },
+            "setAuthenticationService": {
+              "fits": true,
+              "bits": 35
+            },
+            "setPublicKeyWithRecoveryPartner": {
+              "fits": false,
+              "bits": 68
+            },
+            "setSystemResourceToken": {
+              "fits": true,
+              "bits": 40
+            },
+            "withdrawFromSubaccount": {
+              "fits": true,
+              "bits": 44
+            },
+            "withdrawMarketLiquidity": {
+              "fits": false,
+              "bits": 73
+            }
+          }
+        }
+      }
+    }
+  },
+  "potential_normalization_equivalences_not_wire_collisions": {
+    "lookalike": {
+      "groups": 0,
+      "distinct_names_affected": 0,
+      "examples": []
+    },
+    "vowelless": {
+      "groups": 55,
+      "distinct_names_affected": 111,
+      "examples": [
+        {
+          "source": "github-sdk",
+          "scope": "repos",
+          "canonical": "gtrgrlst",
+          "originals": [
+            "getorgruleset",
+            "getorgrulesuite"
+          ]
+        },
+        {
+          "source": "github-sdk",
+          "scope": "repos",
+          "canonical": "gtrgrlsts",
+          "originals": [
+            "getorgrulesets",
+            "getorgrulesuites"
+          ]
+        },
+        {
+          "source": "github-sdk",
+          "scope": "repos",
+          "canonical": "gtrprlst",
+          "originals": [
+            "getreporuleset",
+            "getreporulesuite"
+          ]
+        },
+        {
+          "source": "github-sdk",
+          "scope": "repos",
+          "canonical": "gtrprlsts",
+          "originals": [
+            "getreporulesets",
+            "getreporulesuites"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "mm_fn",
+          "originals": [
+            "mem_fn",
+            "mem_fun"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "rnd",
+          "originals": [
+            "rand",
+            "rend",
+            "round"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "st",
+          "originals": [
+            "set",
+            "stoi"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "stl",
+          "originals": [
+            "stol",
+            "stoul"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "stll",
+          "originals": [
+            "stoll",
+            "stoull"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "strtl",
+          "originals": [
+            "strtol",
+            "strtoul"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "strtll",
+          "originals": [
+            "strtoll",
+            "strtoull"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "strtmx",
+          "originals": [
+            "strtoimax",
+            "strtoumax"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "wcstl",
+          "originals": [
+            "wcstol",
+            "wcstoul"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "wcstll",
+          "originals": [
+            "wcstoll",
+            "wcstoull"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "wcstmx",
+          "originals": [
+            "wcstoimax",
+            "wcstoumax"
+          ]
+        }
+      ]
+    }
+  },
+  "evaluation_seconds": 6.236
+}

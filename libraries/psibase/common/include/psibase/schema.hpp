@@ -15,12 +15,12 @@
 namespace psibase
 {
 
-   struct CompareMethodNumber
+   struct CompareActionName
    {
       using is_transparent = void;
       bool operator()(const auto& lhs, const auto& rhs) const
       {
-         return MethodNumber(lhs) < MethodNumber(rhs);
+         return ActionName(lhs) < ActionName(rhs);
       }
    };
 
@@ -83,9 +83,9 @@ namespace psibase
       psibase::AccountNumber service;
       psio::Schema           types;
       using ActionMap =
-          std::map<std::string, psio::schema_types::FunctionType, CompareMethodNumber>;
+          std::map<std::string, psio::schema_types::FunctionType, CompareActionName>;
       ActionMap actions;
-      using EventMap = std::map<std::string, EventType, CompareMethodNumber>;
+      using EventMap = std::map<std::string, EventType, CompareActionName>;
       EventMap history;
       EventMap merkle;
 
@@ -207,6 +207,17 @@ namespace psibase
          abortMessage("Member is not reflected");
       }
 
+      template <auto K>
+      static constexpr auto keyTypeArgument()
+      {
+         // K remains the non-type template identity. These traversal arguments
+         // select overloads by type and never execute a key extractor.
+         if constexpr (std::is_member_pointer_v<decltype(K)> || std::is_pointer_v<decltype(K)>)
+            return static_cast<decltype(K)>(nullptr);
+         else
+            return K;
+      }
+
       template <bool Last, auto K, typename T, typename M>
       static void makeKeyImpl(M                    T::*,
                               FieldId&&            prefix,
@@ -216,7 +227,11 @@ namespace psibase
          if constexpr (std::is_function_v<M>)
          {
             static_assert(Last, "NestedKey only allows member functions as the final element");
-            prefix.transform = psibase_get_key_transform_name((nt_wrap<K>*)nullptr, K);
+            // The second argument supplies ADL's member-owner type, not an
+            // executable callback. A typed null avoids linking a service's
+            // implementation merely to export its declared schema.
+            prefix.transform = psibase_get_key_transform_name((nt_wrap<K>*)nullptr,
+                                                              static_cast<decltype(K)>(nullptr));
             prefix.type =
                 builder
                     .insert<std::remove_cv_t<typename psio::MemberPtrType<M T::*>::ReturnType>>();
@@ -254,7 +269,7 @@ namespace psibase
                               psio::SchemaBuilder& builder,
                               IndexInfo&           out)
       {
-         makeKeyImpl<Last, K0>(K0, std::move(prefix), builder, out);
+         makeKeyImpl<Last, K0>(keyTypeArgument<K0>(), std::move(prefix), builder, out);
       }
 
       template <bool Last, auto K, auto... KN>
@@ -267,7 +282,7 @@ namespace psibase
 
          std::size_t prefixLen = prefix.path.size();
 
-         (makeKeyImpl<true, KN>(KN, FieldId(prefix), builder, out), ...);
+         (makeKeyImpl<true, KN>(keyTypeArgument<KN>(), FieldId(prefix), builder, out), ...);
       }
 
       template <bool Last, auto K, auto K0>
@@ -276,7 +291,7 @@ namespace psibase
                               psio::SchemaBuilder& builder,
                               IndexInfo&           out)
       {
-         makeKeyImpl<Last, K0>(K0, std::move(prefix), builder, out);
+         makeKeyImpl<Last, K0>(keyTypeArgument<K0>(), std::move(prefix), builder, out);
       }
 
       template <bool Last, auto K, auto K0, auto... KN>
@@ -285,7 +300,7 @@ namespace psibase
                               psio::SchemaBuilder& builder,
                               IndexInfo&           out)
       {
-         makeKeyImpl<false, K0>(K0, std::move(prefix), builder, out);
+         makeKeyImpl<false, K0>(keyTypeArgument<K0>(), std::move(prefix), builder, out);
          makeKeyImpl<Last, NestedKey<KN...>{}>(NestedKey<KN...>{}, std::move(prefix), builder, out);
       }
 
@@ -293,7 +308,7 @@ namespace psibase
       static IndexInfo makeKey(psio::SchemaBuilder& builder)
       {
          IndexInfo result;
-         makeKeyImpl<true, K>(K, {}, builder, result);
+         makeKeyImpl<true, K>(keyTypeArgument<K>(), {}, builder, result);
          return result;
       }
 
@@ -416,7 +431,7 @@ namespace psibase
      public:
       const psio::schema_types::AnyType* getType(bool             canReadPrivate,
                                                  psibase::EventDb db,
-                                                 MethodNumber     event)
+                                                 ActionName       event)
       {
          if (const auto* dbTypes = getDb(db))
             if (auto pos = dbTypes->find(event);

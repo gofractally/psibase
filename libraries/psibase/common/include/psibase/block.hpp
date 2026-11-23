@@ -24,7 +24,7 @@ namespace psibase
    {
       AccountNumber     sender;   ///< Account sending the action
       AccountNumber     service;  ///< Service to execute the action
-      MethodNumber      method;   ///< Service method to execute
+      ActionName        method;   ///< Service method to execute
       std::vector<char> rawData;  ///< Data for the method
       //
       friend bool operator==(const Action&, const Action&) = default;

@@ -503,6 +503,20 @@ pub fn method_raw(item: TokenStream) -> TokenStream {
     method_macro_impl(false, item)
 }
 
+/// Encode an action name using the shared frozen model at compile time.
+#[proc_macro_error]
+#[proc_macro]
+pub fn action_name(item: TokenStream) -> TokenStream {
+    method_macro_impl(true, item)
+}
+
+/// Encode an action name as an exact u64 constant at compile time.
+#[proc_macro_error]
+#[proc_macro]
+pub fn action_name_raw(item: TokenStream) -> TokenStream {
+    method_macro_impl(false, item)
+}
+
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn queries(attr: TokenStream, item: TokenStream) -> TokenStream {

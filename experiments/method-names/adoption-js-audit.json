@@ -1,0 +1,412 @@
+{
+  "scope": "Read-only JS/TS source audit for new parallel action_name; no production edits",
+  "counting": "rg --files in packages/libraries/rust for ts/tsx/js/mjs, respecting ignore rules and excluding node_modules/dist/target/wasm-transpiled; semantic anchors are a curated implementation inventory, not a bulk replacement list",
+  "scanned_js_ts_source_files": 1040,
+  "current_direct_legacy_codec_references": [],
+  "current_direct_legacy_codec_reference_count": 0,
+  "measured_group_totals": {
+    "additive_package_integration": {
+      "files": 3,
+      "distinct_source_lines": 5
+    },
+    "central_transaction_and_json_boundaries": {
+      "files": 1,
+      "distinct_source_lines": 8
+    },
+    "onchain_method_text_declarations": {
+      "files": 4,
+      "distinct_source_lines": 4
+    },
+    "display_and_projection_examples": {
+      "files": 6,
+      "distinct_source_lines": 10
+    },
+    "explicitly_not_onchain_method_ids": {
+      "files": 5,
+      "distinct_source_lines": 6
+    },
+    "existing_bigint_and_wasm_examples": {
+      "files": 2,
+      "distinct_source_lines": 3
+    }
+  },
+  "groups": {
+    "additive_package_integration": [
+      {
+        "path": "packages/user/CommonApi/common/packages/common-lib/src/index.ts",
+        "sha256": "f2e0506cfcffd0119726ed754f6bfdb8f530c777575ad89ff745107248faadcb",
+        "anchors": [
+          {
+            "line": 6,
+            "source": "export * from \"./websocket\";",
+            "purpose": "Optional root export for new ActionName module"
+          }
+        ]
+      },
+      {
+        "path": "packages/user/CommonApi/common/packages/common-lib/package.json",
+        "sha256": "9c64730130c163697ff06d90ab9d89757bdf0bd24caa865c621f1a061a361878",
+        "anchors": [
+          {
+            "line": 9,
+            "source": "    \"exports\": {",
+            "purpose": "New action-name subpath"
+          },
+          {
+            "line": 46,
+            "source": "        \"build\": \"node ../../../../../if-build-needed.mjs 'tsc -b --noEmit && vite build'\",",
+            "purpose": "Codec conformance-test command/build integration"
+          }
+        ]
+      },
+      {
+        "path": "packages/user/CommonApi/common/packages/common-lib/vite.config.ts",
+        "sha256": "4de52a75f21e2de5630f702dd5d2ae9d5d593a2e19de9a6863f80ac7df0b93d2",
+        "anchors": [
+          {
+            "line": 12,
+            "source": "            entry: path.resolve(serviceDir, \"src/index.ts\"),",
+            "purpose": "Dedicated tree-shakable codec entry"
+          },
+          {
+            "line": 14,
+            "source": "            fileName: \"common-lib\",",
+            "purpose": "Preserve current UMD/ESM entry names"
+          }
+        ]
+      }
+    ],
+    "central_transaction_and_json_boundaries": [
+      {
+        "path": "packages/user/CommonApi/common/packages/common-lib/src/rpc.ts",
+        "sha256": "19b620709a48f2f72608f7764fc97f140aff0750e3c39bb43521088df829749d",
+        "anchors": [
+          {
+            "line": 137,
+            "source": "            body: JSON.stringify(json),",
+            "purpose": "BigInt cannot be sent to JSON implicitly; use explicit ActionName text/ID representation"
+          },
+          {
+            "line": 202,
+            "source": "export async function packAction(baseUrl: string, action: any) {",
+            "purpose": "Central optional ActionName input adapter"
+          },
+          {
+            "line": 203,
+            "source": "    let { sender, service, method, data, rawData } = action;",
+            "purpose": "Normalize typed input once"
+          },
+          {
+            "line": 211,
+            "source": "                        \"/pack_action/\" + method,",
+            "purpose": "Keep argument-schema lookup separate from numeric identity"
+          },
+          {
+            "line": 218,
+            "source": "    return { sender, service, method, rawData };",
+            "purpose": "JSON representation selected by explicit codec contract"
+          },
+          {
+            "line": 227,
+            "source": "export async function packTransaction(baseUrl: string, transaction: any) {",
+            "purpose": "Native generic transaction packing"
+          },
+          {
+            "line": 229,
+            "source": "        baseUrl.replace(/\\/+$/, \"\") + \"/common/pack/Transaction\",",
+            "purpose": "Native schema currently owns method encoding"
+          },
+          {
+            "line": 232,
+            "source": "            actions: await packActions(baseUrl, transaction.actions),",
+            "purpose": "One shared adapter covers callers"
+          }
+        ]
+      }
+    ],
+    "onchain_method_text_declarations": [
+      {
+        "path": "packages/user/CommonApi/common/packages/common-lib/src/rpc.ts",
+        "sha256": "19b620709a48f2f72608f7764fc97f140aff0750e3c39bb43521088df829749d",
+        "anchors": [
+          {
+            "line": 27,
+            "source": "    method: string;",
+            "purpose": "GetClaimParams legacy public text API"
+          }
+        ]
+      },
+      {
+        "path": "packages/user/Explorer/ui/src/lib/types.ts",
+        "sha256": "3e62783857765272404b1dd3bc830378b4c3da882b12ec8c42c4f69600dd66cc",
+        "anchors": [
+          {
+            "line": 9,
+            "source": "    method: string;",
+            "purpose": "Public Action JSON remains canonical text"
+          }
+        ]
+      },
+      {
+        "path": "packages/local/XAdmin/ui/src/lib/action-stack.ts",
+        "sha256": "552162c3db098038c958217a2947c0752f85f39dc9f736e1e29d38bfe50fe93a",
+        "anchors": [
+          {
+            "line": 5,
+            "source": "    method: string;",
+            "purpose": "Decoded trace method text"
+          }
+        ]
+      },
+      {
+        "path": "packages/user/Config/ui/src/lib/get-staged-tx.ts",
+        "sha256": "74e51dc650a617f3296ec1f050a4df365f56e910f7ed99175ab595bd7c7783d3",
+        "anchors": [
+          {
+            "line": 17,
+            "source": "                method: z.string(),",
+            "purpose": "Staged transaction method text"
+          }
+        ]
+      }
+    ],
+    "display_and_projection_examples": [
+      {
+        "path": "packages/user/Explorer/ui/src/components/action-chips.tsx",
+        "sha256": "62a09e2adb3180b0f7c0cafced6e7a0995e41b85d594acb4b90b54cc76eb4457",
+        "anchors": [
+          {
+            "line": 19,
+            "source": "    method: string;",
+            "purpose": "MethodChip presentation input"
+          },
+          {
+            "line": 38,
+            "source": "        <span className=\"text-foreground/80 bg-muted/40 px-1.5\">{method}</span>",
+            "purpose": "Visible canonical method label"
+          },
+          {
+            "line": 56,
+            "source": "                <MethodChip key={i} service={a.service} method={a.method} />",
+            "purpose": "Action method label"
+          },
+          {
+            "line": 69,
+            "source": "                                    {a.service}::{a.method}",
+            "purpose": "Overflow label"
+          }
+        ]
+      },
+      {
+        "path": "packages/user/Explorer/ui/src/pages/transaction-detail.tsx",
+        "sha256": "708a4b1e95ff01828d1924b238b0d9cceb58db92ad8bd7f035e788fbe0948fdb",
+        "anchors": [
+          {
+            "line": 228,
+            "source": "                <MethodChip service={action.service} method={action.method} className=\"text-xs\" />",
+            "purpose": "Transaction action label"
+          }
+        ]
+      },
+      {
+        "path": "packages/user/Explorer/ui/src/pages/account.tsx",
+        "sha256": "8085692d262b7cc39e342828c321df49bd8a43a702eafcbe207d64523e0fc58c",
+        "anchors": [
+          {
+            "line": 144,
+            "source": "                    m.set(a.method, (m.get(a.method) ?? 0) + 1);",
+            "purpose": "Method activity aggregation"
+          }
+        ]
+      },
+      {
+        "path": "packages/user/Explorer/ui/src/hooks/use-user-dashboard.ts",
+        "sha256": "72251fc24689d344be2f49e66266b383e50bed96b800ff2b600dbe5f6dbb666c",
+        "anchors": [
+          {
+            "line": 141,
+            "source": "    methods: { key: string; service: string; method: string; count: number }[];",
+            "purpose": "Dashboard public activity type"
+          },
+          {
+            "line": 203,
+            "source": "                    const key = `${a.service}::${a.method}`;",
+            "purpose": "Activity aggregation key"
+          }
+        ]
+      },
+      {
+        "path": "packages/user/Config/ui/src/pages/pending-transaction.tsx",
+        "sha256": "abcc6a50b2d3b8a3f08eb9648d55e35232001aaee20d17fe2b99c251274a73ca",
+        "anchors": [
+          {
+            "line": 270,
+            "source": "                                                {action.method}",
+            "purpose": "Pending action label"
+          }
+        ]
+      },
+      {
+        "path": "packages/local/XAdmin/ui/src/components/progress-status.tsx",
+        "sha256": "ebf807720bcfe187647c8b0623e4f59d3c1378b3621fc03b62f46fe747b37a0f",
+        "anchors": [
+          {
+            "line": 15,
+            "source": "                            {`${act.sender} => ${act.service}::${act.method}`}{\" \"}",
+            "purpose": "Bootstrap error trace label"
+          }
+        ]
+      }
+    ],
+    "explicitly_not_onchain_method_ids": [
+      {
+        "path": "packages/user/Supervisor/ui/src/main.ts",
+        "sha256": "2a677bbe224d9cb3c9053c5ea6d7b7dceb39c2a45bd1d9f68807531f45b6f7fc",
+        "anchors": [
+          {
+            "line": 52,
+            "source": "// Canonical internal form of intf/method is WIT kebab-case. Apps still pass",
+            "purpose": "Plugin export canonicalization"
+          },
+          {
+            "line": 60,
+            "source": "    method: camelToKebab(args.method),",
+            "purpose": "Keep this string-based WIT dispatch unchanged"
+          }
+        ]
+      },
+      {
+        "path": "packages/user/CommonApi/common/packages/common-lib/src/messaging/function-call-request.ts",
+        "sha256": "39bb843bbee67487fba4eebe9063bb094d9cee425d43308809cea62af85e0607",
+        "anchors": [
+          {
+            "line": 7,
+            "source": "    method: string;",
+            "purpose": "Supervisor plugin/WIT function, not action numeric ID"
+          }
+        ]
+      },
+      {
+        "path": "packages/user/Supervisor/ui/src/component-loading/loader.ts",
+        "sha256": "5dbf778f5498b025fc09b19da36c92497531bdbdfdf783b844cdc09fce6f53bb",
+        "anchors": [
+          {
+            "line": 185,
+            "source": "            method: rawMethodName,",
+            "purpose": "Resource export dispatch, not on-chain action name"
+          }
+        ]
+      },
+      {
+        "path": "packages/user/Supervisor/ui/src/host-interface.ts",
+        "sha256": "97eb95d1075b29c401a6d041aaad5b140e055f83e3c6a282678de105c8c7bd56",
+        "anchors": [
+          {
+            "line": 9,
+            "source": "    method: string;",
+            "purpose": "HTTP request method, not action numeric ID"
+          }
+        ]
+      },
+      {
+        "path": "packages/shared-ui/lib/schemas/account.ts",
+        "sha256": "b8864c5816dc4638411aa5b866c4c3ff40229d5da26506a5f0759ec1b8327544",
+        "anchors": [
+          {
+            "line": 72,
+            "source": "export const zAccountNumber = z.string().superRefine((val, ctx) => {",
+            "purpose": "Account-name validation remains a separate identity type"
+          }
+        ]
+      }
+    ],
+    "existing_bigint_and_wasm_examples": [
+      {
+        "path": "packages/user/CommonApi/common/packages/plugin-tester/ui/src/components/inputs/number-input.tsx",
+        "sha256": "e13baa20f5dcdcfa1b46e38409e508a86b9d53c04bd00eadfab6bcdff838c694",
+        "anchors": [
+          {
+            "line": 9,
+            "source": "    value: number | bigint;",
+            "purpose": "Existing generated u64 plugin inputs support bigint"
+          },
+          {
+            "line": 27,
+            "source": "                onChange(BigInt(newValue));",
+            "purpose": "Do not introduce Number conversion"
+          }
+        ]
+      },
+      {
+        "path": "packages/local/XAdmin/ui/src/lib/chain-endpoints.ts",
+        "sha256": "7f9db88a0b26b19ac67988e4ce8c550c3cb699846a2d78aa311ff7b1b243cc6a",
+        "anchors": [
+          {
+            "line": 294,
+            "source": "            util.deserializeTrace(new Uint8Array(await res.arrayBuffer())),",
+            "purpose": "Native Rust/WASM decoder already yields method JSON text"
+          }
+        ]
+      }
+    ]
+  },
+  "implementation_estimates": {
+    "units": "Handwritten source lines added or edited; prospective ranges, not measured diffs. Generated tables/vectors and native Rust/C++ changes excluded.",
+    "additive_codec_type": {
+      "new_production_lines": [
+        350,
+        650
+      ],
+      "new_test_lines": [
+        250,
+        450
+      ],
+      "existing_packaging_lines_added_or_edited": [
+        12,
+        30
+      ],
+      "existing_files": 3,
+      "new_handwritten_files": [
+        2,
+        4
+      ],
+      "required_existing_application_callsite_edits": 0,
+      "assumption": "Expose a separate pure JS/TS action-name codec and BigInt wrapper without changing existing account-name or legacy method/string APIs."
+    },
+    "central_typed_rpc_adoption": {
+      "additional_production_lines_added_or_edited": [
+        30,
+        70
+      ],
+      "additional_test_lines": [
+        80,
+        160
+      ],
+      "existing_production_files": 1,
+      "required_existing_application_callsite_edits": 0,
+      "assumption": "Extend packAction input to ActionName through one normalization point; continue canonical method-text JSON and let explicit native schema/service format choose numeric codec."
+    },
+    "optional_numeric_or_dual_format_public_json": {
+      "additional_lines_added_or_edited": [
+        60,
+        140
+      ],
+      "existing_files": [
+        5,
+        9
+      ],
+      "assumption": "Only needed if public action JSON adds codec IDs/numeric metadata. Preserve method display text to avoid unnecessary broad UI changes. Exact delta requires the chosen JSON version contract."
+    },
+    "generated_model_assets": "Count generated CDF/dictionary tables, byte size and golden-vector count separately from handwritten LOC; a static per-model asset/module can be cached and shared once."
+  },
+  "adoption_recommendations": [
+    "Provide ActionName/action_name as a separate branded bigint or immutable bigint wrapper, with encode/decode, explicit canonical text/JSON conversion and exact 8-byte little-endian helpers. Do not accept lossy Number values.",
+    "Keep current AccountNumber/account string validation and legacy MethodNumber identity separate. A u64 tag space does not establish that new numeric values cannot overlap legacy IDs.",
+    "Do not rename generic Supervisor/plugin WIT method strings or HTTP method fields. New native WIT u64 entry points should map through the existing generated component machinery to bigint.",
+    "Use one frozen generator output for integer CDFs/dictionary/tokenization tie rules and golden vectors in all languages. JavaScript bitwise operators have signed32 semantics; use exact BigInt arithmetic or explicitly proved safe integer operations.",
+    "Specify hash fallback and exact literal validation before claiming a complete codec. Keep its canonical input/output and digest truncation identical across languages.",
+    "Keep payload serialization distinct from argument-schema lookup. Generic current JS clients ask native /pack_action and /common/pack/Transaction endpoints to encode methods; preserve canonical text for those clients or add an explicitly versioned endpoint.",
+    "Carry a model/format fingerprint in development build/network metadata and refuse stale-model typed submissions. Retain exact model files for historical action interpretation; never infer old/new codec solely from a numeric ID.",
+    "Export a dedicated action-name module/subpath with separately measured bundled asset size. Test Node plus a real browser, 64-bit boundaries, EOS overflow, digits/underscores, mode tags, malformed literals, and shared Rust/C++/JS golden vectors."
+  ]
+}

@@ -6,6 +6,8 @@ target_include_directories( psio PUBLIC include )
 add_compile_options( -Wall -Wstrict-aliasing )
 
 target_sources( psio INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/action_name.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/detail/action_name_data.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/fpconv.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/powers.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/check.hpp

@@ -2,6 +2,7 @@ use darling::{ast::NestedMeta, util::PathList, FromMeta};
 use proc_macro2::TokenStream;
 use proc_macro_error::abort;
 use quote::{quote, ToTokens};
+use syn::ext::IdentExt;
 use syn::{
     parse_quote, spanned::Spanned, AttrStyle, Attribute, FnArg, Ident, Item, ItemFn, Meta, Pat,
     ReturnType, Stmt,
@@ -95,6 +96,7 @@ pub fn process_action_args(
         quote! {}
     };
 
+    let action_name = fn_name.unraw().to_string();
     *new_items = quote! {
         #new_items
         #[derive(Debug, Clone, #psibase_mod::Pack, #psibase_mod::Unpack, #psibase_mod::fracpack::ToSchema, serde::Deserialize, serde::Serialize #gql_object_attr)]
@@ -105,7 +107,7 @@ pub fn process_action_args(
         }
 
         impl #fn_name {
-            pub const ACTION_NAME: &'static str = stringify!(#fn_name);
+            pub const ACTION_NAME: &'static str = #action_name;
         }
     };
 
@@ -128,7 +130,7 @@ pub fn process_action_callers(
     invoke_args: &proc_macro2::TokenStream,
 ) {
     let name = &f.sig.ident;
-    let name_str = name.to_string();
+    let name_str = name.unraw().to_string();
     let method_number =
         quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
     let inputs = &f.sig.inputs;
@@ -180,7 +182,7 @@ pub fn process_action_schema(
     insertions: &mut proc_macro2::TokenStream,
 ) {
     let name = &f.sig.ident;
-    let name_str = name.to_string();
+    let name_str = name.unraw().to_string();
 
     let ret = match &f.sig.output {
         ReturnType::Default => quote! { None },

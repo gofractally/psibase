@@ -1,0 +1,1710 @@
+{
+  "base": "44c57f739e20928daf9d020b79d2c9b1d9dd10a9",
+  "counting": "Physical diff lines; new files must be staged; inline tests stay with their runtime file",
+  "categories": {
+    "build_and_package_configuration": {
+      "files": 8,
+      "added": 55,
+      "deleted": 3
+    },
+    "dedicated_tests_and_tools": {
+      "files": 18,
+      "added": 1151,
+      "deleted": 444
+    },
+    "dependency_locks": {
+      "files": 7,
+      "added": 14,
+      "deleted": 44
+    },
+    "documentation": {
+      "files": 6,
+      "added": 292,
+      "deleted": 1
+    },
+    "generated_model_and_vectors": {
+      "files": 6,
+      "added": 22035,
+      "deleted": 0
+    },
+    "runtime_api_files_including_inline_tests": {
+      "files": 37,
+      "added": 1959,
+      "deleted": 1464
+    },
+    "saved_training_and_research": {
+      "files": 191,
+      "added": 309442,
+      "deleted": 0
+    },
+    "validation_evidence": {
+      "files": 4,
+      "added": 355,
+      "deleted": 0
+    }
+  },
+  "files": [
+    {
+      "path": ".gitattributes",
+      "category": "build_and_package_configuration",
+      "added": 2,
+      "deleted": 0
+    },
+    {
+      "path": ".github/workflows/action-name-conformance.yml",
+      "category": "build_and_package_configuration",
+      "added": 37,
+      "deleted": 0
+    },
+    {
+      "path": "demo/token-metadata-host/Cargo.lock",
+      "category": "dependency_locks",
+      "added": 2,
+      "deleted": 7
+    },
+    {
+      "path": "doc/src/SUMMARY.md",
+      "category": "documentation",
+      "added": 3,
+      "deleted": 0
+    },
+    {
+      "path": "doc/src/development/action-name-training.md",
+      "category": "documentation",
+      "added": 104,
+      "deleted": 0
+    },
+    {
+      "path": "doc/src/development/services/cpp-service/reference/magic-numbers.md",
+      "category": "documentation",
+      "added": 1,
+      "deleted": 1
+    },
+    {
+      "path": "doc/src/specifications/data-formats/action-names.md",
+      "category": "documentation",
+      "added": 81,
+      "deleted": 0
+    },
+    {
+      "path": "docs/action-names/VALIDATION.md",
+      "category": "documentation",
+      "added": 55,
+      "deleted": 0
+    },
+    {
+      "path": "docs/action-names/conformance.json",
+      "category": "validation_evidence",
+      "added": 56,
+      "deleted": 0
+    },
+    {
+      "path": "docs/action-names/cpp-dispatch-footprint.json",
+      "category": "validation_evidence",
+      "added": 29,
+      "deleted": 0
+    },
+    {
+      "path": "docs/action-names/retuning.json",
+      "category": "validation_evidence",
+      "added": 18,
+      "deleted": 0
+    },
+    {
+      "path": "docs/action-names/rust-integration.json",
+      "category": "validation_evidence",
+      "added": 252,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/EXPANDED-CORPUS.md",
+      "category": "saved_training_and_research",
+      "added": 84,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/README.md",
+      "category": "saved_training_and_research",
+      "added": 441,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/TARGETED-TRAINING.md",
+      "category": "saved_training_and_research",
+      "added": 29,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/baseline.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/current.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/inputs/evaluation.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/inputs/policy.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/inputs/provenance.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/inputs/training.jsonl",
+      "category": "saved_training_and_research",
+      "added": 25128,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/revisions/14bedb9494fbcc5941ada5409822373df148c9f7c7d0869489bc0656c914c538/golden.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/revisions/14bedb9494fbcc5941ada5409822373df148c9f7c7d0869489bc0656c914c538/manifest.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/revisions/14bedb9494fbcc5941ada5409822373df148c9f7c7d0869489bc0656c914c538/metrics.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/revisions/14bedb9494fbcc5941ada5409822373df148c9f7c7d0869489bc0656c914c538/model.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/revisions/14bedb9494fbcc5941ada5409822373df148c9f7c7d0869489bc0656c914c538/report.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/revisions/14bedb9494fbcc5941ada5409822373df148c9f7c7d0869489bc0656c914c538/weights.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/revisions/fc341d00091bf3ada907d00920413178a0187893ba678a4718e304979a574b65/golden.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/revisions/fc341d00091bf3ada907d00920413178a0187893ba678a4718e304979a574b65/manifest.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/revisions/fc341d00091bf3ada907d00920413178a0187893ba678a4718e304979a574b65/metrics.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/revisions/fc341d00091bf3ada907d00920413178a0187893ba678a4718e304979a574b65/model.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/revisions/fc341d00091bf3ada907d00920413178a0187893ba678a4718e304979a574b65/report.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-training/revisions/fc341d00091bf3ada907d00920413178a0187893ba678a4718e304979a574b65/weights.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action-name-workflow-validation.json",
+      "category": "saved_training_and_research",
+      "added": 26,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action_name_model.py",
+      "category": "saved_training_and_research",
+      "added": 380,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/action_name_training.py",
+      "category": "saved_training_and_research",
+      "added": 439,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/adoption-cpp-audit.json",
+      "category": "saved_training_and_research",
+      "added": 1696,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/adoption-js-audit.json",
+      "category": "saved_training_and_research",
+      "added": 412,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/adoption-rust-audit.json",
+      "category": "saved_training_and_research",
+      "added": 3217,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/adoption_cpp_audit.py",
+      "category": "saved_training_and_research",
+      "added": 146,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/adoption_js_audit.py",
+      "category": "saved_training_and_research",
+      "added": 150,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/adoption_rust_audit.py",
+      "category": "saved_training_and_research",
+      "added": 176,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/benchmark.py",
+      "category": "saved_training_and_research",
+      "added": 627,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/codec-probe/Cargo.lock",
+      "category": "saved_training_and_research",
+      "added": 16,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/codec-probe/Cargo.toml",
+      "category": "saved_training_and_research",
+      "added": 14,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/codec_probe.cpp",
+      "category": "saved_training_and_research",
+      "added": 20,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/codec_probe.rs",
+      "category": "saved_training_and_research",
+      "added": 37,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/core-weight-step2.example.json",
+      "category": "saved_training_and_research",
+      "added": 9,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/core-weight-update.example.json",
+      "category": "saved_training_and_research",
+      "added": 9,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/corpus-expanded-metadata.json",
+      "category": "saved_training_and_research",
+      "added": 354,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/corpus-expanded.jsonl",
+      "category": "saved_training_and_research",
+      "added": 59756,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/corpus-metadata.json",
+      "category": "saved_training_and_research",
+      "added": 800,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/corpus.jsonl",
+      "category": "saved_training_and_research",
+      "added": 22480,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/corpus.py",
+      "category": "saved_training_and_research",
+      "added": 373,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/corpus_apis.py",
+      "category": "saved_training_and_research",
+      "added": 286,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/corpus_cpp.py",
+      "category": "saved_training_and_research",
+      "added": 590,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/corpus_rust.py",
+      "category": "saved_training_and_research",
+      "added": 189,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/direct-adoption-cpp.json",
+      "category": "saved_training_and_research",
+      "added": 138,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/direct-adoption-rust-js.json",
+      "category": "saved_training_and_research",
+      "added": 85,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/expand_corpus.py",
+      "category": "saved_training_and_research",
+      "added": 78,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/expansion-apis-metadata.json",
+      "category": "saved_training_and_research",
+      "added": 4206,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/expansion-apis.jsonl",
+      "category": "saved_training_and_research",
+      "added": 17983,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/expansion-cpp-metadata.json",
+      "category": "saved_training_and_research",
+      "added": 10663,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/expansion-cpp.jsonl",
+      "category": "saved_training_and_research",
+      "added": 10487,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/expansion-rust-metadata.json",
+      "category": "saved_training_and_research",
+      "added": 10185,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/expansion-rust.jsonl",
+      "category": "saved_training_and_research",
+      "added": 8806,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/expansion_benchmark.py",
+      "category": "saved_training_and_research",
+      "added": 199,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/baseline.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/current.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/inputs/evaluation.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/inputs/policy.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/inputs/provenance.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/inputs/training.jsonl",
+      "category": "saved_training_and_research",
+      "added": 25128,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/13509f8e131c41b5d16f5d24c61d1d207ae595a813c2c99d1efeb56dc3907840/golden.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/13509f8e131c41b5d16f5d24c61d1d207ae595a813c2c99d1efeb56dc3907840/manifest.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/13509f8e131c41b5d16f5d24c61d1d207ae595a813c2c99d1efeb56dc3907840/metrics.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/13509f8e131c41b5d16f5d24c61d1d207ae595a813c2c99d1efeb56dc3907840/model.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/13509f8e131c41b5d16f5d24c61d1d207ae595a813c2c99d1efeb56dc3907840/report.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/13509f8e131c41b5d16f5d24c61d1d207ae595a813c2c99d1efeb56dc3907840/weights.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/6af720bfd3cb76de3cb3127a5eb01cebe03d71a98ef122b3555c7e1b98a2e738/golden.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/6af720bfd3cb76de3cb3127a5eb01cebe03d71a98ef122b3555c7e1b98a2e738/manifest.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/6af720bfd3cb76de3cb3127a5eb01cebe03d71a98ef122b3555c7e1b98a2e738/metrics.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/6af720bfd3cb76de3cb3127a5eb01cebe03d71a98ef122b3555c7e1b98a2e738/model.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/6af720bfd3cb76de3cb3127a5eb01cebe03d71a98ef122b3555c7e1b98a2e738/report.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/6af720bfd3cb76de3cb3127a5eb01cebe03d71a98ef122b3555c7e1b98a2e738/weights.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/6b5ef0cf46a33b6f2b4b9a146ffd666c3985f718fef4b01215962b6c43930bcb/golden.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/6b5ef0cf46a33b6f2b4b9a146ffd666c3985f718fef4b01215962b6c43930bcb/manifest.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/6b5ef0cf46a33b6f2b4b9a146ffd666c3985f718fef4b01215962b6c43930bcb/metrics.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/6b5ef0cf46a33b6f2b4b9a146ffd666c3985f718fef4b01215962b6c43930bcb/model.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/6b5ef0cf46a33b6f2b4b9a146ffd666c3985f718fef4b01215962b6c43930bcb/report.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/history/pre-implementation-training/revisions/6b5ef0cf46a33b6f2b4b9a146ffd666c3985f718fef4b01215962b6c43930bcb/weights.json",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/apis/aws-sdk-LICENSE.txt",
+      "category": "saved_training_and_research",
+      "added": 202,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/apis/bitcoin-rpc-COPYING",
+      "category": "saved_training_and_research",
+      "added": 22,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/apis/cometbft-rpc-LICENSE",
+      "category": "saved_training_and_research",
+      "added": 202,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/apis/cometbft-rpc-NOTICE",
+      "category": "saved_training_and_research",
+      "added": 13,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/apis/cosmos-rpc-LICENSE",
+      "category": "saved_training_and_research",
+      "added": 203,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/apis/cosmos-rpc-NOTICE",
+      "category": "saved_training_and_research",
+      "added": 13,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/apis/github-sdk-LICENSE",
+      "category": "saved_training_and_research",
+      "added": 7,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/apis/polkadot-rpc-substrate_LICENSE-APACHE2",
+      "category": "saved_training_and_research",
+      "added": 211,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/apis/polkadot-rpc-substrate_LICENSE-GPL3",
+      "category": "saved_training_and_research",
+      "added": 700,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/apis/solana-rpc-LICENSE",
+      "category": "saved_training_and_research",
+      "added": 51,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/apis/stripe-sdk-LICENSE",
+      "category": "saved_training_and_research",
+      "added": 20,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/boost-algorithm-LICENSE",
+      "category": "saved_training_and_research",
+      "added": 23,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/boost-asio-LICENSE_1_0.txt",
+      "category": "saved_training_and_research",
+      "added": 23,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/boost-beast-LICENSE_1_0.txt",
+      "category": "saved_training_and_research",
+      "added": 23,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/boost-container-LICENSE_1_0.txt",
+      "category": "saved_training_and_research",
+      "added": 23,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/boost-filesystem-LICENSE_1_0.txt",
+      "category": "saved_training_and_research",
+      "added": 23,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/boost-json-LICENSE_1_0.txt",
+      "category": "saved_training_and_research",
+      "added": 23,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/boost-math-LICENSE",
+      "category": "saved_training_and_research",
+      "added": 23,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/boost-multi_index-LICENSE_1_0.txt",
+      "category": "saved_training_and_research",
+      "added": 23,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/boost-unordered-LICENSE",
+      "category": "saved_training_and_research",
+      "added": 23,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/boost-url-LICENSE_1_0.txt",
+      "category": "saved_training_and_research",
+      "added": 23,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/ccxt-LICENSE.txt",
+      "category": "saved_training_and_research",
+      "added": 21,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/ethereum-LICENSE",
+      "category": "saved_training_and_research",
+      "added": 116,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/ethers-LICENSE.md",
+      "category": "saved_training_and_research",
+      "added": 21,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/googleapis-LICENSE",
+      "category": "saved_training_and_research",
+      "added": 201,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/kubernetes-LICENSE",
+      "category": "saved_training_and_research",
+      "added": 202,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/libcxx-LICENSE.TXT",
+      "category": "saved_training_and_research",
+      "added": 311,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qt-core-LICENSES",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qt-network-LICENSES",
+      "category": "saved_training_and_research",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-AFL-2.1.txt",
+      "category": "saved_training_and_research",
+      "added": 45,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-Apache-2.0.txt",
+      "category": "saved_training_and_research",
+      "added": 61,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-BSD-2-Clause.txt",
+      "category": "saved_training_and_research",
+      "added": 10,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-BSD-3-Clause.txt",
+      "category": "saved_training_and_research",
+      "added": 9,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-BSD-4-Clause.txt",
+      "category": "saved_training_and_research",
+      "added": 13,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-BSL-1.0.txt",
+      "category": "saved_training_and_research",
+      "added": 9,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-Bitstream-Vera.txt",
+      "category": "saved_training_and_research",
+      "added": 187,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-CC0-1.0.txt",
+      "category": "saved_training_and_research",
+      "added": 121,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-FTL.txt",
+      "category": "saved_training_and_research",
+      "added": 169,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-GFDL-1.3-no-invariants-only.txt",
+      "category": "saved_training_and_research",
+      "added": 451,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-GPL-2.0-only.txt",
+      "category": "saved_training_and_research",
+      "added": 339,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-GPL-2.0-or-later.txt",
+      "category": "saved_training_and_research",
+      "added": 339,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-GPL-3.0-only.txt",
+      "category": "saved_training_and_research",
+      "added": 674,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-HPND.txt",
+      "category": "saved_training_and_research",
+      "added": 21,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-IJG.txt",
+      "category": "saved_training_and_research",
+      "added": 34,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-IPL-1.0.txt",
+      "category": "saved_training_and_research",
+      "added": 83,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-Imlib2.txt",
+      "category": "saved_training_and_research",
+      "added": 7,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-LGPL-2.1-or-later.txt",
+      "category": "saved_training_and_research",
+      "added": 468,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-LGPL-3.0-only.txt",
+      "category": "saved_training_and_research",
+      "added": 165,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-Libpng.txt",
+      "category": "saved_training_and_research",
+      "added": 73,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-LicenseRef-BSD-3-Clause-with-PCRE2-Binary-Like-Packages-Exception.txt",
+      "category": "saved_training_and_research",
+      "added": 12,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-LicenseRef-ICC-License.txt",
+      "category": "saved_training_and_research",
+      "added": 10,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-LicenseRef-Lcs-Telegraphics.txt",
+      "category": "saved_training_and_research",
+      "added": 2,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-LicenseRef-Qt-Commercial.txt",
+      "category": "saved_training_and_research",
+      "added": 8,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-LicenseRef-SHA1-Public-Domain.txt",
+      "category": "saved_training_and_research",
+      "added": 3,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-Linux-syscall-note.txt",
+      "category": "saved_training_and_research",
+      "added": 5,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-MIT-Khronos-old.txt",
+      "category": "saved_training_and_research",
+      "added": 9,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-MIT-open-group.txt",
+      "category": "saved_training_and_research",
+      "added": 9,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-MIT.txt",
+      "category": "saved_training_and_research",
+      "added": 11,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-MPL-2.0.txt",
+      "category": "saved_training_and_research",
+      "added": 373,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-Qt-GPL-exception-1.0.txt",
+      "category": "saved_training_and_research",
+      "added": 22,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-SPL-1.0.txt",
+      "category": "saved_training_and_research",
+      "added": 93,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-Unicode-3.0.txt",
+      "category": "saved_training_and_research",
+      "added": 39,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-X11.txt",
+      "category": "saved_training_and_research",
+      "added": 24,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-Xerox.txt",
+      "category": "saved_training_and_research",
+      "added": 7,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-Zlib.txt",
+      "category": "saved_training_and_research",
+      "added": 28,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-blessing.txt",
+      "category": "saved_training_and_research",
+      "added": 5,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/qtbase-libpng-2.0.txt",
+      "category": "saved_training_and_research",
+      "added": 134,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-axum-LICENSE",
+      "category": "saved_training_and_research",
+      "added": 27,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-clap-LICENSE-APACHE",
+      "category": "saved_training_and_research",
+      "added": 202,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-clap-LICENSE-MIT",
+      "category": "saved_training_and_research",
+      "added": 19,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-crossbeam-LICENSE-APACHE",
+      "category": "saved_training_and_research",
+      "added": 201,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-crossbeam-LICENSE-MIT",
+      "category": "saved_training_and_research",
+      "added": 27,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-diesel-LICENSE-APACHE",
+      "category": "saved_training_and_research",
+      "added": 190,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-diesel-LICENSE-MIT",
+      "category": "saved_training_and_research",
+      "added": 21,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-futures-LICENSE-APACHE",
+      "category": "saved_training_and_research",
+      "added": 202,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-futures-LICENSE-MIT",
+      "category": "saved_training_and_research",
+      "added": 26,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-rayon-LICENSE-APACHE",
+      "category": "saved_training_and_research",
+      "added": 201,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-rayon-LICENSE-MIT",
+      "category": "saved_training_and_research",
+      "added": 25,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-regex-LICENSE-APACHE",
+      "category": "saved_training_and_research",
+      "added": 201,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-regex-LICENSE-MIT",
+      "category": "saved_training_and_research",
+      "added": 25,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-reqwest-LICENSE-APACHE",
+      "category": "saved_training_and_research",
+      "added": 201,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-reqwest-LICENSE-MIT",
+      "category": "saved_training_and_research",
+      "added": 20,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-serde-LICENSE-APACHE",
+      "category": "saved_training_and_research",
+      "added": 176,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-serde-LICENSE-MIT",
+      "category": "saved_training_and_research",
+      "added": 23,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-stdlib-COPYRIGHT",
+      "category": "saved_training_and_research",
+      "added": 384,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-stdlib-LICENSE-APACHE",
+      "category": "saved_training_and_research",
+      "added": 176,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-stdlib-LICENSE-MIT",
+      "category": "saved_training_and_research",
+      "added": 23,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/rust-tokio-LICENSE",
+      "category": "saved_training_and_research",
+      "added": 21,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/typescript-dom-LICENSE.txt",
+      "category": "saved_training_and_research",
+      "added": 55,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/licenses/typescript-es-LICENSE.txt",
+      "category": "saved_training_and_research",
+      "added": 55,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/preferred-names.json",
+      "category": "saved_training_and_research",
+      "added": 91,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/report_expansion.py",
+      "category": "saved_training_and_research",
+      "added": 136,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/requirements-cpp.txt",
+      "category": "saved_training_and_research",
+      "added": 2,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/results-expanded-no-blockchain.json",
+      "category": "saved_training_and_research",
+      "added": 3678,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/results-expanded-no-cpp.json",
+      "category": "saved_training_and_research",
+      "added": 6037,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/results-expanded-no-google.json",
+      "category": "saved_training_and_research",
+      "added": 1993,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/results-expanded-no-rust.json",
+      "category": "saved_training_and_research",
+      "added": 5363,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/results-expanded.json",
+      "category": "saved_training_and_research",
+      "added": 30150,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/results-external.json",
+      "category": "saved_training_and_research",
+      "added": 12488,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/results-google.json",
+      "category": "saved_training_and_research",
+      "added": 10151,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/results-mixed.json",
+      "category": "saved_training_and_research",
+      "added": 12340,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/results-targeted-training.json",
+      "category": "saved_training_and_research",
+      "added": 9796,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/rust-declaration-parser/Cargo.lock",
+      "category": "saved_training_and_research",
+      "added": 119,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/rust-declaration-parser/Cargo.toml",
+      "category": "saved_training_and_research",
+      "added": 13,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/rust-declaration-parser/README.md",
+      "category": "saved_training_and_research",
+      "added": 41,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/rust-declaration-parser/src/main.rs",
+      "category": "saved_training_and_research",
+      "added": 112,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/targeted_training.py",
+      "category": "saved_training_and_research",
+      "added": 126,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/test_action_name_model.py",
+      "category": "saved_training_and_research",
+      "added": 139,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/test_action_name_training.py",
+      "category": "saved_training_and_research",
+      "added": 310,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/test_expansion.py",
+      "category": "saved_training_and_research",
+      "added": 89,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/usage-audit.json",
+      "category": "saved_training_and_research",
+      "added": 1025,
+      "deleted": 0
+    },
+    {
+      "path": "experiments/method-names/usage_audit.py",
+      "category": "saved_training_and_research",
+      "added": 40,
+      "deleted": 0
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/ActionName.hpp",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 79,
+      "deleted": 0
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/Actor.hpp",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 7,
+      "deleted": 6
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/MethodNumber.hpp",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 3,
+      "deleted": 93
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/block.hpp",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 1,
+      "deleted": 1
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/dispatch.hpp",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 13,
+      "deleted": 4
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/nativeTables.hpp",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 2,
+      "deleted": 2
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/schema.hpp",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 26,
+      "deleted": 11
+    },
+    {
+      "path": "libraries/psibase/common/share/action-name-model.json",
+      "category": "generated_model_and_vectors",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "libraries/psibase/common/share/action-name-vectors.json",
+      "category": "generated_model_and_vectors",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "libraries/psibase/common/src/schema.cpp",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 1,
+      "deleted": 1
+    },
+    {
+      "path": "libraries/psibase/common/tests/CMakeLists.txt",
+      "category": "dedicated_tests_and_tools",
+      "added": 7,
+      "deleted": 0
+    },
+    {
+      "path": "libraries/psibase/common/tests/action_name_constexpr.cpp",
+      "category": "dedicated_tests_and_tools",
+      "added": 23,
+      "deleted": 0
+    },
+    {
+      "path": "libraries/psibase/common/tests/action_name_dispatch.cpp",
+      "category": "dedicated_tests_and_tools",
+      "added": 16,
+      "deleted": 0
+    },
+    {
+      "path": "libraries/psibase/common/tests/action_name_duplicate.cpp",
+      "category": "dedicated_tests_and_tools",
+      "added": 10,
+      "deleted": 0
+    },
+    {
+      "path": "libraries/psibase/common/tests/action_name_probe.cpp",
+      "category": "dedicated_tests_and_tools",
+      "added": 47,
+      "deleted": 0
+    },
+    {
+      "path": "libraries/psibase/common/tests/export_action_name_schemas.py",
+      "category": "dedicated_tests_and_tools",
+      "added": 112,
+      "deleted": 0
+    },
+    {
+      "path": "libraries/psibase/common/tests/name.cpp",
+      "category": "dedicated_tests_and_tools",
+      "added": 96,
+      "deleted": 29
+    },
+    {
+      "path": "libraries/psio/CMakeLists.txt",
+      "category": "build_and_package_configuration",
+      "added": 2,
+      "deleted": 0
+    },
+    {
+      "path": "libraries/psio/include/psio/action_name.hpp",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 461,
+      "deleted": 0
+    },
+    {
+      "path": "libraries/psio/include/psio/compress_name.hpp",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 15,
+      "deleted": 499
+    },
+    {
+      "path": "libraries/psio/include/psio/detail/action_name_data.hpp",
+      "category": "generated_model_and_vectors",
+      "added": 17145,
+      "deleted": 0
+    },
+    {
+      "path": "libraries/psio/include/psio/get_type_name.hpp",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 2,
+      "deleted": 3
+    },
+    {
+      "path": "libraries/psio/include/psio/reflect.hpp",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 50,
+      "deleted": 2
+    },
+    {
+      "path": "packages/Cargo.lock",
+      "category": "dependency_locks",
+      "added": 2,
+      "deleted": 2
+    },
+    {
+      "path": "packages/local/XAdmin/ui/wasm/Cargo.lock",
+      "category": "dependency_locks",
+      "added": 2,
+      "deleted": 7
+    },
+    {
+      "path": "packages/system/Cargo.lock",
+      "category": "dependency_locks",
+      "added": 2,
+      "deleted": 7
+    },
+    {
+      "path": "packages/system/Transact/plugin/transact/Cargo.toml",
+      "category": "build_and_package_configuration",
+      "added": 0,
+      "deleted": 1
+    },
+    {
+      "path": "packages/system/Transact/plugin/transact/src/lib.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 131,
+      "deleted": 36
+    },
+    {
+      "path": "packages/system/Transact/plugin/transact/wit/world.wit",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 5,
+      "deleted": 0
+    },
+    {
+      "path": "packages/user/Cargo.lock",
+      "category": "dependency_locks",
+      "added": 2,
+      "deleted": 7
+    },
+    {
+      "path": "packages/user/CommonApi/common/packages/common-lib/.gitignore",
+      "category": "build_and_package_configuration",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "packages/user/CommonApi/common/packages/common-lib/README.md",
+      "category": "documentation",
+      "added": 48,
+      "deleted": 0
+    },
+    {
+      "path": "packages/user/CommonApi/common/packages/common-lib/package.json",
+      "category": "build_and_package_configuration",
+      "added": 11,
+      "deleted": 1
+    },
+    {
+      "path": "packages/user/CommonApi/common/packages/common-lib/src/action-name-model.generated.ts",
+      "category": "generated_model_and_vectors",
+      "added": 1419,
+      "deleted": 0
+    },
+    {
+      "path": "packages/user/CommonApi/common/packages/common-lib/src/action-name.ts",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 363,
+      "deleted": 0
+    },
+    {
+      "path": "packages/user/CommonApi/common/packages/common-lib/src/index.ts",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "packages/user/CommonApi/common/packages/common-lib/test/action-name-package.test.mjs",
+      "category": "dedicated_tests_and_tools",
+      "added": 40,
+      "deleted": 0
+    },
+    {
+      "path": "packages/user/CommonApi/common/packages/common-lib/test/action-name-probe.mjs",
+      "category": "dedicated_tests_and_tools",
+      "added": 38,
+      "deleted": 0
+    },
+    {
+      "path": "packages/user/CommonApi/common/packages/common-lib/test/action-name.test.mjs",
+      "category": "dedicated_tests_and_tools",
+      "added": 190,
+      "deleted": 0
+    },
+    {
+      "path": "packages/user/CommonApi/common/packages/common-lib/vite.action-name.config.ts",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 19,
+      "deleted": 0
+    },
+    {
+      "path": "packages/user/EthBridge/relayer/Cargo.lock",
+      "category": "dependency_locks",
+      "added": 2,
+      "deleted": 7
+    },
+    {
+      "path": "packages/user/Invite/plugin/src/lib.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 1,
+      "deleted": 1
+    },
+    {
+      "path": "packages/user/Workshop/plugin/src/lib.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 3,
+      "deleted": 1
+    },
+    {
+      "path": "programs/psinode/tests/name.py",
+      "category": "dedicated_tests_and_tools",
+      "added": 23,
+      "deleted": 390
+    },
+    {
+      "path": "programs/psinode/tests/psibase.py",
+      "category": "dedicated_tests_and_tools",
+      "added": 8,
+      "deleted": 5
+    },
+    {
+      "path": "programs/psinode/tests/test_name.py",
+      "category": "dedicated_tests_and_tools",
+      "added": 17,
+      "deleted": 17
+    },
+    {
+      "path": "programs/psinode/tests/test_psibase_types.py",
+      "category": "dedicated_tests_and_tools",
+      "added": 17,
+      "deleted": 3
+    },
+    {
+      "path": "rust/Cargo.lock",
+      "category": "dependency_locks",
+      "added": 2,
+      "deleted": 7
+    },
+    {
+      "path": "rust/psibase/src/method_number.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 85,
+      "deleted": 167
+    },
+    {
+      "path": "rust/psibase/src/schema.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 74,
+      "deleted": 11
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-derive/src/lib.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 14,
+      "deleted": 0
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-derive/src/number_macro.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 14,
+      "deleted": 6
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-lib/Cargo.toml",
+      "category": "build_and_package_configuration",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-lib/src/service_macro/actions.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 5,
+      "deleted": 3
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-lib/src/service_macro/dispatch.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 4,
+      "deleted": 3
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-lib/src/service_macro/events.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 4,
+      "deleted": 3
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-lib/src/service_macro/graphql.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 2,
+      "deleted": 1
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-lib/src/service_macro/mod.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 55,
+      "deleted": 0
+    },
+    {
+      "path": "rust/psibase_names/Cargo.toml",
+      "category": "build_and_package_configuration",
+      "added": 1,
+      "deleted": 1
+    },
+    {
+      "path": "rust/psibase_names/examples/action_name_probe.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 34,
+      "deleted": 0
+    },
+    {
+      "path": "rust/psibase_names/src/action_name.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 472,
+      "deleted": 0
+    },
+    {
+      "path": "rust/psibase_names/src/action_name_model.generated.rs",
+      "category": "generated_model_and_vectors",
+      "added": 3468,
+      "deleted": 0
+    },
+    {
+      "path": "rust/psibase_names/src/constants.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 0,
+      "deleted": 179
+    },
+    {
+      "path": "rust/psibase_names/src/frequency.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 0,
+      "deleted": 78
+    },
+    {
+      "path": "rust/psibase_names/src/lib.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 2,
+      "deleted": 4
+    },
+    {
+      "path": "rust/psibase_names/src/method_number.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 9,
+      "deleted": 100
+    },
+    {
+      "path": "rust/psibase_names/src/method_to_number_converter.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 0,
+      "deleted": 136
+    },
+    {
+      "path": "rust/psibase_names/src/number_to_string_converter.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 0,
+      "deleted": 111
+    },
+    {
+      "path": "rust/psibase_plugin/src/wasm/transact.rs",
+      "category": "runtime_api_files_including_inline_tests",
+      "added": 2,
+      "deleted": 2
+    },
+    {
+      "path": "tools/action_name_change_report.py",
+      "category": "dedicated_tests_and_tools",
+      "added": 66,
+      "deleted": 0
+    },
+    {
+      "path": "tools/action_names.generated.json",
+      "category": "generated_model_and_vectors",
+      "added": 1,
+      "deleted": 0
+    },
+    {
+      "path": "tools/action_names.py",
+      "category": "dedicated_tests_and_tools",
+      "added": 214,
+      "deleted": 0
+    },
+    {
+      "path": "tools/test_action_name_retuning.py",
+      "category": "dedicated_tests_and_tools",
+      "added": 59,
+      "deleted": 0
+    },
+    {
+      "path": "tools/test_action_names.py",
+      "category": "dedicated_tests_and_tools",
+      "added": 168,
+      "deleted": 0
+    }
+  ]
+}

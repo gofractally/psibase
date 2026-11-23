@@ -13,17 +13,20 @@ class AccountNumber(RawAccountNumber):
     def pack(value, stream):
         RawAccountNumber.pack(RawAccountNumber(name.account_to_number(value)), stream)
 
-class RawMethodNumber(Struct):
+class RawActionName(Struct):
     value: u64
 
-class MethodNumber(Custom(RawMethodNumber, "MethodNumber"), str):
+class ActionName(Custom(RawActionName, "ActionName"), str):
     def __eq__(self, other):
         return name.method_to_number(self) == name.method_to_number(other)
     def __hash__(self):
         return hash(name.method_to_number(self))
     @staticmethod
     def pack(value, stream):
-        RawMethodNumber.pack(RawMethodNumber(name.method_to_number(value)), stream)
+        RawActionName.pack(RawActionName(name.method_to_number(value)), stream)
+
+# Source alias only; both names use the one current encoding.
+MethodNumber = ActionName
 
 class TimePointSec(i64):
     @staticmethod
@@ -35,7 +38,7 @@ class TimePointSec(i64):
 class RawAction(Object):
     sender: AccountNumber
     service: AccountNumber
-    method: MethodNumber
+    method: ActionName
     rawData: Bytes
 
 class Action(Custom(RawAction, "Action"), ObjectValue):
@@ -71,7 +74,7 @@ class Action(Custom(RawAction, "Action"), ObjectValue):
 
 default_custom = dict(**fracpack.default_custom, **{
     "AccountNumber": AccountNumber,
-    "MethodNumber": MethodNumber,
+    "ActionName": ActionName,
     "TimePointSec": TimePointSec,
 })
 

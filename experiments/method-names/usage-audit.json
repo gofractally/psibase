@@ -1,0 +1,1025 @@
+{
+  "scope": "StaticRust package source sites; generatedbindings/externalbuilds excluded; not execution counts",
+  "manual": {
+    "sites": 88,
+    "files": 25,
+    "categories": {
+      "generated_ACTION_NAME": 69,
+      "literal": 16,
+      "runtime_or_wrapper": 3
+    },
+    "entries": [
+      {
+        "path": "packages/system/Accounts/plugin/accounts/src/interfaces/admin.rs",
+        "line": 97,
+        "first_argument": "Accounts::action_structs::preapproveAcc::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/Accounts/plugin/accounts/src/interfaces/admin.rs",
+        "line": 110,
+        "first_argument": "Accounts::action_structs::freeze::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/Accounts/plugin/accounts/src/interfaces/admin.rs",
+        "line": 120,
+        "first_argument": "Accounts::action_structs::unfreeze::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/Accounts/plugin/accounts/src/interfaces/api.rs",
+        "line": 21,
+        "first_argument": "\"setAuthServ\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/system/AuthDelegate/plugin/src/lib.rs",
+        "line": 67,
+        "first_argument": "set_owner_action::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/AuthDelegate/plugin/src/lib.rs",
+        "line": 83,
+        "first_argument": "new_account_action::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/AuthDyn/plugin/src/lib.rs",
+        "line": 94,
+        "first_argument": "auth_dyn::action_structs::set_mgmt::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/AuthSig/plugin/src/lib.rs",
+        "line": 152,
+        "first_argument": "MyService::setKey::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/AuthSig/plugin/src/lib.rs",
+        "line": 172,
+        "first_argument": "MyService::newAccount::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/AuthSig/plugin/src/lib.rs",
+        "line": 190,
+        "first_argument": "MyService::newAccountR::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/AuthSig/plugin/src/lib.rs",
+        "line": 202,
+        "first_argument": "MyService::setKeyR::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/AuthSig/plugin/src/lib.rs",
+        "line": 252,
+        "first_argument": "MyService::getRecovery::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/AuthSig/plugin/src/lib.rs",
+        "line": 260,
+        "first_argument": "MyService::rotateKey::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/AuthSig/plugin/src/lib.rs",
+        "line": 287,
+        "first_argument": "MyService::setRecovery::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/AuthSig/plugin/src/lib.rs",
+        "line": 298,
+        "first_argument": "MyService::reqRecovery::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/AuthSig/plugin/src/lib.rs",
+        "line": 308,
+        "first_argument": "MyService::completeRecovery::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/AuthSig/plugin/src/lib.rs",
+        "line": 315,
+        "first_argument": "MyService::cancelRecovery::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/Producers/plugin/src/lib.rs",
+        "line": 117,
+        "first_argument": "Actions::setConsensus::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/Producers/plugin/src/lib.rs",
+        "line": 138,
+        "first_argument": "Actions::setProducers::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/Producers/plugin/src/lib.rs",
+        "line": 166,
+        "first_argument": "Actions::regCandidate::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/Producers/plugin/src/lib.rs",
+        "line": 174,
+        "first_argument": "Actions::unregCand::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/Producers/plugin/src/lib.rs",
+        "line": 183,
+        "first_argument": "Actions::setMaxProds::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/SetCode/plugin/src/lib.rs",
+        "line": 40,
+        "first_argument": "setCode::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/SetCode/plugin/src/lib.rs",
+        "line": 59,
+        "first_argument": "stageCode::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/StagedTx/plugin/src/lib.rs",
+        "line": 104,
+        "first_argument": "remove::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/StagedTx/plugin/src/lib.rs",
+        "line": 122,
+        "first_argument": "accept::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/StagedTx/plugin/src/lib.rs",
+        "line": 138,
+        "first_argument": "reject::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/system/StagedTx/plugin/src/lib.rs",
+        "line": 150,
+        "first_argument": "execute::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Branding/plugin/src/lib.rs",
+        "line": 43,
+        "first_argument": "Actions::setNetworkName::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/BtcBridge/plugin/src/lib.rs",
+        "line": 123,
+        "first_argument": "&a.method",
+        "category": "runtime_or_wrapper"
+      },
+      {
+        "path": "packages/user/BtcRelay/plugin/src/lib.rs",
+        "line": 14,
+        "first_argument": "\"headers\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/user/Chainmail/plugin/src/lib.rs",
+        "line": 59,
+        "first_argument": "\"send\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/user/Chainmail/plugin/src/lib.rs",
+        "line": 77,
+        "first_argument": "\"archive\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/user/Chainmail/plugin/src/lib.rs",
+        "line": 92,
+        "first_argument": "\"save\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/user/EthBridge/plugin/src/lib.rs",
+        "line": 122,
+        "first_argument": "method",
+        "category": "runtime_or_wrapper"
+      },
+      {
+        "path": "packages/user/EthBridge/plugin/src/lib.rs",
+        "line": 182,
+        "first_argument": "stringify!($method)",
+        "category": "runtime_or_wrapper"
+      },
+      {
+        "path": "packages/user/Evaluations/plugin/src/helpers.rs",
+        "line": 92,
+        "first_argument": "evaluations::action_structs::group_key::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Evaluations/plugin/src/lib.rs",
+        "line": 50,
+        "first_argument": "Actions::create::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Evaluations/plugin/src/lib.rs",
+        "line": 55,
+        "first_argument": "Actions::start::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Evaluations/plugin/src/lib.rs",
+        "line": 66,
+        "first_argument": "Actions::close::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Evaluations/plugin/src/lib.rs",
+        "line": 76,
+        "first_argument": "Actions::delete::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Evaluations/plugin/src/lib.rs",
+        "line": 88,
+        "first_argument": "Actions::register::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Evaluations/plugin/src/lib.rs",
+        "line": 100,
+        "first_argument": "Actions::unregister::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Evaluations/plugin/src/lib.rs",
+        "line": 117,
+        "first_argument": "Actions::set_key::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Evaluations/plugin/src/lib.rs",
+        "line": 129,
+        "first_argument": "Actions::register::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Evaluations/plugin/src/lib.rs",
+        "line": 144,
+        "first_argument": "Actions::unregister::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Evaluations/plugin/src/lib.rs",
+        "line": 182,
+        "first_argument": "Actions::propose::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Evaluations/plugin/src/lib.rs",
+        "line": 234,
+        "first_argument": "Actions::attest::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/FaucetTok/plugin/src/lib.rs",
+        "line": 13,
+        "first_argument": "Actions::dispense::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Identity/plugin/src/lib.rs",
+        "line": 54,
+        "first_argument": "\"attest\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/user/Nft/plugin/src/lib.rs",
+        "line": 80,
+        "first_argument": "Nft::action_structs::mint::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Nft/plugin/src/lib.rs",
+        "line": 101,
+        "first_argument": "Nft::action_structs::credit::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Nft/plugin/src/lib.rs",
+        "line": 114,
+        "first_argument": "Nft::action_structs::transfer::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Nft/plugin/src/lib.rs",
+        "line": 126,
+        "first_argument": "Nft::action_structs::uncredit::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Nft/plugin/src/lib.rs",
+        "line": 141,
+        "first_argument": "Nft::action_structs::debit::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Nft/plugin/src/lib.rs",
+        "line": 154,
+        "first_argument": "Nft::action_structs::accept::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Nft/plugin/src/lib.rs",
+        "line": 162,
+        "first_argument": "Nft::action_structs::burn::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Nft/plugin/src/lib.rs",
+        "line": 175,
+        "first_argument": "Nft::action_structs::setAutoDebit::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Packages/plugin/src/lib.rs",
+        "line": 614,
+        "first_argument": "psibase::services::packages::action_structs::setSources::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Profiles/plugin/src/lib.rs",
+        "line": 102,
+        "first_argument": "profiles::action_structs::setProfile::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Profiles/plugin/src/lib.rs",
+        "line": 125,
+        "first_argument": "profiles::action_structs::uploadAvatar::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Profiles/plugin/src/lib.rs",
+        "line": 131,
+        "first_argument": "profiles::action_structs::removeAvatar::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Registry/plugin/src/lib.rs",
+        "line": 43,
+        "first_argument": "setMetadata::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Registry/plugin/src/lib.rs",
+        "line": 54,
+        "first_argument": "publish::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Registry/plugin/src/lib.rs",
+        "line": 61,
+        "first_argument": "unpublish::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Sites/plugin/src/lib.rs",
+        "line": 99,
+        "first_argument": "\"storeSys\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/user/Sites/plugin/src/lib.rs",
+        "line": 120,
+        "first_argument": "\"storeSys\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/user/Sites/plugin/src/lib.rs",
+        "line": 157,
+        "first_argument": "\"storeSys\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/user/Sites/plugin/src/lib.rs",
+        "line": 169,
+        "first_argument": "\"remove\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/user/Sites/plugin/src/lib.rs",
+        "line": 175,
+        "first_argument": "\"enableSpa\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/user/Sites/plugin/src/lib.rs",
+        "line": 181,
+        "first_argument": "\"setCsp\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/user/Sites/plugin/src/lib.rs",
+        "line": 187,
+        "first_argument": "\"enableCache\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/user/Sites/plugin/src/lib.rs",
+        "line": 196,
+        "first_argument": "\"deleteCsp\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/user/Sites/plugin/src/lib.rs",
+        "line": 203,
+        "first_argument": "\"setProxy\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/user/Sites/plugin/src/lib.rs",
+        "line": 211,
+        "first_argument": "\"clearProxy\"",
+        "category": "literal"
+      },
+      {
+        "path": "packages/user/Symbol/plugin/src/lib.rs",
+        "line": 85,
+        "first_argument": "symbol::action_structs::buy::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Symbol/plugin/src/lib.rs",
+        "line": 107,
+        "first_argument": "symbol::action_structs::mapSymbol::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Symbol/plugin/src/lib.rs",
+        "line": 133,
+        "first_argument": "symbol::action_structs::admin_create::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Symbol/plugin/src/lib.rs",
+        "line": 158,
+        "first_argument": "symbol::action_structs::sellLength::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/Symbol/plugin/src/lib.rs",
+        "line": 172,
+        "first_argument": "symbol::action_structs::delLength::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/TokenStream/plugin/src/lib.rs",
+        "line": 38,
+        "first_argument": "token_stream::action_structs::create::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/TokenStream/plugin/src/lib.rs",
+        "line": 60,
+        "first_argument": "token_stream::action_structs::deposit::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/TokenStream/plugin/src/lib.rs",
+        "line": 71,
+        "first_argument": "token_stream::action_structs::claim::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/TokenStream/plugin/src/lib.rs",
+        "line": 82,
+        "first_argument": "token_stream::action_structs::delete::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/TokenSwap/plugin/src/lib.rs",
+        "line": 166,
+        "first_argument": "token_swap::action_structs::swap::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/TokenSwap/plugin/src/lib.rs",
+        "line": 187,
+        "first_argument": "token_swap::action_structs::new_pool::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/TokenSwap/plugin/src/lib.rs",
+        "line": 209,
+        "first_argument": "token_swap::action_structs::add_liquidity::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      },
+      {
+        "path": "packages/user/TokenSwap/plugin/src/lib.rs",
+        "line": 273,
+        "first_argument": "token_swap::action_structs::remove_liquidity::ACTION_NAME",
+        "category": "generated_ACTION_NAME"
+      }
+    ]
+  },
+  "typed": {
+    "sites": 110,
+    "files": 9,
+    "entries": [
+      {
+        "path": "packages/system/AuthRecover/plugin/src/lib.rs",
+        "line": 82
+      },
+      {
+        "path": "packages/system/AuthRecover/plugin/src/lib.rs",
+        "line": 83
+      },
+      {
+        "path": "packages/system/AuthRecover/plugin/src/lib.rs",
+        "line": 92
+      },
+      {
+        "path": "packages/system/AuthRecover/plugin/src/lib.rs",
+        "line": 104
+      },
+      {
+        "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+        "line": 60
+      },
+      {
+        "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+        "line": 67
+      },
+      {
+        "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+        "line": 76
+      },
+      {
+        "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+        "line": 88
+      },
+      {
+        "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+        "line": 95
+      },
+      {
+        "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+        "line": 107
+      },
+      {
+        "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+        "line": 120
+      },
+      {
+        "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+        "line": 126
+      },
+      {
+        "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+        "line": 171
+      },
+      {
+        "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+        "line": 194
+      },
+      {
+        "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+        "line": 218
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 163
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 171
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 178
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 179
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 180
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 182
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 184
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 185
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 186
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 187
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 188
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 189
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 190
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 191
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 192
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 193
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 194
+      },
+      {
+        "path": "packages/user/Exchange/plugin/src/plugin.rs",
+        "line": 195
+      },
+      {
+        "path": "packages/user/Fractals/plugin/src/lib.rs",
+        "line": 63
+      },
+      {
+        "path": "packages/user/Fractals/plugin/src/lib.rs",
+        "line": 77
+      },
+      {
+        "path": "packages/user/Fractals/plugin/src/lib.rs",
+        "line": 85
+      },
+      {
+        "path": "packages/user/Fractals/plugin/src/lib.rs",
+        "line": 91
+      },
+      {
+        "path": "packages/user/Fractals/plugin/src/lib.rs",
+        "line": 97
+      },
+      {
+        "path": "packages/user/Fractals/plugin/src/lib.rs",
+        "line": 108
+      },
+      {
+        "path": "packages/user/Fractals/plugin/src/lib.rs",
+        "line": 114
+      },
+      {
+        "path": "packages/user/Fractals/plugin/src/lib.rs",
+        "line": 120
+      },
+      {
+        "path": "packages/user/Fractals/plugin/src/lib.rs",
+        "line": 128
+      },
+      {
+        "path": "packages/user/Fractals/plugin/src/lib.rs",
+        "line": 134
+      },
+      {
+        "path": "packages/user/Fractals/plugin/src/lib.rs",
+        "line": 146
+      },
+      {
+        "path": "packages/user/Fractals/plugin/src/lib.rs",
+        "line": 158
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 78
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 84
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 214
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 224
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 230
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 236
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 242
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 248
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 254
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 260
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 266
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 272
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 290
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 302
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 310
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 316
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 327
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 338
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 344
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 350
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 367
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 380
+      },
+      {
+        "path": "packages/user/Guilds/plugin/src/lib.rs",
+        "line": 386
+      },
+      {
+        "path": "packages/user/Invite/plugin/src/lib.rs",
+        "line": 197
+      },
+      {
+        "path": "packages/user/Invite/plugin/src/lib.rs",
+        "line": 214
+      },
+      {
+        "path": "packages/user/Invite/plugin/src/lib.rs",
+        "line": 238
+      },
+      {
+        "path": "packages/user/Invite/plugin/src/lib.rs",
+        "line": 257
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 52
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 70
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 95
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 108
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 114
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 144
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 155
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 166
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 180
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 182
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 259
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 269
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 281
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 323
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 331
+      },
+      {
+        "path": "packages/user/NameMarket/plugin/src/lib.rs",
+        "line": 352
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 58
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 74
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 94
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 107
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 113
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 119
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 133
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 139
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 211
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 219
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 227
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 233
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 244
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 252
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 258
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 264
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 270
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 276
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/lib.rs",
+        "line": 284
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/transfer.rs",
+        "line": 362
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/transfer.rs",
+        "line": 365
+      },
+      {
+        "path": "packages/user/Tokens/plugin/src/transfer.rs",
+        "line": 368
+      }
+    ]
+  },
+  "union_files": 34,
+  "source_sha256": {
+    "packages/system/Accounts/plugin/accounts/src/interfaces/admin.rs": "8d304eeaf7fa47a320eff9faa360f4369c113dd88630b58134037c9bc0f542c2",
+    "packages/system/Accounts/plugin/accounts/src/interfaces/api.rs": "045cf1a5a1f611478e92de3a227ad27f15dfaf530375d0a3c52e5a4d4e315c7c",
+    "packages/system/AuthDelegate/plugin/src/lib.rs": "b78a6e8e6133b92d53d14ef1b71046153dee628f610e21ad4c45f563c3abd2d2",
+    "packages/system/AuthDyn/plugin/src/lib.rs": "1c4622c20c68aac4149e6fa324c744eb5d695416c835de3e36cc6180161e7b4b",
+    "packages/system/AuthRecover/plugin/src/lib.rs": "4b893310853c520d3f302eed9464e82407b03b70a0452847d491603a9760b4a1",
+    "packages/system/AuthSig/plugin/src/lib.rs": "410c8654bf0d3473374bf554e9ac8582b11319134b5cd401dbe7c624fc6dc70c",
+    "packages/system/Producers/plugin/src/lib.rs": "7d727f668955a4506fc00b2993c3ac863f73746713ebc86cbc61a0a1b83d59d9",
+    "packages/system/SetCode/plugin/src/lib.rs": "aefc2b4b626acde82450a06cd56f9dd5d0aa0f9164a2500fc2c0946fac771dde",
+    "packages/system/StagedTx/plugin/src/lib.rs": "2974f15512b68111598e266a14858f0d8736c76bb314d388d15a98adf82336b0",
+    "packages/system/VirtualServer/plugin/src/lib.rs": "923232f2825e5109ca509f81b9125d1a13adef33353fe916ac30456cbbe1bbfb",
+    "packages/user/Branding/plugin/src/lib.rs": "8ae538e7dbcfa899e0b59de5d8a0c96c602b21b02301d88ced18343a1b36f06e",
+    "packages/user/BtcBridge/plugin/src/lib.rs": "1cee97264ba608a3a8bbd6338e0556d97a090dd4c22998088bfc4b735400d174",
+    "packages/user/BtcRelay/plugin/src/lib.rs": "1641100bb9fb513ad97b88cae933b716ca51b7cc7e837ccc4b3591302af92dc8",
+    "packages/user/Chainmail/plugin/src/lib.rs": "869727ee5e2a7892968e7d845350abae803acd58f73c02ab1201d85e7de7a9c7",
+    "packages/user/EthBridge/plugin/src/lib.rs": "2ec4c366b0903b34ded0d51b0761dbccef44046849a68963081e9b51de389113",
+    "packages/user/Evaluations/plugin/src/helpers.rs": "477fcb836a12ea14f07271010b1181c25ac2febdad6e3d4f5e8b6bdcb28a694b",
+    "packages/user/Evaluations/plugin/src/lib.rs": "1c59dec7f3dbca528f784e555f0a2fa8cd5fbfce10a775adbd54692de8832e03",
+    "packages/user/Exchange/plugin/src/plugin.rs": "1926fbb850b6eeeea83019e7c48ba55dbd93de4acd59d9ea2a5a18a96ecd38d2",
+    "packages/user/FaucetTok/plugin/src/lib.rs": "693a0224a3412c511c9156701678792ea782458bcb3599efe125da14464001d3",
+    "packages/user/Fractals/plugin/src/lib.rs": "0c7d239abb22f34f1a3267394f58a42ab12841161025550d4946559cabfd9206",
+    "packages/user/Guilds/plugin/src/lib.rs": "a6e67b43120689b744150e90e8e7cab3c685489b7e9e0a178d8efebbbee4370b",
+    "packages/user/Identity/plugin/src/lib.rs": "95ddde2be1fe09b105249df9d3d08e94e5e0c6b32f299051a7f0e944bc86f6f2",
+    "packages/user/Invite/plugin/src/lib.rs": "d959f428af3cbad02ef5dee84ef47570f507f8498f977f1163e450ada280fc2c",
+    "packages/user/NameMarket/plugin/src/lib.rs": "071b431895efa303c9a30800428ac0a35515db3df0499a130cf31c90b47f9ef6",
+    "packages/user/Nft/plugin/src/lib.rs": "ed64d22f9fcb341cbd168d10fa6e976eab3ca2618410a68f2dd3afcaa9d0ca05",
+    "packages/user/Packages/plugin/src/lib.rs": "1eafd02e588cd0363397465ce9dd08789454df5307e76de924f16ee0fcebac4d",
+    "packages/user/Profiles/plugin/src/lib.rs": "348f3c13b15d9aa023e6b0355a1eefff95b363fd80079166ae5fab0a6a9018a3",
+    "packages/user/Registry/plugin/src/lib.rs": "01d1738c39afd4131e95754ea8cbd078a4794d0c517f6ba6452fa52fe2148b5a",
+    "packages/user/Sites/plugin/src/lib.rs": "7dc543749959b4217eb1f460f167f46d026ede971cc59a79c9b3bb21255a9769",
+    "packages/user/Symbol/plugin/src/lib.rs": "28514bb5b3a6f3f28794c3808c1ea50fe3d9f617bdfa0b57a28420d25e55bad3",
+    "packages/user/TokenStream/plugin/src/lib.rs": "26db1eba2e6568044a555635d2e488313e390f0db160c38d916fe883cf54d311",
+    "packages/user/TokenSwap/plugin/src/lib.rs": "5cafdedde54ba09884c8ef5063035accb9ebd7e3fa0818e420433f72b438c125",
+    "packages/user/Tokens/plugin/src/lib.rs": "c03574fac80ab12e5493c90a45e6f795e4d455c17eef0ba59f00103b8b1ca872",
+    "packages/user/Tokens/plugin/src/transfer.rs": "13d17a091f1cfbeb6627378995286d45447aa77dba8e67e79f43884d6a48b1d3"
+  }
+}

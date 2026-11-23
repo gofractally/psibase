@@ -6,12 +6,10 @@
 //! [psibase crate](https://docs.rs/psibase).
 
 mod account_number;
-mod constants;
-mod frequency;
+mod action_name;
 mod method_number;
-mod method_to_number_converter;
 mod name_encoder;
-mod number_to_string_converter;
 
 pub use account_number::*;
+pub use action_name::*;
 pub use method_number::*;

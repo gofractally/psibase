@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "model_sha256": [
+    "7c88693caabc870e8017859201b5622bf52a38ddc782f16ed2e37c773df4c053",
+    "774add87bf4a11e1c698d9c619c02bea398adb91f64a02ed746ad51e8e9bc7be"
+  ],
+  "runtime_sources_unchanged": {
+    "libraries/psio/include/psio/action_name.hpp": "7737ce72ad6db614454e27e2e80a23419ed79cb357cc09fbc836a31e9f1a6ff7",
+    "rust/psibase_names/src/action_name.rs": "297da31b43e074f42086174cbaec4195a67afca2c82c7b2fd44c7002f9cf5b84",
+    "packages/user/CommonApi/common/packages/common-lib/src/action-name.ts": "0eab00c5967659b2d1c3dc9f48086bc22ea569be42538277723e88bd7cb37c82"
+  },
+  "all_ports_identical_for_both_models": true,
+  "current_model_restored": true,
+  "vectors_per_model": [
+    6704,
+    6704
+  ]
+}

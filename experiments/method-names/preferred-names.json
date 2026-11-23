@@ -1,0 +1,91 @@
+{
+  "scope": "Frozen readability probes after maintainer noted existing Psibase spellings adapted to codec constraints. These are plausible descriptive spellings, not an ABI rename proposal or a representative statistical corpus.",
+  "training": "Excluded from all training profiles; evaluated as design probes, not independent blind validation.",
+  "examples": [
+    {
+      "current": "regEvIdx",
+      "preferred": "registerEventIndex"
+    },
+    {
+      "current": "reqRecovery",
+      "preferred": "requestAccountRecovery"
+    },
+    {
+      "current": "completeRecovery",
+      "preferred": "completeAccountRecovery"
+    },
+    {
+      "current": "setKeyR",
+      "preferred": "setPublicKeyWithRecoveryPartner"
+    },
+    {
+      "current": "newAccountR",
+      "preferred": "createAccountWithRecoveryPartner"
+    },
+    {
+      "current": "setAuthServ",
+      "preferred": "setAuthenticationService"
+    },
+    {
+      "current": "fromSub",
+      "preferred": "withdrawFromSubaccount"
+    },
+    {
+      "current": "toSub",
+      "preferred": "depositIntoSubaccount"
+    },
+    {
+      "current": "getBalConf",
+      "preferred": "getBalanceConfiguration"
+    },
+    {
+      "current": "setSysToken",
+      "preferred": "setSystemResourceToken"
+    },
+    {
+      "current": "listName",
+      "preferred": "listAccountNameForSale"
+    },
+    {
+      "current": "mapSymbol",
+      "preferred": "assignSymbolToToken"
+    },
+    {
+      "current": "buyListing",
+      "preferred": "purchaseMarketplaceListing"
+    },
+    {
+      "current": "remliq",
+      "preferred": "withdrawMarketLiquidity"
+    },
+    {
+      "current": "addliq",
+      "preferred": "addMarketLiquidity"
+    },
+    {
+      "current": "liquidate",
+      "preferred": "liquidateMarginPosition"
+    },
+    {
+      "current": "cancelstop",
+      "preferred": "cancelStopLossOrder"
+    },
+    {
+      "current": "cancelListing",
+      "preferred": "cancelMarketplaceListing"
+    },
+    {
+      "current": "uncredit",
+      "preferred": "cancelPendingTokenTransfer"
+    },
+    {
+      "current": "debit",
+      "preferred": "acceptPendingTokenTransfer"
+    },
+    {
+      "current": "limit",
+      "preferred": "placeLimitOrder"
+    }
+  ],
+  "selection_note": "These probes informed architecture selection. They measure target naming style but are not a statistically representative or untouched final test set."
+}

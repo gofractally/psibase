@@ -1,0 +1,29 @@
+{
+  "scope": "Controlled same-codec service-dispatch object comparison; not a whole application binary benchmark",
+  "fixture": "libraries/psibase/common/tests/action_name_dispatch.cpp",
+  "fixture_sha256": "55a50a4fe69b839d9f505822378da5aa8213bcc9e91ef604f3938b164452d724",
+  "model_sha256": "774add87bf4a11e1c698d9c619c02bea398adb91f64a02ed746ad51e8e9bc7be",
+  "target": "wasm32-wasip1",
+  "optimization": "-O2 -fno-exceptions -DCOMPILING_WASM",
+  "before_header": "git HEAD dispatch.hpp (before error-formatting change), overlaid onto same current codec build",
+  "results": {
+    "before": {
+      "wasm_object_bytes": 391751,
+      "codec_model_symbols": [
+        "00000928 W psio::action_names::try_decode(unsigned long long)",
+        "00001400 W psio::action_names::try_encode(std::__2::basic_string_view<char, std::__2::char_traits<char>>)",
+        "00002021 W psio::action_names::impl::word_tokens(psio::action_names::impl::Name const&)",
+        "00031390 W psio::detail::action_name_data::word_costs",
+        "00033390 W psio::detail::action_name_data::word_edges",
+        "00023df0 W psio::detail::action_name_data::word_nodes",
+        "00005280 W psio::detail::action_name_data::character_cdf",
+        "00001250 W psio::detail::action_name_data::words",
+        "00000240 W psio::detail::action_name_data::word_cdf"
+      ]
+    },
+    "after": {
+      "wasm_object_bytes": 11171,
+      "codec_model_symbols": []
+    }
+  }
+}

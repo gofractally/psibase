@@ -7,16 +7,29 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+#[derive(Debug, Clone, Serialize, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct MethodString(pub String);
 
+impl<'de> Deserialize<'de> for MethodString {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let name = String::deserialize(deserializer)?;
+        name.parse::<MethodNumber>()
+            .map_err(serde::de::Error::custom)?;
+        Ok(Self(name))
+    }
+}
+
 impl PartialEq for MethodString {
     fn eq(&self, other: &Self) -> bool {
-        self.0
-            .parse::<MethodNumber>()
-            .unwrap()
-            .eq(&other.0.parse::<MethodNumber>().unwrap())
+        match (
+            self.0.parse::<MethodNumber>(),
+            other.0.parse::<MethodNumber>(),
+        ) {
+            (Ok(left), Ok(right)) => left == right,
+            (Err(_), Err(_)) => self.0 == other.0,
+            _ => false,
+        }
     }
 }
 
@@ -24,7 +37,16 @@ impl Eq for MethodString {}
 
 impl Hash for MethodString {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.parse::<MethodNumber>().unwrap().hash(state)
+        match self.0.parse::<MethodNumber>() {
+            Ok(name) => {
+                0u8.hash(state);
+                name.hash(state);
+            }
+            Err(_) => {
+                1u8.hash(state);
+                self.0.hash(state);
+            }
+        }
     }
 }
 
@@ -218,6 +240,17 @@ pub(crate) fn assert_schema_matches_package<Wrapper: ToServiceSchema>() {
     use std::path::PathBuf;
 
     let my_schema = Wrapper::schema();
+    if let Some(directory) = std::env::var_os("PSIBASE_SCHEMA_FIXTURE_DIR") {
+        let path = PathBuf::from(directory).join(format!("{}.json", my_schema.service));
+        let data = std::fs::read(&path).unwrap_or_else(|error| {
+            panic!("cannot read C++ schema fixture {}: {error}", path.display())
+        });
+        let real_schema: Schema = serde_json::from_slice(&data).unwrap_or_else(|error| {
+            panic!("invalid C++ schema fixture {}: {error}", path.display())
+        });
+        assert_schemas_equivalent(&real_schema, &my_schema);
+        return;
+    }
     let registry = DirectoryRegistry::new(
         PathBuf::from(std::env::var("PSIBASE_DATADIR").unwrap()).join("packages"),
     );
@@ -345,9 +378,9 @@ impl CustomHandler for CustomAccountNumber {
     }
 }
 
-struct CustomMethodNumber;
+struct CustomActionName;
 
-impl CustomHandler for CustomMethodNumber {
+impl CustomHandler for CustomActionName {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
         matches!(
             schema.unwrap_struct(ty),
@@ -364,7 +397,10 @@ impl CustomHandler for CustomMethodNumber {
         src: &mut FracInputStream,
         _allow_empty_container: bool,
     ) -> Result<serde_json::Value, fracpack::Error> {
-        Ok(MethodNumber::new(u64::unpack(src)?).to_string().into())
+        let value = u64::unpack(src)?;
+        psibase_names::action_name_to_string(value)
+            .map(Into::into)
+            .map_err(|_| fracpack::Error::BadScalar)
     }
     fn json2frac(
         &self,
@@ -383,9 +419,9 @@ impl CustomHandler for CustomMethodNumber {
 pub fn schema_types() -> CustomTypes<'static> {
     let mut result = fracpack::standard_types();
     static ACCOUNT_NUMBER: CustomAccountNumber = CustomAccountNumber;
-    static METHOD_NUMBER: CustomMethodNumber = CustomMethodNumber;
+    static ACTION_NAME: CustomActionName = CustomActionName;
     result.insert("AccountNumber".to_string(), &ACCOUNT_NUMBER);
-    result.insert("MethodNumber".to_string(), &METHOD_NUMBER);
+    result.insert("ActionName".to_string(), &ACTION_NAME);
     result
 }
 
@@ -560,4 +596,31 @@ pub fn create_schema<T: ToServiceSchema>() -> Schema {
 
 pub fn print_schema_impl<T: ToServiceSchema>() {
     print!("{}", serde_json::to_string(&T::schema()).unwrap())
+}
+
+#[cfg(test)]
+mod action_name_schema_tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn method_schema_keys_validate_untrusted_text() {
+        for text in ["", "1bad", "bad-name", "é", "#short"] {
+            assert!(serde_json::from_value::<MethodString>(serde_json::json!(text)).is_err());
+        }
+        assert!(serde_json::from_value::<MethodString>(serde_json::json!("getData")).is_ok());
+    }
+
+    #[test]
+    fn method_schema_identity_only_folds_case() {
+        let mut keys = HashSet::new();
+        for name in ["getData", "getdata", "foo_bar", "fooqbar", "load0", "loado"] {
+            keys.insert(MethodString(name.into()));
+        }
+        assert_eq!(keys.len(), 5);
+        // Raw/programmatic invalid keys remain diagnosable, never a panic in
+        // Hash/Eq. JSON construction rejects these before inserting a key.
+        keys.insert(MethodString("bad-name".into()));
+        assert!(keys.contains(&MethodString("bad-name".into())));
+    }
 }

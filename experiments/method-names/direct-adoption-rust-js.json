@@ -1,0 +1,85 @@
+{
+  "scope": "Direct prerelease replacement proposal after user rejected legacy preservation; no production edits",
+  "recommendation": {
+    "canonical_type": "ActionName; optional source-only MethodNumber re-export resolves to same new type/codec",
+    "encoding": "Replace the low-level method encoder/decoder centrally; remove old implementation and old numeric goldens. Update action and event method identities together.",
+    "schema": "One ActionName custom codec; ActionMap and EventMap may continue sharing MethodString and its new numeric identity.",
+    "accounts": "AccountNumber depends on separate NameEncoder path and is unchanged.",
+    "strings": "Supervisor WIT/plugin export names and HTTP methods remain separate string namespaces.",
+    "parsing": "Use strict fallible FromStr/TryFrom-style entry; remove parse-to-zero behavior and convert dynamic boundaries to errors. Source aliases do not preserve infallible invalid-string semantics.",
+    "numeric_transport": "Carry exact u64 through central Transact path; typed callers should not debug-string-reencode. Headerless text APIs can keep canonical strings and use the single current codec.",
+    "development": "Rebuild generated bindings/schemas/permissions and reset development chain when model generation changes; one model fingerprint across build outputs. No old/new per-service negotiation or activation/history machinery."
+  },
+  "removed_work": [
+    "Parallel legacy decoder and golden preservation",
+    "Per-service opt-in flags (66 Rust annotations)",
+    "Action/event schema comparator split",
+    "Dual schema custom handlers",
+    "Legacy alias dispatch ID unions",
+    "Stored permission/action/event/staged transaction migration",
+    "Historical codec lookup and old/new wire-ID guessing"
+  ],
+  "measured_retirable_rust_codec_physical_lines": {
+    "rust/psibase_names/src/method_number.rs": 105,
+    "rust/psibase_names/src/method_to_number_converter.rs": 136,
+    "rust/psibase_names/src/number_to_string_converter.rs": 111,
+    "rust/psibase_names/src/frequency.rs": 78,
+    "rust/psibase_names/src/constants.rs": 179
+  },
+  "measured_retirable_rust_codec_total_physical_lines": 609,
+  "measured_old_alphabet_cdf_array_physical_lines": 151,
+  "measured_retirable_rust_nontable_physical_lines_including_docs_and_tests": 458,
+  "measured_old_wrapper_tests_physical_lines": 134,
+  "planning_estimates_not_actual_diff": {
+    "rust_new_handwritten_codec_type_lines": [
+      450,
+      750
+    ],
+    "rust_existing_integration_changed_added_lines": [
+      100,
+      220
+    ],
+    "rust_new_test_lines": [
+      250,
+      450
+    ],
+    "js_new_handwritten_codec_type_lines": [
+      350,
+      650
+    ],
+    "js_existing_packaging_and_typed_rpc_lines": [
+      42,
+      100
+    ],
+    "js_new_codec_test_lines": [
+      250,
+      450
+    ],
+    "js_additional_typed_rpc_test_lines": [
+      80,
+      160
+    ],
+    "js_application_callsite_rename_required": 0,
+    "net_line_caution": "Do not subtract the 609 old physical lines from new handwritten estimates; old counts include 151 table/alphabet lines, documentation and embedded test code. Generated model data and exact net diff must be reported separately after implementation."
+  },
+  "js_removed_optional_work": {
+    "dual_format_json_existing_lines_previous_estimate": [
+      60,
+      140
+    ],
+    "per_service_model_version_negotiation": true
+  },
+  "source_sha256": {
+    "rust/psibase_names/src/method_number.rs": "4c89886e75710e40080bc7d382769f6ffc8f79d5ce4c6457d5e1582a479594ab",
+    "rust/psibase_names/src/method_to_number_converter.rs": "cb619588fdc122f1d4c98a687e081375e86cd7a9d568a9e7b8913e12e1ea8837",
+    "rust/psibase_names/src/number_to_string_converter.rs": "4d8716f430041d723a78735f9b38f61086936244f526dfc6bba3c45a00c57590",
+    "rust/psibase_names/src/frequency.rs": "d25d4b580712fae638bca351afb4157b5f1c05e2e79dfefacb2595934aa1b670",
+    "rust/psibase_names/src/constants.rs": "d94fa5448fae654c8cfcdb988f78c2a34ffeed90f7c16587cc58124ea1ad0da6",
+    "rust/psibase/src/method_number.rs": "a03db5883cff199eaae58d49320f71a5a68cdb9da68b6f2b6fed11e08babd4f6",
+    "rust/psibase/src/schema.rs": "f6f25a9764fe6f973505d19ef6f234b50615100672f66bbda02fe966d7c53634",
+    "rust/psibase_names/src/account_number.rs": "3d5dbdc513b4c76549d8fd68e532fab96fa2b772d039ad4896ab5366f7a6e1d2",
+    "rust/psibase_macros/psibase-macros-derive/src/number_macro.rs": "a086e4b9c5b9b4ffd13f82290fbcd564458223c4c9cf32894f7df1365ce79e36",
+    "rust/psibase_plugin/src/wasm/transact.rs": "eb510da9bed71b6250a5c96213ef6b8709f998453a4e45139e6bee735ddcad14",
+    "packages/user/CommonApi/common/packages/common-lib/src/rpc.ts": "19b620709a48f2f72608f7764fc97f140aff0750e3c39bb43521088df829749d"
+  }
+}

@@ -13,6 +13,12 @@
             "types": "./dist/index.d.ts",
             "default": "./dist/common-lib.js"
         },
+        "./action-name": {
+            "types": "./dist/action-name.d.ts",
+            "import": "./dist/action-name.js",
+            "require": "./dist/action-name.cjs",
+            "default": "./dist/action-name.js"
+        },
         "./rpc": {
             "import": "./dist/rpc.js",
             "require": "./dist/rpc.js",
@@ -43,7 +49,11 @@
     ],
     "scripts": {
         "dev": "vite",
-        "build": "node ../../../../../if-build-needed.mjs 'tsc -b --noEmit && vite build'",
+        "build": "node ../../../../../if-build-needed.mjs 'tsc -b --noEmit && vite build && vite build --config vite.action-name.config.ts'",
+        "build:action-name-test": "node test/build-action-name.mjs",
+        "test:action-name": "node --test test/action-name.test.mjs",
+        "test:action-name-package": "node --test test/action-name-package.test.mjs",
+        "probe:action-name": "node test/action-name-probe.mjs",
         "preview": "vite preview",
         "format": "prettier --write 'src/**/*.ts'"
     },

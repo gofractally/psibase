@@ -1,0 +1,2 @@
+# Upstream training-source licenses are retained byte-for-byte for their hashes.
+experiments/method-names/licenses/** -whitespace

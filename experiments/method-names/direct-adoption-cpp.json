@@ -1,0 +1,138 @@
+{
+  "scope": "Direct pre-release C++ method/name codec replacement; supersedes legacy-preservation assumptions in adoption-cpp-audit.json. Production code unchanged by this audit.",
+  "policy": "One new codec for current method/action/event/reflected-name identifiers; account encoding stays separate. No old-ID persistence/decoding requirement.",
+  "measured_original_reference_census": {
+    "files": 66,
+    "lines": 199
+  },
+  "implementation_choice": {
+    "recommended": "Canonical ActionName/action_name type and a mechanical in-tree MethodNumber rename; replace common method_to_number/number_to_method/hash classification. Actions and events share the new encoding.",
+    "optional_smallest_diff": "A source-only MethodNumber alias can temporarily point at ActionName; this is one encoder and no legacy decoder. It can be omitted for cleaner APIs."
+  },
+  "estimates_not_measured_patch": {
+    "new_cpp_codec_type_handwritten_lines": [
+      650,
+      1050
+    ],
+    "new_cpp_test_lines": [
+      250,
+      450
+    ],
+    "clean_rename_existing_integration_lines": [
+      220,
+      260
+    ],
+    "source_alias_existing_integration_lines": [
+      40,
+      100
+    ],
+    "new_dedicated_action_only_reflection_version_lines": 0,
+    "generated_model_data": "Track bytes separately; no handwritten LOC estimate."
+  },
+  "replaced_existing_codec_physical_lines": 503,
+  "dropped_work": [
+    "Parallel legacy codec and goldens",
+    "Action/event schema comparator split",
+    "Dedicated action-only C++ reflection path",
+    "Per-service codec negotiation/activation history",
+    "Dual-dispatch legacy aliases",
+    "Historical permission/staged-action migration",
+    "66 per-service action-codec opt-ins"
+  ],
+  "critical_shared_paths": [
+    "get_type_name.hpp hash_name and is_compressed_name delegate to method codec",
+    "reflect.hpp named field and method lookups share hash_name; update both consistently",
+    "Numeric field/member indexes are separate from named hashes",
+    "schema.hpp ActionMap and EventMap share CompareMethodNumber; shared replacement can keep that structure",
+    "Actor.hpp generated action IDs and event IDs derive MethodNumber centrally"
+  ],
+  "additional_python_integration_test_copy": "programs/psinode/tests/name.py contains another old method codec; replace with shared frozen reference/generated goldens and refresh hardcoded test_name.py IDs.",
+  "boundary_decision": "Default raw u64 zero sentinel exists today; specify null/default representation separately from strict parsing of actual identifiers rather than accidentally letting string validation choose object-default semantics.",
+  "files": [
+    {
+      "path": "libraries/psio/include/psio/compress_name.hpp",
+      "physical_lines": 503,
+      "sha256": "6f57da2a2c4523fde1c665b774687a65fb7085c992040b4271134fd296b1596f"
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/MethodNumber.hpp",
+      "physical_lines": 98,
+      "sha256": "39baba302240eb92be4bad37856dacbbd3c85e45bc52144cc44f906bb97ab5ff"
+    },
+    {
+      "path": "libraries/psibase/common/tests/name.cpp",
+      "physical_lines": 99,
+      "sha256": "094098905c9b81c9cc8bb9a6c896acc5c278e41bd89f154e0c5e1e5755793364"
+    },
+    {
+      "path": "libraries/psio/include/psio/get_type_name.hpp",
+      "physical_lines": 250,
+      "sha256": "1e246ad94a8d3acbe261af6b4024f5a393c0fcd5cc291dc30841cbf29a2ecada"
+    },
+    {
+      "path": "libraries/psio/include/psio/reflect.hpp",
+      "physical_lines": 883,
+      "sha256": "4d6f551fd3b6f9285824bf675355cd6f278efc5728e64180b7139c24def49dac"
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/schema.hpp",
+      "physical_lines": 445,
+      "sha256": "cfbbd5199d85a7bcda5452b83a6862fc2e82e951e6eb274cddc81677fdae82e0"
+    },
+    {
+      "path": "libraries/psibase/common/src/schema.cpp",
+      "physical_lines": 121,
+      "sha256": "16b8f3f3646bdbb1a34e3b61ca089266d3e1ee731ffadde4418fd71b3900d75f"
+    },
+    {
+      "path": "programs/psinode/tests/name.py",
+      "physical_lines": 451,
+      "sha256": "2375df843d8b5e335b8e26a1872f4d6611bc7a802d99b776434727ce1a3eecb0"
+    },
+    {
+      "path": "programs/psinode/tests/test_name.py",
+      "physical_lines": 49,
+      "sha256": "2978daf95723a54a6bc6d45b85e474d39464f855c508acafabacdafe7db454ba"
+    }
+  ],
+  "chosen_small_diff_plan": {
+    "single_codec": true,
+    "canonical_type": "ActionName / action_name",
+    "source_only_alias": "MethodNumber may alias ActionName to reduce unrelated source churn; no second numeric format or decoder",
+    "existing_cpp_integration_lines_estimate": [
+      40,
+      100
+    ],
+    "existing_cpp_integration_files_estimate": [
+      8,
+      15
+    ],
+    "old_codec_replaced_physical_lines": 503
+  },
+  "python_test_helper_scope": {
+    "path": "programs/psinode/tests/name.py",
+    "physical_file_lines": 451,
+    "method_only_ast_span_lines_to_replace": 378,
+    "method_only_broad_ranges": [
+      [
+        34,
+        385
+      ],
+      [
+        414,
+        451
+      ]
+    ],
+    "preserve_account_shared_ast_span_lines": 24,
+    "preserve": [
+      "NameEncoder import:32",
+      "InvalidName class:387-389",
+      "ACCOUNT_ENCODER/CHARS/SUBACCOUNT_SEPARATOR:391-393",
+      "account_to_number:395-405",
+      "number_to_account:407-412"
+    ],
+    "tests_preserve": "programs/psinode/tests/test_name.py account test:7-28",
+    "tests_update": "programs/psinode/tests/test_name.py method test:29-46",
+    "recommendation": "Replace Python method arithmetic copy with shared new reference/generated vectors; retain independent enumerative account helpers."
+  }
+}

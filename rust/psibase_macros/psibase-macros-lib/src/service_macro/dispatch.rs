@@ -1,4 +1,5 @@
 use quote::quote;
+use syn::ext::IdentExt;
 use syn::{ItemFn, ReturnType};
 
 pub fn process_dispatch_body(
@@ -8,7 +9,7 @@ pub fn process_dispatch_body(
     invoke_struct_args: proc_macro2::TokenStream,
 ) {
     let name = &f.sig.ident;
-    let name_str = name.to_string();
+    let name_str = name.unraw().to_string();
 
     let args_unpacking = if !invoke_struct_args.is_empty() {
         quote! { let args = <super::action_structs::#name as #psibase_mod::fracpack::Unpack>::unpacked(&act.rawData)?; }
@@ -53,8 +54,8 @@ pub fn add_unknown_action_check_to_dispatch_body(
             #dispatch_body
             else {
                 #psibase_mod::abort_message(&format!(
-                    "unknown service action: {}",
-                    act.method.to_string()
+                    "unknown service action: 0x{:016x}",
+                    act.method.value
                 ));
             }
         };

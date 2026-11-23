@@ -1,0 +1,354 @@
+{
+  "scope": "Pinned external declaration data; historical corpus is unchanged",
+  "inputs": [
+    {
+      "file": "corpus.jsonl",
+      "sha256": "1c2c627635f7ecae0aadf8d9e94658fd25a4e6939e6a10df2aa8086b5cd4080b",
+      "metadata": "corpus-metadata.json",
+      "metadata_sha256": "620351176999ccbb6c4da693e89d55f8d337ad548bf3671f989e6b8e10f87d87"
+    },
+    {
+      "file": "expansion-cpp.jsonl",
+      "sha256": "698fcd6e49f2a78ca8d712ab9c603ddb447e7689bd6d65f5eff5db97bd680119",
+      "metadata": "expansion-cpp-metadata.json",
+      "metadata_sha256": "355d15b1773e66ac354041bae143de29489b3764d82eb9e3386805e35ff85c9b"
+    },
+    {
+      "file": "expansion-rust.jsonl",
+      "sha256": "f9e85daaf8cca6f696d5b128840be6b32d8951cfb8119f8035647e4726a216d4",
+      "metadata": "expansion-rust-metadata.json",
+      "metadata_sha256": "57fc7cb5c340485d9edad33918accf491595baea83da4df260f7c7ff1c1cc8c0"
+    },
+    {
+      "file": "expansion-apis.jsonl",
+      "sha256": "b4a1f2b7f2bf44f4da9dcb98334f08f55c8d04e9303b54b4164764955a8386a6",
+      "metadata": "expansion-apis-metadata.json",
+      "metadata_sha256": "a1e2d1687436f1f87071098703581b96cd8e80fa9f75b5f73dc13b34bac17f4d"
+    }
+  ],
+  "sha256": "d511feee9ecf3b68c596e9cb457ec054596c239c93e87b3d546ce4869aac2939",
+  "records": 59756,
+  "unique_spellings": 31183,
+  "unique_lowercase": 30205,
+  "ecosystems": {
+    "blockchain": 641,
+    "cpp": 10487,
+    "javascript": 6001,
+    "rust": 8806,
+    "service-api": 33821
+  },
+  "sources": {
+    "aws-sdk": {
+      "declarations": 15736,
+      "unique_spellings": 12117,
+      "unique_lowercase": 12089,
+      "families": 385,
+      "ecosystem": "service-api",
+      "provider": "Amazon"
+    },
+    "bitcoin-rpc": {
+      "declarations": 170,
+      "unique_spellings": 170,
+      "unique_lowercase": 170,
+      "families": 20,
+      "ecosystem": "blockchain",
+      "provider": "Bitcoin Core"
+    },
+    "boost-algorithm": {
+      "declarations": 199,
+      "unique_spellings": 194,
+      "unique_lowercase": 194,
+      "families": 17,
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-asio": {
+      "declarations": 313,
+      "unique_spellings": 152,
+      "unique_lowercase": 152,
+      "families": 48,
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-beast": {
+      "declarations": 299,
+      "unique_spellings": 139,
+      "unique_lowercase": 139,
+      "families": 6,
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-container": {
+      "declarations": 224,
+      "unique_spellings": 129,
+      "unique_lowercase": 129,
+      "families": 14,
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-filesystem": {
+      "declarations": 20,
+      "unique_spellings": 17,
+      "unique_lowercase": 17,
+      "families": 3,
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-json": {
+      "declarations": 138,
+      "unique_spellings": 99,
+      "unique_lowercase": 99,
+      "families": 19,
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-math": {
+      "declarations": 395,
+      "unique_spellings": 184,
+      "unique_lowercase": 184,
+      "families": 9,
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-multi_index": {
+      "declarations": 196,
+      "unique_spellings": 73,
+      "unique_lowercase": 73,
+      "families": 2,
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-unordered": {
+      "declarations": 511,
+      "unique_spellings": 77,
+      "unique_lowercase": 77,
+      "families": 20,
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-url": {
+      "declarations": 80,
+      "unique_spellings": 64,
+      "unique_lowercase": 64,
+      "families": 13,
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "ccxt": {
+      "declarations": 208,
+      "unique_spellings": 208,
+      "unique_lowercase": 208,
+      "families": 1,
+      "ecosystem": "javascript",
+      "provider": "ccxt"
+    },
+    "cometbft-rpc": {
+      "declarations": 31,
+      "unique_spellings": 31,
+      "unique_lowercase": 31,
+      "families": 1,
+      "ecosystem": "blockchain",
+      "provider": "CometBFT"
+    },
+    "cosmos-rpc": {
+      "declarations": 171,
+      "unique_spellings": 141,
+      "unique_lowercase": 141,
+      "families": 36,
+      "ecosystem": "blockchain",
+      "provider": "Cosmos SDK"
+    },
+    "ethereum": {
+      "declarations": 93,
+      "unique_spellings": 93,
+      "unique_lowercase": 93,
+      "families": 6,
+      "ecosystem": "blockchain",
+      "provider": "ethereum"
+    },
+    "ethers": {
+      "declarations": 34,
+      "unique_spellings": 31,
+      "unique_lowercase": 31,
+      "families": 2,
+      "ecosystem": "javascript",
+      "provider": "ethers"
+    },
+    "github-sdk": {
+      "declarations": 1044,
+      "unique_spellings": 927,
+      "unique_lowercase": 927,
+      "families": 42,
+      "ecosystem": "service-api",
+      "provider": "GitHub/Octokit"
+    },
+    "googleapis": {
+      "declarations": 15211,
+      "unique_spellings": 6686,
+      "unique_lowercase": 6686,
+      "families": 1060,
+      "ecosystem": "service-api",
+      "provider": "google"
+    },
+    "kubernetes": {
+      "declarations": 1175,
+      "unique_spellings": 1175,
+      "unique_lowercase": 1175,
+      "families": 29,
+      "ecosystem": "service-api",
+      "provider": "kubernetes"
+    },
+    "libcxx": {
+      "declarations": 2429,
+      "unique_spellings": 1180,
+      "unique_lowercase": 1180,
+      "families": 76,
+      "ecosystem": "cpp",
+      "provider": "llvm"
+    },
+    "polkadot-rpc": {
+      "declarations": 107,
+      "unique_spellings": 107,
+      "unique_lowercase": 107,
+      "families": 16,
+      "ecosystem": "blockchain",
+      "provider": "Parity"
+    },
+    "qt-core": {
+      "declarations": 4765,
+      "unique_spellings": 2479,
+      "unique_lowercase": 2476,
+      "families": 198,
+      "ecosystem": "cpp",
+      "provider": "qt"
+    },
+    "qt-network": {
+      "declarations": 918,
+      "unique_spellings": 621,
+      "unique_lowercase": 621,
+      "families": 46,
+      "ecosystem": "cpp",
+      "provider": "qt"
+    },
+    "rust-axum": {
+      "declarations": 278,
+      "unique_spellings": 184,
+      "unique_lowercase": 184,
+      "families": 87,
+      "ecosystem": "rust",
+      "provider": "tokio-rs"
+    },
+    "rust-clap": {
+      "declarations": 522,
+      "unique_spellings": 427,
+      "unique_lowercase": 427,
+      "families": 59,
+      "ecosystem": "rust",
+      "provider": "clap-rs"
+    },
+    "rust-crossbeam": {
+      "declarations": 224,
+      "unique_spellings": 137,
+      "unique_lowercase": 137,
+      "families": 43,
+      "ecosystem": "rust",
+      "provider": "crossbeam-rs"
+    },
+    "rust-diesel": {
+      "declarations": 691,
+      "unique_spellings": 514,
+      "unique_lowercase": 514,
+      "families": 273,
+      "ecosystem": "rust",
+      "provider": "diesel-rs"
+    },
+    "rust-futures": {
+      "declarations": 447,
+      "unique_spellings": 293,
+      "unique_lowercase": 293,
+      "families": 135,
+      "ecosystem": "rust",
+      "provider": "rust-lang"
+    },
+    "rust-rayon": {
+      "declarations": 244,
+      "unique_spellings": 197,
+      "unique_lowercase": 197,
+      "families": 45,
+      "ecosystem": "rust",
+      "provider": "rayon-rs"
+    },
+    "rust-regex": {
+      "declarations": 167,
+      "unique_spellings": 59,
+      "unique_lowercase": 59,
+      "families": 19,
+      "ecosystem": "rust",
+      "provider": "rust-lang"
+    },
+    "rust-reqwest": {
+      "declarations": 513,
+      "unique_spellings": 236,
+      "unique_lowercase": 236,
+      "families": 59,
+      "ecosystem": "rust",
+      "provider": "seanmonstar"
+    },
+    "rust-serde": {
+      "declarations": 155,
+      "unique_spellings": 126,
+      "unique_lowercase": 126,
+      "families": 36,
+      "ecosystem": "rust",
+      "provider": "serde-rs"
+    },
+    "rust-stdlib": {
+      "declarations": 4114,
+      "unique_spellings": 1845,
+      "unique_lowercase": 1845,
+      "families": 646,
+      "ecosystem": "rust",
+      "provider": "rust-lang"
+    },
+    "rust-tokio": {
+      "declarations": 1451,
+      "unique_spellings": 676,
+      "unique_lowercase": 676,
+      "families": 278,
+      "ecosystem": "rust",
+      "provider": "tokio-rs"
+    },
+    "solana-rpc": {
+      "declarations": 69,
+      "unique_spellings": 69,
+      "unique_lowercase": 69,
+      "families": 1,
+      "ecosystem": "blockchain",
+      "provider": "Solana Labs"
+    },
+    "stripe-sdk": {
+      "declarations": 655,
+      "unique_spellings": 170,
+      "unique_lowercase": 170,
+      "families": 162,
+      "ecosystem": "service-api",
+      "provider": "Stripe"
+    },
+    "typescript-dom": {
+      "declarations": 4830,
+      "unique_spellings": 1153,
+      "unique_lowercase": 1153,
+      "families": 546,
+      "ecosystem": "javascript",
+      "provider": "microsoft"
+    },
+    "typescript-es": {
+      "declarations": 929,
+      "unique_spellings": 306,
+      "unique_lowercase": 306,
+      "families": 91,
+      "ecosystem": "javascript",
+      "provider": "microsoft"
+    }
+  }
+}

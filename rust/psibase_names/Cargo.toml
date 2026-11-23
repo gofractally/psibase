@@ -9,5 +9,5 @@ description = "Psibase name conversion functions"
 license.workspace = true
 
 [dependencies]
-seahash = "4.1.0"
+sha2 = "0.10"
 psibase-rust-workspace-hack.workspace = true

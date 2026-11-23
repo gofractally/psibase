@@ -19,7 +19,45 @@ use proc_macro2::TokenStream;
 use proc_macro_error::abort;
 use quote::quote;
 use std::str::FromStr;
+use syn::ext::IdentExt;
 use syn::{parse_quote, AttrStyle, Attribute, Item, ItemMod, ReturnType};
+
+fn duplicate_encoded_name(names: impl IntoIterator<Item = String>) -> Result<(), String> {
+    let mut encoded = std::collections::BTreeMap::new();
+    for name in names {
+        let id = psibase_names::action_name_from_str(&name)
+            .map_err(|error| format!("{name}: {error}"))?;
+        if let Some(previous) = encoded.insert(id, name.clone()) {
+            return Err(format!(
+                "duplicate action-name ID {id}: {previous} and {name}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod action_name_collision_tests {
+    use super::duplicate_encoded_name;
+
+    #[test]
+    fn normalized_declaration_duplicates_are_rejected() {
+        let error = duplicate_encoded_name(["getData".into(), "getdata".into()]).unwrap_err();
+        assert!(error.contains("duplicate action-name ID"));
+        assert!(error.contains("getData") && error.contains("getdata"));
+    }
+
+    #[test]
+    fn digits_and_underscores_remain_different() {
+        duplicate_encoded_name([
+            "load0".into(),
+            "loado".into(),
+            "foo_bar".into(),
+            "fooqbar".into(),
+        ])
+        .unwrap();
+    }
+}
 
 pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args = match NestedMeta::parse_meta_list(attr) {
@@ -117,6 +155,23 @@ fn process_mod(
                             .push((item_index, event_opts));
                     }
                 }
+            }
+        }
+
+        let action_names = action_fns.iter().filter_map(|index| match &items[*index] {
+            Item::Fn(f) => Some(f.sig.ident.unraw().to_string()),
+            _ => None,
+        });
+        if let Err(error) = duplicate_encoded_name(action_names) {
+            return syn::Error::new(impl_mod.ident.span(), error).to_compile_error();
+        }
+        for events in event_fns.values() {
+            let names = events.iter().filter_map(|(index, _)| match &items[*index] {
+                Item::Fn(f) => Some(f.sig.ident.unraw().to_string()),
+                _ => None,
+            });
+            if let Err(error) = duplicate_encoded_name(names) {
+                return syn::Error::new(impl_mod.ident.span(), error).to_compile_error();
             }
         }
 

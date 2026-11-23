@@ -1,0 +1,1696 @@
+{
+  "scope": "C++ audit only; no production code changed",
+  "counting_method": "Distinct physical source lines in tracked or unignored C++ sources under libraries/programs/packages; comments hidden, string/include literals retained; each file/line counted once per category",
+  "interpretation": "Measured references are change candidates and review surfaces, not precise patch LOC. Estimates below are manually scoped planning ranges; new generated data is excluded.",
+  "measured": {
+    "direct_legacy_method_lines": {
+      "files": 66,
+      "source_lines": 199
+    },
+    "action_cutover_candidate_lines": {
+      "files": 51,
+      "source_lines": 118
+    },
+    "service_method_dependent_lines": {
+      "files": 25,
+      "source_lines": 59
+    },
+    "direct_or_dependent_lines": {
+      "files": 79,
+      "source_lines": 252
+    }
+  },
+  "preserved_legacy_files": [
+    "libraries/psibase/common/include/psibase/MethodNumber.hpp",
+    "libraries/psibase/common/tests/name.cpp"
+  ],
+  "event_only_file_inventory": [
+    "packages/user/Events/include/services/user/EventIndex.hpp",
+    "packages/user/Events/include/services/user/Events.hpp",
+    "packages/user/Events/include/services/user/EventsTables.hpp",
+    "packages/user/Events/src/EventConfig.cpp",
+    "packages/user/Events/src/EventIndex.cpp",
+    "packages/user/Events/src/REvents.cpp",
+    "packages/user/Events/src/SchemaCache.cpp",
+    "packages/user/Events/src/SchemaCache.hpp",
+    "packages/user/Events/src/eventKeys.hpp",
+    "packages/user/Events/test/EventsTest.cpp"
+  ],
+  "event_only_direct_reference_lines": 32,
+  "unused_include_files_not_required_for_adoption": [
+    "packages/user/Tokens/include/services/user/tokenTables.hpp",
+    "packages/user/Tokens/test/src/Tokens-test.cpp"
+  ],
+  "preserved_mixed_event_lines": {
+    "libraries/psibase/common/include/psibase/Actor.hpp": [
+      233
+    ],
+    "libraries/psibase/common/include/psibase/schema.hpp": [
+      18,
+      23,
+      88,
+      419
+    ],
+    "packages/system/AuthSig/src/AuthSig.cpp": [
+      301,
+      302,
+      307,
+      308
+    ],
+    "packages/user/Invite/src/Invite.cpp": [
+      77,
+      78
+    ]
+  },
+  "phases": [
+    {
+      "name": "Add parallel type and codec; no action cutover",
+      "existing_files_estimate": [
+        2,
+        4
+      ],
+      "existing_lines_modified_or_added_estimate": [
+        4,
+        12
+      ],
+      "new_handwritten_cpp_lines_estimate": [
+        650,
+        1050
+      ],
+      "new_cpp_test_lines_estimate": [
+        250,
+        450
+      ],
+      "generated_model_data_lines": "Report separately after generator is selected; array formatting does not measure implementation size",
+      "concrete_existing_anchors": [
+        {
+          "path": "libraries/psibase/common/include/psibase/schema.hpp",
+          "line": 6,
+          "change": "Add action_name header; retain legacy MethodNumber include and comparator"
+        },
+        {
+          "path": "libraries/psibase/common/src/schema.cpp",
+          "line": 9,
+          "change": "Register action_name custom type alongside MethodNumber"
+        },
+        {
+          "path": "libraries/psibase/common/tests/CMakeLists.txt",
+          "line": 7,
+          "change": "Add new action-name conformance test source to native/WASM target"
+        }
+      ],
+      "assumptions": [
+        "Header-only constexpr-compatible codec to preserve compile-time dispatch ID generation",
+        "New ActionName.hpp with public action_name alias, explicit u64/string APIs and dedicated literal; legacy types unchanged",
+        "Integer segmentation cost tables and deterministic tie-breaking generated from one model artifact",
+        "New code estimate includes strict parser, bounded decoder, all readable branches, fallback and schema/JSON hooks"
+      ]
+    },
+    {
+      "name": "Homogeneous development-chain action cutover, retaining legacy event IDs",
+      "existing_files_estimate": [
+        50,
+        65
+      ],
+      "existing_lines_modified_or_added_estimate": [
+        180,
+        320
+      ],
+      "additional_handwritten_cpp_lines_estimate": [
+        150,
+        300
+      ],
+      "measured_direct_candidate_lines": 118,
+      "change_groups": [
+        "Action::method and active ServiceMethod fields",
+        "Actor generated calls and dedicated action reflection/dispatch path",
+        "Action schema comparator/codec metadata and JSON/package packing",
+        "Native system actions, callbacks, credentials and auth method comparisons",
+        "Tests and literals for adopted services"
+      ],
+      "assumptions": [
+        "Rebuild and reseed development chains when changing a model; existing persisted IDs are not silently reinterpreted",
+        "Action and ServiceMethod wrapper names can remain source-compatible while member types change in active ABI",
+        "Do not rewrite each reflected action declaration; generated Actor/reflection paths derive new IDs centrally"
+      ]
+    },
+    {
+      "name": "Production dual-version/history support",
+      "existing_lines_estimate": "Not credibly fixed until service/envelope version strategy is selected; ServiceMethod-dependent surface listed separately",
+      "additional_work": [
+        "Archive every model and choose codec by explicit network/service ABI generation",
+        "Preserve credentials, staged actions, callbacks and history against the codec originally used",
+        "Audit numeric alias collisions across every accepted legacy and new dispatch table",
+        "Event-ID migration is independently versioned, with 32 direct reference lines across 10 event-only files plus mixed call sites"
+      ]
+    }
+  ],
+  "key_source_anchors": [
+    {
+      "path": "libraries/psibase/common/include/psibase/MethodNumber.hpp",
+      "line": 49,
+      "finding": "String constructor hard-wires current codec; str() at54 uses current decoder"
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/block.hpp",
+      "line": 27,
+      "finding": "Action.method is an unversioned eight-byte MethodNumber"
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/Actor.hpp",
+      "line": 48,
+      "finding": "Generated action calls encode reflected name here and156; event type separately at233"
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/dispatch.hpp",
+      "line": 103,
+      "finding": "Dispatch numeric member lookup must select action codec, not generic field hash"
+    },
+    {
+      "path": "libraries/psio/include/psio/reflect.hpp",
+      "line": 507,
+      "finding": "Legacy numeric method lookup uses hash_name; other macros use same hash for data members"
+    },
+    {
+      "path": "libraries/psio/include/psio/reflect.hpp",
+      "line": 752,
+      "finding": "Generic data-member numeric reflection must keep its old meaning"
+    },
+    {
+      "path": "libraries/psio/include/psio/get_type_name.hpp",
+      "line": 240,
+      "finding": "hash_name is shared infrastructure; replacing it globally would alter more than action names"
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/schema.hpp",
+      "line": 86,
+      "finding": "ActionMap and EventMap at88 share legacy comparator today; split their policies"
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/nativeTables.hpp",
+      "line": 333,
+      "finding": "ServiceMethod persisted/auth data shares numeric method type"
+    },
+    {
+      "path": "packages/user/Events/src/REvents.cpp",
+      "line": 475,
+      "finding": "Headerless event SQL query encodes user-supplied event string"
+    },
+    {
+      "path": "libraries/psibase/common/src/package.cpp",
+      "line": 122,
+      "finding": "Headerless package/CLI JSON string method conversion requires explicit new-format selection"
+    }
+  ],
+  "design_constraints": [
+    "A using alias from MethodNumber to action_name cannot preserve both codec meanings",
+    "Strong types with explicit conversions prevent accidental legacy-ID reinterpretation",
+    "Both numeric payloads occupy eight bytes, so the bytes alone do not identify old versus new formats",
+    "Changing a model changes numeric IDs even for names whose spelling remains readable",
+    "Compile-time collision checks must include every declared method and all compatibility aliases",
+    "Existing numeric dispatch remains u64 comparisons; codec retraining alone does not prove a faster dispatch path"
+  ],
+  "inventory": [
+    {
+      "path": "libraries/net/test/test_util.cpp",
+      "sha256": "76c6aa3c5a50a5f2397a19d55da0ef0e6f002a3e6c222a25ff16030f40b49988",
+      "direct_legacy_method_lines": [
+        101,
+        194
+      ],
+      "action_cutover_candidate_lines": [
+        101,
+        194
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        101,
+        194
+      ]
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/Actor.hpp",
+      "sha256": "c261d4d2c5176d51304780cc28083662c955daaad273f26222a59c8ee282f077",
+      "direct_legacy_method_lines": [
+        48,
+        113,
+        128,
+        156,
+        233,
+        237
+      ],
+      "action_cutover_candidate_lines": [
+        48,
+        113,
+        128,
+        156,
+        237
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        48,
+        113,
+        128,
+        156,
+        233,
+        237
+      ]
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/MethodNumber.hpp",
+      "sha256": "39baba302240eb92be4bad37856dacbbd3c85e45bc52144cc44f906bb97ab5ff",
+      "direct_legacy_method_lines": [
+        28,
+        34,
+        41,
+        49,
+        60,
+        61,
+        65,
+        71,
+        73,
+        76,
+        81,
+        88,
+        90
+      ],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        28,
+        34,
+        41,
+        49,
+        60,
+        61,
+        65,
+        71,
+        73,
+        76,
+        81,
+        88,
+        90
+      ]
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/block.hpp",
+      "sha256": "8141ac301a478e348e773e0f191e1b1e197d7ac11f0ded923614badac0e399bf",
+      "direct_legacy_method_lines": [
+        4,
+        27
+      ],
+      "action_cutover_candidate_lines": [
+        4,
+        27
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        4,
+        27
+      ]
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/nativeTables.hpp",
+      "sha256": "42d9134dcb0e1cea003ee7de6e664b8abcd81b6a9898af05e4acd45fc636c8d0",
+      "direct_legacy_method_lines": [
+        336,
+        462
+      ],
+      "action_cutover_candidate_lines": [
+        336,
+        462
+      ],
+      "service_method_dependent_lines": [
+        333,
+        337,
+        339,
+        394
+      ],
+      "direct_or_dependent_lines": [
+        333,
+        336,
+        337,
+        339,
+        394,
+        462
+      ]
+    },
+    {
+      "path": "libraries/psibase/common/include/psibase/schema.hpp",
+      "sha256": "cfbbd5199d85a7bcda5452b83a6862fc2e82e951e6eb274cddc81677fdae82e0",
+      "direct_legacy_method_lines": [
+        6,
+        18,
+        23,
+        86,
+        88,
+        419
+      ],
+      "action_cutover_candidate_lines": [
+        6,
+        86
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        6,
+        18,
+        23,
+        86,
+        88,
+        419
+      ]
+    },
+    {
+      "path": "libraries/psibase/common/src/package.cpp",
+      "sha256": "df92b93bc07a59e9106fff9b3ea5d2e1952a1390780db5f46ce5ea43cd4d9781",
+      "direct_legacy_method_lines": [
+        63,
+        122,
+        126,
+        156,
+        315
+      ],
+      "action_cutover_candidate_lines": [
+        63,
+        122,
+        126,
+        156,
+        315
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        63,
+        122,
+        126,
+        156,
+        315
+      ]
+    },
+    {
+      "path": "libraries/psibase/common/src/schema.cpp",
+      "sha256": "16b8f3f3646bdbb1a34e3b61ca089266d3e1ee731ffadde4418fd71b3900d75f",
+      "direct_legacy_method_lines": [
+        9
+      ],
+      "action_cutover_candidate_lines": [
+        9
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        9
+      ]
+    },
+    {
+      "path": "libraries/psibase/common/src/serviceEntry.cpp",
+      "sha256": "c10e6d2836dafe1a2c114de2a8cf521daed12501435c260108b6dd14fe231965",
+      "direct_legacy_method_lines": [
+        10
+      ],
+      "action_cutover_candidate_lines": [
+        10
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        10
+      ]
+    },
+    {
+      "path": "libraries/psibase/common/src/trace.cpp",
+      "sha256": "6c5dbfc7f2b38469eaf47589190a03ae3fc6c4ae817c662ec6dd6a21c903074d",
+      "direct_legacy_method_lines": [
+        111,
+        113
+      ],
+      "action_cutover_candidate_lines": [
+        111,
+        113
+      ],
+      "service_method_dependent_lines": [
+        136,
+        143,
+        248
+      ],
+      "direct_or_dependent_lines": [
+        111,
+        113,
+        136,
+        143,
+        248
+      ]
+    },
+    {
+      "path": "libraries/psibase/common/tests/name.cpp",
+      "sha256": "094098905c9b81c9cc8bb9a6c896acc5c278e41bd89f154e0c5e1e5755793364",
+      "direct_legacy_method_lines": [
+        4,
+        62,
+        65,
+        68,
+        71,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98
+      ],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        4,
+        62,
+        65,
+        68,
+        71,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98
+      ]
+    },
+    {
+      "path": "libraries/psibase/native/src/BlockContext.cpp",
+      "sha256": "1dea7fcfc1c260156ad5d70802853eafb9ede9f1b3a8e410952b1c865108ad71",
+      "direct_legacy_method_lines": [
+        141
+      ],
+      "action_cutover_candidate_lines": [
+        141
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        141
+      ]
+    },
+    {
+      "path": "libraries/psibase/native/src/NativeFunctions.cpp",
+      "sha256": "5ada5c920b23494995665736952b315b31617b81efea411296b23add9f3f8572",
+      "direct_legacy_method_lines": [
+        462
+      ],
+      "action_cutover_candidate_lines": [
+        462
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        462
+      ]
+    },
+    {
+      "path": "libraries/psibase/native/src/TransactionContext.cpp",
+      "sha256": "399ed612af0ae54d5b6ef0055612686d092b2fcec343cb3702adf5af2e69a5a9",
+      "direct_legacy_method_lines": [
+        205
+      ],
+      "action_cutover_candidate_lines": [
+        205
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        205
+      ]
+    },
+    {
+      "path": "libraries/psibase/tester/include/psibase/tester.hpp",
+      "sha256": "b700f0085a5d0f6f57836ac65f348deedf47ec11646f983c5e6985107d9760ca",
+      "direct_legacy_method_lines": [
+        28,
+        36,
+        40,
+        42
+      ],
+      "action_cutover_candidate_lines": [
+        28,
+        36,
+        40,
+        42
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        28,
+        36,
+        40,
+        42
+      ]
+    },
+    {
+      "path": "libraries/psibase/tester/src/DefaultTestChain.cpp",
+      "sha256": "c1759285d3c79ac14f5d988737878dd1bfb24787e213a247bb32224934c61a8b",
+      "direct_legacy_method_lines": [
+        128
+      ],
+      "action_cutover_candidate_lines": [
+        128
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        128
+      ]
+    },
+    {
+      "path": "libraries/psibase/tester/src/tester.cpp",
+      "sha256": "0d9cbe19d44b61b90a62844ede158f47350b552e072b0553841d7bd76633144c",
+      "direct_legacy_method_lines": [
+        325,
+        636
+      ],
+      "action_cutover_candidate_lines": [
+        325,
+        636
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        325,
+        636
+      ]
+    },
+    {
+      "path": "packages/local/XHttp/include/services/local/XHttp.hpp",
+      "sha256": "2f7fd7637a9a8af28e7aac38c27ba492661ae704c2a62624b6307c47f0b8dbd3",
+      "direct_legacy_method_lines": [
+        27,
+        28,
+        131,
+        132
+      ],
+      "action_cutover_candidate_lines": [
+        27,
+        28,
+        131,
+        132
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        27,
+        28,
+        131,
+        132
+      ]
+    },
+    {
+      "path": "packages/local/XHttp/src/XHttp.cpp",
+      "sha256": "c2b8d34a6ea4c483a17a64f3c5d788f9ff1cb19f899e45bf24e76c2cb809e151",
+      "direct_legacy_method_lines": [
+        257,
+        291,
+        530,
+        531
+      ],
+      "action_cutover_candidate_lines": [
+        257,
+        291,
+        530,
+        531
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        257,
+        291,
+        530,
+        531
+      ]
+    },
+    {
+      "path": "packages/local/XKeys/src/XKeys.cpp",
+      "sha256": "2ab46dea5f9c29954b50f5564171b1dfccbd45e6860081711d7bece320bd8ff9",
+      "direct_legacy_method_lines": [],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [
+        45
+      ],
+      "direct_or_dependent_lines": [
+        45
+      ]
+    },
+    {
+      "path": "packages/local/XKeys/test/XKeys-test.cpp",
+      "sha256": "9e19553cb1d9ec1cbf697197571f8f5433b3bfe6bee63fa6f2f7e7c5e6e3f192",
+      "direct_legacy_method_lines": [
+        57
+      ],
+      "action_cutover_candidate_lines": [
+        57
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        57
+      ]
+    },
+    {
+      "path": "packages/local/XPeers/src/XPeers.cpp",
+      "sha256": "0a2b95a862b6d92cb56872f4c7669abc8c20bade668f6021b460582a3e4b4336",
+      "direct_legacy_method_lines": [
+        120,
+        201,
+        588,
+        850
+      ],
+      "action_cutover_candidate_lines": [
+        120,
+        201,
+        588,
+        850
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        120,
+        201,
+        588,
+        850
+      ]
+    },
+    {
+      "path": "packages/local/XProxy/src/XProxy.cpp",
+      "sha256": "2177656075d81f6ff9f300ea800bdddaf633d62a45f142f60520dcd7fca52ef0",
+      "direct_legacy_method_lines": [
+        191,
+        195,
+        200,
+        206,
+        248,
+        249
+      ],
+      "action_cutover_candidate_lines": [
+        191,
+        195,
+        200,
+        206,
+        248,
+        249
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        191,
+        195,
+        200,
+        206,
+        248,
+        249
+      ]
+    },
+    {
+      "path": "packages/local/XRun/include/services/local/XRun.hpp",
+      "sha256": "c676470173822bfee78a1e6eb163650639d59eaf44f13a93e38d721319e2ffd5",
+      "direct_legacy_method_lines": [
+        20,
+        28,
+        35
+      ],
+      "action_cutover_candidate_lines": [
+        20,
+        28,
+        35
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        20,
+        28,
+        35
+      ]
+    },
+    {
+      "path": "packages/local/XRun/src/XRun.cpp",
+      "sha256": "4199d5fd26806f1f6373333eeb920b4e9ac50b881037c4354b86fac75bec85cd",
+      "direct_legacy_method_lines": [
+        23,
+        45,
+        51,
+        69
+      ],
+      "action_cutover_candidate_lines": [
+        23,
+        45,
+        51,
+        69
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        23,
+        45,
+        51,
+        69
+      ]
+    },
+    {
+      "path": "packages/local/XTimer/include/services/local/XTimer.hpp",
+      "sha256": "188be20e76090dbd516fd566e8ce4f7f4a688bbf972f1ff73cfce0fc42074710",
+      "direct_legacy_method_lines": [
+        20,
+        42
+      ],
+      "action_cutover_candidate_lines": [
+        20,
+        42
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        20,
+        42
+      ]
+    },
+    {
+      "path": "packages/local/XTimer/src/XTimer.cpp",
+      "sha256": "8858b17df4e02520426e068467fb7ac5e1ed04cc241c4cb5ad055d7b8e0970bf",
+      "direct_legacy_method_lines": [
+        9,
+        21,
+        47,
+        77
+      ],
+      "action_cutover_candidate_lines": [
+        9,
+        21,
+        47,
+        77
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        9,
+        21,
+        47,
+        77
+      ]
+    },
+    {
+      "path": "packages/local/XTransact/include/services/local/XTransact.hpp",
+      "sha256": "628f223ef57006b61954d95aa232c733f4c33771934e433554f2b7e4f0d52045",
+      "direct_legacy_method_lines": [
+        16,
+        17
+      ],
+      "action_cutover_candidate_lines": [
+        16,
+        17
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        16,
+        17
+      ]
+    },
+    {
+      "path": "packages/local/XTransact/src/XTransact.cpp",
+      "sha256": "1a2b89547245124f181d4091b62a5ff267eb4913591a252437de4167b152e88a",
+      "direct_legacy_method_lines": [
+        34,
+        55
+      ],
+      "action_cutover_candidate_lines": [
+        34,
+        55
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        34,
+        55
+      ]
+    },
+    {
+      "path": "packages/psibase_tests/include/services/test/AuthTest.hpp",
+      "sha256": "6756ecae646100ae5e9d538e9ebc9b8f48b2b5a98ac129cb4a212ad704fc7289",
+      "direct_legacy_method_lines": [],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [
+        22,
+        44,
+        45,
+        49,
+        52
+      ],
+      "direct_or_dependent_lines": [
+        22,
+        44,
+        45,
+        49,
+        52
+      ]
+    },
+    {
+      "path": "packages/psibase_tests/include/services/test/CredResThief.hpp",
+      "sha256": "9c2053165318d8fed234d18b807ca2e2a1aada9b29f2ae9d12a2d40f2f8fac50",
+      "direct_legacy_method_lines": [],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [
+        58
+      ],
+      "direct_or_dependent_lines": [
+        58
+      ]
+    },
+    {
+      "path": "packages/psibase_tests/src/AuthTest.cpp",
+      "sha256": "eb685049c142fbde63aef0db7c5d978f0db46f988859098bc859f8eab9dc21f8",
+      "direct_legacy_method_lines": [],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [
+        29,
+        59,
+        70,
+        78,
+        86
+      ],
+      "direct_or_dependent_lines": [
+        29,
+        59,
+        70,
+        78,
+        86
+      ]
+    },
+    {
+      "path": "packages/psibase_tests/src/CredResThief.cpp",
+      "sha256": "6df6d76ce5cfbc136471f4e985fe37fbfed85e1731d64e5abe7135b3c53ebaa4",
+      "direct_legacy_method_lines": [
+        46
+      ],
+      "action_cutover_candidate_lines": [
+        46
+      ],
+      "service_method_dependent_lines": [
+        61
+      ],
+      "direct_or_dependent_lines": [
+        46,
+        61
+      ]
+    },
+    {
+      "path": "packages/psibase_tests/src/MockTransact.cpp",
+      "sha256": "aea03af5466a78e2027decf4eb8617b095447f1a49030bca3317ed1336184785",
+      "direct_legacy_method_lines": [
+        63
+      ],
+      "action_cutover_candidate_lines": [
+        63
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        63
+      ]
+    },
+    {
+      "path": "packages/psibase_tests/src/TestServiceEntry.cpp",
+      "sha256": "00e061e0d4527a9c5fb6820621c16edb4e87216c6764c042bb26a15d954556e0",
+      "direct_legacy_method_lines": [
+        49
+      ],
+      "action_cutover_candidate_lines": [
+        49
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        49
+      ]
+    },
+    {
+      "path": "packages/psibase_tests/src/WSEcho.cpp",
+      "sha256": "947cd47a9d636d3f4231455acc093c62467bbba301a480145fb64ddd5dfe4bd1",
+      "direct_legacy_method_lines": [
+        31
+      ],
+      "action_cutover_candidate_lines": [
+        31
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        31
+      ]
+    },
+    {
+      "path": "packages/psibase_tests/src/XDelay.cpp",
+      "sha256": "c31de155363509beb0e4411fecabbf8e19fed93985a9080c9fab0062f0118e50",
+      "direct_legacy_method_lines": [
+        51
+      ],
+      "action_cutover_candidate_lines": [
+        51
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        51
+      ]
+    },
+    {
+      "path": "packages/psibase_tests/test/test_notify.cpp",
+      "sha256": "58b9473a8583736ca34c56ffea4d645310aa5d6f7e1e5a033f135dc9f8ea0bc2",
+      "direct_legacy_method_lines": [
+        31,
+        90
+      ],
+      "action_cutover_candidate_lines": [
+        31,
+        90
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        31,
+        90
+      ]
+    },
+    {
+      "path": "packages/system/AuthAny/include/services/system/AuthAny.hpp",
+      "sha256": "231083e23213052e399913ab0c997ec78745d830bb6e340d53c3ec6f0373b1c6",
+      "direct_legacy_method_lines": [],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [
+        13
+      ],
+      "direct_or_dependent_lines": [
+        13
+      ]
+    },
+    {
+      "path": "packages/system/AuthAny/src/AuthAny.cpp",
+      "sha256": "d10988fe4a39c29c0addf445a3a0b0b6f960e2293b3d3fde49c30a3694326b36",
+      "direct_legacy_method_lines": [],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [
+        17
+      ],
+      "direct_or_dependent_lines": [
+        17
+      ]
+    },
+    {
+      "path": "packages/system/AuthDelegate/include/services/system/AuthDelegate.hpp",
+      "sha256": "bff195be9883423afe6baa41d158d7efdb5f6256a81e6110e7312cb1fea862a0",
+      "direct_legacy_method_lines": [],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [
+        47
+      ],
+      "direct_or_dependent_lines": [
+        47
+      ]
+    },
+    {
+      "path": "packages/system/AuthDelegate/src/AuthDelegate.cpp",
+      "sha256": "9ede166168fdbb63e10f43b032b23f52acc211f24258981ce8b3233fff919919",
+      "direct_legacy_method_lines": [],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [
+        15
+      ],
+      "direct_or_dependent_lines": [
+        15
+      ]
+    },
+    {
+      "path": "packages/system/AuthDelegate/test/src/AuthDelegate-test.cpp",
+      "sha256": "486499cc98b3687ea80267bab63cf668e88db94be801640b767a3b9a3da6efb8",
+      "direct_legacy_method_lines": [
+        91
+      ],
+      "action_cutover_candidate_lines": [
+        91
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        91
+      ]
+    },
+    {
+      "path": "packages/system/AuthNone/include/services/system/AuthNone.hpp",
+      "sha256": "c09e89d3420d8b5248e0df595567d1a8814280964c77c2923dfe54ba6a63c091",
+      "direct_legacy_method_lines": [],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [
+        13
+      ],
+      "direct_or_dependent_lines": [
+        13
+      ]
+    },
+    {
+      "path": "packages/system/AuthNone/src/AuthNone.cpp",
+      "sha256": "5ba8d828a55faf7765cbe9b5612415e785dcf13efcd0607e4481caa7dd6e4264",
+      "direct_legacy_method_lines": [],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [
+        9
+      ],
+      "direct_or_dependent_lines": [
+        9
+      ]
+    },
+    {
+      "path": "packages/system/AuthSig/include/services/system/AuthSig.hpp",
+      "sha256": "38f75ad85388690b0dcd106dcd854c3d93dedc666bbde4255eb06166ee2b3e20",
+      "direct_legacy_method_lines": [],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [
+        166,
+        168
+      ],
+      "direct_or_dependent_lines": [
+        166,
+        168
+      ]
+    },
+    {
+      "path": "packages/system/AuthSig/src/AuthSig.cpp",
+      "sha256": "3f6f4640195e2236d2c2ccedf0abf32f06aa17c319c86addcdd622369f513c05",
+      "direct_legacy_method_lines": [
+        301,
+        302,
+        307,
+        308
+      ],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [
+        160,
+        162
+      ],
+      "direct_or_dependent_lines": [
+        160,
+        162,
+        301,
+        302,
+        307,
+        308
+      ]
+    },
+    {
+      "path": "packages/system/AuthSig/src/RRecoveryObserver.cpp",
+      "sha256": "c7f6057c277e44fc53ce53f4cd9489203eb2d849bc1c6ac8e5aef5feada186ba",
+      "direct_legacy_method_lines": [
+        21
+      ],
+      "action_cutover_candidate_lines": [
+        21
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        21
+      ]
+    },
+    {
+      "path": "packages/system/AuthSig/test/src/AuthSig-test.cpp",
+      "sha256": "83a281882855088f11334f2c3e9d81c7b6bf179286441c83a38afacb5a53b84f",
+      "direct_legacy_method_lines": [
+        67,
+        78
+      ],
+      "action_cutover_candidate_lines": [
+        67,
+        78
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        67,
+        78
+      ]
+    },
+    {
+      "path": "packages/system/AuthSig/test/src/Recovery-test.cpp",
+      "sha256": "ed919067d035bd3122b448af52d737e92176bd4dfb61a67c8dd0be666310b267",
+      "direct_legacy_method_lines": [
+        231,
+        238,
+        323,
+        795
+      ],
+      "action_cutover_candidate_lines": [
+        231,
+        238,
+        323,
+        795
+      ],
+      "service_method_dependent_lines": [
+        795,
+        798,
+        802
+      ],
+      "direct_or_dependent_lines": [
+        231,
+        238,
+        323,
+        795,
+        798,
+        802
+      ]
+    },
+    {
+      "path": "packages/system/Credentials/service/cpp/include/services/system/Credentials.hpp",
+      "sha256": "8a5c224154a27234cf8b06a14ec533e9b2771dd64b6858b2260e104f2400a980",
+      "direct_legacy_method_lines": [
+        4,
+        51
+      ],
+      "action_cutover_candidate_lines": [
+        4,
+        51
+      ],
+      "service_method_dependent_lines": [
+        26
+      ],
+      "direct_or_dependent_lines": [
+        4,
+        26,
+        51
+      ]
+    },
+    {
+      "path": "packages/system/Credentials/service/cpp/test/Credentials-test.cpp",
+      "sha256": "00116ed7ca006ca2cf09d594e0dbd5659109b729a8edeeb7788fa50b16d8aab7",
+      "direct_legacy_method_lines": [
+        94
+      ],
+      "action_cutover_candidate_lines": [
+        94
+      ],
+      "service_method_dependent_lines": [
+        94
+      ],
+      "direct_or_dependent_lines": [
+        94
+      ]
+    },
+    {
+      "path": "packages/system/HttpServer/src/HttpServer.cpp",
+      "sha256": "58896723f67751d20be4c8a04bd330333d992a316d0c95602d7529fe11404a94",
+      "direct_legacy_method_lines": [
+        71
+      ],
+      "action_cutover_candidate_lines": [
+        71
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        71
+      ]
+    },
+    {
+      "path": "packages/system/Producers/include/services/system/Producers.hpp",
+      "sha256": "4b58d4fe74d9bc3fbe654f4d7cc03d3bc6a90bd085096b636287b981f7c20ee8",
+      "direct_legacy_method_lines": [],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [
+        81
+      ],
+      "direct_or_dependent_lines": [
+        81
+      ]
+    },
+    {
+      "path": "packages/system/Producers/src/Producers.cpp",
+      "sha256": "d938bd8a7c45151eecc6cd52d17f78da9000c7baecba6318a3347d855c08e493",
+      "direct_legacy_method_lines": [],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [
+        246
+      ],
+      "direct_or_dependent_lines": [
+        246
+      ]
+    },
+    {
+      "path": "packages/system/Producers/test/src/Producers-test.cpp",
+      "sha256": "27c1d171e431b4677d44be8e2c4aa270923a6fbd5b0d056fe9620277cd5ce16c",
+      "direct_legacy_method_lines": [
+        157
+      ],
+      "action_cutover_candidate_lines": [
+        157
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        157
+      ]
+    },
+    {
+      "path": "packages/system/Transact/include/services/system/Transact.hpp",
+      "sha256": "3c50b21603d193450c03a801e0bc0188e050ffbeb90a63717cbdcee39dc52fd1",
+      "direct_legacy_method_lines": [
+        527
+      ],
+      "action_cutover_candidate_lines": [
+        527
+      ],
+      "service_method_dependent_lines": [
+        11,
+        64,
+        85,
+        99,
+        114,
+        146,
+        327
+      ],
+      "direct_or_dependent_lines": [
+        11,
+        64,
+        85,
+        99,
+        114,
+        146,
+        327,
+        527
+      ]
+    },
+    {
+      "path": "packages/system/Transact/src/RTransact.cpp",
+      "sha256": "659efb7d4620a3af4774bbf28844d69355249a93b03794629e2a8453bac8b03f",
+      "direct_legacy_method_lines": [
+        53,
+        130,
+        164,
+        295,
+        297,
+        637,
+        648,
+        1035,
+        1056,
+        1437,
+        1465
+      ],
+      "action_cutover_candidate_lines": [
+        53,
+        130,
+        164,
+        295,
+        297,
+        637,
+        648,
+        1035,
+        1056,
+        1437,
+        1465
+      ],
+      "service_method_dependent_lines": [
+        1465
+      ],
+      "direct_or_dependent_lines": [
+        53,
+        130,
+        164,
+        295,
+        297,
+        637,
+        648,
+        1035,
+        1056,
+        1437,
+        1465
+      ]
+    },
+    {
+      "path": "packages/system/Transact/src/Transact.cpp",
+      "sha256": "dae93532a847e453a96fa9e9b33f52a247b89de87fab3d4bf8a4c84f7a0bffc3",
+      "direct_legacy_method_lines": [
+        343,
+        1099
+      ],
+      "action_cutover_candidate_lines": [
+        343,
+        1099
+      ],
+      "service_method_dependent_lines": [
+        360,
+        375,
+        512,
+        513,
+        525,
+        543,
+        588,
+        799
+      ],
+      "direct_or_dependent_lines": [
+        343,
+        360,
+        375,
+        512,
+        513,
+        525,
+        543,
+        588,
+        799,
+        1099
+      ]
+    },
+    {
+      "path": "packages/system/Transact/test/Transact-test.cpp",
+      "sha256": "e0202aba8fe392a68bc13984119b18cdc7469ca83dafae10eb61f76373e0d07b",
+      "direct_legacy_method_lines": [
+        573,
+        574
+      ],
+      "action_cutover_candidate_lines": [
+        573,
+        574
+      ],
+      "service_method_dependent_lines": [
+        483,
+        545,
+        560,
+        573,
+        574
+      ],
+      "direct_or_dependent_lines": [
+        483,
+        545,
+        560,
+        573,
+        574
+      ]
+    },
+    {
+      "path": "packages/system/VerifySig/src/VerifySig.cpp",
+      "sha256": "749047a0f06ad2196493aef151838e51bb03b8018548f948b7f828770a01f483",
+      "direct_legacy_method_lines": [
+        17
+      ],
+      "action_cutover_candidate_lines": [
+        17
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        17
+      ]
+    },
+    {
+      "path": "packages/user/Events/include/services/user/EventIndex.hpp",
+      "sha256": "5997b5a2e5b9184c76066153de2d88a7f4a812459c7f3c7a5a97c4cc948f5ff9",
+      "direct_legacy_method_lines": [
+        4,
+        18
+      ],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        4,
+        18
+      ]
+    },
+    {
+      "path": "packages/user/Events/include/services/user/Events.hpp",
+      "sha256": "c1f35222d883d65c176e058209c2df2e0a950b70d9475b53ff174339f4859ae4",
+      "direct_legacy_method_lines": [
+        5,
+        64,
+        68
+      ],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        5,
+        64,
+        68
+      ]
+    },
+    {
+      "path": "packages/user/Events/include/services/user/EventsTables.hpp",
+      "sha256": "d1c8da47f56bde5ba970119252c3a501c76810b410d5b1b9f7a95bcec9bba2ee",
+      "direct_legacy_method_lines": [
+        5,
+        32,
+        73,
+        87,
+        119
+      ],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        5,
+        32,
+        73,
+        87,
+        119
+      ]
+    },
+    {
+      "path": "packages/user/Events/src/EventConfig.cpp",
+      "sha256": "7b31df17d70443d9ee2826de65be84980837635d7ed98dbde161dcfa68041829",
+      "direct_legacy_method_lines": [
+        42,
+        64
+      ],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        42,
+        64
+      ]
+    },
+    {
+      "path": "packages/user/Events/src/EventIndex.cpp",
+      "sha256": "446df5fe2129f05facabb93b51d2b129269f6a6aefed52ea8b1300cb37483999",
+      "direct_legacy_method_lines": [
+        18
+      ],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        18
+      ]
+    },
+    {
+      "path": "packages/user/Events/src/REvents.cpp",
+      "sha256": "f83ac6b70f408b884a587ed77f008656b030b29a0bb2a017a7c041397b9c078a",
+      "direct_legacy_method_lines": [
+        118,
+        449,
+        475,
+        1064
+      ],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        118,
+        449,
+        475,
+        1064
+      ]
+    },
+    {
+      "path": "packages/user/Events/src/SchemaCache.cpp",
+      "sha256": "d0d372a47df1260cffbb558979750e661d2b261af553f3fec79efe9290721728",
+      "direct_legacy_method_lines": [
+        15
+      ],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        15
+      ]
+    },
+    {
+      "path": "packages/user/Events/src/SchemaCache.hpp",
+      "sha256": "d56b3468cfd1295a87a732aeb68080fa4dc3e0b22fd9922b78410b72987161d8",
+      "direct_legacy_method_lines": [
+        14
+      ],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        14
+      ]
+    },
+    {
+      "path": "packages/user/Events/src/eventKeys.hpp",
+      "sha256": "e967af5b0d4707a04e3a63e993d7b6d17a9a92cd24cbf1e8ee5b01f5b257f6b9",
+      "direct_legacy_method_lines": [
+        6,
+        19
+      ],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        6,
+        19
+      ]
+    },
+    {
+      "path": "packages/user/Events/test/EventsTest.cpp",
+      "sha256": "14cf94e32ab026996ffed558f2a6651486688d861f6f9dcf7971b314d8bb839c",
+      "direct_legacy_method_lines": [
+        121,
+        124,
+        130,
+        134,
+        137,
+        140,
+        197,
+        215,
+        239,
+        280,
+        293
+      ],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        121,
+        124,
+        130,
+        134,
+        137,
+        140,
+        197,
+        215,
+        239,
+        280,
+        293
+      ]
+    },
+    {
+      "path": "packages/user/Explorer/src/Explorer.cpp",
+      "sha256": "de26f3e4a3bcf63767fb4d19ce8046762f0c2b9ed0df26b1b0ca01c4849a6355",
+      "direct_legacy_method_lines": [
+        34,
+        63
+      ],
+      "action_cutover_candidate_lines": [
+        34,
+        63
+      ],
+      "service_method_dependent_lines": [
+        34
+      ],
+      "direct_or_dependent_lines": [
+        34,
+        63
+      ]
+    },
+    {
+      "path": "packages/user/Explorer/test/Explorer-test.cpp",
+      "sha256": "1ec8893b85fee197f84349f475df1fa6516773e032130ff45be28cb5905b8534",
+      "direct_legacy_method_lines": [
+        15,
+        91,
+        235,
+        287
+      ],
+      "action_cutover_candidate_lines": [
+        15,
+        91,
+        235,
+        287
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        15,
+        91,
+        235,
+        287
+      ]
+    },
+    {
+      "path": "packages/user/Invite/src/Invite.cpp",
+      "sha256": "71ea1314fa7d81ed345d6ea4069398055078dbb58946e7f547f035d565c5a276",
+      "direct_legacy_method_lines": [
+        49,
+        50,
+        58,
+        77,
+        78,
+        150
+      ],
+      "action_cutover_candidate_lines": [
+        49,
+        50,
+        58,
+        150
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        49,
+        50,
+        58,
+        77,
+        78,
+        150
+      ]
+    },
+    {
+      "path": "packages/user/Tokens/include/services/user/tokenTables.hpp",
+      "sha256": "e8427c732bf9f99f3ee2d19afd1547fc8b72402843eec07353cee6769d95bce3",
+      "direct_legacy_method_lines": [
+        5
+      ],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        5
+      ]
+    },
+    {
+      "path": "packages/user/Tokens/test/src/Tokens-test.cpp",
+      "sha256": "8fa2cd07a74f8b8526750976779504ce2d2f89bd426da374d3cf4e4b6204989d",
+      "direct_legacy_method_lines": [
+        4
+      ],
+      "action_cutover_candidate_lines": [],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        4
+      ]
+    },
+    {
+      "path": "programs/psinode/main.cpp",
+      "sha256": "3956d3ad4536e6ae3ce5847bf9c0d9183b97983d681d86c1392b7eb8825149c7",
+      "direct_legacy_method_lines": [
+        1858
+      ],
+      "action_cutover_candidate_lines": [
+        1858
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        1858
+      ]
+    },
+    {
+      "path": "programs/snapshot/LightValidator.hpp",
+      "sha256": "cf5bffb4dcf601a67a5014deff8e5f724a266631324925c8a3f47bc0b0c0a189",
+      "direct_legacy_method_lines": [
+        294
+      ],
+      "action_cutover_candidate_lines": [
+        294
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        294
+      ]
+    },
+    {
+      "path": "programs/snapshot/load-snapshot.cpp",
+      "sha256": "82bff3ce792749065975c4d189ce237a637148fc54fb223c7656a1111bd39749",
+      "direct_legacy_method_lines": [
+        234
+      ],
+      "action_cutover_candidate_lines": [
+        234
+      ],
+      "service_method_dependent_lines": [],
+      "direct_or_dependent_lines": [
+        234
+      ]
+    }
+  ]
+}

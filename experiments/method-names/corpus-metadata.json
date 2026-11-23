@@ -1,0 +1,800 @@
+{
+  "corpus_sha256": "1c2c627635f7ecae0aadf8d9e94658fd25a4e6939e6a10df2aa8086b5cd4080b",
+  "downloaded_code_executed": false,
+  "limitations": [
+    "Identifier extraction is lexical, not a full protobuf/YAML/TypeScript parser.",
+    "OpenAPI operationIds are generated public API names, not simple source function declarations.",
+    "TypeScript interface methods exclude computed Symbol names and callable properties; overloads coalesce within interface/file.",
+    "CCXT is restricted to declared unified capability methods, not all exported base-class helpers or exchange adapters.",
+    "Google service/version duplicates are retained explicitly; report unique names as well as occurrence-weighted results."
+  ],
+  "purpose": "Read-only extracted API identifiers for a method codec experiment",
+  "records": 22480,
+  "sources": {
+    "ccxt": {
+      "definition_files_inspected": 2,
+      "download_bytes": 611039,
+      "download_kind": "pinned raw unified API declarations",
+      "download_sha256": "a4afbdf0bcca3b4c192458600d64c2009987fae478a36f50cbebe9345abf1445",
+      "downloads": [
+        {
+          "bytes": 530572,
+          "path": "ts/src/base/Exchange.ts",
+          "sha256": "e4d0ffa82df9e39155830a4a333e2ed2d9342ff44e35a33b2536b26bbdcb61d6",
+          "url": "https://raw.githubusercontent.com/ccxt/ccxt/1d184b2a025d4008d03ec9dd1ff74ae726067d17/ts/src/base/Exchange.ts"
+        },
+        {
+          "bytes": 80467,
+          "path": "js/src/base/Exchange.d.ts",
+          "sha256": "d95b295f1f52a9fbdca76e3958f78c85e3a01a6af640eb1ce54a6ac800e18b42",
+          "url": "https://raw.githubusercontent.com/ccxt/ccxt/1d184b2a025d4008d03ec9dd1ff74ae726067d17/js/src/base/Exchange.d.ts"
+        }
+      ],
+      "extraction": "Only base-class declared method signatures intersecting the unified has capability map; raw REST aliases, properties and internal helpers excluded",
+      "license": "MIT",
+      "license_sha256": "1086fddb6d4084c1d5ef1175ff9e524c574a4c5b27255258911a58d8b9efa39c",
+      "license_url": "https://github.com/ccxt/ccxt/blob/1d184b2a025d4008d03ec9dd1ff74ae726067d17/LICENSE.txt",
+      "records": 208,
+      "repository": "ccxt/ccxt",
+      "revision": "1d184b2a025d4008d03ec9dd1ff74ae726067d17",
+      "services": 2,
+      "split_groups": 1,
+      "unique_methods": 208,
+      "url": "https://github.com/ccxt/ccxt"
+    },
+    "ethereum": {
+      "definition_files_inspected": 46,
+      "download_bytes": 2587467,
+      "download_sha256": "bca0f4289b3186e12c784fd373f13f9126b815cd48834fe4630834827366e229",
+      "download_url": "https://codeload.github.com/ethereum/execution-apis/tar.gz/1a1f8e129c11b221e72f1a7830bfaef84d1004ca",
+      "license": "CC0-1.0",
+      "license_sha256": "36ffd9dc085d529a7e60e1276d73ae5a030b020313e6c5408593a6ae2af39673",
+      "license_url": "https://github.com/ethereum/execution-apis/blob/1a1f8e129c11b221e72f1a7830bfaef84d1004ca/LICENSE",
+      "records": 93,
+      "repository": "ethereum/execution-apis",
+      "revision": "1a1f8e129c11b221e72f1a7830bfaef84d1004ca",
+      "services": 6,
+      "split_groups": 6,
+      "unique_methods": 93,
+      "url": "https://github.com/ethereum/execution-apis"
+    },
+    "ethers": {
+      "definition_files_inspected": 3,
+      "download_bytes": 73680,
+      "download_kind": "pinned raw unified API declarations",
+      "download_sha256": "4c68422e2d5474f06cb8badbbc0f5679d4ab09396b0ceec97cda11f64c721659",
+      "downloads": [
+        {
+          "bytes": 66080,
+          "path": "src.ts/providers/provider.ts",
+          "sha256": "ac6c318e0f889ec4593e9183483115fc48e23846830d4d3596a274fe7f04d2b3",
+          "url": "https://raw.githubusercontent.com/ethers-io/ethers.js/3ea4c226dd0b3a074abf90748de9d11192027f4f/src.ts/providers/provider.ts"
+        },
+        {
+          "bytes": 6378,
+          "path": "src.ts/providers/signer.ts",
+          "sha256": "7a5c4c210046d34becfb9d9682938916661028d22dd6c4e8826a32e2d8d7460e",
+          "url": "https://raw.githubusercontent.com/ethers-io/ethers.js/3ea4c226dd0b3a074abf90748de9d11192027f4f/src.ts/providers/signer.ts"
+        },
+        {
+          "bytes": 1222,
+          "path": "src.ts/providers/contracts.ts",
+          "sha256": "ad14ba10b15b6283b93692e46dde07e8672d42443c66d55b7f0c967d07730616",
+          "url": "https://raw.githubusercontent.com/ethers-io/ethers.js/3ea4c226dd0b3a074abf90748de9d11192027f4f/src.ts/providers/contracts.ts"
+        }
+      ],
+      "extraction": "Named public interface methods in provider, signer and contract-runner definitions; implementation classes/private helpers excluded",
+      "license": "MIT",
+      "license_sha256": "44eea86637405118248327fbe9d9fa95d04c7a57221c7e8c155f736db9f1b612",
+      "license_url": "https://github.com/ethers-io/ethers.js/blob/3ea4c226dd0b3a074abf90748de9d11192027f4f/LICENSE.md",
+      "records": 34,
+      "repository": "ethers-io/ethers.js",
+      "revision": "3ea4c226dd0b3a074abf90748de9d11192027f4f",
+      "services": 2,
+      "split_groups": 2,
+      "unique_methods": 31,
+      "url": "https://github.com/ethers-io/ethers.js"
+    },
+    "googleapis": {
+      "definition_files_inspected": 7519,
+      "download_bytes": 13778241,
+      "download_sha256": "4a94310130b07ef04f1695e132f9d1fcb07132bd81ec3f20f84e90e3b408016e",
+      "download_url": "https://codeload.github.com/googleapis/googleapis/tar.gz/56eddd2a45213efec86ad4a36246923b0b7a1a58",
+      "license": "Apache-2.0",
+      "license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "license_url": "https://github.com/googleapis/googleapis/blob/56eddd2a45213efec86ad4a36246923b0b7a1a58/LICENSE",
+      "records": 15211,
+      "repository": "googleapis/googleapis",
+      "revision": "56eddd2a45213efec86ad4a36246923b0b7a1a58",
+      "services": 1898,
+      "split_groups": 1060,
+      "unique_methods": 6686,
+      "url": "https://github.com/googleapis/googleapis"
+    },
+    "kubernetes": {
+      "download_bytes": 4381165,
+      "download_sha256": "a5ffd0509edb2be823776fd0432bd480de8d0783038331a8087435c8ac1de66f",
+      "download_url": "https://raw.githubusercontent.com/kubernetes/kubernetes/43cbb94ee845ad387717fe851bf5f421b7284329/api/openapi-spec/swagger.json",
+      "license": "Apache-2.0",
+      "license_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "license_url": "https://github.com/kubernetes/kubernetes/blob/43cbb94ee845ad387717fe851bf5f421b7284329/LICENSE",
+      "records": 1175,
+      "repository": "kubernetes/kubernetes",
+      "revision": "43cbb94ee845ad387717fe851bf5f421b7284329",
+      "services": 64,
+      "split_groups": 29,
+      "unique_methods": 1175,
+      "url": "https://github.com/kubernetes/kubernetes"
+    },
+    "typescript-dom": {
+      "definition_files_inspected": 15,
+      "download_bytes": 4780213,
+      "download_kind": "pinned raw declaration files",
+      "download_sha256": "fa83b2f73ef0f853cf3600d08924d654cd3d3ba30cbf03c63c2024b93e5d56db",
+      "downloads": [
+        {
+          "bytes": 119,
+          "path": "baselines/audioworklet.asynciterable.generated.d.ts",
+          "sha256": "90c917e57e6717b38892be7cbfe9a21830711c74dd4bb4c0c97472dbebddf379",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-DOM-lib-generator/8859ea03105d2bfc9189a3a7465b80e3def10d4f/baselines/audioworklet.asynciterable.generated.d.ts"
+        },
+        {
+          "bytes": 101265,
+          "path": "baselines/audioworklet.generated.d.ts",
+          "sha256": "c5e50f8a74a32aacf6f8dbac5c429ce1d5d83024ce8acaee82de5e7b8b634a9d",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-DOM-lib-generator/8859ea03105d2bfc9189a3a7465b80e3def10d4f/baselines/audioworklet.generated.d.ts"
+        },
+        {
+          "bytes": 119,
+          "path": "baselines/audioworklet.iterable.generated.d.ts",
+          "sha256": "90c917e57e6717b38892be7cbfe9a21830711c74dd4bb4c0c97472dbebddf379",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-DOM-lib-generator/8859ea03105d2bfc9189a3a7465b80e3def10d4f/baselines/audioworklet.iterable.generated.d.ts"
+        },
+        {
+          "bytes": 119,
+          "path": "baselines/dom.asynciterable.generated.d.ts",
+          "sha256": "90c917e57e6717b38892be7cbfe9a21830711c74dd4bb4c0c97472dbebddf379",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-DOM-lib-generator/8859ea03105d2bfc9189a3a7465b80e3def10d4f/baselines/dom.asynciterable.generated.d.ts"
+        },
+        {
+          "bytes": 2426852,
+          "path": "baselines/dom.generated.d.ts",
+          "sha256": "cf2d63a32223df563570123297a9f49c37b3fbfddaadf47cd01c76949e449ff8",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-DOM-lib-generator/8859ea03105d2bfc9189a3a7465b80e3def10d4f/baselines/dom.generated.d.ts"
+        },
+        {
+          "bytes": 119,
+          "path": "baselines/dom.iterable.generated.d.ts",
+          "sha256": "90c917e57e6717b38892be7cbfe9a21830711c74dd4bb4c0c97472dbebddf379",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-DOM-lib-generator/8859ea03105d2bfc9189a3a7465b80e3def10d4f/baselines/dom.iterable.generated.d.ts"
+        },
+        {
+          "bytes": 119,
+          "path": "baselines/serviceworker.asynciterable.generated.d.ts",
+          "sha256": "90c917e57e6717b38892be7cbfe9a21830711c74dd4bb4c0c97472dbebddf379",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-DOM-lib-generator/8859ea03105d2bfc9189a3a7465b80e3def10d4f/baselines/serviceworker.asynciterable.generated.d.ts"
+        },
+        {
+          "bytes": 726604,
+          "path": "baselines/serviceworker.generated.d.ts",
+          "sha256": "47477e12e1c760516c6289c7921772247ddd1edd9125fcd1623d3c520a6108f2",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-DOM-lib-generator/8859ea03105d2bfc9189a3a7465b80e3def10d4f/baselines/serviceworker.generated.d.ts"
+        },
+        {
+          "bytes": 119,
+          "path": "baselines/serviceworker.iterable.generated.d.ts",
+          "sha256": "90c917e57e6717b38892be7cbfe9a21830711c74dd4bb4c0c97472dbebddf379",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-DOM-lib-generator/8859ea03105d2bfc9189a3a7465b80e3def10d4f/baselines/serviceworker.iterable.generated.d.ts"
+        },
+        {
+          "bytes": 119,
+          "path": "baselines/sharedworker.asynciterable.generated.d.ts",
+          "sha256": "90c917e57e6717b38892be7cbfe9a21830711c74dd4bb4c0c97472dbebddf379",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-DOM-lib-generator/8859ea03105d2bfc9189a3a7465b80e3def10d4f/baselines/sharedworker.asynciterable.generated.d.ts"
+        },
+        {
+          "bytes": 710347,
+          "path": "baselines/sharedworker.generated.d.ts",
+          "sha256": "6bac8cfe88031f8a6abed5fed8d9bb4bf8c3fa6a373c37c2575b1c7e700c2164",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-DOM-lib-generator/8859ea03105d2bfc9189a3a7465b80e3def10d4f/baselines/sharedworker.generated.d.ts"
+        },
+        {
+          "bytes": 119,
+          "path": "baselines/sharedworker.iterable.generated.d.ts",
+          "sha256": "90c917e57e6717b38892be7cbfe9a21830711c74dd4bb4c0c97472dbebddf379",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-DOM-lib-generator/8859ea03105d2bfc9189a3a7465b80e3def10d4f/baselines/sharedworker.iterable.generated.d.ts"
+        },
+        {
+          "bytes": 119,
+          "path": "baselines/webworker.asynciterable.generated.d.ts",
+          "sha256": "90c917e57e6717b38892be7cbfe9a21830711c74dd4bb4c0c97472dbebddf379",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-DOM-lib-generator/8859ea03105d2bfc9189a3a7465b80e3def10d4f/baselines/webworker.asynciterable.generated.d.ts"
+        },
+        {
+          "bytes": 813955,
+          "path": "baselines/webworker.generated.d.ts",
+          "sha256": "99948d0cf298f69f5c4f2a613205aba0dd80792c7af70289992d2c39f85644a2",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-DOM-lib-generator/8859ea03105d2bfc9189a3a7465b80e3def10d4f/baselines/webworker.generated.d.ts"
+        },
+        {
+          "bytes": 119,
+          "path": "baselines/webworker.iterable.generated.d.ts",
+          "sha256": "90c917e57e6717b38892be7cbfe9a21830711c74dd4bb4c0c97472dbebddf379",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript-DOM-lib-generator/8859ea03105d2bfc9189a3a7465b80e3def10d4f/baselines/webworker.iterable.generated.d.ts"
+        }
+      ],
+      "extraction": "Named top-level interface methods; function properties and computed symbol methods excluded; same-interface/file overloads coalesced",
+      "license": "Apache-2.0",
+      "license_sha256": "a5e9f9b1575301c7a7a03508fdaa2e05a918cc17fd21c6e898096a96d6a34f61",
+      "license_url": "https://github.com/microsoft/TypeScript-DOM-lib-generator/blob/8859ea03105d2bfc9189a3a7465b80e3def10d4f/LICENSE.txt",
+      "records": 4830,
+      "repository": "microsoft/TypeScript-DOM-lib-generator",
+      "revision": "8859ea03105d2bfc9189a3a7465b80e3def10d4f",
+      "services": 546,
+      "split_groups": 546,
+      "unique_methods": 1153,
+      "url": "https://github.com/microsoft/TypeScript-DOM-lib-generator"
+    },
+    "typescript-es": {
+      "definition_files_inspected": 90,
+      "download_bytes": 510570,
+      "download_kind": "pinned raw declaration files",
+      "download_sha256": "41ab7da683f8a5690290cf9e60f170bb4c46eb63ea03c3beaf6951feab7f8172",
+      "downloads": [
+        {
+          "bytes": 4505,
+          "path": "src/lib/es2015.collection.d.ts",
+          "sha256": "3fdbfe4ee086c520541038564f037e09b42c3bbcb91af0b958724fe07df10499",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2015.collection.d.ts"
+        },
+        {
+          "bytes": 22592,
+          "path": "src/lib/es2015.core.d.ts",
+          "sha256": "ed64b7e6628be7b6b06196bc446235d2dd79d0e20744a7bdf471020e5e43cb6c",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2015.core.d.ts"
+        },
+        {
+          "bytes": 398,
+          "path": "src/lib/es2015.d.ts",
+          "sha256": "d7a41229106a5340f9a821ad3f407782df57e686cb5dde1be8455f1eda23e131",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2015.d.ts"
+        },
+        {
+          "bytes": 184,
+          "path": "src/lib/es2015.full.d.ts",
+          "sha256": "eb376b8763e1001330f279fdfb58879a1dedddd65c858ef1c4c7dfca6238dbe2",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2015.full.d.ts"
+        },
+        {
+          "bytes": 1763,
+          "path": "src/lib/es2015.generator.d.ts",
+          "sha256": "3b6518dfd20f600982c1f79c4e3683f91ae5a85c23bf0e6ed7e81e3a1f37762a",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2015.generator.d.ts"
+        },
+        {
+          "bytes": 17934,
+          "path": "src/lib/es2015.iterable.d.ts",
+          "sha256": "c196fd589ca7a34533775e9b52674af70fd18ca8e5f07c3b717ddae2c5080656",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2015.iterable.d.ts"
+        },
+        {
+          "bytes": 2410,
+          "path": "src/lib/es2015.promise.d.ts",
+          "sha256": "cce52a2b34fbbd88cec4025a4ff49728817b55927ffeb8e8a74a34cc17a32c0a",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2015.promise.d.ts"
+        },
+        {
+          "bytes": 4508,
+          "path": "src/lib/es2015.proxy.d.ts",
+          "sha256": "3c7de5b8825daa4626eba6eca9608bc2d64fa54148915203a954eed7e377e270",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2015.proxy.d.ts"
+        },
+        {
+          "bytes": 5766,
+          "path": "src/lib/es2015.reflect.d.ts",
+          "sha256": "259fd3197c6c583600ce814c87f5320c9067c84db51acadab2e2d0feb91f01f8",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2015.reflect.d.ts"
+        },
+        {
+          "bytes": 824,
+          "path": "src/lib/es2015.symbol.d.ts",
+          "sha256": "a55f533eb6e22379922524e55ad24a4861ecfc550d48b1f5fee9b334f25d17b4",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2015.symbol.d.ts"
+        },
+        {
+          "bytes": 10465,
+          "path": "src/lib/es2015.symbol.wellknown.d.ts",
+          "sha256": "6cdc07feaac947ce54f6315890d65ff9116bf100a0aaed96576c9fbd3bd7c38b",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2015.symbol.wellknown.d.ts"
+        },
+        {
+          "bytes": 4449,
+          "path": "src/lib/es2016.array.include.d.ts",
+          "sha256": "c91d6d83d8e051810bee33b99d990fc13a4398ddfef240f903c98efb454d5731",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2016.array.include.d.ts"
+        },
+        {
+          "bytes": 115,
+          "path": "src/lib/es2016.d.ts",
+          "sha256": "7e01bfd48d74e97c1ecfdb4e4c3bf695ae5829881d244ecbd089b40f51577b5e",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2016.d.ts"
+        },
+        {
+          "bytes": 184,
+          "path": "src/lib/es2016.full.d.ts",
+          "sha256": "cc3e5957e8119f8e4cc0e15c3b3b58016938e871999c71bdc89e0f54af12df17",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2016.full.d.ts"
+        },
+        {
+          "bytes": 644,
+          "path": "src/lib/es2016.intl.d.ts",
+          "sha256": "75ceba53078f8f2f3598b75727900ff115f96ca415fd5ee00752d995bac49861",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2016.intl.d.ts"
+        },
+        {
+          "bytes": 65,
+          "path": "src/lib/es2017.arraybuffer.d.ts",
+          "sha256": "521a5b5d2bae74439ff66f23c9967241109028439880c6afa980026f2d08c4f8",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2017.arraybuffer.d.ts"
+        },
+        {
+          "bytes": 317,
+          "path": "src/lib/es2017.d.ts",
+          "sha256": "36136609449f6a5b779516c2797ccf37ec0aabbcb2ad4b3aac3a2b7e3d857a8b",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2017.d.ts"
+        },
+        {
+          "bytes": 1076,
+          "path": "src/lib/es2017.date.d.ts",
+          "sha256": "bee769d62f141913ac872d52d8c7eaee1e2d506b72b54fd0ce44e49d3fc9fd49",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2017.date.d.ts"
+        },
+        {
+          "bytes": 184,
+          "path": "src/lib/es2017.full.d.ts",
+          "sha256": "b5b8e8c632c5d336cb6282f2acd87a78cdbcf2e786088c1105e4eafdc717c2c5",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2017.full.d.ts"
+        },
+        {
+          "bytes": 622,
+          "path": "src/lib/es2017.intl.d.ts",
+          "sha256": "f9b8edb6ab7437cd687e7e4d0836a9ce439c34852907c3db8f744378262e5168",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2017.intl.d.ts"
+        },
+        {
+          "bytes": 1651,
+          "path": "src/lib/es2017.object.d.ts",
+          "sha256": "c2611bd81c212755401ddbd80063dbf5d97d36ed8616e29c3ce8a9f5f49b30aa",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2017.object.d.ts"
+        },
+        {
+          "bytes": 6473,
+          "path": "src/lib/es2017.sharedmemory.d.ts",
+          "sha256": "76249d3d8b1f22b9b0b23601138a575c19cde5aa6fd4c0fea305680da8a19923",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2017.sharedmemory.d.ts"
+        },
+        {
+          "bytes": 1552,
+          "path": "src/lib/es2017.string.d.ts",
+          "sha256": "1f7a5a1911a66cdb3197cd314bfbf338355b1b5706cf65c8e20a5178c3c3e707",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2017.string.d.ts"
+        },
+        {
+          "bytes": 724,
+          "path": "src/lib/es2017.typedarrays.d.ts",
+          "sha256": "faf73eb1ffb56628d3d76c71bb622f72ee09943d3ea8a33a79713df90268279a",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2017.typedarrays.d.ts"
+        },
+        {
+          "bytes": 1898,
+          "path": "src/lib/es2018.asyncgenerator.d.ts",
+          "sha256": "cf59739cf25de29f65b2f957e590cf38771eed9a5830077c60ff123d0bb0383e",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2018.asyncgenerator.d.ts"
+        },
+        {
+          "bytes": 1439,
+          "path": "src/lib/es2018.asynciterable.d.ts",
+          "sha256": "6d5b98935060d024e29786d723abce705c972d158d173c5ba8d22ec24ca73bd5",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2018.asynciterable.d.ts"
+        },
+        {
+          "bytes": 241,
+          "path": "src/lib/es2018.d.ts",
+          "sha256": "579d2996bee941aaf6ca72b77ed9e1369d8799ef1854948c6a0d6402eee9d009",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2018.d.ts"
+        },
+        {
+          "bytes": 227,
+          "path": "src/lib/es2018.full.d.ts",
+          "sha256": "5608c7eb712ee3f23d1bdf1b135e40d7dd6324c4c08fcb62a240b60dbc5cabe9",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2018.full.d.ts"
+        },
+        {
+          "bytes": 2233,
+          "path": "src/lib/es2018.intl.d.ts",
+          "sha256": "8f31cab84cfafb466b982bef69d09ecec2da2a9cba690657645b148fa441f52a",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2018.intl.d.ts"
+        },
+        {
+          "bytes": 512,
+          "path": "src/lib/es2018.promise.d.ts",
+          "sha256": "5ed277f1f8df62a7fd74725c55eb3018d55be340a8150fadfaa5ea47a81c908c",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2018.promise.d.ts"
+        },
+        {
+          "bytes": 398,
+          "path": "src/lib/es2018.regexp.d.ts",
+          "sha256": "460dd42677ae4238ff376bd1564f5d55b64f3288808654f18711800f2e31bcc2",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2018.regexp.d.ts"
+        },
+        {
+          "bytes": 2371,
+          "path": "src/lib/es2019.array.d.ts",
+          "sha256": "19236bc4de5e45b5b992b00b4c985eff02305e0639ea93035a0b2fed5a79f768",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2019.array.d.ts"
+        },
+        {
+          "bytes": 224,
+          "path": "src/lib/es2019.d.ts",
+          "sha256": "bcd7e7c8d2273cf22f26ce07fdf8a459ca2e8fcfeed9b4a49e8752746b10095a",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2019.d.ts"
+        },
+        {
+          "bytes": 227,
+          "path": "src/lib/es2019.full.d.ts",
+          "sha256": "c0579688d541db005772f23a60de60c2e05066efc3978c9e541027508f84fb45",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2019.full.d.ts"
+        },
+        {
+          "bytes": 110,
+          "path": "src/lib/es2019.intl.d.ts",
+          "sha256": "7f9dd0aedb2c70bb73544308f4ca02a74851ad7948f662730026a43c35f38af7",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2019.intl.d.ts"
+        },
+        {
+          "bytes": 635,
+          "path": "src/lib/es2019.object.d.ts",
+          "sha256": "6b9136dc7390f45362bddbb1c8440cc080db642ff01205727947a0888de23928",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2019.object.d.ts"
+        },
+        {
+          "bytes": 694,
+          "path": "src/lib/es2019.string.d.ts",
+          "sha256": "58804f56bfa24149a1a77b19c114f234c9fc03f29d8d7536e105744fbb1bd1af",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2019.string.d.ts"
+        },
+        {
+          "bytes": 159,
+          "path": "src/lib/es2019.symbol.d.ts",
+          "sha256": "33c700c3a3806f1ef9339027111b6b29abf89d78414a418d45baa0ea267d9fca",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2019.symbol.d.ts"
+        },
+        {
+          "bytes": 38079,
+          "path": "src/lib/es2020.bigint.d.ts",
+          "sha256": "0f79ae7623ec7ea3fe0e08aed8f843124375514c97219b5f9dc4bdd17b4da6f2",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2020.bigint.d.ts"
+        },
+        {
+          "bytes": 357,
+          "path": "src/lib/es2020.d.ts",
+          "sha256": "fabb62f3cae302f00084ecfaf69fe1015a7db77fd5eca87eb73870072d5cd5c6",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2020.d.ts"
+        },
+        {
+          "bytes": 2127,
+          "path": "src/lib/es2020.date.d.ts",
+          "sha256": "c45c0120bfebfe339c9b52548bb6b646e7edd24f9a2a7c581ba0d401df0c34d0",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2020.date.d.ts"
+        },
+        {
+          "bytes": 227,
+          "path": "src/lib/es2020.full.d.ts",
+          "sha256": "8d67f55a4a0094c579eb5186cb3b21ab801cd6504b96466b50fdfa10a8607eaf",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2020.full.d.ts"
+        },
+        {
+          "bytes": 22041,
+          "path": "src/lib/es2020.intl.d.ts",
+          "sha256": "78e5b069d6f84747f8ed22d8413b093776d34c98160d609f9fe8caf94ba308d0",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2020.intl.d.ts"
+        },
+        {
+          "bytes": 744,
+          "path": "src/lib/es2020.number.d.ts",
+          "sha256": "b62aad5b52b97c2974db418cedc131a56730f047dcd80b93fc03cb98dd56d623",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2020.number.d.ts"
+        },
+        {
+          "bytes": 979,
+          "path": "src/lib/es2020.promise.d.ts",
+          "sha256": "cc2b7d9097dc58cac431d0e2c617601b60fafa11b25b6bb3f9766f0c6a5967fa",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2020.promise.d.ts"
+        },
+        {
+          "bytes": 4356,
+          "path": "src/lib/es2020.sharedmemory.d.ts",
+          "sha256": "4ab6471540800df5c0244ab77fd4a88a94a439b12201ee305af7c1933905526e",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2020.sharedmemory.d.ts"
+        },
+        {
+          "bytes": 1729,
+          "path": "src/lib/es2020.string.d.ts",
+          "sha256": "1b56728cf4b4e617d06c962d7b074122f45ed5aed8829b4e6f3d1fda3f78412d",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2020.string.d.ts"
+        },
+        {
+          "bytes": 776,
+          "path": "src/lib/es2020.symbol.wellknown.d.ts",
+          "sha256": "87a4ef013e8d21814ca986a90c6f5a76847e280bcecb6b498d2c0b17b7286f8e",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2020.symbol.wellknown.d.ts"
+        },
+        {
+          "bytes": 188,
+          "path": "src/lib/es2021.d.ts",
+          "sha256": "4042428ede7c4ffb7386ab6f047ad87ab31ecd96d46061f7bf078515b4d9914a",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2021.d.ts"
+        },
+        {
+          "bytes": 227,
+          "path": "src/lib/es2021.full.d.ts",
+          "sha256": "7b1c900ab996f7c4fcd3e23f8359283f9f3e2a6895220760e11f57038077b179",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2021.full.d.ts"
+        },
+        {
+          "bytes": 7540,
+          "path": "src/lib/es2021.intl.d.ts",
+          "sha256": "f13505d03f2bee8acd2277f976acec70bf61aa5754dede65a3fe024e81d0b9c6",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2021.intl.d.ts"
+        },
+        {
+          "bytes": 1439,
+          "path": "src/lib/es2021.promise.d.ts",
+          "sha256": "fcdd5be9c79bed17d7f47177c0a8c81e7b8d6e5d32f02e4f8c75bedc6e39fd1c",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2021.promise.d.ts"
+        },
+        {
+          "bytes": 754,
+          "path": "src/lib/es2021.string.d.ts",
+          "sha256": "9ea4db8182e29f885040a9fb5fcd72b30f93885ae27b1c9ec5b8e37c2a391a28",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2021.string.d.ts"
+        },
+        {
+          "bytes": 2378,
+          "path": "src/lib/es2021.weakref.d.ts",
+          "sha256": "57a7819b99f2fea4a5eacea680b852c7aa254738ced54c2e2430b0db950ba65d",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2021.weakref.d.ts"
+        },
+        {
+          "bytes": 3926,
+          "path": "src/lib/es2022.array.d.ts",
+          "sha256": "29dc207282cc18496b2b78a70ee7df23e1b90de41cd06348353df473dd7c8883",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2022.array.d.ts"
+        },
+        {
+          "bytes": 262,
+          "path": "src/lib/es2022.d.ts",
+          "sha256": "2ffcf71111860490c7a88bb9857f60b75dd852e68c0f68345b9e59ec9e428cb4",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2022.d.ts"
+        },
+        {
+          "bytes": 1583,
+          "path": "src/lib/es2022.error.d.ts",
+          "sha256": "24e59a5ddc94a48a3ca2168f522ce9f46b714c797731ab24d6d0265b7675b9ce",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2022.error.d.ts"
+        },
+        {
+          "bytes": 227,
+          "path": "src/lib/es2022.full.d.ts",
+          "sha256": "6b17ebc9a4dd464341ef962ffd2a83e825980b0801c4bc22b4692c69b8159fc1",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2022.full.d.ts"
+        },
+        {
+          "bytes": 6966,
+          "path": "src/lib/es2022.intl.d.ts",
+          "sha256": "d2e74ee882e77888d82c4b7763fa32b8fd5aab659634651efcb51cb57172e1f5",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2022.intl.d.ts"
+        },
+        {
+          "bytes": 240,
+          "path": "src/lib/es2022.object.d.ts",
+          "sha256": "c5fa52e962d4a9d0c8b639a1b9bb4b61fdc2f6bdd9c4205cb13d0eb47c0fa85b",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2022.object.d.ts"
+        },
+        {
+          "bytes": 499,
+          "path": "src/lib/es2022.regexp.d.ts",
+          "sha256": "e745de9608a03cf82627df00fc84ded0e4ccde78a398062b5267816d9b864e7f",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2022.regexp.d.ts"
+        },
+        {
+          "bytes": 309,
+          "path": "src/lib/es2022.string.d.ts",
+          "sha256": "2789b507b24f25f759956058eede1170a0ded4e6965b78e2a86699f5e3288c63",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2022.string.d.ts"
+        },
+        {
+          "bytes": 40289,
+          "path": "src/lib/es2023.array.d.ts",
+          "sha256": "a8825136a4c2356cec601b01061e734f11038ebce6eada3c7379688aa603f96a",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2023.array.d.ts"
+        },
+        {
+          "bytes": 50,
+          "path": "src/lib/es2023.collection.d.ts",
+          "sha256": "f91a6e4fcd633152c8b0b23f082b8d83cea3df3f459fbf589aaba48503c6b34a",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2023.collection.d.ts"
+        },
+        {
+          "bytes": 150,
+          "path": "src/lib/es2023.d.ts",
+          "sha256": "cf8b525e6d003cc22064954c193300982764567b0a4bcacd39354f473e1dfeba",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2023.d.ts"
+        },
+        {
+          "bytes": 227,
+          "path": "src/lib/es2023.full.d.ts",
+          "sha256": "69f03c5a49661f6350a72ce4be5d35194c88e9022b9e247efbabd706ffad55f6",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2023.full.d.ts"
+        },
+        {
+          "bytes": 1830,
+          "path": "src/lib/es2023.intl.d.ts",
+          "sha256": "8178e40a224b26095ee77a55ef5c367d162bd2a07859add281c284f49407a0a2",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2023.intl.d.ts"
+        },
+        {
+          "bytes": 1831,
+          "path": "src/lib/es2024.arraybuffer.d.ts",
+          "sha256": "bd0e5470fed91c5594696531af45d9599ec9662d36f5b68db842bdada7d3bea1",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2024.arraybuffer.d.ts"
+        },
+        {
+          "bytes": 382,
+          "path": "src/lib/es2024.collection.d.ts",
+          "sha256": "d44292148d53db314a01f6d29a4cb60d88b4b180d61f315021a2f7c1c18aa455",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2024.collection.d.ts"
+        },
+        {
+          "bytes": 321,
+          "path": "src/lib/es2024.d.ts",
+          "sha256": "c7a439e008f9ae4ce7f211a1ff59fc2096c09e74ed568bae5d4763fc751585f5",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2024.d.ts"
+        },
+        {
+          "bytes": 227,
+          "path": "src/lib/es2024.full.d.ts",
+          "sha256": "8b2ffc04407512a9e74f7d4ea598776cc0f038d945428a8d217d9a27559ea4eb",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2024.full.d.ts"
+        },
+        {
+          "bytes": 417,
+          "path": "src/lib/es2024.object.d.ts",
+          "sha256": "1c644d581a3369669ba2052f353f734c1893f883e820898433461dc754650603",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2024.object.d.ts"
+        },
+        {
+          "bytes": 553,
+          "path": "src/lib/es2024.promise.d.ts",
+          "sha256": "fc41572829f759b4c251c24d282470f17fb91d14399d72d9ebb8143d9d686b56",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2024.promise.d.ts"
+        },
+        {
+          "bytes": 227,
+          "path": "src/lib/es2024.regexp.d.ts",
+          "sha256": "cca7daaefb24ee9ea4656c93992dd3525ddf902329f93df625518f42d5848b7a",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2024.regexp.d.ts"
+        },
+        {
+          "bytes": 2274,
+          "path": "src/lib/es2024.sharedmemory.d.ts",
+          "sha256": "5aba87cbacc9f14ec81cd79f0af5070e3f57c1780ed0d3d8620dcab7a4d4d53e",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2024.sharedmemory.d.ts"
+        },
+        {
+          "bytes": 352,
+          "path": "src/lib/es2024.string.d.ts",
+          "sha256": "e49b0ea0a875f884ca5667ebdcdc0e3f3e3b474e26e42941f0505296378251d3",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es2024.string.d.ts"
+        },
+        {
+          "bytes": 222169,
+          "path": "src/lib/es5.d.ts",
+          "sha256": "587eb6543e89bedff1e048b81fd68de5f7a37437e84171d51427f78abc6918ef",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es5.d.ts"
+        },
+        {
+          "bytes": 143,
+          "path": "src/lib/es5.full.d.ts",
+          "sha256": "878e8a652f6b45c260ce7b958ab3c13caa9679c08130b2f3a11fb9341ec1aa41",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/es5.full.d.ts"
+        },
+        {
+          "bytes": 955,
+          "path": "src/lib/esnext.array.d.ts",
+          "sha256": "6f482ffd4d6fce3371f5b32cbe2181993f412892de27983b4771c04572441c52",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/esnext.array.d.ts"
+        },
+        {
+          "bytes": 3103,
+          "path": "src/lib/esnext.collection.d.ts",
+          "sha256": "07cc160d1fed57d7560d31a5828a1c0d26c52f1de41ec6f110a372046a5656e3",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/esnext.collection.d.ts"
+        },
+        {
+          "bytes": 440,
+          "path": "src/lib/esnext.d.ts",
+          "sha256": "ee3616be85e45f9edbae3f9887a66f493003b32c2932114eb0c5e8b2bbdb91cb",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/esnext.d.ts"
+        },
+        {
+          "bytes": 227,
+          "path": "src/lib/esnext.decorators.d.ts",
+          "sha256": "888616d182c342e55136fb44a0be2fd8d990b9d304045a0592c60f977d243d5a",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/esnext.decorators.d.ts"
+        },
+        {
+          "bytes": 6128,
+          "path": "src/lib/esnext.disposable.d.ts",
+          "sha256": "ce12fd32dd87707ea99755ea00d0af305a5a3e238783ed7c6b295aaf1ae00f06",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/esnext.disposable.d.ts"
+        },
+        {
+          "bytes": 182,
+          "path": "src/lib/esnext.error.d.ts",
+          "sha256": "1b3372f70d0bd92aca2bc524ea5fbf4dd91459a50b6fc60ded13f8e1056b42f5",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/esnext.error.d.ts"
+        },
+        {
+          "bytes": 20102,
+          "path": "src/lib/esnext.float16.d.ts",
+          "sha256": "89a9d44a527246122e5c5e442921a19529a3c218b504d333ef30b08cae3adad6",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/esnext.float16.d.ts"
+        },
+        {
+          "bytes": 227,
+          "path": "src/lib/esnext.full.d.ts",
+          "sha256": "4ee79f8a6bb340a718f68e0e560861ae81a7449af7bbf2aa20af3e5de0f45354",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/esnext.full.d.ts"
+        },
+        {
+          "bytes": 43,
+          "path": "src/lib/esnext.intl.d.ts",
+          "sha256": "e082396ba35440a0f3909d1316ad3bcf5de9c9af892d4d805136d7c47e7e8758",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/esnext.intl.d.ts"
+        },
+        {
+          "bytes": 7953,
+          "path": "src/lib/esnext.iterator.d.ts",
+          "sha256": "c7fdc1257f77f9a17daad1ed8534f1dd50cf0af551480c08dd8c9a185cc6e3cf",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/esnext.iterator.d.ts"
+        },
+        {
+          "bytes": 821,
+          "path": "src/lib/esnext.promise.d.ts",
+          "sha256": "077f12222d63005cff286eb5e9abf1e20928376952eaf7cdcb5ce9680ad70762",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/esnext.promise.d.ts"
+        },
+        {
+          "bytes": 221,
+          "path": "src/lib/esnext.sharedmemory.d.ts",
+          "sha256": "772228ff434f041fcf47ca93a9ff18049076fbfa7de5e11e99ff38ff89523010",
+          "url": "https://raw.githubusercontent.com/microsoft/TypeScript/c63de15a992d37f0d6cec03ac7631872838602cb/src/lib/esnext.sharedmemory.d.ts"
+        }
+      ],
+      "extraction": "Named top-level interface methods; function properties and computed symbol methods excluded; same-interface/file overloads coalesced",
+      "license": "Apache-2.0",
+      "license_sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47",
+      "license_url": "https://github.com/microsoft/TypeScript/blob/c63de15a992d37f0d6cec03ac7631872838602cb/LICENSE.txt",
+      "records": 929,
+      "repository": "microsoft/TypeScript",
+      "revision": "c63de15a992d37f0d6cec03ac7631872838602cb",
+      "selection": "Official v5.9.3 historical source release for ECMAScript library declarations",
+      "services": 91,
+      "split_groups": 91,
+      "unique_methods": 306,
+      "url": "https://github.com/microsoft/TypeScript"
+    }
+  },
+  "split_guidance": "Group by source/service family, collapse canonical method duplicates before train/test splitting; do not random-split versioned RPC occurrences."
+}

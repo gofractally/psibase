@@ -1,0 +1,5363 @@
+{
+  "scope": "Experimental readable branches only; no production codec changes or CPU claims",
+  "corpus_sha256": "d511feee9ecf3b68c596e9cb457ec054596c239c93e87b3d546ce4869aac2939",
+  "corpus_metadata_sha256": "bca49a7d311068e07a7e00414f34bed1087a3257e18cd40963a9bbce3f6113a3",
+  "historical_corpus_sha256": "1c2c627635f7ecae0aadf8d9e94658fd25a4e6939e6a10df2aa8086b5cd4080b",
+  "experiment_source_sha256": {
+    "benchmark.py": "0d904ebcae5254c00806e3b31af62c57cc4e8dbf89e5c09505db6608e84d2a2d",
+    "expansion_benchmark.py": "270c479b04891d8c6af166e5a35a9318bcdc8d4e165fce18c23d45933b0624e4",
+    "expand_corpus.py": "04715a94bc754c158a5f3ff0afb38e9a28b3ca9d069d8bf55d706568347cd843"
+  },
+  "codec_source_sha256": {
+    "libraries/psio/include/psio/compress_name.hpp": "6f57da2a2c4523fde1c665b774687a65fb7085c992040b4271134fd296b1596f",
+    "rust/psibase_names/src/constants.rs": "d94fa5448fae654c8cfcdb988f78c2a34ffeed90f7c16587cc58124ea1ad0da6",
+    "rust/psibase_names/src/method_to_number_converter.rs": "cb619588fdc122f1d4c98a687e081375e86cd7a9d568a9e7b8913e12e1ea8837"
+  },
+  "split": {
+    "family_rule": "source:split_group SHA256 modulo5, residue0 held out",
+    "leave_out_ecosystem": "rust",
+    "leave_out_provider": null,
+    "training_records": 50950,
+    "heldout_records": 8806,
+    "novel_records": 6850,
+    "novel_names": 3438,
+    "novel_definition": "No lowercase spelling in ANY expanded training source",
+    "shared_evaluation_across_profiles": true,
+    "psibase_and_preferred_names_excluded_from_all_training": true
+  },
+  "balance": {
+    "rule": "Equal ecosystems > equal providers > equal sources > equal distinct spellings",
+    "source_mass": {
+      "bitcoin-rpc": {
+        "ecosystem": "blockchain",
+        "provider": "Bitcoin Core",
+        "mass": 0.041666666666666664,
+        "spellings": 170
+      },
+      "cometbft-rpc": {
+        "ecosystem": "blockchain",
+        "provider": "CometBFT",
+        "mass": 0.041666666666666664,
+        "spellings": 31
+      },
+      "cosmos-rpc": {
+        "ecosystem": "blockchain",
+        "provider": "Cosmos SDK",
+        "mass": 0.041666666666666664,
+        "spellings": 141
+      },
+      "polkadot-rpc": {
+        "ecosystem": "blockchain",
+        "provider": "Parity",
+        "mass": 0.041666666666666664,
+        "spellings": 107
+      },
+      "solana-rpc": {
+        "ecosystem": "blockchain",
+        "provider": "Solana Labs",
+        "mass": 0.041666666666666664,
+        "spellings": 69
+      },
+      "ethereum": {
+        "ecosystem": "blockchain",
+        "provider": "ethereum",
+        "mass": 0.041666666666666664,
+        "spellings": 93
+      },
+      "boost-algorithm": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.008333333333333333,
+        "spellings": 194
+      },
+      "boost-asio": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.008333333333333333,
+        "spellings": 152
+      },
+      "boost-beast": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.008333333333333333,
+        "spellings": 139
+      },
+      "boost-container": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.008333333333333333,
+        "spellings": 129
+      },
+      "boost-filesystem": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.008333333333333333,
+        "spellings": 17
+      },
+      "boost-json": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.008333333333333333,
+        "spellings": 99
+      },
+      "boost-math": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.008333333333333333,
+        "spellings": 184
+      },
+      "boost-multi_index": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.008333333333333333,
+        "spellings": 73
+      },
+      "boost-unordered": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.008333333333333333,
+        "spellings": 77
+      },
+      "boost-url": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.008333333333333333,
+        "spellings": 64
+      },
+      "libcxx": {
+        "ecosystem": "cpp",
+        "provider": "llvm",
+        "mass": 0.08333333333333333,
+        "spellings": 1180
+      },
+      "qt-core": {
+        "ecosystem": "cpp",
+        "provider": "qt",
+        "mass": 0.041666666666666664,
+        "spellings": 2479
+      },
+      "qt-network": {
+        "ecosystem": "cpp",
+        "provider": "qt",
+        "mass": 0.041666666666666664,
+        "spellings": 621
+      },
+      "ccxt": {
+        "ecosystem": "javascript",
+        "provider": "ccxt",
+        "mass": 0.08333333333333333,
+        "spellings": 208
+      },
+      "ethers": {
+        "ecosystem": "javascript",
+        "provider": "ethers",
+        "mass": 0.08333333333333333,
+        "spellings": 31
+      },
+      "typescript-dom": {
+        "ecosystem": "javascript",
+        "provider": "microsoft",
+        "mass": 0.041666666666666664,
+        "spellings": 1153
+      },
+      "typescript-es": {
+        "ecosystem": "javascript",
+        "provider": "microsoft",
+        "mass": 0.041666666666666664,
+        "spellings": 306
+      },
+      "aws-sdk": {
+        "ecosystem": "service-api",
+        "provider": "Amazon",
+        "mass": 0.05,
+        "spellings": 12117
+      },
+      "github-sdk": {
+        "ecosystem": "service-api",
+        "provider": "GitHub/Octokit",
+        "mass": 0.05,
+        "spellings": 927
+      },
+      "stripe-sdk": {
+        "ecosystem": "service-api",
+        "provider": "Stripe",
+        "mass": 0.05,
+        "spellings": 170
+      },
+      "googleapis": {
+        "ecosystem": "service-api",
+        "provider": "google",
+        "mass": 0.05,
+        "spellings": 6686
+      },
+      "kubernetes": {
+        "ecosystem": "service-api",
+        "provider": "kubernetes",
+        "mass": 0.05,
+        "spellings": 1175
+      }
+    }
+  },
+  "source_info": {
+    "aws-sdk": {
+      "ecosystem": "service-api",
+      "provider": "Amazon"
+    },
+    "bitcoin-rpc": {
+      "ecosystem": "blockchain",
+      "provider": "Bitcoin Core"
+    },
+    "boost-algorithm": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-asio": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-beast": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-container": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-filesystem": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-json": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-math": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-multi_index": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-unordered": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-url": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "ccxt": {
+      "ecosystem": "javascript",
+      "provider": "ccxt"
+    },
+    "cometbft-rpc": {
+      "ecosystem": "blockchain",
+      "provider": "CometBFT"
+    },
+    "cosmos-rpc": {
+      "ecosystem": "blockchain",
+      "provider": "Cosmos SDK"
+    },
+    "ethereum": {
+      "ecosystem": "blockchain",
+      "provider": "ethereum"
+    },
+    "ethers": {
+      "ecosystem": "javascript",
+      "provider": "ethers"
+    },
+    "github-sdk": {
+      "ecosystem": "service-api",
+      "provider": "GitHub/Octokit"
+    },
+    "googleapis": {
+      "ecosystem": "service-api",
+      "provider": "google"
+    },
+    "kubernetes": {
+      "ecosystem": "service-api",
+      "provider": "kubernetes"
+    },
+    "libcxx": {
+      "ecosystem": "cpp",
+      "provider": "llvm"
+    },
+    "polkadot-rpc": {
+      "ecosystem": "blockchain",
+      "provider": "Parity"
+    },
+    "qt-core": {
+      "ecosystem": "cpp",
+      "provider": "qt"
+    },
+    "qt-network": {
+      "ecosystem": "cpp",
+      "provider": "qt"
+    },
+    "rust-axum": {
+      "ecosystem": "rust",
+      "provider": "tokio-rs"
+    },
+    "rust-clap": {
+      "ecosystem": "rust",
+      "provider": "clap-rs"
+    },
+    "rust-crossbeam": {
+      "ecosystem": "rust",
+      "provider": "crossbeam-rs"
+    },
+    "rust-diesel": {
+      "ecosystem": "rust",
+      "provider": "diesel-rs"
+    },
+    "rust-futures": {
+      "ecosystem": "rust",
+      "provider": "rust-lang"
+    },
+    "rust-rayon": {
+      "ecosystem": "rust",
+      "provider": "rayon-rs"
+    },
+    "rust-regex": {
+      "ecosystem": "rust",
+      "provider": "rust-lang"
+    },
+    "rust-reqwest": {
+      "ecosystem": "rust",
+      "provider": "seanmonstar"
+    },
+    "rust-serde": {
+      "ecosystem": "rust",
+      "provider": "serde-rs"
+    },
+    "rust-stdlib": {
+      "ecosystem": "rust",
+      "provider": "rust-lang"
+    },
+    "rust-tokio": {
+      "ecosystem": "rust",
+      "provider": "tokio-rs"
+    },
+    "solana-rpc": {
+      "ecosystem": "blockchain",
+      "provider": "Solana Labs"
+    },
+    "stripe-sdk": {
+      "ecosystem": "service-api",
+      "provider": "Stripe"
+    },
+    "typescript-dom": {
+      "ecosystem": "javascript",
+      "provider": "microsoft"
+    },
+    "typescript-es": {
+      "ecosystem": "javascript",
+      "provider": "microsoft"
+    }
+  },
+  "baseline_current_cpp": {
+    "heldout_all": {
+      "names": 3879,
+      "readable": 2361,
+      "percent": 60.87,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 1725,
+          "readable": 1720,
+          "fit_percent": 99.71
+        },
+        {
+          "length": "11-15",
+          "names": 1246,
+          "readable": 640,
+          "fit_percent": 51.36
+        },
+        {
+          "length": "16-20",
+          "names": 579,
+          "readable": 1,
+          "fit_percent": 0.17
+        },
+        {
+          "length": "21-25",
+          "names": 217,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 102,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 10,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "novel_all": {
+      "names": 3438,
+      "readable": 1933,
+      "percent": 56.22,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 1316,
+          "readable": 1311,
+          "fit_percent": 99.62
+        },
+        {
+          "length": "11-15",
+          "names": 1216,
+          "readable": 621,
+          "fit_percent": 51.07
+        },
+        {
+          "length": "16-20",
+          "names": 578,
+          "readable": 1,
+          "fit_percent": 0.17
+        },
+        {
+          "length": "21-25",
+          "names": 216,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 102,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 10,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "preferred_descriptive_probes": {
+      "names": 21,
+      "readable": 1,
+      "percent": 4.76,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "11-15",
+          "names": 1,
+          "readable": 1,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "16-20",
+          "names": 4,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 11,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 5,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "psibase_compatibility": {
+      "names": 528,
+      "readable": 473,
+      "percent": 89.58,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 363,
+          "readable": 356,
+          "fit_percent": 98.07
+        },
+        {
+          "length": "11-15",
+          "names": 153,
+          "readable": 116,
+          "fit_percent": 75.82
+        },
+        {
+          "length": "16-20",
+          "names": 10,
+          "readable": 1,
+          "fit_percent": 10.0
+        },
+        {
+          "length": "21-25",
+          "names": 2,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:rust-axum": {
+      "names": 184,
+      "readable": 141,
+      "percent": 76.63,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 109,
+          "readable": 109,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 40,
+          "readable": 32,
+          "fit_percent": 80.0
+        },
+        {
+          "length": "16-20",
+          "names": 21,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 11,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 3,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "source:rust-axum": {
+      "names": 129,
+      "readable": 86,
+      "percent": 66.67,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 54,
+          "readable": 54,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 40,
+          "readable": 32,
+          "fit_percent": 80.0
+        },
+        {
+          "length": "16-20",
+          "names": 21,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 11,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 3,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:rust-clap": {
+      "names": 427,
+      "readable": 224,
+      "percent": 52.46,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 170,
+          "readable": 170,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 119,
+          "readable": 54,
+          "fit_percent": 45.38
+        },
+        {
+          "length": "16-20",
+          "names": 64,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 41,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 30,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 3,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "source:rust-clap": {
+      "names": 369,
+      "readable": 166,
+      "percent": 44.99,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 113,
+          "readable": 113,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 118,
+          "readable": 53,
+          "fit_percent": 44.92
+        },
+        {
+          "length": "16-20",
+          "names": 64,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 41,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 30,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 3,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "heldout-source:rust-crossbeam": {
+      "names": 137,
+      "readable": 123,
+      "percent": 89.78,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 103,
+          "readable": 103,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 28,
+          "readable": 20,
+          "fit_percent": 71.43
+        },
+        {
+          "length": "16-20",
+          "names": 3,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 2,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 1,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "source:rust-crossbeam": {
+      "names": 92,
+      "readable": 80,
+      "percent": 86.96,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 60,
+          "readable": 60,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 27,
+          "readable": 20,
+          "fit_percent": 74.07
+        },
+        {
+          "length": "16-20",
+          "names": 3,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 1,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 1,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:rust-diesel": {
+      "names": 514,
+      "readable": 305,
+      "percent": 59.34,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 225,
+          "readable": 224,
+          "fit_percent": 99.56
+        },
+        {
+          "length": "11-15",
+          "names": 148,
+          "readable": 81,
+          "fit_percent": 54.73
+        },
+        {
+          "length": "16-20",
+          "names": 77,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 39,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 22,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 3,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "source:rust-diesel": {
+      "names": 438,
+      "readable": 229,
+      "percent": 52.28,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 150,
+          "readable": 149,
+          "fit_percent": 99.33
+        },
+        {
+          "length": "11-15",
+          "names": 147,
+          "readable": 80,
+          "fit_percent": 54.42
+        },
+        {
+          "length": "16-20",
+          "names": 77,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 39,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 22,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 3,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "heldout-source:rust-futures": {
+      "names": 293,
+      "readable": 233,
+      "percent": 79.52,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 186,
+          "readable": 185,
+          "fit_percent": 99.46
+        },
+        {
+          "length": "11-15",
+          "names": 83,
+          "readable": 48,
+          "fit_percent": 57.83
+        },
+        {
+          "length": "16-20",
+          "names": 21,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 3,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "source:rust-futures": {
+      "names": 232,
+      "readable": 172,
+      "percent": 74.14,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 125,
+          "readable": 124,
+          "fit_percent": 99.2
+        },
+        {
+          "length": "11-15",
+          "names": 83,
+          "readable": 48,
+          "fit_percent": 57.83
+        },
+        {
+          "length": "16-20",
+          "names": 21,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 3,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:rust-rayon": {
+      "names": 197,
+      "readable": 135,
+      "percent": 68.53,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 103,
+          "readable": 103,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 56,
+          "readable": 32,
+          "fit_percent": 57.14
+        },
+        {
+          "length": "16-20",
+          "names": 29,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 7,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 2,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "source:rust-rayon": {
+      "names": 161,
+      "readable": 99,
+      "percent": 61.49,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 67,
+          "readable": 67,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 56,
+          "readable": 32,
+          "fit_percent": 57.14
+        },
+        {
+          "length": "16-20",
+          "names": 29,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 7,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 2,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:rust-regex": {
+      "names": 59,
+      "readable": 49,
+      "percent": 83.05,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 38,
+          "readable": 38,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 14,
+          "readable": 11,
+          "fit_percent": 78.57
+        },
+        {
+          "length": "16-20",
+          "names": 7,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "source:rust-regex": {
+      "names": 42,
+      "readable": 32,
+      "percent": 76.19,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 22,
+          "readable": 22,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 13,
+          "readable": 10,
+          "fit_percent": 76.92
+        },
+        {
+          "length": "16-20",
+          "names": 7,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:rust-reqwest": {
+      "names": 236,
+      "readable": 142,
+      "percent": 60.17,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 121,
+          "readable": 121,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 49,
+          "readable": 21,
+          "fit_percent": 42.86
+        },
+        {
+          "length": "16-20",
+          "names": 29,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 20,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 13,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 4,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "source:rust-reqwest": {
+      "names": 186,
+      "readable": 93,
+      "percent": 50.0,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 72,
+          "readable": 72,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 48,
+          "readable": 21,
+          "fit_percent": 43.75
+        },
+        {
+          "length": "16-20",
+          "names": 29,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 20,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 13,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 4,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "heldout-source:rust-serde": {
+      "names": 126,
+      "readable": 70,
+      "percent": 55.56,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 36,
+          "readable": 36,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 57,
+          "readable": 33,
+          "fit_percent": 57.89
+        },
+        {
+          "length": "16-20",
+          "names": 21,
+          "readable": 1,
+          "fit_percent": 4.76
+        },
+        {
+          "length": "21-25",
+          "names": 11,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 1,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "source:rust-serde": {
+      "names": 122,
+      "readable": 66,
+      "percent": 54.1,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 32,
+          "readable": 32,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "11-15",
+          "names": 57,
+          "readable": 33,
+          "fit_percent": 57.89
+        },
+        {
+          "length": "16-20",
+          "names": 21,
+          "readable": 1,
+          "fit_percent": 4.76
+        },
+        {
+          "length": "21-25",
+          "names": 11,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 1,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:rust-stdlib": {
+      "names": 1845,
+      "readable": 1258,
+      "percent": 68.18,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 982,
+          "readable": 979,
+          "fit_percent": 99.69
+        },
+        {
+          "length": "11-15",
+          "names": 547,
+          "readable": 279,
+          "fit_percent": 51.01
+        },
+        {
+          "length": "16-20",
+          "names": 232,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 63,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 21,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "source:rust-stdlib": {
+      "names": 1549,
+      "readable": 972,
+      "percent": 62.75,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 713,
+          "readable": 710,
+          "fit_percent": 99.58
+        },
+        {
+          "length": "11-15",
+          "names": 522,
+          "readable": 262,
+          "fit_percent": 50.19
+        },
+        {
+          "length": "16-20",
+          "names": 231,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 62,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 21,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:rust-tokio": {
+      "names": 676,
+      "readable": 437,
+      "percent": 64.64,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 342,
+          "readable": 341,
+          "fit_percent": 99.71
+        },
+        {
+          "length": "11-15",
+          "names": 207,
+          "readable": 96,
+          "fit_percent": 46.38
+        },
+        {
+          "length": "16-20",
+          "names": 92,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 26,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 9,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "source:rust-tokio": {
+      "names": 562,
+      "readable": 325,
+      "percent": 57.83,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 231,
+          "readable": 230,
+          "fit_percent": 99.57
+        },
+        {
+          "length": "11-15",
+          "names": 204,
+          "readable": 95,
+          "fit_percent": 46.57
+        },
+        {
+          "length": "16-20",
+          "names": 92,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 26,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 9,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "macro": {
+      "ecosystem_macro_percent": {
+        "rust": 60.39
+      },
+      "balanced_macro_percent": 60.39
+    },
+    "heldout_macro": {
+      "ecosystem_macro_percent": {
+        "rust": 66.67
+      },
+      "balanced_macro_percent": 66.67
+    }
+  },
+  "profiles": {
+    "expanded_balanced": {
+      "training_unique_spellings": 27740,
+      "training_sources": [
+        "aws-sdk",
+        "bitcoin-rpc",
+        "boost-algorithm",
+        "boost-asio",
+        "boost-beast",
+        "boost-container",
+        "boost-filesystem",
+        "boost-json",
+        "boost-math",
+        "boost-multi_index",
+        "boost-unordered",
+        "boost-url",
+        "ccxt",
+        "cometbft-rpc",
+        "cosmos-rpc",
+        "ethereum",
+        "ethers",
+        "github-sdk",
+        "googleapis",
+        "kubernetes",
+        "libcxx",
+        "polkadot-rpc",
+        "qt-core",
+        "qt-network",
+        "solana-rpc",
+        "stripe-sdk",
+        "typescript-dom",
+        "typescript-es"
+      ],
+      "models": {
+        "char2": {
+          "model": {
+            "kind": "character",
+            "order": 2,
+            "symbols_including_eos": 38,
+            "observed_context_rows": 887,
+            "evaluated_cdf_rows": 1322,
+            "evaluated_cdf_u16_bytes": 103116
+          },
+          "metrics": {
+            "heldout_all": {
+              "names": 3879,
+              "readable": 2991,
+              "percent": 77.11,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 1725,
+                  "readable": 1719,
+                  "fit_percent": 99.65
+                },
+                {
+                  "length": "11-15",
+                  "names": 1246,
+                  "readable": 1082,
+                  "fit_percent": 86.84
+                },
+                {
+                  "length": "16-20",
+                  "names": 579,
+                  "readable": 182,
+                  "fit_percent": 31.43
+                },
+                {
+                  "length": "21-25",
+                  "names": 217,
+                  "readable": 8,
+                  "fit_percent": 3.69
+                },
+                {
+                  "length": "26-35",
+                  "names": 102,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 10,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "novel_all": {
+              "names": 3438,
+              "readable": 2551,
+              "percent": 74.2,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 1316,
+                  "readable": 1310,
+                  "fit_percent": 99.54
+                },
+                {
+                  "length": "11-15",
+                  "names": 1216,
+                  "readable": 1052,
+                  "fit_percent": 86.51
+                },
+                {
+                  "length": "16-20",
+                  "names": 578,
+                  "readable": 181,
+                  "fit_percent": 31.31
+                },
+                {
+                  "length": "21-25",
+                  "names": 216,
+                  "readable": 8,
+                  "fit_percent": 3.7
+                },
+                {
+                  "length": "26-35",
+                  "names": 102,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 10,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "preferred_descriptive_probes": {
+              "names": 21,
+              "readable": 9,
+              "percent": 42.86,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "11-15",
+                  "names": 1,
+                  "readable": 1,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 4,
+                  "readable": 3,
+                  "fit_percent": 75.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 5,
+                  "fit_percent": 45.45
+                },
+                {
+                  "length": "26-35",
+                  "names": 5,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "psibase_compatibility": {
+              "names": 528,
+              "readable": 510,
+              "percent": 96.59,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 363,
+                  "readable": 361,
+                  "fit_percent": 99.45
+                },
+                {
+                  "length": "11-15",
+                  "names": 153,
+                  "readable": 144,
+                  "fit_percent": 94.12
+                },
+                {
+                  "length": "16-20",
+                  "names": 10,
+                  "readable": 5,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-axum": {
+              "names": 184,
+              "readable": 161,
+              "percent": 87.5,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 109,
+                  "readable": 109,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 40,
+                  "readable": 39,
+                  "fit_percent": 97.5
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 13,
+                  "fit_percent": 61.9
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-axum": {
+              "names": 129,
+              "readable": 106,
+              "percent": 82.17,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 54,
+                  "readable": 54,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 40,
+                  "readable": 39,
+                  "fit_percent": 97.5
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 13,
+                  "fit_percent": 61.9
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-clap": {
+              "names": 427,
+              "readable": 294,
+              "percent": 68.85,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 170,
+                  "readable": 170,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 119,
+                  "readable": 102,
+                  "fit_percent": 85.71
+                },
+                {
+                  "length": "16-20",
+                  "names": 64,
+                  "readable": 22,
+                  "fit_percent": 34.38
+                },
+                {
+                  "length": "21-25",
+                  "names": 41,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 30,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:rust-clap": {
+              "names": 369,
+              "readable": 236,
+              "percent": 63.96,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 113,
+                  "readable": 113,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 118,
+                  "readable": 101,
+                  "fit_percent": 85.59
+                },
+                {
+                  "length": "16-20",
+                  "names": 64,
+                  "readable": 22,
+                  "fit_percent": 34.38
+                },
+                {
+                  "length": "21-25",
+                  "names": 41,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 30,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:rust-crossbeam": {
+              "names": 137,
+              "readable": 130,
+              "percent": 94.89,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 103,
+                  "readable": 103,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 28,
+                  "readable": 25,
+                  "fit_percent": 89.29
+                },
+                {
+                  "length": "16-20",
+                  "names": 3,
+                  "readable": 2,
+                  "fit_percent": 66.67
+                },
+                {
+                  "length": "21-25",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-crossbeam": {
+              "names": 92,
+              "readable": 86,
+              "percent": 93.48,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 60,
+                  "readable": 60,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 27,
+                  "readable": 24,
+                  "fit_percent": 88.89
+                },
+                {
+                  "length": "16-20",
+                  "names": 3,
+                  "readable": 2,
+                  "fit_percent": 66.67
+                },
+                {
+                  "length": "21-25",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-diesel": {
+              "names": 514,
+              "readable": 406,
+              "percent": 78.99,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 225,
+                  "readable": 225,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 148,
+                  "readable": 133,
+                  "fit_percent": 89.86
+                },
+                {
+                  "length": "16-20",
+                  "names": 77,
+                  "readable": 42,
+                  "fit_percent": 54.55
+                },
+                {
+                  "length": "21-25",
+                  "names": 39,
+                  "readable": 6,
+                  "fit_percent": 15.38
+                },
+                {
+                  "length": "26-35",
+                  "names": 22,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:rust-diesel": {
+              "names": 438,
+              "readable": 330,
+              "percent": 75.34,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 150,
+                  "readable": 150,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 147,
+                  "readable": 132,
+                  "fit_percent": 89.8
+                },
+                {
+                  "length": "16-20",
+                  "names": 77,
+                  "readable": 42,
+                  "fit_percent": 54.55
+                },
+                {
+                  "length": "21-25",
+                  "names": 39,
+                  "readable": 6,
+                  "fit_percent": 15.38
+                },
+                {
+                  "length": "26-35",
+                  "names": 22,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:rust-futures": {
+              "names": 293,
+              "readable": 262,
+              "percent": 89.42,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 186,
+                  "readable": 186,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 83,
+                  "readable": 72,
+                  "fit_percent": 86.75
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 4,
+                  "fit_percent": 19.05
+                },
+                {
+                  "length": "21-25",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-futures": {
+              "names": 232,
+              "readable": 201,
+              "percent": 86.64,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 125,
+                  "readable": 125,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 83,
+                  "readable": 72,
+                  "fit_percent": 86.75
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 4,
+                  "fit_percent": 19.05
+                },
+                {
+                  "length": "21-25",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-rayon": {
+              "names": 197,
+              "readable": 158,
+              "percent": 80.2,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 103,
+                  "readable": 103,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 56,
+                  "readable": 50,
+                  "fit_percent": 89.29
+                },
+                {
+                  "length": "16-20",
+                  "names": 29,
+                  "readable": 5,
+                  "fit_percent": 17.24
+                },
+                {
+                  "length": "21-25",
+                  "names": 7,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-rayon": {
+              "names": 161,
+              "readable": 122,
+              "percent": 75.78,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 67,
+                  "readable": 67,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 56,
+                  "readable": 50,
+                  "fit_percent": 89.29
+                },
+                {
+                  "length": "16-20",
+                  "names": 29,
+                  "readable": 5,
+                  "fit_percent": 17.24
+                },
+                {
+                  "length": "21-25",
+                  "names": 7,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-regex": {
+              "names": 59,
+              "readable": 54,
+              "percent": 91.53,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 38,
+                  "readable": 38,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 14,
+                  "readable": 13,
+                  "fit_percent": 92.86
+                },
+                {
+                  "length": "16-20",
+                  "names": 7,
+                  "readable": 3,
+                  "fit_percent": 42.86
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-regex": {
+              "names": 42,
+              "readable": 37,
+              "percent": 88.1,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 22,
+                  "readable": 22,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 13,
+                  "readable": 12,
+                  "fit_percent": 92.31
+                },
+                {
+                  "length": "16-20",
+                  "names": 7,
+                  "readable": 3,
+                  "fit_percent": 42.86
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-reqwest": {
+              "names": 236,
+              "readable": 163,
+              "percent": 69.07,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 121,
+                  "readable": 121,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 49,
+                  "readable": 36,
+                  "fit_percent": 73.47
+                },
+                {
+                  "length": "16-20",
+                  "names": 29,
+                  "readable": 6,
+                  "fit_percent": 20.69
+                },
+                {
+                  "length": "21-25",
+                  "names": 20,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 13,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:rust-reqwest": {
+              "names": 186,
+              "readable": 113,
+              "percent": 60.75,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 72,
+                  "readable": 72,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 48,
+                  "readable": 35,
+                  "fit_percent": 72.92
+                },
+                {
+                  "length": "16-20",
+                  "names": 29,
+                  "readable": 6,
+                  "fit_percent": 20.69
+                },
+                {
+                  "length": "21-25",
+                  "names": 20,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 13,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:rust-serde": {
+              "names": 126,
+              "readable": 99,
+              "percent": 78.57,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 36,
+                  "readable": 36,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 57,
+                  "readable": 53,
+                  "fit_percent": 92.98
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 10,
+                  "fit_percent": 47.62
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-serde": {
+              "names": 122,
+              "readable": 95,
+              "percent": 77.87,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 32,
+                  "readable": 32,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 57,
+                  "readable": 53,
+                  "fit_percent": 92.98
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 10,
+                  "fit_percent": 47.62
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-stdlib": {
+              "names": 1845,
+              "readable": 1500,
+              "percent": 81.3,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 982,
+                  "readable": 977,
+                  "fit_percent": 99.49
+                },
+                {
+                  "length": "11-15",
+                  "names": 547,
+                  "readable": 471,
+                  "fit_percent": 86.11
+                },
+                {
+                  "length": "16-20",
+                  "names": 232,
+                  "readable": 51,
+                  "fit_percent": 21.98
+                },
+                {
+                  "length": "21-25",
+                  "names": 63,
+                  "readable": 1,
+                  "fit_percent": 1.59
+                },
+                {
+                  "length": "26-35",
+                  "names": 21,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-stdlib": {
+              "names": 1549,
+              "readable": 1205,
+              "percent": 77.79,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 713,
+                  "readable": 708,
+                  "fit_percent": 99.3
+                },
+                {
+                  "length": "11-15",
+                  "names": 522,
+                  "readable": 446,
+                  "fit_percent": 85.44
+                },
+                {
+                  "length": "16-20",
+                  "names": 231,
+                  "readable": 50,
+                  "fit_percent": 21.65
+                },
+                {
+                  "length": "21-25",
+                  "names": 62,
+                  "readable": 1,
+                  "fit_percent": 1.61
+                },
+                {
+                  "length": "26-35",
+                  "names": 21,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-tokio": {
+              "names": 676,
+              "readable": 553,
+              "percent": 81.8,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 342,
+                  "readable": 341,
+                  "fit_percent": 99.71
+                },
+                {
+                  "length": "11-15",
+                  "names": 207,
+                  "readable": 185,
+                  "fit_percent": 89.37
+                },
+                {
+                  "length": "16-20",
+                  "names": 92,
+                  "readable": 26,
+                  "fit_percent": 28.26
+                },
+                {
+                  "length": "21-25",
+                  "names": 26,
+                  "readable": 1,
+                  "fit_percent": 3.85
+                },
+                {
+                  "length": "26-35",
+                  "names": 9,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-tokio": {
+              "names": 562,
+              "readable": 439,
+              "percent": 78.11,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 231,
+                  "readable": 230,
+                  "fit_percent": 99.57
+                },
+                {
+                  "length": "11-15",
+                  "names": 204,
+                  "readable": 182,
+                  "fit_percent": 89.22
+                },
+                {
+                  "length": "16-20",
+                  "names": 92,
+                  "readable": 26,
+                  "fit_percent": 28.26
+                },
+                {
+                  "length": "21-25",
+                  "names": 26,
+                  "readable": 1,
+                  "fit_percent": 3.85
+                },
+                {
+                  "length": "26-35",
+                  "names": 9,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "macro": {
+              "ecosystem_macro_percent": {
+                "rust": 76.44
+              },
+              "balanced_macro_percent": 76.44
+            },
+            "heldout_macro": {
+              "ecosystem_macro_percent": {
+                "rust": 80.33
+              },
+              "balanced_macro_percent": 80.33
+            }
+          },
+          "probes": {
+            "acceptPendingTokenTransfer": {
+              "fits": false,
+              "bits": 82
+            },
+            "addMarketLiquidity": {
+              "fits": true,
+              "bits": 60
+            },
+            "assignSymbolToToken": {
+              "fits": false,
+              "bits": 81
+            },
+            "cancelMarketplaceListing": {
+              "fits": false,
+              "bits": 73
+            },
+            "cancelPendingTokenTransfer": {
+              "fits": false,
+              "bits": 75
+            },
+            "cancelStopLossOrder": {
+              "fits": true,
+              "bits": 61
+            },
+            "completeAccountRecovery": {
+              "fits": false,
+              "bits": 67
+            },
+            "createAccountWithRecoveryPartner": {
+              "fits": false,
+              "bits": 97
+            },
+            "depositIntoSubaccount": {
+              "fits": true,
+              "bits": 61
+            },
+            "getBalanceConfiguration": {
+              "fits": true,
+              "bits": 49
+            },
+            "liquidateMarginPosition": {
+              "fits": true,
+              "bits": 51
+            },
+            "listAccountNameForSale": {
+              "fits": false,
+              "bits": 67
+            },
+            "placeLimitOrder": {
+              "fits": true,
+              "bits": 46
+            },
+            "purchaseMarketplaceListing": {
+              "fits": false,
+              "bits": 83
+            },
+            "registerEventIndex": {
+              "fits": true,
+              "bits": 55
+            },
+            "requestAccountRecovery": {
+              "fits": true,
+              "bits": 57
+            },
+            "setAuthenticationService": {
+              "fits": true,
+              "bits": 59
+            },
+            "setPublicKeyWithRecoveryPartner": {
+              "fits": false,
+              "bits": 101
+            },
+            "setSystemResourceToken": {
+              "fits": false,
+              "bits": 74
+            },
+            "withdrawFromSubaccount": {
+              "fits": false,
+              "bits": 69
+            },
+            "withdrawMarketLiquidity": {
+              "fits": false,
+              "bits": 75
+            }
+          }
+        },
+        "words2048": {
+          "model": {
+            "kind": "global_component_dictionary_viterbi_unigram",
+            "symbols_including_eos": 2048,
+            "dictionary_utf8_bytes": 14429,
+            "cdf_u16_bytes": 4098
+          },
+          "metrics": {
+            "heldout_all": {
+              "names": 3879,
+              "readable": 3152,
+              "percent": 81.26,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 1725,
+                  "readable": 1702,
+                  "fit_percent": 98.67
+                },
+                {
+                  "length": "11-15",
+                  "names": 1246,
+                  "readable": 1042,
+                  "fit_percent": 83.63
+                },
+                {
+                  "length": "16-20",
+                  "names": 579,
+                  "readable": 339,
+                  "fit_percent": 58.55
+                },
+                {
+                  "length": "21-25",
+                  "names": 217,
+                  "readable": 65,
+                  "fit_percent": 29.95
+                },
+                {
+                  "length": "26-35",
+                  "names": 102,
+                  "readable": 4,
+                  "fit_percent": 3.92
+                },
+                {
+                  "length": "36+",
+                  "names": 10,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "novel_all": {
+              "names": 3438,
+              "readable": 2711,
+              "percent": 78.85,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 1316,
+                  "readable": 1293,
+                  "fit_percent": 98.25
+                },
+                {
+                  "length": "11-15",
+                  "names": 1216,
+                  "readable": 1012,
+                  "fit_percent": 83.22
+                },
+                {
+                  "length": "16-20",
+                  "names": 578,
+                  "readable": 338,
+                  "fit_percent": 58.48
+                },
+                {
+                  "length": "21-25",
+                  "names": 216,
+                  "readable": 64,
+                  "fit_percent": 29.63
+                },
+                {
+                  "length": "26-35",
+                  "names": 102,
+                  "readable": 4,
+                  "fit_percent": 3.92
+                },
+                {
+                  "length": "36+",
+                  "names": 10,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "preferred_descriptive_probes": {
+              "names": 21,
+              "readable": 15,
+              "percent": 71.43,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "11-15",
+                  "names": 1,
+                  "readable": 1,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 4,
+                  "readable": 3,
+                  "fit_percent": 75.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 8,
+                  "fit_percent": 72.73
+                },
+                {
+                  "length": "26-35",
+                  "names": 5,
+                  "readable": 3,
+                  "fit_percent": 60.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "psibase_compatibility": {
+              "names": 528,
+              "readable": 504,
+              "percent": 95.45,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 363,
+                  "readable": 359,
+                  "fit_percent": 98.9
+                },
+                {
+                  "length": "11-15",
+                  "names": 153,
+                  "readable": 138,
+                  "fit_percent": 90.2
+                },
+                {
+                  "length": "16-20",
+                  "names": 10,
+                  "readable": 6,
+                  "fit_percent": 60.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 2,
+                  "readable": 1,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-axum": {
+              "names": 184,
+              "readable": 179,
+              "percent": 97.28,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 109,
+                  "readable": 109,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 40,
+                  "readable": 40,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 21,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 8,
+                  "fit_percent": 72.73
+                },
+                {
+                  "length": "26-35",
+                  "names": 3,
+                  "readable": 1,
+                  "fit_percent": 33.33
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-axum": {
+              "names": 129,
+              "readable": 124,
+              "percent": 96.12,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 54,
+                  "readable": 54,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 40,
+                  "readable": 40,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 21,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 8,
+                  "fit_percent": 72.73
+                },
+                {
+                  "length": "26-35",
+                  "names": 3,
+                  "readable": 1,
+                  "fit_percent": 33.33
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-clap": {
+              "names": 427,
+              "readable": 320,
+              "percent": 74.94,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 170,
+                  "readable": 170,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 119,
+                  "readable": 103,
+                  "fit_percent": 86.55
+                },
+                {
+                  "length": "16-20",
+                  "names": 64,
+                  "readable": 41,
+                  "fit_percent": 64.06
+                },
+                {
+                  "length": "21-25",
+                  "names": 41,
+                  "readable": 6,
+                  "fit_percent": 14.63
+                },
+                {
+                  "length": "26-35",
+                  "names": 30,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:rust-clap": {
+              "names": 369,
+              "readable": 262,
+              "percent": 71.0,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 113,
+                  "readable": 113,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 118,
+                  "readable": 102,
+                  "fit_percent": 86.44
+                },
+                {
+                  "length": "16-20",
+                  "names": 64,
+                  "readable": 41,
+                  "fit_percent": 64.06
+                },
+                {
+                  "length": "21-25",
+                  "names": 41,
+                  "readable": 6,
+                  "fit_percent": 14.63
+                },
+                {
+                  "length": "26-35",
+                  "names": 30,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:rust-crossbeam": {
+              "names": 137,
+              "readable": 132,
+              "percent": 96.35,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 103,
+                  "readable": 103,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 28,
+                  "readable": 26,
+                  "fit_percent": 92.86
+                },
+                {
+                  "length": "16-20",
+                  "names": 3,
+                  "readable": 2,
+                  "fit_percent": 66.67
+                },
+                {
+                  "length": "21-25",
+                  "names": 2,
+                  "readable": 1,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-crossbeam": {
+              "names": 92,
+              "readable": 87,
+              "percent": 94.57,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 60,
+                  "readable": 60,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 27,
+                  "readable": 25,
+                  "fit_percent": 92.59
+                },
+                {
+                  "length": "16-20",
+                  "names": 3,
+                  "readable": 2,
+                  "fit_percent": 66.67
+                },
+                {
+                  "length": "21-25",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-diesel": {
+              "names": 514,
+              "readable": 422,
+              "percent": 82.1,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 225,
+                  "readable": 223,
+                  "fit_percent": 99.11
+                },
+                {
+                  "length": "11-15",
+                  "names": 148,
+                  "readable": 123,
+                  "fit_percent": 83.11
+                },
+                {
+                  "length": "16-20",
+                  "names": 77,
+                  "readable": 54,
+                  "fit_percent": 70.13
+                },
+                {
+                  "length": "21-25",
+                  "names": 39,
+                  "readable": 20,
+                  "fit_percent": 51.28
+                },
+                {
+                  "length": "26-35",
+                  "names": 22,
+                  "readable": 2,
+                  "fit_percent": 9.09
+                },
+                {
+                  "length": "36+",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:rust-diesel": {
+              "names": 438,
+              "readable": 346,
+              "percent": 79.0,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 150,
+                  "readable": 148,
+                  "fit_percent": 98.67
+                },
+                {
+                  "length": "11-15",
+                  "names": 147,
+                  "readable": 122,
+                  "fit_percent": 82.99
+                },
+                {
+                  "length": "16-20",
+                  "names": 77,
+                  "readable": 54,
+                  "fit_percent": 70.13
+                },
+                {
+                  "length": "21-25",
+                  "names": 39,
+                  "readable": 20,
+                  "fit_percent": 51.28
+                },
+                {
+                  "length": "26-35",
+                  "names": 22,
+                  "readable": 2,
+                  "fit_percent": 9.09
+                },
+                {
+                  "length": "36+",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:rust-futures": {
+              "names": 293,
+              "readable": 259,
+              "percent": 88.4,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 186,
+                  "readable": 182,
+                  "fit_percent": 97.85
+                },
+                {
+                  "length": "11-15",
+                  "names": 83,
+                  "readable": 65,
+                  "fit_percent": 78.31
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 10,
+                  "fit_percent": 47.62
+                },
+                {
+                  "length": "21-25",
+                  "names": 3,
+                  "readable": 2,
+                  "fit_percent": 66.67
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-futures": {
+              "names": 232,
+              "readable": 198,
+              "percent": 85.34,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 125,
+                  "readable": 121,
+                  "fit_percent": 96.8
+                },
+                {
+                  "length": "11-15",
+                  "names": 83,
+                  "readable": 65,
+                  "fit_percent": 78.31
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 10,
+                  "fit_percent": 47.62
+                },
+                {
+                  "length": "21-25",
+                  "names": 3,
+                  "readable": 2,
+                  "fit_percent": 66.67
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-rayon": {
+              "names": 197,
+              "readable": 159,
+              "percent": 80.71,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 103,
+                  "readable": 102,
+                  "fit_percent": 99.03
+                },
+                {
+                  "length": "11-15",
+                  "names": 56,
+                  "readable": 45,
+                  "fit_percent": 80.36
+                },
+                {
+                  "length": "16-20",
+                  "names": 29,
+                  "readable": 11,
+                  "fit_percent": 37.93
+                },
+                {
+                  "length": "21-25",
+                  "names": 7,
+                  "readable": 1,
+                  "fit_percent": 14.29
+                },
+                {
+                  "length": "26-35",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-rayon": {
+              "names": 161,
+              "readable": 123,
+              "percent": 76.4,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 67,
+                  "readable": 66,
+                  "fit_percent": 98.51
+                },
+                {
+                  "length": "11-15",
+                  "names": 56,
+                  "readable": 45,
+                  "fit_percent": 80.36
+                },
+                {
+                  "length": "16-20",
+                  "names": 29,
+                  "readable": 11,
+                  "fit_percent": 37.93
+                },
+                {
+                  "length": "21-25",
+                  "names": 7,
+                  "readable": 1,
+                  "fit_percent": 14.29
+                },
+                {
+                  "length": "26-35",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-regex": {
+              "names": 59,
+              "readable": 53,
+              "percent": 89.83,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 38,
+                  "readable": 38,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 14,
+                  "readable": 12,
+                  "fit_percent": 85.71
+                },
+                {
+                  "length": "16-20",
+                  "names": 7,
+                  "readable": 3,
+                  "fit_percent": 42.86
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-regex": {
+              "names": 42,
+              "readable": 36,
+              "percent": 85.71,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 22,
+                  "readable": 22,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 13,
+                  "readable": 11,
+                  "fit_percent": 84.62
+                },
+                {
+                  "length": "16-20",
+                  "names": 7,
+                  "readable": 3,
+                  "fit_percent": 42.86
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-reqwest": {
+              "names": 236,
+              "readable": 184,
+              "percent": 77.97,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 121,
+                  "readable": 121,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 49,
+                  "readable": 40,
+                  "fit_percent": 81.63
+                },
+                {
+                  "length": "16-20",
+                  "names": 29,
+                  "readable": 20,
+                  "fit_percent": 68.97
+                },
+                {
+                  "length": "21-25",
+                  "names": 20,
+                  "readable": 3,
+                  "fit_percent": 15.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 13,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:rust-reqwest": {
+              "names": 186,
+              "readable": 134,
+              "percent": 72.04,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 72,
+                  "readable": 72,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 48,
+                  "readable": 39,
+                  "fit_percent": 81.25
+                },
+                {
+                  "length": "16-20",
+                  "names": 29,
+                  "readable": 20,
+                  "fit_percent": 68.97
+                },
+                {
+                  "length": "21-25",
+                  "names": 20,
+                  "readable": 3,
+                  "fit_percent": 15.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 13,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:rust-serde": {
+              "names": 126,
+              "readable": 112,
+              "percent": 88.89,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 36,
+                  "readable": 36,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 57,
+                  "readable": 57,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 15,
+                  "fit_percent": 71.43
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 4,
+                  "fit_percent": 36.36
+                },
+                {
+                  "length": "26-35",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-serde": {
+              "names": 122,
+              "readable": 108,
+              "percent": 88.52,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 32,
+                  "readable": 32,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 57,
+                  "readable": 57,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 15,
+                  "fit_percent": 71.43
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 4,
+                  "fit_percent": 36.36
+                },
+                {
+                  "length": "26-35",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-stdlib": {
+              "names": 1845,
+              "readable": 1549,
+              "percent": 83.96,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 982,
+                  "readable": 966,
+                  "fit_percent": 98.37
+                },
+                {
+                  "length": "11-15",
+                  "names": 547,
+                  "readable": 452,
+                  "fit_percent": 82.63
+                },
+                {
+                  "length": "16-20",
+                  "names": 232,
+                  "readable": 115,
+                  "fit_percent": 49.57
+                },
+                {
+                  "length": "21-25",
+                  "names": 63,
+                  "readable": 16,
+                  "fit_percent": 25.4
+                },
+                {
+                  "length": "26-35",
+                  "names": 21,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-stdlib": {
+              "names": 1549,
+              "readable": 1253,
+              "percent": 80.89,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 713,
+                  "readable": 697,
+                  "fit_percent": 97.76
+                },
+                {
+                  "length": "11-15",
+                  "names": 522,
+                  "readable": 427,
+                  "fit_percent": 81.8
+                },
+                {
+                  "length": "16-20",
+                  "names": 231,
+                  "readable": 114,
+                  "fit_percent": 49.35
+                },
+                {
+                  "length": "21-25",
+                  "names": 62,
+                  "readable": 15,
+                  "fit_percent": 24.19
+                },
+                {
+                  "length": "26-35",
+                  "names": 21,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-tokio": {
+              "names": 676,
+              "readable": 581,
+              "percent": 85.95,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 342,
+                  "readable": 339,
+                  "fit_percent": 99.12
+                },
+                {
+                  "length": "11-15",
+                  "names": 207,
+                  "readable": 175,
+                  "fit_percent": 84.54
+                },
+                {
+                  "length": "16-20",
+                  "names": 92,
+                  "readable": 59,
+                  "fit_percent": 64.13
+                },
+                {
+                  "length": "21-25",
+                  "names": 26,
+                  "readable": 7,
+                  "fit_percent": 26.92
+                },
+                {
+                  "length": "26-35",
+                  "names": 9,
+                  "readable": 1,
+                  "fit_percent": 11.11
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-tokio": {
+              "names": 562,
+              "readable": 467,
+              "percent": 83.1,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 231,
+                  "readable": 228,
+                  "fit_percent": 98.7
+                },
+                {
+                  "length": "11-15",
+                  "names": 204,
+                  "readable": 172,
+                  "fit_percent": 84.31
+                },
+                {
+                  "length": "16-20",
+                  "names": 92,
+                  "readable": 59,
+                  "fit_percent": 64.13
+                },
+                {
+                  "length": "21-25",
+                  "names": 26,
+                  "readable": 7,
+                  "fit_percent": 26.92
+                },
+                {
+                  "length": "26-35",
+                  "names": 9,
+                  "readable": 1,
+                  "fit_percent": 11.11
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "macro": {
+              "ecosystem_macro_percent": {
+                "rust": 81.89
+              },
+              "balanced_macro_percent": 81.89
+            },
+            "heldout_macro": {
+              "ecosystem_macro_percent": {
+                "rust": 85.0
+              },
+              "balanced_macro_percent": 85.0
+            }
+          },
+          "probes": {
+            "acceptPendingTokenTransfer": {
+              "fits": true,
+              "bits": 48
+            },
+            "addMarketLiquidity": {
+              "fits": false,
+              "bits": 86
+            },
+            "assignSymbolToToken": {
+              "fits": true,
+              "bits": 46
+            },
+            "cancelMarketplaceListing": {
+              "fits": false,
+              "bits": 82
+            },
+            "cancelPendingTokenTransfer": {
+              "fits": true,
+              "bits": 45
+            },
+            "cancelStopLossOrder": {
+              "fits": true,
+              "bits": 42
+            },
+            "completeAccountRecovery": {
+              "fits": true,
+              "bits": 41
+            },
+            "createAccountWithRecoveryPartner": {
+              "fits": true,
+              "bits": 57
+            },
+            "depositIntoSubaccount": {
+              "fits": true,
+              "bits": 49
+            },
+            "getBalanceConfiguration": {
+              "fits": true,
+              "bits": 26
+            },
+            "liquidateMarginPosition": {
+              "fits": false,
+              "bits": 72
+            },
+            "listAccountNameForSale": {
+              "fits": true,
+              "bits": 61
+            },
+            "placeLimitOrder": {
+              "fits": true,
+              "bits": 55
+            },
+            "purchaseMarketplaceListing": {
+              "fits": false,
+              "bits": 118
+            },
+            "registerEventIndex": {
+              "fits": true,
+              "bits": 36
+            },
+            "requestAccountRecovery": {
+              "fits": true,
+              "bits": 37
+            },
+            "setAuthenticationService": {
+              "fits": true,
+              "bits": 34
+            },
+            "setPublicKeyWithRecoveryPartner": {
+              "fits": false,
+              "bits": 68
+            },
+            "setSystemResourceToken": {
+              "fits": true,
+              "bits": 39
+            },
+            "withdrawFromSubaccount": {
+              "fits": true,
+              "bits": 45
+            },
+            "withdrawMarketLiquidity": {
+              "fits": false,
+              "bits": 87
+            }
+          }
+        },
+        "mixture": {
+          "model": {
+            "kind": "tagged_readable_mixture",
+            "tag_bits": 2,
+            "payload_bits": 62,
+            "modes": [
+              "char2",
+              "component_dictionary",
+              "bijective_base37_literal"
+            ],
+            "fallback": "not implemented"
+          },
+          "metrics": {
+            "heldout_all": {
+              "names": 3879,
+              "readable": 3314,
+              "percent": 85.43,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 1725,
+                  "readable": 1725,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 1246,
+                  "readable": 1166,
+                  "fit_percent": 93.58
+                },
+                {
+                  "length": "16-20",
+                  "names": 579,
+                  "readable": 356,
+                  "fit_percent": 61.49
+                },
+                {
+                  "length": "21-25",
+                  "names": 217,
+                  "readable": 64,
+                  "fit_percent": 29.49
+                },
+                {
+                  "length": "26-35",
+                  "names": 102,
+                  "readable": 3,
+                  "fit_percent": 2.94
+                },
+                {
+                  "length": "36+",
+                  "names": 10,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "novel_all": {
+              "names": 3438,
+              "readable": 2873,
+              "percent": 83.57,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 1316,
+                  "readable": 1316,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 1216,
+                  "readable": 1136,
+                  "fit_percent": 93.42
+                },
+                {
+                  "length": "16-20",
+                  "names": 578,
+                  "readable": 355,
+                  "fit_percent": 61.42
+                },
+                {
+                  "length": "21-25",
+                  "names": 216,
+                  "readable": 63,
+                  "fit_percent": 29.17
+                },
+                {
+                  "length": "26-35",
+                  "names": 102,
+                  "readable": 3,
+                  "fit_percent": 2.94
+                },
+                {
+                  "length": "36+",
+                  "names": 10,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "preferred_descriptive_probes": {
+              "names": 21,
+              "readable": 17,
+              "percent": 80.95,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "11-15",
+                  "names": 1,
+                  "readable": 1,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 4,
+                  "readable": 4,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 9,
+                  "fit_percent": 81.82
+                },
+                {
+                  "length": "26-35",
+                  "names": 5,
+                  "readable": 3,
+                  "fit_percent": 60.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "psibase_compatibility": {
+              "names": 528,
+              "readable": 524,
+              "percent": 99.24,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 363,
+                  "readable": 363,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 153,
+                  "readable": 152,
+                  "fit_percent": 99.35
+                },
+                {
+                  "length": "16-20",
+                  "names": 10,
+                  "readable": 8,
+                  "fit_percent": 80.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 2,
+                  "readable": 1,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-axum": {
+              "names": 184,
+              "readable": 178,
+              "percent": 96.74,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 109,
+                  "readable": 109,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 40,
+                  "readable": 40,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 20,
+                  "fit_percent": 95.24
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 8,
+                  "fit_percent": 72.73
+                },
+                {
+                  "length": "26-35",
+                  "names": 3,
+                  "readable": 1,
+                  "fit_percent": 33.33
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-axum": {
+              "names": 129,
+              "readable": 123,
+              "percent": 95.35,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 54,
+                  "readable": 54,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 40,
+                  "readable": 40,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 20,
+                  "fit_percent": 95.24
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 8,
+                  "fit_percent": 72.73
+                },
+                {
+                  "length": "26-35",
+                  "names": 3,
+                  "readable": 1,
+                  "fit_percent": 33.33
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-clap": {
+              "names": 427,
+              "readable": 328,
+              "percent": 76.81,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 170,
+                  "readable": 170,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 119,
+                  "readable": 110,
+                  "fit_percent": 92.44
+                },
+                {
+                  "length": "16-20",
+                  "names": 64,
+                  "readable": 42,
+                  "fit_percent": 65.62
+                },
+                {
+                  "length": "21-25",
+                  "names": 41,
+                  "readable": 6,
+                  "fit_percent": 14.63
+                },
+                {
+                  "length": "26-35",
+                  "names": 30,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:rust-clap": {
+              "names": 369,
+              "readable": 270,
+              "percent": 73.17,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 113,
+                  "readable": 113,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 118,
+                  "readable": 109,
+                  "fit_percent": 92.37
+                },
+                {
+                  "length": "16-20",
+                  "names": 64,
+                  "readable": 42,
+                  "fit_percent": 65.62
+                },
+                {
+                  "length": "21-25",
+                  "names": 41,
+                  "readable": 6,
+                  "fit_percent": 14.63
+                },
+                {
+                  "length": "26-35",
+                  "names": 30,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:rust-crossbeam": {
+              "names": 137,
+              "readable": 133,
+              "percent": 97.08,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 103,
+                  "readable": 103,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 28,
+                  "readable": 27,
+                  "fit_percent": 96.43
+                },
+                {
+                  "length": "16-20",
+                  "names": 3,
+                  "readable": 2,
+                  "fit_percent": 66.67
+                },
+                {
+                  "length": "21-25",
+                  "names": 2,
+                  "readable": 1,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-crossbeam": {
+              "names": 92,
+              "readable": 88,
+              "percent": 95.65,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 60,
+                  "readable": 60,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 27,
+                  "readable": 26,
+                  "fit_percent": 96.3
+                },
+                {
+                  "length": "16-20",
+                  "names": 3,
+                  "readable": 2,
+                  "fit_percent": 66.67
+                },
+                {
+                  "length": "21-25",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-diesel": {
+              "names": 514,
+              "readable": 449,
+              "percent": 87.35,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 225,
+                  "readable": 225,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 148,
+                  "readable": 142,
+                  "fit_percent": 95.95
+                },
+                {
+                  "length": "16-20",
+                  "names": 77,
+                  "readable": 58,
+                  "fit_percent": 75.32
+                },
+                {
+                  "length": "21-25",
+                  "names": 39,
+                  "readable": 22,
+                  "fit_percent": 56.41
+                },
+                {
+                  "length": "26-35",
+                  "names": 22,
+                  "readable": 2,
+                  "fit_percent": 9.09
+                },
+                {
+                  "length": "36+",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:rust-diesel": {
+              "names": 438,
+              "readable": 373,
+              "percent": 85.16,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 150,
+                  "readable": 150,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 147,
+                  "readable": 141,
+                  "fit_percent": 95.92
+                },
+                {
+                  "length": "16-20",
+                  "names": 77,
+                  "readable": 58,
+                  "fit_percent": 75.32
+                },
+                {
+                  "length": "21-25",
+                  "names": 39,
+                  "readable": 22,
+                  "fit_percent": 56.41
+                },
+                {
+                  "length": "26-35",
+                  "names": 22,
+                  "readable": 2,
+                  "fit_percent": 9.09
+                },
+                {
+                  "length": "36+",
+                  "names": 3,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:rust-futures": {
+              "names": 293,
+              "readable": 273,
+              "percent": 93.17,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 186,
+                  "readable": 186,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 83,
+                  "readable": 75,
+                  "fit_percent": 90.36
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 11,
+                  "fit_percent": 52.38
+                },
+                {
+                  "length": "21-25",
+                  "names": 3,
+                  "readable": 1,
+                  "fit_percent": 33.33
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-futures": {
+              "names": 232,
+              "readable": 212,
+              "percent": 91.38,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 125,
+                  "readable": 125,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 83,
+                  "readable": 75,
+                  "fit_percent": 90.36
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 11,
+                  "fit_percent": 52.38
+                },
+                {
+                  "length": "21-25",
+                  "names": 3,
+                  "readable": 1,
+                  "fit_percent": 33.33
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-rayon": {
+              "names": 197,
+              "readable": 169,
+              "percent": 85.79,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 103,
+                  "readable": 103,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 56,
+                  "readable": 53,
+                  "fit_percent": 94.64
+                },
+                {
+                  "length": "16-20",
+                  "names": 29,
+                  "readable": 12,
+                  "fit_percent": 41.38
+                },
+                {
+                  "length": "21-25",
+                  "names": 7,
+                  "readable": 1,
+                  "fit_percent": 14.29
+                },
+                {
+                  "length": "26-35",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-rayon": {
+              "names": 161,
+              "readable": 133,
+              "percent": 82.61,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 67,
+                  "readable": 67,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 56,
+                  "readable": 53,
+                  "fit_percent": 94.64
+                },
+                {
+                  "length": "16-20",
+                  "names": 29,
+                  "readable": 12,
+                  "fit_percent": 41.38
+                },
+                {
+                  "length": "21-25",
+                  "names": 7,
+                  "readable": 1,
+                  "fit_percent": 14.29
+                },
+                {
+                  "length": "26-35",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-regex": {
+              "names": 59,
+              "readable": 55,
+              "percent": 93.22,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 38,
+                  "readable": 38,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 14,
+                  "readable": 14,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 7,
+                  "readable": 3,
+                  "fit_percent": 42.86
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-regex": {
+              "names": 42,
+              "readable": 38,
+              "percent": 90.48,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 22,
+                  "readable": 22,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 13,
+                  "readable": 13,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 7,
+                  "readable": 3,
+                  "fit_percent": 42.86
+                },
+                {
+                  "length": "21-25",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-reqwest": {
+              "names": 236,
+              "readable": 185,
+              "percent": 78.39,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 121,
+                  "readable": 121,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 49,
+                  "readable": 41,
+                  "fit_percent": 83.67
+                },
+                {
+                  "length": "16-20",
+                  "names": 29,
+                  "readable": 21,
+                  "fit_percent": 72.41
+                },
+                {
+                  "length": "21-25",
+                  "names": 20,
+                  "readable": 2,
+                  "fit_percent": 10.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 13,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:rust-reqwest": {
+              "names": 186,
+              "readable": 135,
+              "percent": 72.58,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 72,
+                  "readable": 72,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 48,
+                  "readable": 40,
+                  "fit_percent": 83.33
+                },
+                {
+                  "length": "16-20",
+                  "names": 29,
+                  "readable": 21,
+                  "fit_percent": 72.41
+                },
+                {
+                  "length": "21-25",
+                  "names": 20,
+                  "readable": 2,
+                  "fit_percent": 10.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 13,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 4,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "heldout-source:rust-serde": {
+              "names": 126,
+              "readable": 113,
+              "percent": 89.68,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 36,
+                  "readable": 36,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 57,
+                  "readable": 57,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 16,
+                  "fit_percent": 76.19
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 4,
+                  "fit_percent": 36.36
+                },
+                {
+                  "length": "26-35",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-serde": {
+              "names": 122,
+              "readable": 109,
+              "percent": 89.34,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 32,
+                  "readable": 32,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 57,
+                  "readable": 57,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 21,
+                  "readable": 16,
+                  "fit_percent": 76.19
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 4,
+                  "fit_percent": 36.36
+                },
+                {
+                  "length": "26-35",
+                  "names": 1,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-stdlib": {
+              "names": 1845,
+              "readable": 1626,
+              "percent": 88.13,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 982,
+                  "readable": 982,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 547,
+                  "readable": 508,
+                  "fit_percent": 92.87
+                },
+                {
+                  "length": "16-20",
+                  "names": 232,
+                  "readable": 122,
+                  "fit_percent": 52.59
+                },
+                {
+                  "length": "21-25",
+                  "names": 63,
+                  "readable": 14,
+                  "fit_percent": 22.22
+                },
+                {
+                  "length": "26-35",
+                  "names": 21,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-stdlib": {
+              "names": 1549,
+              "readable": 1330,
+              "percent": 85.86,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 713,
+                  "readable": 713,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 522,
+                  "readable": 483,
+                  "fit_percent": 92.53
+                },
+                {
+                  "length": "16-20",
+                  "names": 231,
+                  "readable": 121,
+                  "fit_percent": 52.38
+                },
+                {
+                  "length": "21-25",
+                  "names": 62,
+                  "readable": 13,
+                  "fit_percent": 20.97
+                },
+                {
+                  "length": "26-35",
+                  "names": 21,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:rust-tokio": {
+              "names": 676,
+              "readable": 609,
+              "percent": 90.09,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 342,
+                  "readable": 342,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 207,
+                  "readable": 199,
+                  "fit_percent": 96.14
+                },
+                {
+                  "length": "16-20",
+                  "names": 92,
+                  "readable": 61,
+                  "fit_percent": 66.3
+                },
+                {
+                  "length": "21-25",
+                  "names": 26,
+                  "readable": 7,
+                  "fit_percent": 26.92
+                },
+                {
+                  "length": "26-35",
+                  "names": 9,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "source:rust-tokio": {
+              "names": 562,
+              "readable": 495,
+              "percent": 88.08,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 231,
+                  "readable": 231,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 204,
+                  "readable": 196,
+                  "fit_percent": 96.08
+                },
+                {
+                  "length": "16-20",
+                  "names": 92,
+                  "readable": 61,
+                  "fit_percent": 66.3
+                },
+                {
+                  "length": "21-25",
+                  "names": 26,
+                  "readable": 7,
+                  "fit_percent": 26.92
+                },
+                {
+                  "length": "26-35",
+                  "names": 9,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "macro": {
+              "ecosystem_macro_percent": {
+                "rust": 84.93
+              },
+              "balanced_macro_percent": 84.93
+            },
+            "heldout_macro": {
+              "ecosystem_macro_percent": {
+                "rust": 87.5
+              },
+              "balanced_macro_percent": 87.5
+            }
+          },
+          "probes": {
+            "acceptPendingTokenTransfer": {
+              "fits": true,
+              "bits": 48
+            },
+            "addMarketLiquidity": {
+              "fits": true,
+              "bits": 60
+            },
+            "assignSymbolToToken": {
+              "fits": true,
+              "bits": 46
+            },
+            "cancelMarketplaceListing": {
+              "fits": false,
+              "bits": 73
+            },
+            "cancelPendingTokenTransfer": {
+              "fits": true,
+              "bits": 45
+            },
+            "cancelStopLossOrder": {
+              "fits": true,
+              "bits": 42
+            },
+            "completeAccountRecovery": {
+              "fits": true,
+              "bits": 41
+            },
+            "createAccountWithRecoveryPartner": {
+              "fits": true,
+              "bits": 57
+            },
+            "depositIntoSubaccount": {
+              "fits": true,
+              "bits": 49
+            },
+            "getBalanceConfiguration": {
+              "fits": true,
+              "bits": 26
+            },
+            "liquidateMarginPosition": {
+              "fits": true,
+              "bits": 51
+            },
+            "listAccountNameForSale": {
+              "fits": true,
+              "bits": 61
+            },
+            "placeLimitOrder": {
+              "fits": true,
+              "bits": 46
+            },
+            "purchaseMarketplaceListing": {
+              "fits": false,
+              "bits": 83
+            },
+            "registerEventIndex": {
+              "fits": true,
+              "bits": 36
+            },
+            "requestAccountRecovery": {
+              "fits": true,
+              "bits": 37
+            },
+            "setAuthenticationService": {
+              "fits": true,
+              "bits": 34
+            },
+            "setPublicKeyWithRecoveryPartner": {
+              "fits": false,
+              "bits": 68
+            },
+            "setSystemResourceToken": {
+              "fits": true,
+              "bits": 39
+            },
+            "withdrawFromSubaccount": {
+              "fits": true,
+              "bits": 45
+            },
+            "withdrawMarketLiquidity": {
+              "fits": false,
+              "bits": 75
+            }
+          }
+        }
+      }
+    }
+  },
+  "potential_normalization_equivalences_not_wire_collisions": {
+    "lookalike": {
+      "groups": 0,
+      "distinct_names_affected": 0,
+      "examples": []
+    },
+    "vowelless": {
+      "groups": 55,
+      "distinct_names_affected": 111,
+      "examples": [
+        {
+          "source": "github-sdk",
+          "scope": "repos",
+          "canonical": "gtrgrlst",
+          "originals": [
+            "getorgruleset",
+            "getorgrulesuite"
+          ]
+        },
+        {
+          "source": "github-sdk",
+          "scope": "repos",
+          "canonical": "gtrgrlsts",
+          "originals": [
+            "getorgrulesets",
+            "getorgrulesuites"
+          ]
+        },
+        {
+          "source": "github-sdk",
+          "scope": "repos",
+          "canonical": "gtrprlst",
+          "originals": [
+            "getreporuleset",
+            "getreporulesuite"
+          ]
+        },
+        {
+          "source": "github-sdk",
+          "scope": "repos",
+          "canonical": "gtrprlsts",
+          "originals": [
+            "getreporulesets",
+            "getreporulesuites"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "mm_fn",
+          "originals": [
+            "mem_fn",
+            "mem_fun"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "rnd",
+          "originals": [
+            "rand",
+            "rend",
+            "round"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "st",
+          "originals": [
+            "set",
+            "stoi"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "stl",
+          "originals": [
+            "stol",
+            "stoul"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "stll",
+          "originals": [
+            "stoll",
+            "stoull"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "strtl",
+          "originals": [
+            "strtol",
+            "strtoul"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "strtll",
+          "originals": [
+            "strtoll",
+            "strtoull"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "strtmx",
+          "originals": [
+            "strtoimax",
+            "strtoumax"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "wcstl",
+          "originals": [
+            "wcstol",
+            "wcstoul"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "wcstll",
+          "originals": [
+            "wcstoll",
+            "wcstoull"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "wcstmx",
+          "originals": [
+            "wcstoimax",
+            "wcstoumax"
+          ]
+        }
+      ]
+    }
+  },
+  "evaluation_seconds": 6.186
+}

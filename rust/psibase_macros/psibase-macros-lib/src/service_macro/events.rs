@@ -2,6 +2,7 @@ use darling::{util::Flag, FromMeta};
 use proc_macro_error::emit_error;
 use quote::quote;
 use std::fmt::Display;
+use syn::ext::IdentExt;
 use syn::{AttrStyle, Attribute, ItemFn};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -79,7 +80,7 @@ pub fn process_event_callers(
     invoke_args: &proc_macro2::TokenStream,
 ) {
     let name = &f.sig.ident;
-    let name_str = name.to_string();
+    let name_str = name.unraw().to_string();
     let method_number =
         quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
     let inputs = &f.sig.inputs;
@@ -114,7 +115,7 @@ pub fn process_event_name(
     structs: &mut proc_macro2::TokenStream,
 ) {
     let name = &f.sig.ident;
-    let name_str = name.to_string();
+    let name_str = name.unraw().to_string();
     let method_number =
         quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
 
@@ -135,7 +136,7 @@ pub fn process_event_schema(
     insertions: &mut proc_macro2::TokenStream,
 ) {
     let name = &f.sig.ident;
-    let name_str = name.to_string();
+    let name_str = name.unraw().to_string();
     let access = options.access.to_string();
 
     *insertions = quote! {

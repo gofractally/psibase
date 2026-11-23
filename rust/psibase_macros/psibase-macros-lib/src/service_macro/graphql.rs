@@ -1,4 +1,5 @@
 use quote::quote;
+use syn::ext::IdentExt;
 use syn::ItemFn;
 
 pub fn process_gql_union_member(
@@ -9,7 +10,7 @@ pub fn process_gql_union_member(
     dispatch: &mut proc_macro2::TokenStream,
 ) {
     let name = &f.sig.ident;
-    let name_str = name.to_string();
+    let name_str = name.unraw().to_string();
 
     *enumerators = quote! {
         #enumerators

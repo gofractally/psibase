@@ -353,7 +353,7 @@ namespace psibase
    struct ServiceMethod
    {
       AccountNumber service;
-      MethodNumber  method;
+      ActionName  method;
       PSIO_REFLECT(ServiceMethod, service, method)
    };
    inline constexpr bool psio_custom_schema(ServiceMethod*)
@@ -479,7 +479,7 @@ namespace psibase
    {
       MonotonicTimePointUSec expiration;
       psibase::AccountNumber service;
-      psibase::MethodNumber  method;
+      psibase::ActionName  method;
 
       static const auto db = psibase::DbId::nativeSession;
       auto              key() const -> KeyPrefixType;

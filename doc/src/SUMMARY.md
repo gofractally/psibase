@@ -27,6 +27,7 @@
     - [User onboarding](specifications/concepts/user-onboarding.md)
   - [Data formats]()
     - [Account numbers](specifications/data-formats/account-numbers.md)
+    - [Action names](specifications/data-formats/action-names.md)
     - [JSON](specifications/data-formats/json.md)
     - [Schema](specifications/data-formats/schema.md)
     - [fracpack](specifications/data-formats/fracpack.md)
@@ -34,6 +35,8 @@
   - [Platforms](specifications/platforms/README.md)
 
 - [Development guides](development/README.md)
+
+  - [Action-name training and release](development/action-name-training.md)
 
   - [Services](development/services/README.md)
     - [Action scripts](development/services/action-scripts.md)

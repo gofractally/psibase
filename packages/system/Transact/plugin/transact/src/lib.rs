@@ -40,7 +40,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [add_evidence, add_signature, unhook_actions_sender, add_action_to_transaction, register_pre_publish_hook],
+        None => [add_evidence, add_signature, unhook_actions_sender, add_action_to_transaction, add_action_id_to_transaction, register_pre_publish_hook],
         Low => [],
         High => [hook_actions_sender],
         Max => [set_propose_latch, propose, set_snapshot_time, get_query_token],
@@ -67,12 +67,19 @@ psibase::define_trust! {
 
 struct TransactPlugin {}
 
-fn validate_action_name(action_name: &str) -> Result<(), HostTypes::Error> {
-    let re = regex::Regex::new(r"^([a-zA-Z0-9_]+|#[a-z]{16})$").unwrap();
-    if re.is_match(action_name) {
-        return Ok(());
-    }
-    Err(InvalidActionName(action_name).into())
+fn validate_action_name(action_name: &str) -> Result<psibase::ActionName, HostTypes::Error> {
+    action_name
+        .parse::<psibase::ActionName>()
+        .map_err(|_| InvalidActionName(action_name).into())
+}
+
+fn validate_action_id(method_id: u64) -> Result<(psibase::ActionName, String), HostTypes::Error> {
+    let method = psibase::ActionName::new(method_id);
+    let diagnostic = format!("numeric ID 0x{method_id:016x}");
+    let text = method
+        .try_to_string()
+        .map_err(|_| HostTypes::Error::from(InvalidActionName(&diagnostic)))?;
+    Ok((method, text))
 }
 
 fn get_action_sender(service: &str, method: &str) -> Result<String, HostTypes::Error> {
@@ -108,15 +115,28 @@ fn schedule_action(
     method_name: String,
     packed_args: Vec<u8>,
 ) -> Result<(), HostTypes::Error> {
-    validate_action_name(&method_name)?;
-    let sender = get_action_sender(service.as_str(), method_name.as_str())?;
+    let method = validate_action_name(&method_name)?;
+    schedule_parsed_action(service, method, &method_name, packed_args)
+}
 
-    let action = psibase::Action::from(ImportAction {
-        sender,
-        service,
-        method: method_name,
-        raw_data: packed_args,
-    });
+fn schedule_parsed_action(
+    service: String,
+    method: psibase::ActionName,
+    method_name: &str,
+    packed_args: Vec<u8>,
+) -> Result<(), HostTypes::Error> {
+    let sender = get_action_sender(service.as_str(), method_name)?;
+
+    let action = psibase::Action {
+        sender: sender
+            .parse()
+            .map_err(|_| BadResponse("invalid action sender"))?,
+        service: service
+            .parse()
+            .map_err(|_| BadResponse("invalid action service"))?,
+        method,
+        rawData: packed_args.into(),
+    };
 
     if OpenTx::latch_is_active() {
         OpenTx::add_latched(action);
@@ -127,16 +147,14 @@ fn schedule_action(
     Ok(())
 }
 
-fn pack_staged_propose(actions: Vec<ImportAction>, auto_exec: bool) -> (String, String, Vec<u8>) {
-    let inner: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
+fn pack_staged_propose(
+    actions: Vec<psibase::Action>,
+    auto_exec: bool,
+) -> (String, String, Vec<u8>) {
     (
         psibase::services::staged_tx::SERVICE.to_string(),
         psibase::services::staged_tx::action_structs::propose::ACTION_NAME.to_string(),
-        psibase::services::staged_tx::action_structs::propose {
-            actions: inner,
-            auto_exec,
-        }
-        .packed(),
+        psibase::services::staged_tx::action_structs::propose { actions, auto_exec }.packed(),
     )
 }
 
@@ -169,14 +187,21 @@ fn user_auth_proof(
     on_user_auth_proof(plugin_ref, user, tx_hash)
 }
 
-impl From<ImportAction> for psibase::Action {
-    fn from(action: ImportAction) -> Self {
-        psibase::Action {
-            sender: action.sender.parse().unwrap(),
-            service: action.service.parse().unwrap(),
-            method: psibase::MethodNumber::from(action.method.as_str()),
+impl TryFrom<ImportAction> for psibase::Action {
+    type Error = HostTypes::Error;
+    fn try_from(action: ImportAction) -> Result<Self, Self::Error> {
+        Ok(psibase::Action {
+            sender: action
+                .sender
+                .parse()
+                .map_err(|_| BadResponse("invalid action sender"))?,
+            service: action
+                .service
+                .parse()
+                .map_err(|_| BadResponse("invalid action service"))?,
+            method: validate_action_name(&action.method)?,
             rawData: action.raw_data.into(),
-        }
+        })
     }
 }
 
@@ -228,6 +253,14 @@ impl Api for TransactPlugin {
         schedule_action(Client::get_sender(), method_name, packed_args)
     }
 
+    fn add_action_id_to_transaction(
+        method_id: u64,
+        packed_args: Vec<u8>,
+    ) -> Result<(), HostTypes::Error> {
+        let (method, method_name) = validate_action_id(method_id)?;
+        schedule_parsed_action(Client::get_sender(), method, &method_name, packed_args)
+    }
+
     fn add_signature(claim: ExportClaim) -> Result<(), HostTypes::Error> {
         OpenTx::add_claim(psibase::Claim {
             service: claim.verify_service.parse().unwrap(),
@@ -237,10 +270,20 @@ impl Api for TransactPlugin {
     }
 
     fn add_evidence(claim: ExportClaim, proof: Vec<u8>) -> Result<(), HostTypes::Error> {
-        OpenTx::check_connection(bindings::host::accounts::api::get_current_user()).map_err(ConnectionChanged)?;
-        let service = claim.verify_service.parse().map_err(|_| BadResponse("invalid evidence verifier"))?;
-        OpenTx::add_evidence(psibase::Claim { service, rawData: claim.raw_data.into() }, proof.into())
-            .map_err(|e| BadResponse(e).into())
+        OpenTx::check_connection(bindings::host::accounts::api::get_current_user())
+            .map_err(ConnectionChanged)?;
+        let service = claim
+            .verify_service
+            .parse()
+            .map_err(|_| BadResponse("invalid evidence verifier"))?;
+        OpenTx::add_evidence(
+            psibase::Claim {
+                service,
+                rawData: claim.raw_data.into(),
+            },
+            proof.into(),
+        )
+        .map_err(|e| BadResponse(e).into())
     }
 
     fn set_propose_latch(account: Option<String>) -> Result<(), HostTypes::Error> {
@@ -267,7 +310,7 @@ impl Api for TransactPlugin {
     fn propose(actions: Vec<ExportAction>, auto_exec: bool) -> Result<(), HostTypes::Error> {
         assert_authorized_with_whitelist(FunctionName::propose, vec!["packages".into()])?;
 
-        let actions: Vec<ImportAction> = actions
+        let actions: Vec<psibase::Action> = actions
             .into_iter()
             .map(|a| ImportAction {
                 sender: a.sender,
@@ -275,7 +318,8 @@ impl Api for TransactPlugin {
                 method: a.method,
                 raw_data: a.raw_data,
             })
-            .collect();
+            .map(TryInto::try_into)
+            .collect::<Result<_, HostTypes::Error>>()?;
         let (service, method, packed) = pack_staged_propose(actions, auto_exec);
         schedule_action(service, method, packed)
     }
@@ -317,7 +361,10 @@ impl Auth for TransactPlugin {
         let claims: Vec<ImportClaim> = user_auth_claim(&user)?.into_iter().collect();
 
         let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
-        let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
+        let actions: Vec<psibase::Action> = actions
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<_, HostTypes::Error>>()?;
 
         let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
         let tapos = Tapos {
@@ -370,3 +417,51 @@ impl Authorized for TransactPlugin {
 }
 
 bindings::export!(TransactPlugin with_types_in bindings);
+
+#[cfg(test)]
+mod action_name_transport_tests {
+    use super::*;
+
+    #[test]
+    fn invalid_numeric_ids_fail_before_any_host_call() {
+        for id in [0, 1, 2u64 << 62] {
+            assert!(validate_action_id(id).is_err());
+            assert!(<TransactPlugin as Api>::add_action_id_to_transaction(id, vec![]).is_err());
+        }
+    }
+
+    #[test]
+    fn untrusted_text_is_fallible_and_hash_literals_are_exact() {
+        for text in ["", "bad-name", "1bad", "é", "#short", "#0000000000000000"] {
+            assert!(validate_action_name(text).is_err());
+        }
+        assert_eq!(
+            validate_action_name("#ffffffffffffffff").unwrap().value,
+            u64::MAX
+        );
+    }
+
+    #[test]
+    fn numeric_and_text_inputs_keep_the_same_wire_id() {
+        for text in [
+            "setKey",
+            "requestRecovery",
+            "set_guild_weight_curve",
+            "#ffffffffffffffff",
+        ] {
+            let parsed = validate_action_name(text).unwrap();
+            let (numeric, hook_text) = validate_action_id(parsed.value).unwrap();
+            assert_eq!(numeric.value, parsed.value);
+            assert_eq!(validate_action_name(&hook_text).unwrap(), parsed);
+            let action = psibase::Action::try_from(ImportAction {
+                sender: "alice".into(),
+                service: "tokens".into(),
+                method: text.into(),
+                raw_data: vec![1, 2, 3],
+            })
+            .unwrap();
+            assert_eq!(action.method, numeric);
+            assert_eq!(action.rawData.0, vec![1, 2, 3]);
+        }
+    }
+}

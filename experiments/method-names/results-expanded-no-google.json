@@ -1,0 +1,1993 @@
+{
+  "scope": "Experimental readable branches only; no production codec changes or CPU claims",
+  "corpus_sha256": "d511feee9ecf3b68c596e9cb457ec054596c239c93e87b3d546ce4869aac2939",
+  "corpus_metadata_sha256": "bca49a7d311068e07a7e00414f34bed1087a3257e18cd40963a9bbce3f6113a3",
+  "historical_corpus_sha256": "1c2c627635f7ecae0aadf8d9e94658fd25a4e6939e6a10df2aa8086b5cd4080b",
+  "experiment_source_sha256": {
+    "benchmark.py": "0d904ebcae5254c00806e3b31af62c57cc4e8dbf89e5c09505db6608e84d2a2d",
+    "expansion_benchmark.py": "270c479b04891d8c6af166e5a35a9318bcdc8d4e165fce18c23d45933b0624e4",
+    "expand_corpus.py": "04715a94bc754c158a5f3ff0afb38e9a28b3ca9d069d8bf55d706568347cd843"
+  },
+  "codec_source_sha256": {
+    "libraries/psio/include/psio/compress_name.hpp": "6f57da2a2c4523fde1c665b774687a65fb7085c992040b4271134fd296b1596f",
+    "rust/psibase_names/src/constants.rs": "d94fa5448fae654c8cfcdb988f78c2a34ffeed90f7c16587cc58124ea1ad0da6",
+    "rust/psibase_names/src/method_to_number_converter.rs": "cb619588fdc122f1d4c98a687e081375e86cd7a9d568a9e7b8913e12e1ea8837"
+  },
+  "split": {
+    "family_rule": "source:split_group SHA256 modulo5, residue0 held out",
+    "leave_out_ecosystem": null,
+    "leave_out_provider": "google",
+    "training_records": 44545,
+    "heldout_records": 15211,
+    "novel_records": 10334,
+    "novel_names": 5768,
+    "novel_definition": "No lowercase spelling in ANY expanded training source",
+    "shared_evaluation_across_profiles": true,
+    "psibase_and_preferred_names_excluded_from_all_training": true
+  },
+  "balance": {
+    "rule": "Equal ecosystems > equal providers > equal sources > equal distinct spellings",
+    "source_mass": {
+      "bitcoin-rpc": {
+        "ecosystem": "blockchain",
+        "provider": "Bitcoin Core",
+        "mass": 0.03333333333333333,
+        "spellings": 170
+      },
+      "cometbft-rpc": {
+        "ecosystem": "blockchain",
+        "provider": "CometBFT",
+        "mass": 0.03333333333333333,
+        "spellings": 31
+      },
+      "cosmos-rpc": {
+        "ecosystem": "blockchain",
+        "provider": "Cosmos SDK",
+        "mass": 0.03333333333333333,
+        "spellings": 141
+      },
+      "polkadot-rpc": {
+        "ecosystem": "blockchain",
+        "provider": "Parity",
+        "mass": 0.03333333333333333,
+        "spellings": 107
+      },
+      "solana-rpc": {
+        "ecosystem": "blockchain",
+        "provider": "Solana Labs",
+        "mass": 0.03333333333333333,
+        "spellings": 69
+      },
+      "ethereum": {
+        "ecosystem": "blockchain",
+        "provider": "ethereum",
+        "mass": 0.03333333333333333,
+        "spellings": 93
+      },
+      "boost-algorithm": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.006666666666666666,
+        "spellings": 194
+      },
+      "boost-asio": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.006666666666666666,
+        "spellings": 152
+      },
+      "boost-beast": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.006666666666666666,
+        "spellings": 139
+      },
+      "boost-container": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.006666666666666666,
+        "spellings": 129
+      },
+      "boost-filesystem": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.006666666666666666,
+        "spellings": 17
+      },
+      "boost-json": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.006666666666666666,
+        "spellings": 99
+      },
+      "boost-math": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.006666666666666666,
+        "spellings": 184
+      },
+      "boost-multi_index": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.006666666666666666,
+        "spellings": 73
+      },
+      "boost-unordered": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.006666666666666666,
+        "spellings": 77
+      },
+      "boost-url": {
+        "ecosystem": "cpp",
+        "provider": "boost",
+        "mass": 0.006666666666666666,
+        "spellings": 64
+      },
+      "libcxx": {
+        "ecosystem": "cpp",
+        "provider": "llvm",
+        "mass": 0.06666666666666667,
+        "spellings": 1180
+      },
+      "qt-core": {
+        "ecosystem": "cpp",
+        "provider": "qt",
+        "mass": 0.03333333333333333,
+        "spellings": 2479
+      },
+      "qt-network": {
+        "ecosystem": "cpp",
+        "provider": "qt",
+        "mass": 0.03333333333333333,
+        "spellings": 621
+      },
+      "ccxt": {
+        "ecosystem": "javascript",
+        "provider": "ccxt",
+        "mass": 0.06666666666666667,
+        "spellings": 208
+      },
+      "ethers": {
+        "ecosystem": "javascript",
+        "provider": "ethers",
+        "mass": 0.06666666666666667,
+        "spellings": 31
+      },
+      "typescript-dom": {
+        "ecosystem": "javascript",
+        "provider": "microsoft",
+        "mass": 0.03333333333333333,
+        "spellings": 1153
+      },
+      "typescript-es": {
+        "ecosystem": "javascript",
+        "provider": "microsoft",
+        "mass": 0.03333333333333333,
+        "spellings": 306
+      },
+      "rust-clap": {
+        "ecosystem": "rust",
+        "provider": "clap-rs",
+        "mass": 0.025,
+        "spellings": 427
+      },
+      "rust-crossbeam": {
+        "ecosystem": "rust",
+        "provider": "crossbeam-rs",
+        "mass": 0.025,
+        "spellings": 137
+      },
+      "rust-diesel": {
+        "ecosystem": "rust",
+        "provider": "diesel-rs",
+        "mass": 0.025,
+        "spellings": 514
+      },
+      "rust-rayon": {
+        "ecosystem": "rust",
+        "provider": "rayon-rs",
+        "mass": 0.025,
+        "spellings": 197
+      },
+      "rust-futures": {
+        "ecosystem": "rust",
+        "provider": "rust-lang",
+        "mass": 0.008333333333333333,
+        "spellings": 293
+      },
+      "rust-regex": {
+        "ecosystem": "rust",
+        "provider": "rust-lang",
+        "mass": 0.008333333333333333,
+        "spellings": 59
+      },
+      "rust-stdlib": {
+        "ecosystem": "rust",
+        "provider": "rust-lang",
+        "mass": 0.008333333333333333,
+        "spellings": 1845
+      },
+      "rust-reqwest": {
+        "ecosystem": "rust",
+        "provider": "seanmonstar",
+        "mass": 0.025,
+        "spellings": 236
+      },
+      "rust-serde": {
+        "ecosystem": "rust",
+        "provider": "serde-rs",
+        "mass": 0.025,
+        "spellings": 126
+      },
+      "rust-axum": {
+        "ecosystem": "rust",
+        "provider": "tokio-rs",
+        "mass": 0.0125,
+        "spellings": 184
+      },
+      "rust-tokio": {
+        "ecosystem": "rust",
+        "provider": "tokio-rs",
+        "mass": 0.0125,
+        "spellings": 676
+      },
+      "aws-sdk": {
+        "ecosystem": "service-api",
+        "provider": "Amazon",
+        "mass": 0.05,
+        "spellings": 12117
+      },
+      "github-sdk": {
+        "ecosystem": "service-api",
+        "provider": "GitHub/Octokit",
+        "mass": 0.05,
+        "spellings": 927
+      },
+      "stripe-sdk": {
+        "ecosystem": "service-api",
+        "provider": "Stripe",
+        "mass": 0.05,
+        "spellings": 170
+      },
+      "kubernetes": {
+        "ecosystem": "service-api",
+        "provider": "kubernetes",
+        "mass": 0.05,
+        "spellings": 1175
+      }
+    }
+  },
+  "source_info": {
+    "aws-sdk": {
+      "ecosystem": "service-api",
+      "provider": "Amazon"
+    },
+    "bitcoin-rpc": {
+      "ecosystem": "blockchain",
+      "provider": "Bitcoin Core"
+    },
+    "boost-algorithm": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-asio": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-beast": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-container": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-filesystem": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-json": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-math": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-multi_index": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-unordered": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "boost-url": {
+      "ecosystem": "cpp",
+      "provider": "boost"
+    },
+    "ccxt": {
+      "ecosystem": "javascript",
+      "provider": "ccxt"
+    },
+    "cometbft-rpc": {
+      "ecosystem": "blockchain",
+      "provider": "CometBFT"
+    },
+    "cosmos-rpc": {
+      "ecosystem": "blockchain",
+      "provider": "Cosmos SDK"
+    },
+    "ethereum": {
+      "ecosystem": "blockchain",
+      "provider": "ethereum"
+    },
+    "ethers": {
+      "ecosystem": "javascript",
+      "provider": "ethers"
+    },
+    "github-sdk": {
+      "ecosystem": "service-api",
+      "provider": "GitHub/Octokit"
+    },
+    "googleapis": {
+      "ecosystem": "service-api",
+      "provider": "google"
+    },
+    "kubernetes": {
+      "ecosystem": "service-api",
+      "provider": "kubernetes"
+    },
+    "libcxx": {
+      "ecosystem": "cpp",
+      "provider": "llvm"
+    },
+    "polkadot-rpc": {
+      "ecosystem": "blockchain",
+      "provider": "Parity"
+    },
+    "qt-core": {
+      "ecosystem": "cpp",
+      "provider": "qt"
+    },
+    "qt-network": {
+      "ecosystem": "cpp",
+      "provider": "qt"
+    },
+    "rust-axum": {
+      "ecosystem": "rust",
+      "provider": "tokio-rs"
+    },
+    "rust-clap": {
+      "ecosystem": "rust",
+      "provider": "clap-rs"
+    },
+    "rust-crossbeam": {
+      "ecosystem": "rust",
+      "provider": "crossbeam-rs"
+    },
+    "rust-diesel": {
+      "ecosystem": "rust",
+      "provider": "diesel-rs"
+    },
+    "rust-futures": {
+      "ecosystem": "rust",
+      "provider": "rust-lang"
+    },
+    "rust-rayon": {
+      "ecosystem": "rust",
+      "provider": "rayon-rs"
+    },
+    "rust-regex": {
+      "ecosystem": "rust",
+      "provider": "rust-lang"
+    },
+    "rust-reqwest": {
+      "ecosystem": "rust",
+      "provider": "seanmonstar"
+    },
+    "rust-serde": {
+      "ecosystem": "rust",
+      "provider": "serde-rs"
+    },
+    "rust-stdlib": {
+      "ecosystem": "rust",
+      "provider": "rust-lang"
+    },
+    "rust-tokio": {
+      "ecosystem": "rust",
+      "provider": "tokio-rs"
+    },
+    "solana-rpc": {
+      "ecosystem": "blockchain",
+      "provider": "Solana Labs"
+    },
+    "stripe-sdk": {
+      "ecosystem": "service-api",
+      "provider": "Stripe"
+    },
+    "typescript-dom": {
+      "ecosystem": "javascript",
+      "provider": "microsoft"
+    },
+    "typescript-es": {
+      "ecosystem": "javascript",
+      "provider": "microsoft"
+    }
+  },
+  "baseline_current_cpp": {
+    "heldout_all": {
+      "names": 6686,
+      "readable": 1890,
+      "percent": 28.27,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 567,
+          "readable": 566,
+          "fit_percent": 99.82
+        },
+        {
+          "length": "11-15",
+          "names": 1892,
+          "readable": 1292,
+          "fit_percent": 68.29
+        },
+        {
+          "length": "16-20",
+          "names": 2084,
+          "readable": 32,
+          "fit_percent": 1.54
+        },
+        {
+          "length": "21-25",
+          "names": 1281,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 751,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 111,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "novel_all": {
+      "names": 5768,
+      "readable": 1231,
+      "percent": 21.34,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 320,
+          "readable": 319,
+          "fit_percent": 99.69
+        },
+        {
+          "length": "11-15",
+          "names": 1412,
+          "readable": 892,
+          "fit_percent": 63.17
+        },
+        {
+          "length": "16-20",
+          "names": 1928,
+          "readable": 20,
+          "fit_percent": 1.04
+        },
+        {
+          "length": "21-25",
+          "names": 1261,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 736,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 111,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "preferred_descriptive_probes": {
+      "names": 21,
+      "readable": 1,
+      "percent": 4.76,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "11-15",
+          "names": 1,
+          "readable": 1,
+          "fit_percent": 100.0
+        },
+        {
+          "length": "16-20",
+          "names": 4,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "21-25",
+          "names": 11,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 5,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "psibase_compatibility": {
+      "names": 528,
+      "readable": 473,
+      "percent": 89.58,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 363,
+          "readable": 356,
+          "fit_percent": 98.07
+        },
+        {
+          "length": "11-15",
+          "names": 153,
+          "readable": 116,
+          "fit_percent": 75.82
+        },
+        {
+          "length": "16-20",
+          "names": 10,
+          "readable": 1,
+          "fit_percent": 10.0
+        },
+        {
+          "length": "21-25",
+          "names": 2,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        },
+        {
+          "length": "36+",
+          "names": 0,
+          "readable": 0,
+          "fit_percent": null
+        }
+      ]
+    },
+    "heldout-source:googleapis": {
+      "names": 6686,
+      "readable": 1890,
+      "percent": 28.27,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 567,
+          "readable": 566,
+          "fit_percent": 99.82
+        },
+        {
+          "length": "11-15",
+          "names": 1892,
+          "readable": 1292,
+          "fit_percent": 68.29
+        },
+        {
+          "length": "16-20",
+          "names": 2084,
+          "readable": 32,
+          "fit_percent": 1.54
+        },
+        {
+          "length": "21-25",
+          "names": 1281,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 751,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 111,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "source:googleapis": {
+      "names": 5768,
+      "readable": 1231,
+      "percent": 21.34,
+      "length_bands": [
+        {
+          "length": "1-10",
+          "names": 320,
+          "readable": 319,
+          "fit_percent": 99.69
+        },
+        {
+          "length": "11-15",
+          "names": 1412,
+          "readable": 892,
+          "fit_percent": 63.17
+        },
+        {
+          "length": "16-20",
+          "names": 1928,
+          "readable": 20,
+          "fit_percent": 1.04
+        },
+        {
+          "length": "21-25",
+          "names": 1261,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "26-35",
+          "names": 736,
+          "readable": 0,
+          "fit_percent": 0.0
+        },
+        {
+          "length": "36+",
+          "names": 111,
+          "readable": 0,
+          "fit_percent": 0.0
+        }
+      ]
+    },
+    "macro": {
+      "ecosystem_macro_percent": {
+        "service-api": 21.34
+      },
+      "balanced_macro_percent": 21.34
+    },
+    "heldout_macro": {
+      "ecosystem_macro_percent": {
+        "service-api": 28.27
+      },
+      "balanced_macro_percent": 28.27
+    }
+  },
+  "profiles": {
+    "expanded_balanced": {
+      "training_unique_spellings": 24497,
+      "training_sources": [
+        "aws-sdk",
+        "bitcoin-rpc",
+        "boost-algorithm",
+        "boost-asio",
+        "boost-beast",
+        "boost-container",
+        "boost-filesystem",
+        "boost-json",
+        "boost-math",
+        "boost-multi_index",
+        "boost-unordered",
+        "boost-url",
+        "ccxt",
+        "cometbft-rpc",
+        "cosmos-rpc",
+        "ethereum",
+        "ethers",
+        "github-sdk",
+        "kubernetes",
+        "libcxx",
+        "polkadot-rpc",
+        "qt-core",
+        "qt-network",
+        "rust-axum",
+        "rust-clap",
+        "rust-crossbeam",
+        "rust-diesel",
+        "rust-futures",
+        "rust-rayon",
+        "rust-regex",
+        "rust-reqwest",
+        "rust-serde",
+        "rust-stdlib",
+        "rust-tokio",
+        "solana-rpc",
+        "stripe-sdk",
+        "typescript-dom",
+        "typescript-es"
+      ],
+      "models": {
+        "char2": {
+          "model": {
+            "kind": "character",
+            "order": 2,
+            "symbols_including_eos": 38,
+            "observed_context_rows": 903,
+            "evaluated_cdf_rows": 1319,
+            "evaluated_cdf_u16_bytes": 102882
+          },
+          "metrics": {
+            "heldout_all": {
+              "names": 6686,
+              "readable": 4055,
+              "percent": 60.65,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 567,
+                  "readable": 567,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 1892,
+                  "readable": 1832,
+                  "fit_percent": 96.83
+                },
+                {
+                  "length": "16-20",
+                  "names": 2084,
+                  "readable": 1413,
+                  "fit_percent": 67.8
+                },
+                {
+                  "length": "21-25",
+                  "names": 1281,
+                  "readable": 237,
+                  "fit_percent": 18.5
+                },
+                {
+                  "length": "26-35",
+                  "names": 751,
+                  "readable": 6,
+                  "fit_percent": 0.8
+                },
+                {
+                  "length": "36+",
+                  "names": 111,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "novel_all": {
+              "names": 5768,
+              "readable": 3176,
+              "percent": 55.06,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 320,
+                  "readable": 320,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 1412,
+                  "readable": 1352,
+                  "fit_percent": 95.75
+                },
+                {
+                  "length": "16-20",
+                  "names": 1928,
+                  "readable": 1270,
+                  "fit_percent": 65.87
+                },
+                {
+                  "length": "21-25",
+                  "names": 1261,
+                  "readable": 228,
+                  "fit_percent": 18.08
+                },
+                {
+                  "length": "26-35",
+                  "names": 736,
+                  "readable": 6,
+                  "fit_percent": 0.82
+                },
+                {
+                  "length": "36+",
+                  "names": 111,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "preferred_descriptive_probes": {
+              "names": 21,
+              "readable": 9,
+              "percent": 42.86,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "11-15",
+                  "names": 1,
+                  "readable": 1,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 4,
+                  "readable": 3,
+                  "fit_percent": 75.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 5,
+                  "fit_percent": 45.45
+                },
+                {
+                  "length": "26-35",
+                  "names": 5,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "psibase_compatibility": {
+              "names": 528,
+              "readable": 519,
+              "percent": 98.3,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 363,
+                  "readable": 363,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 153,
+                  "readable": 148,
+                  "fit_percent": 96.73
+                },
+                {
+                  "length": "16-20",
+                  "names": 10,
+                  "readable": 8,
+                  "fit_percent": 80.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 2,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:googleapis": {
+              "names": 6686,
+              "readable": 4055,
+              "percent": 60.65,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 567,
+                  "readable": 567,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 1892,
+                  "readable": 1832,
+                  "fit_percent": 96.83
+                },
+                {
+                  "length": "16-20",
+                  "names": 2084,
+                  "readable": 1413,
+                  "fit_percent": 67.8
+                },
+                {
+                  "length": "21-25",
+                  "names": 1281,
+                  "readable": 237,
+                  "fit_percent": 18.5
+                },
+                {
+                  "length": "26-35",
+                  "names": 751,
+                  "readable": 6,
+                  "fit_percent": 0.8
+                },
+                {
+                  "length": "36+",
+                  "names": 111,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "source:googleapis": {
+              "names": 5768,
+              "readable": 3176,
+              "percent": 55.06,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 320,
+                  "readable": 320,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 1412,
+                  "readable": 1352,
+                  "fit_percent": 95.75
+                },
+                {
+                  "length": "16-20",
+                  "names": 1928,
+                  "readable": 1270,
+                  "fit_percent": 65.87
+                },
+                {
+                  "length": "21-25",
+                  "names": 1261,
+                  "readable": 228,
+                  "fit_percent": 18.08
+                },
+                {
+                  "length": "26-35",
+                  "names": 736,
+                  "readable": 6,
+                  "fit_percent": 0.82
+                },
+                {
+                  "length": "36+",
+                  "names": 111,
+                  "readable": 0,
+                  "fit_percent": 0.0
+                }
+              ]
+            },
+            "macro": {
+              "ecosystem_macro_percent": {
+                "service-api": 55.06
+              },
+              "balanced_macro_percent": 55.06
+            },
+            "heldout_macro": {
+              "ecosystem_macro_percent": {
+                "service-api": 60.65
+              },
+              "balanced_macro_percent": 60.65
+            }
+          },
+          "probes": {
+            "acceptPendingTokenTransfer": {
+              "fits": false,
+              "bits": 83
+            },
+            "addMarketLiquidity": {
+              "fits": true,
+              "bits": 62
+            },
+            "assignSymbolToToken": {
+              "fits": false,
+              "bits": 82
+            },
+            "cancelMarketplaceListing": {
+              "fits": false,
+              "bits": 76
+            },
+            "cancelPendingTokenTransfer": {
+              "fits": false,
+              "bits": 76
+            },
+            "cancelStopLossOrder": {
+              "fits": true,
+              "bits": 63
+            },
+            "completeAccountRecovery": {
+              "fits": false,
+              "bits": 68
+            },
+            "createAccountWithRecoveryPartner": {
+              "fits": false,
+              "bits": 99
+            },
+            "depositIntoSubaccount": {
+              "fits": true,
+              "bits": 60
+            },
+            "getBalanceConfiguration": {
+              "fits": true,
+              "bits": 50
+            },
+            "liquidateMarginPosition": {
+              "fits": true,
+              "bits": 54
+            },
+            "listAccountNameForSale": {
+              "fits": false,
+              "bits": 70
+            },
+            "placeLimitOrder": {
+              "fits": true,
+              "bits": 46
+            },
+            "purchaseMarketplaceListing": {
+              "fits": false,
+              "bits": 86
+            },
+            "registerEventIndex": {
+              "fits": true,
+              "bits": 55
+            },
+            "requestAccountRecovery": {
+              "fits": true,
+              "bits": 59
+            },
+            "setAuthenticationService": {
+              "fits": true,
+              "bits": 60
+            },
+            "setPublicKeyWithRecoveryPartner": {
+              "fits": false,
+              "bits": 104
+            },
+            "setSystemResourceToken": {
+              "fits": false,
+              "bits": 74
+            },
+            "withdrawFromSubaccount": {
+              "fits": false,
+              "bits": 67
+            },
+            "withdrawMarketLiquidity": {
+              "fits": false,
+              "bits": 76
+            }
+          }
+        },
+        "words2048": {
+          "model": {
+            "kind": "global_component_dictionary_viterbi_unigram",
+            "symbols_including_eos": 2048,
+            "dictionary_utf8_bytes": 14273,
+            "cdf_u16_bytes": 4098
+          },
+          "metrics": {
+            "heldout_all": {
+              "names": 6686,
+              "readable": 5013,
+              "percent": 74.98,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 567,
+                  "readable": 564,
+                  "fit_percent": 99.47
+                },
+                {
+                  "length": "11-15",
+                  "names": 1892,
+                  "readable": 1752,
+                  "fit_percent": 92.6
+                },
+                {
+                  "length": "16-20",
+                  "names": 2084,
+                  "readable": 1635,
+                  "fit_percent": 78.45
+                },
+                {
+                  "length": "21-25",
+                  "names": 1281,
+                  "readable": 775,
+                  "fit_percent": 60.5
+                },
+                {
+                  "length": "26-35",
+                  "names": 751,
+                  "readable": 277,
+                  "fit_percent": 36.88
+                },
+                {
+                  "length": "36+",
+                  "names": 111,
+                  "readable": 10,
+                  "fit_percent": 9.01
+                }
+              ]
+            },
+            "novel_all": {
+              "names": 5768,
+              "readable": 4144,
+              "percent": 71.84,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 320,
+                  "readable": 318,
+                  "fit_percent": 99.38
+                },
+                {
+                  "length": "11-15",
+                  "names": 1412,
+                  "readable": 1288,
+                  "fit_percent": 91.22
+                },
+                {
+                  "length": "16-20",
+                  "names": 1928,
+                  "readable": 1498,
+                  "fit_percent": 77.7
+                },
+                {
+                  "length": "21-25",
+                  "names": 1261,
+                  "readable": 761,
+                  "fit_percent": 60.35
+                },
+                {
+                  "length": "26-35",
+                  "names": 736,
+                  "readable": 269,
+                  "fit_percent": 36.55
+                },
+                {
+                  "length": "36+",
+                  "names": 111,
+                  "readable": 10,
+                  "fit_percent": 9.01
+                }
+              ]
+            },
+            "preferred_descriptive_probes": {
+              "names": 21,
+              "readable": 16,
+              "percent": 76.19,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "11-15",
+                  "names": 1,
+                  "readable": 1,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 4,
+                  "readable": 3,
+                  "fit_percent": 75.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 9,
+                  "fit_percent": 81.82
+                },
+                {
+                  "length": "26-35",
+                  "names": 5,
+                  "readable": 3,
+                  "fit_percent": 60.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "psibase_compatibility": {
+              "names": 528,
+              "readable": 504,
+              "percent": 95.45,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 363,
+                  "readable": 360,
+                  "fit_percent": 99.17
+                },
+                {
+                  "length": "11-15",
+                  "names": 153,
+                  "readable": 137,
+                  "fit_percent": 89.54
+                },
+                {
+                  "length": "16-20",
+                  "names": 10,
+                  "readable": 6,
+                  "fit_percent": 60.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 2,
+                  "readable": 1,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:googleapis": {
+              "names": 6686,
+              "readable": 5013,
+              "percent": 74.98,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 567,
+                  "readable": 564,
+                  "fit_percent": 99.47
+                },
+                {
+                  "length": "11-15",
+                  "names": 1892,
+                  "readable": 1752,
+                  "fit_percent": 92.6
+                },
+                {
+                  "length": "16-20",
+                  "names": 2084,
+                  "readable": 1635,
+                  "fit_percent": 78.45
+                },
+                {
+                  "length": "21-25",
+                  "names": 1281,
+                  "readable": 775,
+                  "fit_percent": 60.5
+                },
+                {
+                  "length": "26-35",
+                  "names": 751,
+                  "readable": 277,
+                  "fit_percent": 36.88
+                },
+                {
+                  "length": "36+",
+                  "names": 111,
+                  "readable": 10,
+                  "fit_percent": 9.01
+                }
+              ]
+            },
+            "source:googleapis": {
+              "names": 5768,
+              "readable": 4144,
+              "percent": 71.84,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 320,
+                  "readable": 318,
+                  "fit_percent": 99.38
+                },
+                {
+                  "length": "11-15",
+                  "names": 1412,
+                  "readable": 1288,
+                  "fit_percent": 91.22
+                },
+                {
+                  "length": "16-20",
+                  "names": 1928,
+                  "readable": 1498,
+                  "fit_percent": 77.7
+                },
+                {
+                  "length": "21-25",
+                  "names": 1261,
+                  "readable": 761,
+                  "fit_percent": 60.35
+                },
+                {
+                  "length": "26-35",
+                  "names": 736,
+                  "readable": 269,
+                  "fit_percent": 36.55
+                },
+                {
+                  "length": "36+",
+                  "names": 111,
+                  "readable": 10,
+                  "fit_percent": 9.01
+                }
+              ]
+            },
+            "macro": {
+              "ecosystem_macro_percent": {
+                "service-api": 71.84
+              },
+              "balanced_macro_percent": 71.84
+            },
+            "heldout_macro": {
+              "ecosystem_macro_percent": {
+                "service-api": 74.98
+              },
+              "balanced_macro_percent": 74.98
+            }
+          },
+          "probes": {
+            "acceptPendingTokenTransfer": {
+              "fits": true,
+              "bits": 48
+            },
+            "addMarketLiquidity": {
+              "fits": false,
+              "bits": 87
+            },
+            "assignSymbolToToken": {
+              "fits": true,
+              "bits": 47
+            },
+            "cancelMarketplaceListing": {
+              "fits": true,
+              "bits": 62
+            },
+            "cancelPendingTokenTransfer": {
+              "fits": true,
+              "bits": 46
+            },
+            "cancelStopLossOrder": {
+              "fits": true,
+              "bits": 44
+            },
+            "completeAccountRecovery": {
+              "fits": true,
+              "bits": 40
+            },
+            "createAccountWithRecoveryPartner": {
+              "fits": true,
+              "bits": 57
+            },
+            "depositIntoSubaccount": {
+              "fits": true,
+              "bits": 46
+            },
+            "getBalanceConfiguration": {
+              "fits": true,
+              "bits": 27
+            },
+            "liquidateMarginPosition": {
+              "fits": false,
+              "bits": 73
+            },
+            "listAccountNameForSale": {
+              "fits": true,
+              "bits": 62
+            },
+            "placeLimitOrder": {
+              "fits": true,
+              "bits": 34
+            },
+            "purchaseMarketplaceListing": {
+              "fits": false,
+              "bits": 98
+            },
+            "registerEventIndex": {
+              "fits": true,
+              "bits": 36
+            },
+            "requestAccountRecovery": {
+              "fits": true,
+              "bits": 37
+            },
+            "setAuthenticationService": {
+              "fits": true,
+              "bits": 34
+            },
+            "setPublicKeyWithRecoveryPartner": {
+              "fits": false,
+              "bits": 68
+            },
+            "setSystemResourceToken": {
+              "fits": true,
+              "bits": 40
+            },
+            "withdrawFromSubaccount": {
+              "fits": true,
+              "bits": 45
+            },
+            "withdrawMarketLiquidity": {
+              "fits": false,
+              "bits": 89
+            }
+          }
+        },
+        "mixture": {
+          "model": {
+            "kind": "tagged_readable_mixture",
+            "tag_bits": 2,
+            "payload_bits": 62,
+            "modes": [
+              "char2",
+              "component_dictionary",
+              "bijective_base37_literal"
+            ],
+            "fallback": "not implemented"
+          },
+          "metrics": {
+            "heldout_all": {
+              "names": 6686,
+              "readable": 5330,
+              "percent": 79.72,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 567,
+                  "readable": 567,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 1892,
+                  "readable": 1869,
+                  "fit_percent": 98.78
+                },
+                {
+                  "length": "16-20",
+                  "names": 2084,
+                  "readable": 1812,
+                  "fit_percent": 86.95
+                },
+                {
+                  "length": "21-25",
+                  "names": 1281,
+                  "readable": 805,
+                  "fit_percent": 62.84
+                },
+                {
+                  "length": "26-35",
+                  "names": 751,
+                  "readable": 267,
+                  "fit_percent": 35.55
+                },
+                {
+                  "length": "36+",
+                  "names": 111,
+                  "readable": 10,
+                  "fit_percent": 9.01
+                }
+              ]
+            },
+            "novel_all": {
+              "names": 5768,
+              "readable": 4431,
+              "percent": 76.82,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 320,
+                  "readable": 320,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 1412,
+                  "readable": 1389,
+                  "fit_percent": 98.37
+                },
+                {
+                  "length": "16-20",
+                  "names": 1928,
+                  "readable": 1660,
+                  "fit_percent": 86.1
+                },
+                {
+                  "length": "21-25",
+                  "names": 1261,
+                  "readable": 791,
+                  "fit_percent": 62.73
+                },
+                {
+                  "length": "26-35",
+                  "names": 736,
+                  "readable": 261,
+                  "fit_percent": 35.46
+                },
+                {
+                  "length": "36+",
+                  "names": 111,
+                  "readable": 10,
+                  "fit_percent": 9.01
+                }
+              ]
+            },
+            "preferred_descriptive_probes": {
+              "names": 21,
+              "readable": 18,
+              "percent": 85.71,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "11-15",
+                  "names": 1,
+                  "readable": 1,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "16-20",
+                  "names": 4,
+                  "readable": 4,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 11,
+                  "readable": 10,
+                  "fit_percent": 90.91
+                },
+                {
+                  "length": "26-35",
+                  "names": 5,
+                  "readable": 3,
+                  "fit_percent": 60.0
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "psibase_compatibility": {
+              "names": 528,
+              "readable": 524,
+              "percent": 99.24,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 363,
+                  "readable": 363,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 153,
+                  "readable": 151,
+                  "fit_percent": 98.69
+                },
+                {
+                  "length": "16-20",
+                  "names": 10,
+                  "readable": 9,
+                  "fit_percent": 90.0
+                },
+                {
+                  "length": "21-25",
+                  "names": 2,
+                  "readable": 1,
+                  "fit_percent": 50.0
+                },
+                {
+                  "length": "26-35",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                },
+                {
+                  "length": "36+",
+                  "names": 0,
+                  "readable": 0,
+                  "fit_percent": null
+                }
+              ]
+            },
+            "heldout-source:googleapis": {
+              "names": 6686,
+              "readable": 5330,
+              "percent": 79.72,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 567,
+                  "readable": 567,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 1892,
+                  "readable": 1869,
+                  "fit_percent": 98.78
+                },
+                {
+                  "length": "16-20",
+                  "names": 2084,
+                  "readable": 1812,
+                  "fit_percent": 86.95
+                },
+                {
+                  "length": "21-25",
+                  "names": 1281,
+                  "readable": 805,
+                  "fit_percent": 62.84
+                },
+                {
+                  "length": "26-35",
+                  "names": 751,
+                  "readable": 267,
+                  "fit_percent": 35.55
+                },
+                {
+                  "length": "36+",
+                  "names": 111,
+                  "readable": 10,
+                  "fit_percent": 9.01
+                }
+              ]
+            },
+            "source:googleapis": {
+              "names": 5768,
+              "readable": 4431,
+              "percent": 76.82,
+              "length_bands": [
+                {
+                  "length": "1-10",
+                  "names": 320,
+                  "readable": 320,
+                  "fit_percent": 100.0
+                },
+                {
+                  "length": "11-15",
+                  "names": 1412,
+                  "readable": 1389,
+                  "fit_percent": 98.37
+                },
+                {
+                  "length": "16-20",
+                  "names": 1928,
+                  "readable": 1660,
+                  "fit_percent": 86.1
+                },
+                {
+                  "length": "21-25",
+                  "names": 1261,
+                  "readable": 791,
+                  "fit_percent": 62.73
+                },
+                {
+                  "length": "26-35",
+                  "names": 736,
+                  "readable": 261,
+                  "fit_percent": 35.46
+                },
+                {
+                  "length": "36+",
+                  "names": 111,
+                  "readable": 10,
+                  "fit_percent": 9.01
+                }
+              ]
+            },
+            "macro": {
+              "ecosystem_macro_percent": {
+                "service-api": 76.82
+              },
+              "balanced_macro_percent": 76.82
+            },
+            "heldout_macro": {
+              "ecosystem_macro_percent": {
+                "service-api": 79.72
+              },
+              "balanced_macro_percent": 79.72
+            }
+          },
+          "probes": {
+            "acceptPendingTokenTransfer": {
+              "fits": true,
+              "bits": 48
+            },
+            "addMarketLiquidity": {
+              "fits": true,
+              "bits": 62
+            },
+            "assignSymbolToToken": {
+              "fits": true,
+              "bits": 47
+            },
+            "cancelMarketplaceListing": {
+              "fits": true,
+              "bits": 62
+            },
+            "cancelPendingTokenTransfer": {
+              "fits": true,
+              "bits": 46
+            },
+            "cancelStopLossOrder": {
+              "fits": true,
+              "bits": 44
+            },
+            "completeAccountRecovery": {
+              "fits": true,
+              "bits": 40
+            },
+            "createAccountWithRecoveryPartner": {
+              "fits": true,
+              "bits": 57
+            },
+            "depositIntoSubaccount": {
+              "fits": true,
+              "bits": 46
+            },
+            "getBalanceConfiguration": {
+              "fits": true,
+              "bits": 27
+            },
+            "liquidateMarginPosition": {
+              "fits": true,
+              "bits": 54
+            },
+            "listAccountNameForSale": {
+              "fits": true,
+              "bits": 62
+            },
+            "placeLimitOrder": {
+              "fits": true,
+              "bits": 34
+            },
+            "purchaseMarketplaceListing": {
+              "fits": false,
+              "bits": 86
+            },
+            "registerEventIndex": {
+              "fits": true,
+              "bits": 36
+            },
+            "requestAccountRecovery": {
+              "fits": true,
+              "bits": 37
+            },
+            "setAuthenticationService": {
+              "fits": true,
+              "bits": 34
+            },
+            "setPublicKeyWithRecoveryPartner": {
+              "fits": false,
+              "bits": 68
+            },
+            "setSystemResourceToken": {
+              "fits": true,
+              "bits": 40
+            },
+            "withdrawFromSubaccount": {
+              "fits": true,
+              "bits": 45
+            },
+            "withdrawMarketLiquidity": {
+              "fits": false,
+              "bits": 76
+            }
+          }
+        }
+      }
+    }
+  },
+  "potential_normalization_equivalences_not_wire_collisions": {
+    "lookalike": {
+      "groups": 0,
+      "distinct_names_affected": 0,
+      "examples": []
+    },
+    "vowelless": {
+      "groups": 55,
+      "distinct_names_affected": 111,
+      "examples": [
+        {
+          "source": "github-sdk",
+          "scope": "repos",
+          "canonical": "gtrgrlst",
+          "originals": [
+            "getorgruleset",
+            "getorgrulesuite"
+          ]
+        },
+        {
+          "source": "github-sdk",
+          "scope": "repos",
+          "canonical": "gtrgrlsts",
+          "originals": [
+            "getorgrulesets",
+            "getorgrulesuites"
+          ]
+        },
+        {
+          "source": "github-sdk",
+          "scope": "repos",
+          "canonical": "gtrprlst",
+          "originals": [
+            "getreporuleset",
+            "getreporulesuite"
+          ]
+        },
+        {
+          "source": "github-sdk",
+          "scope": "repos",
+          "canonical": "gtrprlsts",
+          "originals": [
+            "getreporulesets",
+            "getreporulesuites"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "mm_fn",
+          "originals": [
+            "mem_fn",
+            "mem_fun"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "rnd",
+          "originals": [
+            "rand",
+            "rend",
+            "round"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "st",
+          "originals": [
+            "set",
+            "stoi"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "stl",
+          "originals": [
+            "stol",
+            "stoul"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "stll",
+          "originals": [
+            "stoll",
+            "stoull"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "strtl",
+          "originals": [
+            "strtol",
+            "strtoul"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "strtll",
+          "originals": [
+            "strtoll",
+            "strtoull"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "strtmx",
+          "originals": [
+            "strtoimax",
+            "strtoumax"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "wcstl",
+          "originals": [
+            "wcstol",
+            "wcstoul"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "wcstll",
+          "originals": [
+            "wcstoll",
+            "wcstoull"
+          ]
+        },
+        {
+          "source": "libcxx",
+          "scope": "std",
+          "canonical": "wcstmx",
+          "originals": [
+            "wcstoimax",
+            "wcstoumax"
+          ]
+        }
+      ]
+    }
+  },
+  "evaluation_seconds": 6.934
+}

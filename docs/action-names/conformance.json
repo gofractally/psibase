@@ -1,0 +1,56 @@
+{
+  "passed": true,
+  "model_sha256": "774add87bf4a11e1c698d9c619c02bea398adb91f64a02ed746ad51e8e9bc7be",
+  "vectors": 6704,
+  "arbitrary_ids": 4108,
+  "languages": {
+    "cpp": {
+      "language": "cpp",
+      "passed": true,
+      "model_sha256": "774add87bf4a11e1c698d9c619c02bea398adb91f64a02ed746ad51e8e9bc7be",
+      "golden_sha256": "5b382a59b537b75c718fc972fb56fc879a1102d7af6dc465ca2894e52281e927",
+      "runtime_golden_sha256": "a7533289424ed23a9815e976f78036f3d23b2fc3f7d92e39ec410a344fa81e6a",
+      "vector_count": 6704,
+      "arbitrary_ids": 4108,
+      "checks": {
+        "round_trip": true,
+        "malformed": true,
+        "boundaries": true,
+        "hash_fallback": true,
+        "duplicate_ids": true
+      }
+    },
+    "rust": {
+      "language": "rust",
+      "passed": true,
+      "model_sha256": "774add87bf4a11e1c698d9c619c02bea398adb91f64a02ed746ad51e8e9bc7be",
+      "golden_sha256": "5b382a59b537b75c718fc972fb56fc879a1102d7af6dc465ca2894e52281e927",
+      "runtime_golden_sha256": "a7533289424ed23a9815e976f78036f3d23b2fc3f7d92e39ec410a344fa81e6a",
+      "vector_count": 6704,
+      "arbitrary_ids": 4108,
+      "checks": {
+        "round_trip": true,
+        "malformed": true,
+        "boundaries": true,
+        "hash_fallback": true,
+        "duplicate_ids": true
+      }
+    },
+    "javascript": {
+      "language": "javascript",
+      "passed": true,
+      "model_sha256": "774add87bf4a11e1c698d9c619c02bea398adb91f64a02ed746ad51e8e9bc7be",
+      "golden_sha256": "5b382a59b537b75c718fc972fb56fc879a1102d7af6dc465ca2894e52281e927",
+      "runtime_golden_sha256": "a7533289424ed23a9815e976f78036f3d23b2fc3f7d92e39ec410a344fa81e6a",
+      "vector_count": 6704,
+      "arbitrary_ids": 4108,
+      "checks": {
+        "round_trip": true,
+        "malformed": true,
+        "boundaries": true,
+        "hash_fallback": true,
+        "duplicate_ids": true
+      }
+    }
+  }
+}

@@ -266,7 +266,7 @@ impl HookActionsSender for InvitePlugin {
         let create_account_method =
             MethodNumber::from(Invite::action_structs::createAccount::ACTION_NAME);
         if service == Invite::SERVICE.to_string()
-            && MethodNumber::from(method.as_str()) == create_account_method
+            && method.parse::<MethodNumber>().ok() == Some(create_account_method)
         {
             return Ok(Some(CREDENTIAL_SENDER.to_string()));
         } else {

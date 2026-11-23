@@ -1,0 +1,37 @@
+name: Action name conformance
+on:
+  pull_request:
+  push:
+    branches: ["bytemaster/head", "codex/action-name-encoding"]
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y libboost-dev
+      - run: corepack enable
+      - run: yarn install --immutable
+        working-directory: packages
+      - run: python3 tools/action_names.py check
+      - run: python3 -m unittest discover -s experiments/method-names -p 'test_action_name*.py'
+      - run: python3 programs/psinode/tests/test_name.py
+      - run: python3 programs/psinode/tests/test_psibase_types.py
+      - run: python3 tools/test_action_name_retuning.py
+      - run: cargo test -p psibase -p psibase_names -p psibase-macros-lib -p psibase-macros-derive -- --skip verify_schema
+        working-directory: rust
+      - run: yarn test:action-name
+        working-directory: packages/user/CommonApi/common/packages/common-lib
+      - run: yarn build
+        working-directory: packages/user/CommonApi/common/packages/common-lib
+      - run: yarn test:action-name-package
+        working-directory: packages/user/CommonApi/common/packages/common-lib
+      - uses: actions/upload-artifact@v4
+        with:
+          name: action-name-conformance
+          path: build-action-names/*.json

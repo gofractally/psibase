@@ -1,0 +1,13 @@
+[package]
+name = "method-corpus-rust-parser"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+syn = { version = "=2.0.108", features = ["full"] }
+quote = "=1.0.42"
+proc-macro2 = { version = "=1.0.103", features = ["span-locations"] }
+serde_json = "=1.0.145"

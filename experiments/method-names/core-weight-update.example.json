@@ -1,0 +1,9 @@
+{
+  "reason": "Add the four current core-library readability misses at one average vote each; retain the descriptive-name validation set",
+  "weights": {
+    "cpu_blocks_avg": 1,
+    "cpu_thresholds": 1,
+    "set_guild_weight_curve": 1,
+    "unreg_res_provider": 1
+  }
+}

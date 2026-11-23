@@ -145,7 +145,9 @@ impl Registry for WorkshopPlugin {
 
 impl Development for WorkshopPlugin {
     fn is_valid_method_name(name: String) -> bool {
-        MethodNumber::from_str(&name).unwrap().to_string() == name
+        MethodNumber::from_str(&name)
+            .map(|method| method.to_string() == name)
+            .unwrap_or(false)
     }
 }
 

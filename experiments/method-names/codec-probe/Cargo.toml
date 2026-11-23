@@ -1,0 +1,14 @@
+[package]
+name = "psibase-method-name-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "codec-probe-rust"
+path = "../codec_probe.rs"
+
+[dependencies]
+seahash = "=4.1.0"

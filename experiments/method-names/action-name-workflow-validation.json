@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-23",
+  "current_revision": "13509f8e131c41b5d16f5d24c61d1d207ae595a813c2c99d1efeb56dc3907840",
+  "baseline_revision": "6b5ef0cf46a33b6f2b4b9a146ffd666c3985f718fef4b01215962b6c43930bcb",
+  "unit_tests_passed": 35,
+  "checks": {
+    "saved_weight_snapshot": true,
+    "model_regenerated_exactly": true,
+    "6399_golden_vectors_reference_round_trip": true,
+    "one_vote_update_accepted": true,
+    "second_step_preferred_regression_rejected": true,
+    "rejected_candidate_did_not_change_current": true,
+    "incomplete_release_evidence_rejected": true,
+    "bundle_remains_development_unlocked": true
+  },
+  "rejected_candidates": [
+    {
+      "revision": "6af720bfd3cb76de3cb3127a5eb01cebe03d71a98ef122b3555c7e1b98a2e738",
+      "errors": [
+        "preferred readable regressions: ['cancelMarketplaceListing']"
+      ]
+    }
+  ],
+  "native_ports_implemented": false,
+  "native_conformance_claimed": false
+}

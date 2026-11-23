@@ -2512,6 +2512,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2",
  "psibase-rust-workspace-hack",
+ "psibase_names",
  "quote",
  "syn 2.0.109",
 ]
@@ -2560,7 +2561,7 @@ name = "psibase_names"
 version = "0.29.0"
 dependencies = [
  "psibase-rust-workspace-hack",
- "seahash",
+ "sha2",
 ]
 
 [[package]]
@@ -3619,7 +3620,6 @@ dependencies = [
  "chrono",
  "psibase",
  "psibase-plugin-workspace-hack",
- "regex",
  "serde",
  "serde_json",
  "sha2",

@@ -1,0 +1,3217 @@
+{
+  "scope": "Read-only Rust source inventory; exact static line counts and separate planning estimates; no production edits",
+  "counting": "rust/**/*.rs and packages/**/*.rs; target/node_modules/dist/bindings.rs excluded; nested comments hidden, string literals retained; unique source lines counted once per category",
+  "measured": {
+    "legacy_name_reference_lines": 198,
+    "legacy_name_reference_files": 45,
+    "retained_legacy_implementation_reference_lines": 65,
+    "event_only_reference_lines": 10,
+    "remaining_action_or_mixed_candidate_reference_lines": 123,
+    "remaining_action_or_mixed_candidate_files": 39,
+    "service_registration_attributes": 66,
+    "service_registration_files": 66,
+    "package_service_registration_attributes": 54,
+    "manual_add_action_calls": 88,
+    "manual_add_action_files": 25,
+    "manual_call_categories": {
+      "generated_ACTION_NAME": 69,
+      "literal": 16,
+      "runtime_or_wrapper": 3
+    },
+    "typed_add_to_tx_expressions": 110,
+    "typed_add_to_tx_files": 9,
+    "manual_and_typed_union_files": 34
+  },
+  "interpretation": [
+    "A parallel ActionName type does not require renaming all MethodNumber references; legacy implementations and golden tests should remain.",
+    "Reference lines are review anchors, not a measured final diff. Type aliases, imports, helper bodies, trait signatures and tests have different implementation costs.",
+    "Rust action bodies and action function names do not need editing when central procedural macros choose the new codec.",
+    "Typed add_to_tx users can benefit from one central numeric-transport change. Manual call expressions can retain source spellings if string entry points resolve a service codec version.",
+    "Service-registration attributes are a possible one-line opt-in cost per service module, not mandatory if a network-wide profile is selected by build configuration.",
+    "Mixed schema/action/event files require semantic review. Event-only files may stay legacy in an action-only phase."
+  ],
+  "anchors": [
+    {
+      "path": "rust/psibase_names/src/lib.rs",
+      "line": 17,
+      "purpose": "Export new action_name functions/model alongside legacy modules"
+    },
+    {
+      "path": "rust/psibase/src/lib.rs",
+      "line": 64,
+      "purpose": "Export new ActionName wrapper alongside MethodNumber"
+    },
+    {
+      "path": "rust/psibase/src/method_number.rs",
+      "line": 25,
+      "purpose": "Wrapper pattern: u64 Pack/Unpack/ToKey/ToSchema, string serialization and GraphQL scalar; retain old file"
+    },
+    {
+      "path": "rust/psibase/src/internal_macros.rs",
+      "line": 1,
+      "purpose": "serialize_as_str macro can support separate ActionName parser/display"
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-derive/src/number_macro.rs",
+      "line": 20,
+      "purpose": "Add separate action_name/action_name_raw compile-time encoders with strict validation"
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-lib/src/service_macro/actions.rs",
+      "line": 108,
+      "purpose": "Central generated ACTION_NAME string and future numeric ACTION_ID/version constant"
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-lib/src/service_macro/actions.rs",
+      "line": 133,
+      "purpose": "Central action caller numeric-ID generation"
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-lib/src/service_macro/dispatch.rs",
+      "line": 30,
+      "purpose": "Action dispatch ID generation; add duplicate-ID rejection including legacy aliases"
+    },
+    {
+      "path": "rust/psibase/src/block.rs",
+      "line": 50,
+      "purpose": "Action.method and SharedAction.method semantic type; on-wire field remains u64"
+    },
+    {
+      "path": "rust/psibase/src/service.rs",
+      "line": 103,
+      "purpose": "Caller trait and implementations carry method IDs"
+    },
+    {
+      "path": "rust/psibase/src/schema.rs",
+      "line": 14,
+      "purpose": "MethodString equality/hash currently encode with legacy codec; split action/event key interpretation"
+    },
+    {
+      "path": "rust/psibase/src/schema.rs",
+      "line": 348,
+      "purpose": "Separate ActionName custom handler and schema tag; preserve MethodNumber legacy handler"
+    },
+    {
+      "path": "rust/psibase_plugin/src/wasm/transact.rs",
+      "line": 18,
+      "purpose": "Avoid numeric->debug string->numeric roundtrip by adding exact u64 transport"
+    },
+    {
+      "path": "packages/system/Transact/plugin/transact/wit/world.wit",
+      "line": 68,
+      "purpose": "Shared cross-language string-only add-action boundary; add numeric/version-aware entry point"
+    },
+    {
+      "path": "packages/system/Transact/plugin/transact/src/lib.rs",
+      "line": 177,
+      "purpose": "ImportAction.method string currently re-encodes using legacy MethodNumber"
+    },
+    {
+      "path": "packages/system/AuthSig/plugin/src/lib.rs",
+      "line": 66,
+      "purpose": "Sender hook currently compares raw camelCase string; compare stable numeric ID/version"
+    },
+    {
+      "path": "packages/user/Invite/plugin/src/lib.rs",
+      "line": 268,
+      "purpose": "Sender hook numeric comparison currently parses with legacy MethodNumber"
+    },
+    {
+      "path": "packages/system/Credentials/service/src/tables.rs",
+      "line": 68,
+      "purpose": "Persistent allowed_actions method-ID permissions; retain intended action binding across migration"
+    },
+    {
+      "path": "rust/psibase/src/native_tables.rs",
+      "line": 411,
+      "purpose": "ServiceMethod native table representation of persisted method IDs"
+    },
+    {
+      "path": "rust/psibase/src/services/events.rs",
+      "line": 27,
+      "purpose": "Event/index IDs remain legacy unless a separate event migration is intended"
+    }
+  ],
+  "planning_estimates_not_measured_diff": {
+    "additive_codec_type_phase": {
+      "new_handwritten_implementation_lines_low": 500,
+      "new_handwritten_implementation_lines_high": 850,
+      "new_test_harness_lines_low": 250,
+      "new_test_harness_lines_high": 450,
+      "existing_file_integration_added_or_changed_lines_low": 50,
+      "existing_file_integration_added_or_changed_lines_high": 100,
+      "existing_file_count_low": 5,
+      "existing_file_count_high": 8,
+      "new_handwritten_file_count_low": 4,
+      "new_handwritten_file_count_high": 7,
+      "notes": "Independent Rust codec, strict parser/hash fallback, deterministic segmentation, ActionName wrapper/macros/schema custom type, golden/property tests; generated model tables/vectors excluded. Existing action behavior stays legacy."
+    },
+    "numeric_transport_and_opt_in_action_phase": {
+      "additional_existing_lines_low": 150,
+      "additional_existing_lines_high": 300,
+      "existing_file_count_low": 8,
+      "existing_file_count_high": 14,
+      "notes": "Caller/dispatch opt-in selection, exact-u64 Transact WIT path and authorization hooks, schema metadata and action JSON support, integration tests. WIT is cross-language shared work; deduplicate in cross-language totals."
+    },
+    "full_action_adoption_phase": {
+      "existing_lines_low": 250,
+      "existing_lines_high": 500,
+      "notes": "Total planning range after additive implementation, including central action/schema/client migration and manual literal/permission review. Registration attrs may add up to measured count of one-line opt-ins. Does not include new handwritten codec/tests or generated model files. Exact final diff requires implementation."
+    },
+    "generated_data_lines": "Not estimated as LOC: depend on formatting. Budget binary table bytes, token count, golden vector count, native/wasm size and CPU separately."
+  },
+  "recommendation": {
+    "type": "Rust ActionName mirrors proposed C++ action_name and JavaScript ActionName; keep legacy MethodNumber and AccountNumber independent",
+    "abi": "Same eight-byte storage does not make identities compatible. New tag bits can overlap valid legacy IDs. Select codec/model through network/service/schema version, not guessed from a bare u64.",
+    "history": "Freeze legacy decoders and old model snapshots; old staged actions/events/native permissions require original numeric semantics. Service alias dispatch needs cross-alias duplicate checks.",
+    "development": "Model/weight changes alter generated action IDs. Lock all Rust const/proc-macro/runtime conversion to the same checked-in model hash; regenerate native/wasm/JS/C++ together; do not silently use a newly trained table for a persisted ID.",
+    "runtime": "Keep dispatch as exact u64 comparison. Do not run arithmetic coding or dictionary search in the dispatch hot path."
+  },
+  "reference_inventory": [
+    {
+      "path": "rust/psibase/src/actions.rs",
+      "reference_lines": 2,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 5,
+          "tokens": [
+            "method_raw",
+            "MethodNumber"
+          ],
+          "source": "account_raw, method_raw, AccountNumber, Action, AnyPublicKey, MethodNumber, ServiceWrapper,"
+        },
+        {
+          "line": 85,
+          "tokens": [
+            "MethodNumber",
+            "method_raw"
+          ],
+          "source": "method: MethodNumber::new(method_raw!(\"loginSys\")),"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase/src/auth.rs",
+      "reference_lines": 2,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 5,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "use crate::{get_service, AccountNumber, Caller, MethodNumber, ServiceCaller, ServiceWrapper};"
+        },
+        {
+          "line": 27,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from(auth_action_structs::isAuthSys::ACTION_NAME),"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase/src/block.rs",
+      "reference_lines": 3,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 4,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "AccountNumber, Hex, MethodNumber, Pack, TimePointSec, TimePointUSec, ToKey, ToSchema, Unpack,"
+        },
+        {
+          "line": 50,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "pub method: MethodNumber,"
+        },
+        {
+          "line": 62,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "pub method: MethodNumber,"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase/src/boot.rs",
+      "reference_lines": 3,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 3,
+          "tokens": [
+            "method_raw"
+          ],
+          "source": "get_schemas, method_raw, set_auth_service_action, set_key_action, validate_dependencies,"
+        },
+        {
+          "line": 4,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "AccountNumber, Action, AnyPublicKey, Claim, EssentialServices, GenesisActionData, MethodNumber,"
+        },
+        {
+          "line": 15,
+          "tokens": [
+            "MethodNumber",
+            "method_raw"
+          ],
+          "source": "MethodNumber::new(method_raw!($name))"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase/src/graph_ql.rs",
+      "reference_lines": 2,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": true,
+      "lines": [
+        {
+          "line": 3,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "BlockTime, EventDb, MethodNumber, RawKey, ServiceWrapper, TableIndex, TableRecord, ToKey,"
+        },
+        {
+          "line": 349,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "fn name() -> MethodNumber;"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase/src/method_number.rs",
+      "reference_lines": 63,
+      "retained_legacy_implementation": true,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 3,
+          "tokens": [
+            "method_number_from_str",
+            "method_number_to_string"
+          ],
+          "source": "use psibase_names::{method_number_from_str, method_number_to_string};"
+        },
+        {
+          "line": 7,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "Invalid{s:String} = \"Invalid MethodNumber {s}\","
+        },
+        {
+          "line": 30,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "custom = \"MethodNumber\""
+        },
+        {
+          "line": 33,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "pub struct MethodNumber {"
+        },
+        {
+          "line": 37,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "serialize_as_str!(MethodNumber, \"method number\");"
+        },
+        {
+          "line": 39,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "impl MethodNumber {"
+        },
+        {
+          "line": 41,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber { value }"
+        },
+        {
+          "line": 45,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "impl From<u64> for MethodNumber {"
+        },
+        {
+          "line": 47,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber { value: n }"
+        },
+        {
+          "line": 51,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "impl FromStr for MethodNumber {"
+        },
+        {
+          "line": 55,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "Ok(MethodNumber {"
+        },
+        {
+          "line": 56,
+          "tokens": [
+            "method_number_from_str"
+          ],
+          "source": "value: method_number_from_str(s),"
+        },
+        {
+          "line": 61,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "impl From<&str> for MethodNumber {"
+        },
+        {
+          "line": 63,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(s).unwrap()"
+        },
+        {
+          "line": 67,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "impl std::fmt::Display for MethodNumber {"
+        },
+        {
+          "line": 69,
+          "tokens": [
+            "method_number_to_string"
+          ],
+          "source": "f.write_str(method_number_to_string(self.value).as_str())"
+        },
+        {
+          "line": 79,
+          "tokens": [
+            "MethodNumber",
+            "MethodNumber"
+          ],
+          "source": "assert_eq!(MethodNumber::from_str(\"\").unwrap(), MethodNumber::new(0));"
+        },
+        {
+          "line": 84,
+          "tokens": [
+            "MethodNumber",
+            "MethodNumber"
+          ],
+          "source": "assert_eq!(MethodNumber::from_str(\"?\").unwrap(), MethodNumber::new(0));"
+        },
+        {
+          "line": 86,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(\"what?\").unwrap(),"
+        },
+        {
+          "line": 87,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::new(0)"
+        },
+        {
+          "line": 90,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(\"?what\").unwrap(),"
+        },
+        {
+          "line": 91,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::new(0)"
+        },
+        {
+          "line": 94,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(\"eaorintsl?\").unwrap(),"
+        },
+        {
+          "line": 95,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::new(0)"
+        },
+        {
+          "line": 98,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(\"????\").unwrap(),"
+        },
+        {
+          "line": 99,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::new(0)"
+        },
+        {
+          "line": 106,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(\"#hneunophpilcroch\").unwrap(),"
+        },
+        {
+          "line": 107,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::new(13346021867974402139)"
+        },
+        {
+          "line": 111,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(\"#niiutpmlecuamehe\").unwrap(),"
+        },
+        {
+          "line": 112,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::new(796603392265069093)"
+        },
+        {
+          "line": 119,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(\"natasharomanoff\").unwrap(),"
+        },
+        {
+          "line": 120,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::new(6905860632893337981)"
+        },
+        {
+          "line": 127,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(\"a\").unwrap(),"
+        },
+        {
+          "line": 128,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::new(32783)"
+        },
+        {
+          "line": 130,
+          "tokens": [
+            "MethodNumber",
+            "MethodNumber"
+          ],
+          "source": "assert_eq!(MethodNumber::from_str(\"b\").unwrap(), MethodNumber::new(196));"
+        },
+        {
+          "line": 132,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(\"c\").unwrap(),"
+        },
+        {
+          "line": 133,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::new(32884)"
+        },
+        {
+          "line": 136,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(\"abc123\").unwrap(),"
+        },
+        {
+          "line": 137,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::new(691485674271)"
+        },
+        {
+          "line": 140,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(\"spiderman\").unwrap(),"
+        },
+        {
+          "line": 141,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::new(311625498215)"
+        },
+        {
+          "line": 144,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(\"brucewayne\").unwrap(),"
+        },
+        {
+          "line": 145,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::new(56488722015273161)"
+        },
+        {
+          "line": 148,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(\"anthonystark\").unwrap(),"
+        },
+        {
+          "line": 149,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::new(50913722085663764)"
+        },
+        {
+          "line": 152,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(\"natasharomanoff\").unwrap(),"
+        },
+        {
+          "line": 153,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::new(6905860632893337981)"
+        },
+        {
+          "line": 156,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(\"abcdefghijklmnopqrstuvwxyz\").unwrap(),"
+        },
+        {
+          "line": 157,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::new(2393445670689189432)"
+        },
+        {
+          "line": 163,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let name = MethodNumber::from_str(\"a\").unwrap();"
+        },
+        {
+          "line": 167,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let name = MethodNumber::from_str(\"b\").unwrap();"
+        },
+        {
+          "line": 169,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let name = MethodNumber::from(196);"
+        },
+        {
+          "line": 172,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let name = MethodNumber::from_str(\"c\").unwrap();"
+        },
+        {
+          "line": 174,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let name = MethodNumber::from(32884);"
+        },
+        {
+          "line": 177,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let name = MethodNumber::from_str(\"spiderman\").unwrap();"
+        },
+        {
+          "line": 179,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let name = MethodNumber::from(311625498215);"
+        },
+        {
+          "line": 182,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let name = MethodNumber::from_str(\"anthonystark\").unwrap();"
+        },
+        {
+          "line": 184,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let name = MethodNumber::from(50913722085663764);"
+        },
+        {
+          "line": 187,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let name = MethodNumber::from_str(\"natasharomanoff\").unwrap();"
+        },
+        {
+          "line": 189,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let name = MethodNumber::from(6905860632893337981);"
+        },
+        {
+          "line": 192,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let name = MethodNumber::from(0);"
+        },
+        {
+          "line": 199,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let name = MethodNumber::from_str(\"A\").unwrap();"
+        },
+        {
+          "line": 203,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let name = MethodNumber::from_str(\"NATASHAROMANOFF\").unwrap();"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase/src/native_tables.rs",
+      "reference_lines": 3,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 5,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "JointConsensus, MethodNumber, MicroSeconds, Pack, ToKey, ToSchema, Unpack,"
+        },
+        {
+          "line": 411,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "pub method: MethodNumber,"
+        },
+        {
+          "line": 415,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "pub fn new(service: AccountNumber, method: MethodNumber) -> Self {"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase/src/package.rs",
+      "reference_lines": 9,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 11,
+          "tokens": [
+            "MethodNumber",
+            "MethodString"
+          ],
+          "source": "Hex, MethodNumber, MethodString, NullSchemaFetcher, PackageDisposition, PackageOp,"
+        },
+        {
+          "line": 58,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "UnknownAction{service: AccountNumber, method: MethodNumber} = \"{service} does not have an action called {method}\","
+        },
+        {
+          "line": 292,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "pub method: MethodNumber,"
+        },
+        {
+          "line": 302,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "method: MethodNumber,"
+        },
+        {
+          "line": 311,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "let Some(act) = schema.actions.get(&MethodString(method.to_string())) else {"
+        },
+        {
+          "line": 412,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": ".get(&MethodString(self.method.to_string()))"
+        },
+        {
+          "line": 426,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "pub method: MethodNumber,"
+        },
+        {
+          "line": 455,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": ".get(&MethodString(next.method.to_string()))"
+        },
+        {
+          "line": 567,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "if let Some(action_type) = schema.actions.get(&MethodString(method.to_string())) {"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase/src/schema.rs",
+      "reference_lines": 20,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 1,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "use crate::{AccountNumber, Action, DbId, Hex, MethodNumber, SchemaMap, SharedAction};"
+        },
+        {
+          "line": 12,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "pub struct MethodString(pub String);"
+        },
+        {
+          "line": 14,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "impl PartialEq for MethodString {"
+        },
+        {
+          "line": 17,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": ".parse::<MethodNumber>()"
+        },
+        {
+          "line": 19,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": ".eq(&other.0.parse::<MethodNumber>().unwrap())"
+        },
+        {
+          "line": 23,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "impl Eq for MethodString {}"
+        },
+        {
+          "line": 25,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "impl Hash for MethodString {"
+        },
+        {
+          "line": 27,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "self.0.parse::<MethodNumber>().unwrap().hash(state)"
+        },
+        {
+          "line": 31,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "impl std::fmt::Display for MethodString {"
+        },
+        {
+          "line": 51,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "type EventMap = IndexMap<MethodString, EventType>;"
+        },
+        {
+          "line": 53,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "type ActionMap = IndexMap<MethodString, FunctionType>;"
+        },
+        {
+          "line": 252,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "fn to_schema(builder: &mut SchemaBuilder) -> IndexMap<MethodString, FunctionType>;"
+        },
+        {
+          "line": 256,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "fn to_schema(builder: &mut SchemaBuilder) -> IndexMap<MethodString, EventType>;"
+        },
+        {
+          "line": 367,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "Ok(MethodNumber::new(u64::unpack(src)?).to_string().into())"
+        },
+        {
+          "line": 376,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "Ok(MethodNumber::deserialize(val)?.pack(dest))"
+        },
+        {
+          "line": 388,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "result.insert(\"MethodNumber\".to_string(), &METHOD_NUMBER);"
+        },
+        {
+          "line": 439,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": ") -> Result<(AccountNumber, AccountNumber, MethodNumber, &'a str), serde_json::Error> {"
+        },
+        {
+          "line": 455,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let method = MethodNumber::deserialize("
+        },
+        {
+          "line": 476,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "let mut method = MethodString(value.method.to_string());"
+        },
+        {
+          "line": 511,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "if let Some(action_type) = schema.actions.get(&MethodString(method.to_string())) {"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase/src/service.rs",
+      "reference_lines": 11,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 3,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "use crate::{get_result_bytes, native_raw, AccountNumber, Action, MethodNumber};"
+        },
+        {
+          "line": 109,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "method: MethodNumber,"
+        },
+        {
+          "line": 115,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "method: MethodNumber,"
+        },
+        {
+          "line": 127,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "fn call_returns_nothing<Args: Pack>(&self, _method: MethodNumber, _args: Args) {}"
+        },
+        {
+          "line": 128,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "fn call<Ret: UnpackOwned, Args: Pack>(&self, _method: MethodNumber, _args: Args) {}"
+        },
+        {
+          "line": 142,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "fn call_returns_nothing<Args: Pack>(&self, method: MethodNumber, args: Args) {"
+        },
+        {
+          "line": 153,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) -> Ret {"
+        },
+        {
+          "line": 178,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "fn call_returns_nothing<Args: Pack>(&self, method: MethodNumber, args: Args) -> Action {"
+        },
+        {
+          "line": 187,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) -> Action {"
+        },
+        {
+          "line": 358,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "fn call_returns_nothing<Args: Pack>(&self, method: MethodNumber, args: Args) {"
+        },
+        {
+          "line": 368,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) -> Ret {"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase/src/services/credentials.rs",
+      "reference_lines": 2,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 10,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "AccountNumber, Claim, MethodNumber, TimePointSec,"
+        },
+        {
+          "line": 69,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "allowed_actions: Vec<MethodNumber>,"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase/src/services/events.rs",
+      "reference_lines": 3,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": true,
+      "lines": [
+        {
+          "line": 19,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "use crate::{AccountNumber, Checksum256, MethodNumber};"
+        },
+        {
+          "line": 27,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "fn addIndex(db_id: EventDb, service: AccountNumber, event: MethodNumber, column: u8) {"
+        },
+        {
+          "line": 33,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "fn event(db: EventDb, type_: MethodNumber, rawData: Vec<u8>) -> u64 {"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase/src/services/x_http.rs",
+      "reference_lines": 2,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 13,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "use crate::{AccountNumber, HttpReply, HttpRequest, MethodNumber, SocketEndpoint, TLSInfo};"
+        },
+        {
+          "line": 106,
+          "tokens": [
+            "MethodNumber",
+            "MethodNumber"
+          ],
+          "source": "fn setCallback(socket: i32, callback: MethodNumber, err: MethodNumber) {"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase/src/tester.rs",
+      "reference_lines": 4,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 1162,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "method: crate::MethodNumber,"
+        },
+        {
+          "line": 1191,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "method: crate::MethodNumber,"
+        },
+        {
+          "line": 1301,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "method: crate::MethodNumber,"
+        },
+        {
+          "line": 1319,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "method: crate::MethodNumber,"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase/src/trace.rs",
+      "reference_lines": 11,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 6,
+          "tokens": [
+            "MethodNumber",
+            "MethodString"
+          ],
+          "source": "AccountNumber, Action, CustomPrettyAction, Hex, MethodNumber, MethodString, Schema, SchemaMap,"
+        },
+        {
+          "line": 198,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "let action_name = MethodString(atrace.action.method.to_string());"
+        },
+        {
+          "line": 354,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "let entry_placeholder = MethodString(\"<entry>\".to_string());"
+        },
+        {
+          "line": 355,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "let action_name = MethodString(atrace.action.method.to_string());"
+        },
+        {
+          "line": 457,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "let action_name = MethodString(atrace.action.method.to_string());"
+        },
+        {
+          "line": 625,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "let action_name = MethodString(act.method.to_string());"
+        },
+        {
+          "line": 650,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "let mut method = MethodString(act.method.to_string());"
+        },
+        {
+          "line": 820,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "method: &'a MethodString,"
+        },
+        {
+          "line": 879,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "let action_name = MethodString(atrace.action.method.to_string());"
+        },
+        {
+          "line": 1003,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "let mut method = MethodString(value.method.to_string());"
+        },
+        {
+          "line": 1031,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "method: MethodNumber::deserialize(object.get(mname).ok_or_else(|| {"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-derive/src/lib.rs",
+      "reference_lines": 1,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 502,
+          "tokens": [
+            "method_raw"
+          ],
+          "source": "pub fn method_raw(item: TokenStream) -> TokenStream {"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-derive/src/number_macro.rs",
+      "reference_lines": 4,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 3,
+          "tokens": [
+            "method_number_from_str"
+          ],
+          "source": "use psibase_names::{account_number_from_str, account_number_to_string, method_number_from_str};"
+        },
+        {
+          "line": 22,
+          "tokens": [
+            "method_number_from_str"
+          ],
+          "source": "let n = method_number_from_str(&item.value());"
+        },
+        {
+          "line": 24,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "emit_error!(item, \"{} is not a valid MethodNumber\", item.value());"
+        },
+        {
+          "line": 27,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "TokenStream::from(quote! {psibase::MethodNumber::new(#n)})"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-lib/src/service_macro/actions.rs",
+      "reference_lines": 2,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 133,
+          "tokens": [
+            "MethodNumber",
+            "method_raw"
+          ],
+          "source": "quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};"
+        },
+        {
+          "line": 194,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "actions.insert(#psibase_mod::MethodString(#name_str.to_string()), #psibase_mod::fracpack::FunctionType{ params: builder.insert::<#action_mod::#name>(), result: #ret });"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-lib/src/service_macro/dispatch.rs",
+      "reference_lines": 1,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 30,
+          "tokens": [
+            "MethodNumber",
+            "method_raw"
+          ],
+          "source": "let method_comparison = quote! { act.method == #psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str)) };"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-lib/src/service_macro/events.rs",
+      "reference_lines": 4,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": true,
+      "lines": [
+        {
+          "line": 84,
+          "tokens": [
+            "MethodNumber",
+            "method_raw"
+          ],
+          "source": "quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};"
+        },
+        {
+          "line": 119,
+          "tokens": [
+            "MethodNumber",
+            "method_raw"
+          ],
+          "source": "quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};"
+        },
+        {
+          "line": 125,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "fn name() -> #psibase_mod::MethodNumber { #method_number }"
+        },
+        {
+          "line": 143,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "events.insert(#psibase_mod::MethodString(#name_str.to_string()), #psibase_mod::EventType{ type_: builder.insert::<#event_mod::#name>(), access: #access.to_string() });"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-lib/src/service_macro/graphql.rs",
+      "reference_lines": 1,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": true,
+      "lines": [
+        {
+          "line": 21,
+          "tokens": [
+            "method_raw"
+          ],
+          "source": "#psibase_mod::method_raw!(#name_str) => {"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-lib/src/service_macro/mod.rs",
+      "reference_lines": 3,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 228,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::fracpack::FunctionType> {"
+        },
+        {
+          "line": 327,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "fn to_schema(_builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::EventType> {"
+        },
+        {
+          "line": 412,
+          "tokens": [
+            "MethodString"
+          ],
+          "source": "fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::EventType> {"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase_names/src/method_number.rs",
+      "reference_lines": 2,
+      "retained_legacy_implementation": true,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 78,
+          "tokens": [
+            "method_number_from_str"
+          ],
+          "source": "pub fn method_number_from_str(s: &str) -> u64 {"
+        },
+        {
+          "line": 97,
+          "tokens": [
+            "method_number_to_string"
+          ],
+          "source": "pub fn method_number_to_string(value: u64) -> String {"
+        }
+      ]
+    },
+    {
+      "path": "rust/psibase_plugin/src/wasm/transact.rs",
+      "reference_lines": 3,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 4,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "use psibase::{Caller, MethodNumber, ServiceWrapper};"
+        },
+        {
+          "line": 13,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "fn call_returns_nothing<Args: Pack>(&self, method: MethodNumber, args: Args) {"
+        },
+        {
+          "line": 17,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) {"
+        }
+      ]
+    },
+    {
+      "path": "packages/system/Credentials/service/src/lib.rs",
+      "reference_lines": 1,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 136,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "allowed_actions: Vec<MethodNumber>,"
+        }
+      ]
+    },
+    {
+      "path": "packages/system/Credentials/service/src/tables.rs",
+      "reference_lines": 2,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 68,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "pub allowed_actions: Vec<MethodNumber>,"
+        },
+        {
+          "line": 92,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "allowed_actions: Vec<MethodNumber>,"
+        }
+      ]
+    },
+    {
+      "path": "packages/system/StagedTx/service/src/lib.rs",
+      "reference_lines": 1,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 66,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let updated = MethodNumber::from(\"updated\");"
+        }
+      ]
+    },
+    {
+      "path": "packages/system/StagedTx/service/src/policy.rs",
+      "reference_lines": 4,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 6,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "use psibase::{AccountNumber, Caller, MethodNumber, ServiceCaller, ServiceWrapper};"
+        },
+        {
+          "line": 28,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from(auth_action_structs::getDlgsSys::ACTION_NAME),"
+        },
+        {
+          "line": 40,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from(auth_action_structs::isAuthSys::ACTION_NAME),"
+        },
+        {
+          "line": 56,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from(auth_action_structs::isRejectSys::ACTION_NAME),"
+        }
+      ]
+    },
+    {
+      "path": "packages/system/StagedTx/service/src/tests.rs",
+      "reference_lines": 1,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 77,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "method: MethodNumber::from(\"mint\"),"
+        }
+      ]
+    },
+    {
+      "path": "packages/system/Transact/plugin/shared/open_tx_table.rs",
+      "reference_lines": 2,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 3,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "use psibase::{Action, Claim, Hex, MethodNumber};"
+        },
+        {
+          "line": 188,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "method: MethodNumber::from("
+        }
+      ]
+    },
+    {
+      "path": "packages/system/Transact/plugin/transact/src/lib.rs",
+      "reference_lines": 1,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 177,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "method: psibase::MethodNumber::from(action.method.as_str()),"
+        }
+      ]
+    },
+    {
+      "path": "packages/system/VirtualServer/service/src/rpc.rs",
+      "reference_lines": 2,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 13,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "AccountNumber, EventConnection, EventQuery, MethodNumber, RawKey, ServiceWrapper, Table,"
+        },
+        {
+          "line": 168,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "method: MethodNumber::from(crate::action_structs::serveSys::ACTION_NAME),"
+        }
+      ]
+    },
+    {
+      "path": "packages/system/VirtualServer/service/src/tests/chain.rs",
+      "reference_lines": 1,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 587,
+          "tokens": [
+            "MethodNumber",
+            "method_raw"
+          ],
+          "source": "method: MethodNumber::new(method_raw!(\"createAccount\")),"
+        }
+      ]
+    },
+    {
+      "path": "packages/user/Chainmail/service/src/lib.rs",
+      "reference_lines": 3,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 19,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "get_sender, serve_graphql, AccountNumber, EventDb, HttpReply, HttpRequest, MethodNumber,"
+        },
+        {
+          "line": 33,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from(\"sent\"),"
+        },
+        {
+          "line": 39,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from(\"sent\"),"
+        }
+      ]
+    },
+    {
+      "path": "packages/user/Exchange/service/src/trades.rs",
+      "reference_lines": 3,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 6,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "use psibase::{AccountNumber, DbId, KvHandle, KvMode, MethodNumber, ServiceWrapper, ToKey};"
+        },
+        {
+          "line": 19,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "event: MethodNumber,"
+        },
+        {
+          "line": 31,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "let event = MethodNumber::from(method);"
+        }
+      ]
+    },
+    {
+      "path": "packages/user/FaucetTok/service/src/lib.rs",
+      "reference_lines": 2,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 62,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "method: MethodNumber::from(setSysToken::ACTION_NAME),"
+        },
+        {
+          "line": 81,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "method: MethodNumber::from(admin_create::ACTION_NAME),"
+        }
+      ]
+    },
+    {
+      "path": "packages/user/Fractals/service/src/lib.rs",
+      "reference_lines": 2,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 55,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "*svc == method.service && method.method == MethodNumber::from(name)"
+        },
+        {
+          "line": 64,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": ".find(|(_, name)| method.method == MethodNumber::from(*name))"
+        }
+      ]
+    },
+    {
+      "path": "packages/user/Invite/plugin/src/lib.rs",
+      "reference_lines": 3,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 38,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "AccountNumber, MethodNumber,"
+        },
+        {
+          "line": 266,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from(Invite::action_structs::createAccount::ACTION_NAME);"
+        },
+        {
+          "line": 268,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "&& MethodNumber::from(method.as_str()) == create_account_method"
+        }
+      ]
+    },
+    {
+      "path": "packages/user/NameMarket/query-service/src/lib.rs",
+      "reference_lines": 1,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 328,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "method: MethodNumber::from(crate::action_structs::serveSys::ACTION_NAME),"
+        }
+      ]
+    },
+    {
+      "path": "packages/user/NameMarket/service/src/lib.rs",
+      "reference_lines": 1,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 228,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from(method),"
+        }
+      ]
+    },
+    {
+      "path": "packages/user/Nft/service/src/lib.rs",
+      "reference_lines": 2,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 422,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "get_sender, services::events, AccountNumber, EventDb, Memo, MethodNumber, ServiceWrapper,"
+        },
+        {
+          "line": 438,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from(\"ownerChange\"),"
+        }
+      ]
+    },
+    {
+      "path": "packages/user/Symbol/service/src/lib.rs",
+      "reference_lines": 1,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 417,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from(method),"
+        }
+      ]
+    },
+    {
+      "path": "packages/user/TokenSwap/service/src/lib.rs",
+      "reference_lines": 1,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 32,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from(method),"
+        }
+      ]
+    },
+    {
+      "path": "packages/user/Tokens/service/src/lib.rs",
+      "reference_lines": 1,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 36,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from(method),"
+        }
+      ]
+    },
+    {
+      "path": "packages/user/Workshop/plugin/src/lib.rs",
+      "reference_lines": 2,
+      "retained_legacy_implementation": false,
+      "event_only_reference_file": false,
+      "lines": [
+        {
+          "line": 14,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "use psibase::MethodNumber;"
+        },
+        {
+          "line": 148,
+          "tokens": [
+            "MethodNumber"
+          ],
+          "source": "MethodNumber::from_str(&name).unwrap().to_string() == name"
+        }
+      ]
+    }
+  ],
+  "service_registration_inventory": [
+    {
+      "path": "rust/burst-transfer/src/main.rs",
+      "line": 30
+    },
+    {
+      "path": "rust/psibase_macros/psibase-macros-lib/src/service_macro/mod.rs",
+      "line": 529
+    },
+    {
+      "path": "rust/test_contract/src/lib.rs",
+      "line": 8
+    },
+    {
+      "path": "rust/test_contract_2/src/lib.rs",
+      "line": 6
+    },
+    {
+      "path": "rust/test_package/query/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "rust/test_package/service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "rust/test_panic/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "rust/test_psibase_macros/services/add-check-init/src/lib.rs",
+      "line": 14
+    },
+    {
+      "path": "rust/test_psibase_macros/services/basic-w-query/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "rust/test_psibase_macros/services/min-call-recvr/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "rust/test_psibase_macros/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "rust/test_subjective/src/lib.rs",
+      "line": 14
+    },
+    {
+      "path": "packages/system/AuthDyn/query-service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/system/AuthDyn/service/src/lib.rs",
+      "line": 65
+    },
+    {
+      "path": "packages/system/AuthRecover/query-service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/system/AuthRecover/service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/system/Credentials/service/src/lib.rs",
+      "line": 5
+    },
+    {
+      "path": "packages/system/StagedTx/query-service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/system/StagedTx/service/src/lib.rs",
+      "line": 26
+    },
+    {
+      "path": "packages/system/VirtualServer/service/src/lib.rs",
+      "line": 140
+    },
+    {
+      "path": "packages/system/WsAuth/service/src/lib.rs",
+      "line": 36
+    },
+    {
+      "path": "packages/user/Branding/service/src/lib.rs",
+      "line": 26
+    },
+    {
+      "path": "packages/user/BrotliSvc/service/src/lib.rs",
+      "line": 2
+    },
+    {
+      "path": "packages/user/BtcBridge/query-service/src/lib.rs",
+      "line": 2
+    },
+    {
+      "path": "packages/user/BtcBridge/service/src/lib.rs",
+      "line": 131
+    },
+    {
+      "path": "packages/user/BtcRelay/service/src/lib.rs",
+      "line": 100
+    },
+    {
+      "path": "packages/user/Chainmail/service/src/lib.rs",
+      "line": 9
+    },
+    {
+      "path": "packages/user/DiffAdjust/query-service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/user/DiffAdjust/service/src/lib.rs",
+      "line": 317
+    },
+    {
+      "path": "packages/user/EthBridge/query-service/src/lib.rs",
+      "line": 2
+    },
+    {
+      "path": "packages/user/EthBridge/service/src/lib.rs",
+      "line": 164
+    },
+    {
+      "path": "packages/user/EthRelay/service/src/lib.rs",
+      "line": 133
+    },
+    {
+      "path": "packages/user/EthRelay/verify/src/lib.rs",
+      "line": 4
+    },
+    {
+      "path": "packages/user/Evaluations/query-service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/user/Evaluations/service/src/lib.rs",
+      "line": 4
+    },
+    {
+      "path": "packages/user/Exchange/query-service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/user/Exchange/service/src/lib.rs",
+      "line": 15
+    },
+    {
+      "path": "packages/user/FaucetTok/service/src/lib.rs",
+      "line": 38
+    },
+    {
+      "path": "packages/user/FractalGen/service/src/lib.rs",
+      "line": 27
+    },
+    {
+      "path": "packages/user/FractalTester/service/src/lib.rs",
+      "line": 35
+    },
+    {
+      "path": "packages/user/Fractals/de-facto/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/user/Fractals/query-service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/user/Fractals/service/src/lib.rs",
+      "line": 11
+    },
+    {
+      "path": "packages/user/Guilds/query-service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/user/Guilds/service/src/lib.rs",
+      "line": 4
+    },
+    {
+      "path": "packages/user/Identity/service/src/lib.rs",
+      "line": 91
+    },
+    {
+      "path": "packages/user/NameMarket/query-service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/user/NameMarket/service/src/lib.rs",
+      "line": 188
+    },
+    {
+      "path": "packages/user/Nft/query-service/src/lib.rs",
+      "line": 3
+    },
+    {
+      "path": "packages/user/Nft/service/src/lib.rs",
+      "line": 418
+    },
+    {
+      "path": "packages/user/Profiles/query-service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/user/Profiles/service/src/lib.rs",
+      "line": 34
+    },
+    {
+      "path": "packages/user/Registry/query/src/lib.rs",
+      "line": 9
+    },
+    {
+      "path": "packages/user/Registry/service/src/lib.rs",
+      "line": 4
+    },
+    {
+      "path": "packages/user/Signing/query-service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/user/Signing/service/src/lib.rs",
+      "line": 79
+    },
+    {
+      "path": "packages/user/SingleProd/service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/user/Subgroups/service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/user/Symbol/query-service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/user/Symbol/service/src/lib.rs",
+      "line": 391
+    },
+    {
+      "path": "packages/user/TokenStream/query-service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/user/TokenStream/service/src/lib.rs",
+      "line": 176
+    },
+    {
+      "path": "packages/user/TokenSwap/query-service/src/lib.rs",
+      "line": 1
+    },
+    {
+      "path": "packages/user/TokenSwap/service/src/lib.rs",
+      "line": 4
+    },
+    {
+      "path": "packages/user/Tokens/query-service/src/lib.rs",
+      "line": 3
+    },
+    {
+      "path": "packages/user/Tokens/service/src/lib.rs",
+      "line": 7
+    }
+  ],
+  "manual_add_action_inventory": [
+    {
+      "path": "packages/system/Accounts/plugin/accounts/src/interfaces/admin.rs",
+      "line": 97,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/Accounts/plugin/accounts/src/interfaces/admin.rs",
+      "line": 110,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/Accounts/plugin/accounts/src/interfaces/admin.rs",
+      "line": 120,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/Accounts/plugin/accounts/src/interfaces/api.rs",
+      "line": 21,
+      "category": "literal"
+    },
+    {
+      "path": "packages/system/AuthDelegate/plugin/src/lib.rs",
+      "line": 67,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/AuthDelegate/plugin/src/lib.rs",
+      "line": 83,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/AuthDyn/plugin/src/lib.rs",
+      "line": 94,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/AuthSig/plugin/src/lib.rs",
+      "line": 152,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/AuthSig/plugin/src/lib.rs",
+      "line": 172,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/AuthSig/plugin/src/lib.rs",
+      "line": 190,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/AuthSig/plugin/src/lib.rs",
+      "line": 202,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/AuthSig/plugin/src/lib.rs",
+      "line": 252,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/AuthSig/plugin/src/lib.rs",
+      "line": 260,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/AuthSig/plugin/src/lib.rs",
+      "line": 287,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/AuthSig/plugin/src/lib.rs",
+      "line": 298,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/AuthSig/plugin/src/lib.rs",
+      "line": 308,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/AuthSig/plugin/src/lib.rs",
+      "line": 315,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/Producers/plugin/src/lib.rs",
+      "line": 117,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/Producers/plugin/src/lib.rs",
+      "line": 138,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/Producers/plugin/src/lib.rs",
+      "line": 166,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/Producers/plugin/src/lib.rs",
+      "line": 174,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/Producers/plugin/src/lib.rs",
+      "line": 183,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/SetCode/plugin/src/lib.rs",
+      "line": 40,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/SetCode/plugin/src/lib.rs",
+      "line": 59,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/StagedTx/plugin/src/lib.rs",
+      "line": 104,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/StagedTx/plugin/src/lib.rs",
+      "line": 122,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/StagedTx/plugin/src/lib.rs",
+      "line": 138,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/system/StagedTx/plugin/src/lib.rs",
+      "line": 150,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Branding/plugin/src/lib.rs",
+      "line": 43,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/BtcBridge/plugin/src/lib.rs",
+      "line": 123,
+      "category": "runtime_or_wrapper"
+    },
+    {
+      "path": "packages/user/BtcRelay/plugin/src/lib.rs",
+      "line": 14,
+      "category": "literal"
+    },
+    {
+      "path": "packages/user/Chainmail/plugin/src/lib.rs",
+      "line": 59,
+      "category": "literal"
+    },
+    {
+      "path": "packages/user/Chainmail/plugin/src/lib.rs",
+      "line": 77,
+      "category": "literal"
+    },
+    {
+      "path": "packages/user/Chainmail/plugin/src/lib.rs",
+      "line": 92,
+      "category": "literal"
+    },
+    {
+      "path": "packages/user/EthBridge/plugin/src/lib.rs",
+      "line": 122,
+      "category": "runtime_or_wrapper"
+    },
+    {
+      "path": "packages/user/EthBridge/plugin/src/lib.rs",
+      "line": 182,
+      "category": "runtime_or_wrapper"
+    },
+    {
+      "path": "packages/user/Evaluations/plugin/src/helpers.rs",
+      "line": 92,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Evaluations/plugin/src/lib.rs",
+      "line": 50,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Evaluations/plugin/src/lib.rs",
+      "line": 55,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Evaluations/plugin/src/lib.rs",
+      "line": 66,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Evaluations/plugin/src/lib.rs",
+      "line": 76,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Evaluations/plugin/src/lib.rs",
+      "line": 88,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Evaluations/plugin/src/lib.rs",
+      "line": 100,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Evaluations/plugin/src/lib.rs",
+      "line": 117,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Evaluations/plugin/src/lib.rs",
+      "line": 129,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Evaluations/plugin/src/lib.rs",
+      "line": 144,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Evaluations/plugin/src/lib.rs",
+      "line": 182,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Evaluations/plugin/src/lib.rs",
+      "line": 234,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/FaucetTok/plugin/src/lib.rs",
+      "line": 13,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Identity/plugin/src/lib.rs",
+      "line": 54,
+      "category": "literal"
+    },
+    {
+      "path": "packages/user/Nft/plugin/src/lib.rs",
+      "line": 80,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Nft/plugin/src/lib.rs",
+      "line": 101,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Nft/plugin/src/lib.rs",
+      "line": 114,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Nft/plugin/src/lib.rs",
+      "line": 126,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Nft/plugin/src/lib.rs",
+      "line": 141,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Nft/plugin/src/lib.rs",
+      "line": 154,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Nft/plugin/src/lib.rs",
+      "line": 162,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Nft/plugin/src/lib.rs",
+      "line": 175,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Packages/plugin/src/lib.rs",
+      "line": 614,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Profiles/plugin/src/lib.rs",
+      "line": 102,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Profiles/plugin/src/lib.rs",
+      "line": 125,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Profiles/plugin/src/lib.rs",
+      "line": 131,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Registry/plugin/src/lib.rs",
+      "line": 43,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Registry/plugin/src/lib.rs",
+      "line": 54,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Registry/plugin/src/lib.rs",
+      "line": 61,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Sites/plugin/src/lib.rs",
+      "line": 99,
+      "category": "literal"
+    },
+    {
+      "path": "packages/user/Sites/plugin/src/lib.rs",
+      "line": 120,
+      "category": "literal"
+    },
+    {
+      "path": "packages/user/Sites/plugin/src/lib.rs",
+      "line": 157,
+      "category": "literal"
+    },
+    {
+      "path": "packages/user/Sites/plugin/src/lib.rs",
+      "line": 169,
+      "category": "literal"
+    },
+    {
+      "path": "packages/user/Sites/plugin/src/lib.rs",
+      "line": 175,
+      "category": "literal"
+    },
+    {
+      "path": "packages/user/Sites/plugin/src/lib.rs",
+      "line": 181,
+      "category": "literal"
+    },
+    {
+      "path": "packages/user/Sites/plugin/src/lib.rs",
+      "line": 187,
+      "category": "literal"
+    },
+    {
+      "path": "packages/user/Sites/plugin/src/lib.rs",
+      "line": 196,
+      "category": "literal"
+    },
+    {
+      "path": "packages/user/Sites/plugin/src/lib.rs",
+      "line": 203,
+      "category": "literal"
+    },
+    {
+      "path": "packages/user/Sites/plugin/src/lib.rs",
+      "line": 211,
+      "category": "literal"
+    },
+    {
+      "path": "packages/user/Symbol/plugin/src/lib.rs",
+      "line": 85,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Symbol/plugin/src/lib.rs",
+      "line": 107,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Symbol/plugin/src/lib.rs",
+      "line": 133,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Symbol/plugin/src/lib.rs",
+      "line": 158,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/Symbol/plugin/src/lib.rs",
+      "line": 172,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/TokenStream/plugin/src/lib.rs",
+      "line": 38,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/TokenStream/plugin/src/lib.rs",
+      "line": 60,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/TokenStream/plugin/src/lib.rs",
+      "line": 71,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/TokenStream/plugin/src/lib.rs",
+      "line": 82,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/TokenSwap/plugin/src/lib.rs",
+      "line": 166,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/TokenSwap/plugin/src/lib.rs",
+      "line": 187,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/TokenSwap/plugin/src/lib.rs",
+      "line": 209,
+      "category": "generated_ACTION_NAME"
+    },
+    {
+      "path": "packages/user/TokenSwap/plugin/src/lib.rs",
+      "line": 273,
+      "category": "generated_ACTION_NAME"
+    }
+  ],
+  "typed_add_to_tx_inventory": [
+    {
+      "path": "packages/system/AuthRecover/plugin/src/lib.rs",
+      "line": 82
+    },
+    {
+      "path": "packages/system/AuthRecover/plugin/src/lib.rs",
+      "line": 83
+    },
+    {
+      "path": "packages/system/AuthRecover/plugin/src/lib.rs",
+      "line": 92
+    },
+    {
+      "path": "packages/system/AuthRecover/plugin/src/lib.rs",
+      "line": 104
+    },
+    {
+      "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+      "line": 60
+    },
+    {
+      "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+      "line": 67
+    },
+    {
+      "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+      "line": 76
+    },
+    {
+      "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+      "line": 88
+    },
+    {
+      "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+      "line": 95
+    },
+    {
+      "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+      "line": 107
+    },
+    {
+      "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+      "line": 120
+    },
+    {
+      "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+      "line": 126
+    },
+    {
+      "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+      "line": 171
+    },
+    {
+      "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+      "line": 194
+    },
+    {
+      "path": "packages/system/VirtualServer/plugin/src/lib.rs",
+      "line": 218
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 163
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 171
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 178
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 179
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 180
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 182
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 184
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 185
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 186
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 187
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 188
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 189
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 190
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 191
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 192
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 193
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 194
+    },
+    {
+      "path": "packages/user/Exchange/plugin/src/plugin.rs",
+      "line": 195
+    },
+    {
+      "path": "packages/user/Fractals/plugin/src/lib.rs",
+      "line": 63
+    },
+    {
+      "path": "packages/user/Fractals/plugin/src/lib.rs",
+      "line": 77
+    },
+    {
+      "path": "packages/user/Fractals/plugin/src/lib.rs",
+      "line": 85
+    },
+    {
+      "path": "packages/user/Fractals/plugin/src/lib.rs",
+      "line": 91
+    },
+    {
+      "path": "packages/user/Fractals/plugin/src/lib.rs",
+      "line": 97
+    },
+    {
+      "path": "packages/user/Fractals/plugin/src/lib.rs",
+      "line": 108
+    },
+    {
+      "path": "packages/user/Fractals/plugin/src/lib.rs",
+      "line": 114
+    },
+    {
+      "path": "packages/user/Fractals/plugin/src/lib.rs",
+      "line": 120
+    },
+    {
+      "path": "packages/user/Fractals/plugin/src/lib.rs",
+      "line": 128
+    },
+    {
+      "path": "packages/user/Fractals/plugin/src/lib.rs",
+      "line": 134
+    },
+    {
+      "path": "packages/user/Fractals/plugin/src/lib.rs",
+      "line": 146
+    },
+    {
+      "path": "packages/user/Fractals/plugin/src/lib.rs",
+      "line": 158
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 78
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 84
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 214
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 224
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 230
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 236
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 242
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 248
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 254
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 260
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 266
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 272
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 290
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 302
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 310
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 316
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 327
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 338
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 344
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 350
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 367
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 380
+    },
+    {
+      "path": "packages/user/Guilds/plugin/src/lib.rs",
+      "line": 386
+    },
+    {
+      "path": "packages/user/Invite/plugin/src/lib.rs",
+      "line": 197
+    },
+    {
+      "path": "packages/user/Invite/plugin/src/lib.rs",
+      "line": 214
+    },
+    {
+      "path": "packages/user/Invite/plugin/src/lib.rs",
+      "line": 238
+    },
+    {
+      "path": "packages/user/Invite/plugin/src/lib.rs",
+      "line": 257
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 52
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 70
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 95
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 108
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 114
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 144
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 155
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 166
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 180
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 182
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 259
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 269
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 281
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 323
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 331
+    },
+    {
+      "path": "packages/user/NameMarket/plugin/src/lib.rs",
+      "line": 352
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 58
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 74
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 94
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 107
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 113
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 119
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 133
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 139
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 211
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 219
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 227
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 233
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 244
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 252
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 258
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 264
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 270
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 276
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/lib.rs",
+      "line": 284
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/transfer.rs",
+      "line": 362
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/transfer.rs",
+      "line": 365
+    },
+    {
+      "path": "packages/user/Tokens/plugin/src/transfer.rs",
+      "line": 368
+    }
+  ],
+  "source_sha256": {
+    "packages/system/Accounts/plugin/accounts/src/interfaces/admin.rs": "8d304eeaf7fa47a320eff9faa360f4369c113dd88630b58134037c9bc0f542c2",
+    "packages/system/Accounts/plugin/accounts/src/interfaces/api.rs": "045cf1a5a1f611478e92de3a227ad27f15dfaf530375d0a3c52e5a4d4e315c7c",
+    "packages/system/AuthDelegate/plugin/src/lib.rs": "b78a6e8e6133b92d53d14ef1b71046153dee628f610e21ad4c45f563c3abd2d2",
+    "packages/system/AuthDyn/plugin/src/lib.rs": "1c4622c20c68aac4149e6fa324c744eb5d695416c835de3e36cc6180161e7b4b",
+    "packages/system/AuthDyn/query-service/src/lib.rs": "eb0a478aefef853dfcda87cef1e29b2b8c63142aef2fbeacd3f8f93df9de1905",
+    "packages/system/AuthDyn/service/src/lib.rs": "36819bcd406d595a023bec999542210f5f9a86753ca54f1c13c0723560f657b2",
+    "packages/system/AuthRecover/plugin/src/lib.rs": "4b893310853c520d3f302eed9464e82407b03b70a0452847d491603a9760b4a1",
+    "packages/system/AuthRecover/query-service/src/lib.rs": "7050fee81a4c3650422190ffb0a06fbe8a398721b3817f5961c6663245875841",
+    "packages/system/AuthRecover/service/src/lib.rs": "7c09236032f80a0b7c31f2f8da687fb58f1b44aaf0195f3c14ed0c6f048e7d37",
+    "packages/system/AuthSig/plugin/src/lib.rs": "410c8654bf0d3473374bf554e9ac8582b11319134b5cd401dbe7c624fc6dc70c",
+    "packages/system/Credentials/service/src/lib.rs": "a054e34af3aebdf2cff81a251d13bd921430b7c2c1b48bcfe79cd57e47baacdd",
+    "packages/system/Credentials/service/src/tables.rs": "3eb16e08af49d0ef988b25f2e9475a22ed4a726ed95b312075cd4eded6f099ca",
+    "packages/system/Producers/plugin/src/lib.rs": "7d727f668955a4506fc00b2993c3ac863f73746713ebc86cbc61a0a1b83d59d9",
+    "packages/system/SetCode/plugin/src/lib.rs": "aefc2b4b626acde82450a06cd56f9dd5d0aa0f9164a2500fc2c0946fac771dde",
+    "packages/system/StagedTx/plugin/src/lib.rs": "2974f15512b68111598e266a14858f0d8736c76bb314d388d15a98adf82336b0",
+    "packages/system/StagedTx/query-service/src/lib.rs": "48f963530920479b8ed32c36f0961dad6bd316d3e0864e005e7df5171f942f36",
+    "packages/system/StagedTx/service/src/lib.rs": "70b4f9d02945036152344207cb2cf45b484a54c15031212188de633ac0bef9b3",
+    "packages/system/StagedTx/service/src/policy.rs": "ef0f2b81e4838d0a5df3682aa4c796b2e11b4402f74796efc43bfd2a302808b0",
+    "packages/system/StagedTx/service/src/tests.rs": "7c281b3ba02c8ba2b5a6ce6fffcdd03beda956fea7108f3dea417d50a7b0051b",
+    "packages/system/Transact/plugin/shared/open_tx_table.rs": "61d5128fc69abc486cbb93c726958808300916b97672dc0335a5344e70dfac31",
+    "packages/system/Transact/plugin/transact/src/lib.rs": "85d0dea465d4405863c3e7b91261f0aba80d2a676338786f32d8865b0896a6e1",
+    "packages/system/VirtualServer/plugin/src/lib.rs": "923232f2825e5109ca509f81b9125d1a13adef33353fe916ac30456cbbe1bbfb",
+    "packages/system/VirtualServer/service/src/lib.rs": "c2978b652f9856228e90ad75536546395abd435cc8878b2de3042d40688fc78e",
+    "packages/system/VirtualServer/service/src/rpc.rs": "c8d1592823e55f619478067987cc7ada14ee3834b986e30dc3b2a1fb6ca7f419",
+    "packages/system/VirtualServer/service/src/tests/chain.rs": "7142f168791deeaa25920a8986aa9afc7dd3be4dc81037b6ccbcbe4b71b18aa1",
+    "packages/system/WsAuth/service/src/lib.rs": "ee885a12c8f8f25a29a14c5aee40ef8d426a6a58423faa6bf9bb2b11bea3b11c",
+    "packages/user/Branding/plugin/src/lib.rs": "8ae538e7dbcfa899e0b59de5d8a0c96c602b21b02301d88ced18343a1b36f06e",
+    "packages/user/Branding/service/src/lib.rs": "c7e4e75e89e0f00e305bde78841f76ef2dc6c80a1b06ca7bd353ca40e52a3f5c",
+    "packages/user/BrotliSvc/service/src/lib.rs": "79644073949cc5b40a536b3e7dc6230a45824db7ddcc5fe03ecb5b5afd129cf5",
+    "packages/user/BtcBridge/plugin/src/lib.rs": "1cee97264ba608a3a8bbd6338e0556d97a090dd4c22998088bfc4b735400d174",
+    "packages/user/BtcBridge/query-service/src/lib.rs": "35f8916236e3435bb469389ec05bd8ffceb1d20a4483d7bc451194fb58c02ff9",
+    "packages/user/BtcBridge/service/src/lib.rs": "995877f5a39e9cafdf7ef260ab0b26159840da2ff348a12dbc93c4b017a93cf5",
+    "packages/user/BtcRelay/plugin/src/lib.rs": "1641100bb9fb513ad97b88cae933b716ca51b7cc7e837ccc4b3591302af92dc8",
+    "packages/user/BtcRelay/service/src/lib.rs": "dda9b2d9f52c0788f25fd1cd039a6909b3fec7e4cecb31f9e9ff5fd687952fae",
+    "packages/user/Chainmail/plugin/src/lib.rs": "869727ee5e2a7892968e7d845350abae803acd58f73c02ab1201d85e7de7a9c7",
+    "packages/user/Chainmail/service/src/lib.rs": "b8273064fab8112adc3d6cc32d0c52d45cfb78744a7e0dcb987729fab52413eb",
+    "packages/user/DiffAdjust/query-service/src/lib.rs": "53e562d1c8428b5ab8364949f70831e852c3451f3ab5f0809fe97e102f3674c8",
+    "packages/user/DiffAdjust/service/src/lib.rs": "a0636eacf9bfe86b1aaff10d44642145a0b6bb8efc12a52fe6b1685976c34699",
+    "packages/user/EthBridge/plugin/src/lib.rs": "2ec4c366b0903b34ded0d51b0761dbccef44046849a68963081e9b51de389113",
+    "packages/user/EthBridge/query-service/src/lib.rs": "8350456706ce5ba82d9e3a01a8e8ab9a881508fc0b59a504567d1ea676eba4e4",
+    "packages/user/EthBridge/service/src/lib.rs": "0c61b9b11c8466b7acdc2782b39f28aa67713ec7c29fa0818a49520a5c8de7a4",
+    "packages/user/EthRelay/service/src/lib.rs": "12fd6c1a8e0925dd57990e73cbb282751f15fe14c746f94fbc27d7791e2f6c19",
+    "packages/user/EthRelay/verify/src/lib.rs": "225c62aa713bb39ca73984a29b0007e7d32c46e9400ee3adbd16b6a44ab29158",
+    "packages/user/Evaluations/plugin/src/helpers.rs": "477fcb836a12ea14f07271010b1181c25ac2febdad6e3d4f5e8b6bdcb28a694b",
+    "packages/user/Evaluations/plugin/src/lib.rs": "1c59dec7f3dbca528f784e555f0a2fa8cd5fbfce10a775adbd54692de8832e03",
+    "packages/user/Evaluations/query-service/src/lib.rs": "52544d4bd544c35c4446a0fdf8e08245fa423a440b4fb5859a238276035c3ad5",
+    "packages/user/Evaluations/service/src/lib.rs": "ffc225ca56d8783e1e19153d5cc648585185c344cf86f3ea3296ce4d138d48f3",
+    "packages/user/Exchange/plugin/src/plugin.rs": "1926fbb850b6eeeea83019e7c48ba55dbd93de4acd59d9ea2a5a18a96ecd38d2",
+    "packages/user/Exchange/query-service/src/lib.rs": "7fe5303d0550b084f244145ee18a489beab94f43a931c37c1a3a91cc01d41f45",
+    "packages/user/Exchange/service/src/lib.rs": "3f724b6a07c26c4e2d6910a79df4fc7459d860403781b7ea986910d56b6e29e3",
+    "packages/user/Exchange/service/src/trades.rs": "0ae12a0ab38e87736f362bdfc16e31222a996e2eca98d9a363fca90571a0339e",
+    "packages/user/FaucetTok/plugin/src/lib.rs": "693a0224a3412c511c9156701678792ea782458bcb3599efe125da14464001d3",
+    "packages/user/FaucetTok/service/src/lib.rs": "c9eba69a868d3a65fde16a98b289de6021f03540b8667d9d9aaff5c0da532693",
+    "packages/user/FractalGen/service/src/lib.rs": "ec14903ad0d7f9827fab26d491348ca37c3c63a66109066dd3eae75dd927a5bf",
+    "packages/user/FractalTester/service/src/lib.rs": "52dbdf5e14fcbd7ec239798db6ab6675ba4a5dccf5512fdfe826e78ed926dec1",
+    "packages/user/Fractals/de-facto/src/lib.rs": "0c07a97c3230a8671eac34428527ebc5b7b712dfb42894baf14735e0a1dc7bbb",
+    "packages/user/Fractals/plugin/src/lib.rs": "0c7d239abb22f34f1a3267394f58a42ab12841161025550d4946559cabfd9206",
+    "packages/user/Fractals/query-service/src/lib.rs": "ce6d8cb289cc11cbd167586b1fed939d5795f49a6ed1aff2a1923017277880be",
+    "packages/user/Fractals/service/src/lib.rs": "2a7eebdab2f04a3455bdfecd40e8d8521dbeb2c27abcb98015650046ff680dc8",
+    "packages/user/Guilds/plugin/src/lib.rs": "a6e67b43120689b744150e90e8e7cab3c685489b7e9e0a178d8efebbbee4370b",
+    "packages/user/Guilds/query-service/src/lib.rs": "941807aab24a6b8d42016caea2599f404f1fb0f4661a7263dab6f75a6e1b3d00",
+    "packages/user/Guilds/service/src/lib.rs": "276bedc00414227946c950255ba7debbbe7f74ccd80064144b772ff674433e9b",
+    "packages/user/Identity/plugin/src/lib.rs": "95ddde2be1fe09b105249df9d3d08e94e5e0c6b32f299051a7f0e944bc86f6f2",
+    "packages/user/Identity/service/src/lib.rs": "68f2b448af6cba106e20681ae2a07310d491be49e194736380591526e42102b6",
+    "packages/user/Invite/plugin/src/lib.rs": "d959f428af3cbad02ef5dee84ef47570f507f8498f977f1163e450ada280fc2c",
+    "packages/user/NameMarket/plugin/src/lib.rs": "071b431895efa303c9a30800428ac0a35515db3df0499a130cf31c90b47f9ef6",
+    "packages/user/NameMarket/query-service/src/lib.rs": "8fb07d279a0e9f912c2f4834edc95c2661037ef68a980b49dcdd65182a148fd2",
+    "packages/user/NameMarket/service/src/lib.rs": "1b00ec563cd8041b04c6386fc6ccb31ab13f496926a8f0a0dbd07cc34f9895f4",
+    "packages/user/Nft/plugin/src/lib.rs": "ed64d22f9fcb341cbd168d10fa6e976eab3ca2618410a68f2dd3afcaa9d0ca05",
+    "packages/user/Nft/query-service/src/lib.rs": "eaa228627fa828aa9960e497e9b6849e25ff13e2f1b7d051a188b23d2f3600e4",
+    "packages/user/Nft/service/src/lib.rs": "ba1ea71dea4805a70977e0beda9a5023a3b241ca56c747723692d6cabfbb1c19",
+    "packages/user/Packages/plugin/src/lib.rs": "1eafd02e588cd0363397465ce9dd08789454df5307e76de924f16ee0fcebac4d",
+    "packages/user/Profiles/plugin/src/lib.rs": "348f3c13b15d9aa023e6b0355a1eefff95b363fd80079166ae5fab0a6a9018a3",
+    "packages/user/Profiles/query-service/src/lib.rs": "e028390bef117484e20efb87bc673ca269666da2929030da5def5ff331a99cd1",
+    "packages/user/Profiles/service/src/lib.rs": "47ed2105041ce7a9c5a6a6e7b9362039e690e244156fc486eacebd4b7a553b87",
+    "packages/user/Registry/plugin/src/lib.rs": "01d1738c39afd4131e95754ea8cbd078a4794d0c517f6ba6452fa52fe2148b5a",
+    "packages/user/Registry/query/src/lib.rs": "75c6f0c8fa9b740509189ea22c2ffa2deb910d18dbccc005064b4a3b802bfc16",
+    "packages/user/Registry/service/src/lib.rs": "278c6735ef5ac25744e0a42bc480b3cb8f5d03510c3860f89be57111c0f44cda",
+    "packages/user/Signing/query-service/src/lib.rs": "8688aeeea6a527d3a31b7b88f04894f015b2462fa74d3d25edcddbe0d1ae0993",
+    "packages/user/Signing/service/src/lib.rs": "26f1c74103a80cc96e566e457609ab4712780f3d24820bbcb518d6bbd87ddc92",
+    "packages/user/SingleProd/service/src/lib.rs": "587a0d0c6ecc44303ce852e5ecd237408feb6204be9cee2aef049454efa77451",
+    "packages/user/Sites/plugin/src/lib.rs": "7dc543749959b4217eb1f460f167f46d026ede971cc59a79c9b3bb21255a9769",
+    "packages/user/Subgroups/service/src/lib.rs": "cd545238a6b1b7183f0a907878ef1baa5b1feb745e3f448574331c5d516e38eb",
+    "packages/user/Symbol/plugin/src/lib.rs": "28514bb5b3a6f3f28794c3808c1ea50fe3d9f617bdfa0b57a28420d25e55bad3",
+    "packages/user/Symbol/query-service/src/lib.rs": "6f6484ee68871f6f7560e903dbfdf7ab81a0be437ca288cda5a8b61603c43e71",
+    "packages/user/Symbol/service/src/lib.rs": "8e2b906ec21c19ddeb636903e18b1191fa8f2e3ec774b77cf40cca0735f7ec2d",
+    "packages/user/TokenStream/plugin/src/lib.rs": "26db1eba2e6568044a555635d2e488313e390f0db160c38d916fe883cf54d311",
+    "packages/user/TokenStream/query-service/src/lib.rs": "395e974d6fae530fdb03bc77db0408b5ace9e4ae90c2937577be3f26d3345c4a",
+    "packages/user/TokenStream/service/src/lib.rs": "2cc1b2cf94e2d5c487f59ce57a4f133baf0096ecb796be8fdc6ec2a25f77a814",
+    "packages/user/TokenSwap/plugin/src/lib.rs": "5cafdedde54ba09884c8ef5063035accb9ebd7e3fa0818e420433f72b438c125",
+    "packages/user/TokenSwap/query-service/src/lib.rs": "47ab43cd156a8e1d228b31e7a75d2bcf149569380df57f3a7055d4d295bc2472",
+    "packages/user/TokenSwap/service/src/lib.rs": "7d7d46eda10fe18ea5e5a78ed979c4874f61fbbb5c442aaebf30be0e75e0457a",
+    "packages/user/Tokens/plugin/src/lib.rs": "c03574fac80ab12e5493c90a45e6f795e4d455c17eef0ba59f00103b8b1ca872",
+    "packages/user/Tokens/plugin/src/transfer.rs": "13d17a091f1cfbeb6627378995286d45447aa77dba8e67e79f43884d6a48b1d3",
+    "packages/user/Tokens/query-service/src/lib.rs": "3b35059e31d8d2ac9ca2922730e907b2c14c70b3677c85a98a0d5fca9a5d7151",
+    "packages/user/Tokens/service/src/lib.rs": "a7a6a217a22189eb8298ef1fa686c1567ac6d1cc4db2eead63dc0e7c7d8f2e56",
+    "packages/user/Workshop/plugin/src/lib.rs": "350447f0e8f05565d78f2f42e00366ae7f9cb40b0ba68c22b29152ec09f85982",
+    "rust/burst-transfer/src/main.rs": "f63fafb7b65c0bf4ca94ce9fec6e91162ec941fd5b784dcf24094758fb7146ca",
+    "rust/psibase/src/actions.rs": "ca41b4b2f601b8ea5def52f558423c7305e881a9433d362abc9bcb7c77c69aa0",
+    "rust/psibase/src/auth.rs": "1f864b408e435071f38ab29c6956ed7983ec9588043bb81c078841b8e1fe2762",
+    "rust/psibase/src/block.rs": "d52846a3edfaf753bf25d9c7e624d6d15352ff13867072fdb14d7728d8b32213",
+    "rust/psibase/src/boot.rs": "a3d1387fef564c96327e63275ef9cf24177f8f6f2e7a0ff12029a3f192b7d422",
+    "rust/psibase/src/graph_ql.rs": "bbc28b7fb8ffad78f686adddba2402f2cd276ee4f6851b1695b04e1584fff1ed",
+    "rust/psibase/src/method_number.rs": "a03db5883cff199eaae58d49320f71a5a68cdb9da68b6f2b6fed11e08babd4f6",
+    "rust/psibase/src/native_tables.rs": "50b09bafb6df2cd63fc925299aed2a9a1ac060920afa7135fc1ff34ccb92b224",
+    "rust/psibase/src/package.rs": "097c66f4a51da02974ac928106490ea7c489a08cfe32dce57721eb32771e3cb1",
+    "rust/psibase/src/schema.rs": "f6f25a9764fe6f973505d19ef6f234b50615100672f66bbda02fe966d7c53634",
+    "rust/psibase/src/service.rs": "b47cfc6b7f759583d8cf1cccd754d4fbc975b183c7c1855ec54157ff1f9795c3",
+    "rust/psibase/src/services/credentials.rs": "ce17dde42d3ee55f9168ca63075b17cbb652724694c14411d8b1a3cf22138cc9",
+    "rust/psibase/src/services/events.rs": "32b231c813a4ad3104ae8af4610327ea2297416ada1aa9a952ea2daab7d88085",
+    "rust/psibase/src/services/x_http.rs": "71dcd827a600ed0c3e04d000e35a3d694b97595191129681378f317122565441",
+    "rust/psibase/src/tester.rs": "0308a07d33f318f8705adf714549e719b0d56cf5b06e75244c3752383550b8d6",
+    "rust/psibase/src/trace.rs": "b29caa0040c3268908adca4184d3bc8a08b713f9cda539cdb92c21501ddb9cb1",
+    "rust/psibase_macros/psibase-macros-derive/src/lib.rs": "fb5276bbce87aa898619044d879bab68382c61b4ec33c1a8ba583ef1d3596599",
+    "rust/psibase_macros/psibase-macros-derive/src/number_macro.rs": "a086e4b9c5b9b4ffd13f82290fbcd564458223c4c9cf32894f7df1365ce79e36",
+    "rust/psibase_macros/psibase-macros-lib/src/service_macro/actions.rs": "6102d4d2a5ed80de6b0a8f1a7cf00d6f33785aeeb5b2b1798154c75f5fca81a7",
+    "rust/psibase_macros/psibase-macros-lib/src/service_macro/dispatch.rs": "7f32b34cacb0b7cbd7d2cfed7ed15a970619a4eeebe64f02e397248684045d4e",
+    "rust/psibase_macros/psibase-macros-lib/src/service_macro/events.rs": "493ce302313a674e33878c5b0f9edd1688145b0546c41e4b5c28a8b4921d812e",
+    "rust/psibase_macros/psibase-macros-lib/src/service_macro/graphql.rs": "9db41f9ec8c68f5de72c8fd2d2d20da78212bc6e9a1eb2c8ad186074d930f68a",
+    "rust/psibase_macros/psibase-macros-lib/src/service_macro/mod.rs": "0e7582ec7f312c22b71ad305284af1dfc6a4c80f6673cf00c76598a4fe2aa10b",
+    "rust/psibase_names/src/method_number.rs": "4c89886e75710e40080bc7d382769f6ffc8f79d5ce4c6457d5e1582a479594ab",
+    "rust/psibase_plugin/src/wasm/transact.rs": "eb510da9bed71b6250a5c96213ef6b8709f998453a4e45139e6bee735ddcad14",
+    "rust/test_contract/src/lib.rs": "036116d09728889382cfea34f83f3b48f0baf19365178d331e8cc57b0d2b642e",
+    "rust/test_contract_2/src/lib.rs": "0bf0ef88c8c90519710fb490fcc0c9184c96baefc84df305a65c9d376aeae0b7",
+    "rust/test_package/query/src/lib.rs": "8bd2cdfa4dcf6d5ad4d6ea03a0a63e171a84476e9800d9dd596c8930a8ae4ca8",
+    "rust/test_package/service/src/lib.rs": "b6ed268a2ea0368e26d95c5f772daebf306cde79db7214e1794678ca22bded80",
+    "rust/test_panic/src/lib.rs": "79dc4a30ba3e4eef6fe16f9c8213befd909dd56f9339f1237631f563648e9408",
+    "rust/test_psibase_macros/services/add-check-init/src/lib.rs": "89e5e3f59215445fb3524db3d9afb2eb54ce529e09e9595dbafb730576e2e49e",
+    "rust/test_psibase_macros/services/basic-w-query/src/lib.rs": "a3d5cf5e1f007a2e463abca8db2f40bcc065a8cb2e86c2acd0e548f9c8db29bf",
+    "rust/test_psibase_macros/services/min-call-recvr/src/lib.rs": "c3bfa16b8edb44c6a55ab58d1d59a65bd1654015d1316209517ed8bc9b7a9328",
+    "rust/test_psibase_macros/src/lib.rs": "86c814b7abbc2de12c6c107cdf0c877134b1b75fa8335442e91467fbc7465650",
+    "rust/test_subjective/src/lib.rs": "fc2c54105e5e561e3c86e562c9ca490533f7c5c67e8bdcf49b71f209202ae915"
+  }
+}

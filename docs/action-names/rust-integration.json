@@ -1,0 +1,252 @@
+{
+  "scope": "Rust integration validation; C++ schema fixtures generated from actual interfaces",
+  "model_sha256": "774add87bf4a11e1c698d9c619c02bea398adb91f64a02ed746ad51e8e9bc7be",
+  "checks": [
+    {
+      "cwd": "rust",
+      "command": "cargo test -p psibase --lib --offline -- --skip verify_schema",
+      "passed": true,
+      "tests_passed": 51,
+      "package_fixture_tests_filtered": 43
+    },
+    {
+      "cwd": "rust",
+      "command": "cargo test -p psibase_names --offline",
+      "passed": true,
+      "unit_tests_passed": 5
+    },
+    {
+      "cwd": "rust",
+      "command": "cargo test -p psibase-macros-lib --offline --lib",
+      "passed": true,
+      "tests_passed": 6
+    },
+    {
+      "cwd": "rust",
+      "command": "cargo test -p psibase -p psibase_names -p psibase-macros-lib -p psibase-macros-derive --offline -- --skip verify_schema",
+      "passed": true,
+      "trybuild_suite_passed": true,
+      "runnable_doctests_passed": 2
+    },
+    {
+      "cwd": "rust",
+      "command": "cargo check -p psibase_names --target wasm32-wasip1 --offline",
+      "passed": true
+    },
+    {
+      "cwd": "rust",
+      "command": "cargo check -p psibase_plugin --target wasm32-wasip1 --offline",
+      "passed": true
+    },
+    {
+      "cwd": "packages",
+      "command": "cargo component check --manifest-path Cargo.toml -p transact --target wasm32-wasip1",
+      "passed": true,
+      "bindings_regenerated": true
+    },
+    {
+      "cwd": "packages",
+      "command": "cargo test --manifest-path Cargo.toml -p transact --lib --target aarch64-apple-darwin --offline",
+      "passed": true,
+      "tests_passed": 9,
+      "new_transport_tests": 3
+    },
+    {
+      "cwd": "rust",
+      "environment": {
+        "PSIBASE_SCHEMA_FIXTURE_DIR": "$REPO/build-action-names/cpp-schemas"
+      },
+      "command": "cargo test -p psibase --lib verify_schema --offline -- --skip services::auth_dyn:: --skip services::auth_recover:: --skip services::credentials:: --skip services::diff_adjust:: --skip services::evaluations:: --skip services::events:: --skip services::fractals:: --skip services::guilds:: --skip services::r_events:: --skip services::staged_tx:: --skip services::subgroups:: --skip services::token_stream:: --skip services::token_swap:: --skip services::virtual_server:: --skip services::ws_auth::",
+      "passed": true,
+      "cpp_rust_service_schemas_passed": 28,
+      "excluded_pure_rust_services_missing_cpp_headers": [
+        {
+          "test": "services::auth_dyn::verify_schema",
+          "service": "auth-dyn"
+        },
+        {
+          "test": "services::auth_recover::verify_schema",
+          "service": "auth-rcovr"
+        },
+        {
+          "test": "services::credentials::verify_schema",
+          "service": "credential"
+        },
+        {
+          "test": "services::diff_adjust::verify_schema",
+          "service": "diff-adj"
+        },
+        {
+          "test": "services::evaluations::verify_schema",
+          "service": "evaluation"
+        },
+        {
+          "test": "services::events::verify_schema",
+          "service": "events"
+        },
+        {
+          "test": "services::fractals::verify_schema",
+          "service": "fractals"
+        },
+        {
+          "test": "services::guilds::verify_schema",
+          "service": "guilds"
+        },
+        {
+          "test": "services::r_events::verify_schema",
+          "service": "events+1"
+        },
+        {
+          "test": "services::staged_tx::verify_schema",
+          "service": "staged-tx"
+        },
+        {
+          "test": "services::subgroups::verify_schema",
+          "service": "subgroups"
+        },
+        {
+          "test": "services::token_stream::verify_schema",
+          "service": "tok-stream"
+        },
+        {
+          "test": "services::token_swap::verify_schema",
+          "service": "token-swap"
+        },
+        {
+          "test": "services::virtual_server::verify_schema",
+          "service": "vserver"
+        },
+        {
+          "test": "services::ws_auth::verify_schema",
+          "service": "wsauth"
+        }
+      ]
+    }
+  ],
+  "cpp_schema_matched_services": [
+    {
+      "test": "services::accounts::verify_schema",
+      "service": "accounts"
+    },
+    {
+      "test": "services::auth_any::verify_schema",
+      "service": "auth-any"
+    },
+    {
+      "test": "services::auth_delegate::verify_schema",
+      "service": "auth-delg"
+    },
+    {
+      "test": "services::auth_none::verify_schema",
+      "service": "auth-none"
+    },
+    {
+      "test": "services::auth_sig::verify_schema",
+      "service": "auth-sig"
+    },
+    {
+      "test": "services::brotli_svc::verify_schema",
+      "service": "brotli-svc"
+    },
+    {
+      "test": "services::chainmail::verify_schema",
+      "service": "chainmail"
+    },
+    {
+      "test": "services::common_api::verify_schema",
+      "service": "common-api"
+    },
+    {
+      "test": "services::cpu_limit::verify_schema",
+      "service": "cpu-limit"
+    },
+    {
+      "test": "services::db::verify_schema",
+      "service": "db"
+    },
+    {
+      "test": "services::dyn_ld::verify_schema",
+      "service": "dyn-ld"
+    },
+    {
+      "test": "services::http_server::verify_schema",
+      "service": "http"
+    },
+    {
+      "test": "services::invite::verify_schema",
+      "service": "invite"
+    },
+    {
+      "test": "services::nft::verify_schema",
+      "service": "nft"
+    },
+    {
+      "test": "services::packages::verify_schema",
+      "service": "packages"
+    },
+    {
+      "test": "services::producers::verify_schema",
+      "service": "producers"
+    },
+    {
+      "test": "services::setcode::verify_schema",
+      "service": "setcode"
+    },
+    {
+      "test": "services::sites::verify_schema",
+      "service": "sites"
+    },
+    {
+      "test": "services::symbol::verify_schema",
+      "service": "symbol"
+    },
+    {
+      "test": "services::tokens::verify_schema",
+      "service": "tokens"
+    },
+    {
+      "test": "services::transact::verify_schema",
+      "service": "transact"
+    },
+    {
+      "test": "services::verify_sig::verify_schema",
+      "service": "verify-sig"
+    },
+    {
+      "test": "services::x_admin::verify_schema",
+      "service": "x-admin"
+    },
+    {
+      "test": "services::x_db::verify_schema",
+      "service": "x-db"
+    },
+    {
+      "test": "services::x_http::verify_schema",
+      "service": "x-http"
+    },
+    {
+      "test": "services::x_keys::verify_schema",
+      "service": "x-keys"
+    },
+    {
+      "test": "services::x_packages::verify_schema",
+      "service": "x-packages"
+    },
+    {
+      "test": "services::x_sites::verify_schema",
+      "service": "x-sites"
+    }
+  ],
+  "shared_vector_probe": {
+    "executable": "rust/target/debug/examples/action_name_probe",
+    "passed": true,
+    "vectors_matched": 6719,
+    "invalid_names_rejected": 11,
+    "invalid_raw_ids_rejected": 3
+  },
+  "notes": [
+    "The 15 excluded schemas require freshly built Rust service packages for the normal PSIBASE_DATADIR check; no matching C++ header exists.",
+    "The initial unconfigured 43-schema run failed only because PSIBASE_DATADIR was absent.",
+    "The installed cargo-component requires an explicit component lock with --offline; the successful component check used local WIT paths without that flag."
+  ]
+}

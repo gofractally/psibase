@@ -235,11 +235,10 @@ namespace psio
       return get_type_name((const T*)nullptr);
    }
 
-   // TODO: rename. "hash_name" implies it's always a hash and
-   //       doesn't indicate which name format
+   // Reflected-name lookup shares the globally generated action-name codec.
    inline constexpr uint64_t hash_name(std::string_view str)
    {
-      return detail::method_to_number(str);
+      return action_names::encode(str);
    }
 
    inline constexpr bool is_compressed_name(uint64_t c)

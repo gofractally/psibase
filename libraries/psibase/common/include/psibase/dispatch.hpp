@@ -102,14 +102,14 @@ namespace psibase
 
       bool called = psio::get_member_function<Service>(
           act->method().value(),
-          [&](auto member, auto /*names*/)
+          [&](auto member, auto names)
           {
              using result_type = decltype(psio::result_of(member));
              using param_tuple = typename psio::make_param_value_tuple<decltype(member)>::type;
 
              auto param_data = std::span<const char>{act->rawData().data(), act->rawData().size()};
-             psibase::check(psio::fracpack_validate<param_tuple>(param_data),
-                            "invalid argument encoding for " + act->method().unpack().str());
+             if (!psio::fracpack_validate<param_tuple>(param_data))
+                abortMessage("invalid argument encoding for " + std::string{*names.begin()});
 
              psio::view<const param_tuple> param_view(
                  psio::prevalidated<std::span<const char>>{param_data});
@@ -130,7 +130,16 @@ namespace psibase
                  param_view);
           });  // reflect::get
       if (!called)
-         abortMessage("unknown service action: " + act->method().unpack().str());
+      {
+         // Dispatch compares generated u64 constants. Error formatting must not
+         // pull the statistical decoder into every service or run it per call.
+         constexpr char hex[] = "0123456789abcdef";
+         std::uint64_t value = act->method().value();
+         std::string message = "unknown service action: 0x";
+         for (int i = 15; i >= 0; --i)
+            message += hex[(value >> (i * 4)) & 15];
+         abortMessage(message);
+      }
       internal::sender = prevSender;
       // psio::member_proxy
    }  // dispatch

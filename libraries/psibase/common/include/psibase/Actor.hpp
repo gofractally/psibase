@@ -45,7 +45,7 @@ namespace psibase
 
          return psibase::Action{
              sender, receiver,
-             MethodNumber(*psio::reflect<member_class>::member_function_names[idx].begin()),
+             ActionName(psio::reflect<member_class>::member_function_numbers[idx]),
              psio::convert_to_frac(param_tuple(std::forward<Args>(args)...))};
       }
    };
@@ -110,7 +110,7 @@ namespace psibase
    {
       AccountNumber   sender;   ///< Account sending the action
       AccountNumber   service;  ///< Service to execute the action
-      MethodNumber    method;   ///< Service method to execute
+      ActionName    method;   ///< Service method to execute
       psio::nested<T> rawData;  ///< Data for the method
       PSIO_REFLECT(TypedAction, sender, service, method, rawData)
    };
@@ -125,7 +125,7 @@ namespace psibase
       template <typename... T, typename... U>
       auto packImpl(std::tuple<T...>*,
                     std::tuple<U...>*,
-                    MethodNumber method,
+                    ActionName method,
                     const std::conditional_t<psio::PackableAs<U, T>, U, T>&... args) const
       {
          using Args = std::tuple<decltype(args)...>;
@@ -153,7 +153,7 @@ namespace psibase
 
          return packImpl(
              (param_tuple*)nullptr, (std::tuple<std::remove_cvref_t<Args>...>*)nullptr,
-             MethodNumber(*psio::reflect<member_class>::member_function_names[idx].begin()),
+             ActionName(psio::reflect<member_class>::member_function_numbers[idx]),
              std::forward<Args>(args)...);
       }
    };
@@ -230,11 +230,12 @@ namespace psibase
          static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
                        "insufficient arguments passed to method");
 
-         auto type = MethodNumber{*psio::reflect<member_class>::member_function_names[idx].begin()};
+         auto type = ActionName{psio::reflect<member_class>::member_function_numbers[idx]};
+         static constexpr ActionName eventMethod{"event"};
          auto action = TypedAction{
              .sender  = sender,
              .service = AccountNumber{"events"},
-             .method  = MethodNumber{"event"},
+             .method  = eventMethod,
              .rawData =
                  psio::nested{std::tuple(event_log, type, psio::nested{param_tuple(args...)})},
          };

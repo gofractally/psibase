@@ -511,7 +511,19 @@ namespace psio
    constexpr bool get_member_function(std::uint64_t name, F&& f)
    {
       return get_member((typename reflect<T>::member_functions*)nullptr,
-                        reflect<T>::member_function_names, name, f);
+                        reflect<T>::member_function_names,
+                        reflect<T>::member_function_numbers, name, f);
+   }
+
+   template <auto... M, typename F>
+   constexpr bool get_member(MemberList<M...>*,
+                             const std::initializer_list<const char*>* names,
+                             const std::uint64_t* numbers,
+                             std::uint64_t name,
+                             F&& f)
+   {
+      std::size_t i = 0;
+      return (false || ... || (name == numbers[i++] && (f(M, names[i - 1]), true)));
    }
 
    template <auto... M, typename F>
@@ -530,7 +542,28 @@ namespace psio
    constexpr bool get_member_function_type(std::uint64_t name, F&& f)
    {
       return get_member_type((typename reflect<T>::member_functions*)nullptr,
-                             reflect<T>::member_function_names, name, f);
+                             reflect<T>::member_function_names,
+                             reflect<T>::member_function_numbers, name, f);
+   }
+
+   template <auto... M, typename F>
+   constexpr bool get_member_type(MemberList<M...>*,
+                                  const std::initializer_list<const char*>* names,
+                                  const std::uint64_t* numbers,
+                                  std::uint64_t name,
+                                  F&& f)
+   {
+      std::size_t i = 0;
+      return (false || ... || (name == numbers[i++] &&
+               (f(static_cast<decltype(M)>(nullptr), names[i - 1]), true)));
+   }
+
+   constexpr bool unique_name_ids(const std::uint64_t* ids, std::size_t count)
+   {
+      for (std::size_t i = 0; i < count; ++i)
+         for (std::size_t j = 0; j < i; ++j)
+            if (ids[i] == ids[j]) return false;
+      return true;
    }
 
 }  // namespace psio
@@ -710,6 +743,9 @@ namespace psio
 #define PSIO_REFLECT_MEMBER_FUNCTION_NAME(r, STRUCT, elem) \
    {BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), PSIO_GET_QUOTED_ARGS(elem)},
 
+#define PSIO_REFLECT_NAME_NUMBER(r, STRUCT, elem) \
+   psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))),
+
 #define PSIO_FOR_EACH_MEMBER(r, STRUCT, i, elem)                                               \
    {                                                                                           \
       (void)lambda(                                                                            \
@@ -829,6 +865,12 @@ namespace psio
           BOOST_PP_SEQ_FOR_EACH(PSIO_REFLECT_DATA_MEMBER_NAME,                                                    \
                                 ReflectedType,                                                                    \
                                 PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))};                                         \
+      static constexpr std::uint64_t data_member_name_numbers[] = {                                                \
+          BOOST_PP_SEQ_FOR_EACH(PSIO_REFLECT_NAME_NUMBER, ReflectedType,                                             \
+                                PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))};                                           \
+      static_assert(psio::unique_name_ids(data_member_name_numbers,                                                 \
+                    sizeof(data_member_name_numbers) / sizeof(std::uint64_t)),                                     \
+                    "Duplicate encoded reflected data-member name");                                             \
       using member_functions = psio::MemberList<BOOST_PP_IIF(                                                     \
           BOOST_PP_CHECK_EMPTY(PSIO_REFLECT_METHODS(__VA_ARGS__)),                                                \
           PSIO_EMPTY,                                                                                             \
@@ -839,6 +881,12 @@ namespace psio
           BOOST_PP_SEQ_FOR_EACH(PSIO_REFLECT_MEMBER_FUNCTION_NAME,                                                \
                                 ReflectedType,                                                                    \
                                 PSIO_REFLECT_METHODS(__VA_ARGS__))};                                              \
+      static constexpr std::uint64_t member_function_numbers[] = {                                                  \
+          BOOST_PP_SEQ_FOR_EACH(PSIO_REFLECT_NAME_NUMBER, ReflectedType,                                             \
+                                PSIO_REFLECT_METHODS(__VA_ARGS__))};                                                \
+      static_assert(psio::unique_name_ids(member_function_numbers,                                                  \
+                    sizeof(member_function_numbers) / sizeof(std::uint64_t)),                                      \
+                    "Duplicate encoded reflected method name");                                                  \
       static constexpr auto member_pointers()                                                                     \
       {                                                                                                           \
          return std::make_tuple(                                                                                  \

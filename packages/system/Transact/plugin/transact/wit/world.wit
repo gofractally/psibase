@@ -67,6 +67,11 @@ interface api {
     /// * `packed-args`: The arguments for the action, packed into fracpack format
     add-action-to-transaction: func(method-name: string, packed-args: list<u8>) -> result<_, error>;
 
+    /// Adds a generated numeric action ID without converting it to text in the
+    /// caller. The u64 is exact across the native/component boundary. The
+    /// receiver validates it and decodes once for sender-hook display.
+    add-action-id-to-transaction: func(method-id: u64, packed-args: list<u8>) -> result<_, error>;
+
     /// Append a `claim` to the current transaction. At finish-tx, the transact
     /// admin driver produces the matching proof by calling `host:crypto/keyvault.sign`
     /// with `claim.raw-data` (typically a DER-encoded public key); the host

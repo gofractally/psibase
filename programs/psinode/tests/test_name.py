@@ -27,23 +27,23 @@ class TestName(unittest.TestCase):
         self.assertEqual(name.account_to_number("spiderman+255"), 950660654012764416 + 255)
         self.assertEqual(name.number_to_account(950660654012764416 + 255), "spiderman+255")
     def test_method(self):
-        self.assertEqual(name.method_to_number(""), 0)
-        self.assertEqual(name.number_to_method(0), "")
-        self.assertEqual(name.method_to_number("a"), 32783)
-        self.assertEqual(name.number_to_method(32783), "a")
-        self.assertEqual(name.method_to_number("b"), 196)
-        self.assertEqual(name.number_to_method(196), "b")
-        self.assertEqual(name.method_to_number("c"), 32884)
-        self.assertEqual(name.number_to_method(32884), "c")
-        self.assertEqual(name.method_to_number("spiderman"), 311625498215)
-        self.assertEqual(name.number_to_method(311625498215), "spiderman")
-        self.assertEqual(name.method_to_number("anthonystark"), 50913722085663764)
-        self.assertEqual(name.number_to_method(50913722085663764), "anthonystark")
-        self.assertEqual(name.method_to_number("natasharomanoff"), 6905860632893337981)
-        self.assertEqual(name.method_to_number("#psaoryoiluhlrpyn"), 6905860632893337981)
-        self.assertEqual(name.number_to_method(6905860632893337981), "#psaoryoiluhlrpyn")
-        self.assertEqual(name.method_to_number("NATASHAROMANOFF"), 679355919866582572)
-        self.assertEqual(name.method_to_number("abcdefghijklmnopqrstuvwxyz"), 2393445670689189432)
+        import json
+        from pathlib import Path
+        root = Path(__file__).resolve().parents[3]
+        data = json.loads((root / "libraries/psibase/common/share/action-name-vectors.json").read_text())
+        for row in data["vectors"]:
+            with self.subTest(text=row["text"]):
+                number = name.method_to_number(row["text"])
+                self.assertEqual(number, int(row["value_u64"]))
+                self.assertEqual(name.number_to_method(number), row["decoded"])
+                self.assertEqual(name.method_to_number(row["decoded"]), number)
+        for invalid in data["invalid_names"]:
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(name.InvalidName):
+                    name.method_to_number(invalid)
+        for invalid in data["invalid_u64_decimal"]:
+            with self.assertRaises(name.InvalidName):
+                name.number_to_method(int(invalid))
 
 if __name__ == '__main__':
     unittest.main()
