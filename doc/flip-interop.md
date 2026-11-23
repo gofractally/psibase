@@ -7,17 +7,16 @@ the C++ file that defines it). The Rust side (`cargo-psibase`, the `psibase`
 CLI, Rust services and plugins) must produce and accept exactly the "after"
 column.
 
-Status of this file: sections 0, 0.1, 1, 2, 2.1 and 2.2 are
-**definitive**: keys flipped in section 1.18 and the binary wire in
-section 1.19 of `doc/pssz-conversion.md`; string kinds were applied in its
-section 1.20; schemas flipped in its section 1.21 (stage S2), which
-implements the `ServiceSchema` record of section 2. Everything
-schema-related in sections 3 and 4 is definitive too (each row says so);
-the rest of sections 3–6 states the intended formats and is still to be
-confirmed by the C++ stages: S4 (JSON) for sections 3, 4 and 5, S5 for
-section 6 (GraphQL). Line numbers in those
-sections are from the survey at `bc71f6bb0` and were read, not re-checked
-one by one.
+Status of this file: sections 0 to 5 are **definitive**: keys flipped in
+section 1.18 and the binary wire in section 1.19 of
+`doc/pssz-conversion.md`; string kinds were applied in its section 1.20;
+schemas flipped in its section 1.21 (stage S2), which implements the
+`ServiceSchema` record of section 2; JSON flipped in its section 1.22
+(stage S4): every JSON text C++ reads or writes outside GraphQL is PSIO's
+I-JSON, and sections 3, 4, 5 and 5.1 say what the code does. Section 6
+(GraphQL) states the intended format and is still to be confirmed by
+stage S5; until then a C++ GraphQL answer is written by the legacy
+library (64-bit integers always quoted, `DbId` a number).
 
 PSIO pin for both languages: `e12e4f6df7a2422f893d609848ab06194b75e082`
 (`cmake/PsibaseDependencies.cmake`; PSIO `main`, its C++ identical to
@@ -347,8 +346,10 @@ any appended optional member.
 `psibase::DbId` (`libraries/psibase/common/include/psibase/db.hpp`,
 `enum class DbId : uint32_t`; C++ is the authority) is its `u32` in PSSZ
 and in a key, unchanged. In JSON it becomes its **name** in both languages
-(PSIO's enum rule: the name is written, the name or the number is read);
-C++ wrote the number until the JSON flip. The named values, C++ spelling
+(PSIO's enum rule: the name is written, the name or the number is read).
+**Done in C++ (S4):** `PSIO_REFLECT_ENUM(DbId, …)` with exactly the eleven
+names below; pinned in `libraries/psibase/common/tests/json.cpp` ("DbId is
+its name; its bytes are a u32"). The named values, C++ spelling
 (Rust's identifiers differ by case convention only):
 
 | Value | C++ name | Rust |
@@ -410,37 +411,103 @@ Container and layout do not change.
 | Artifact | Path | Producer | Consumers | Format (today = after unless said) |
 |---|---|---|---|---|
 | Package archive | `<build>/share/psibase/packages/<Name>.psi` | `pack_service.cmake` `psibase_package`; Rust `cargo-psibase/src/package.rs`; `rust/reserved-names` | C++ `libraries/psibase/common/src/package.cpp` `PackagedService` (tester, `psinode` init / precompile); Rust `rust/psibase/src/package.rs` | zip: `meta.json`, `service/<acct>.wasm`, `service/<acct>.json`, `data/<acct>/<path>`, `script/postinstall.json`; sub-account `a+1` is `service/a/1.*` |
-| `meta.json` | in zip | `pack_service.cmake` `write_meta`; cargo-psibase; reserved-names | C++ `package.cpp` → `PackageMeta` (`Packages.hpp`); Rust `Meta`; `make_package_index.sh` (text) | JSON `{name, version, scope, description, depends:[{name,version}], accounts, services, exports:[{name,service}]}`. **Every member must be present** in both languages: C++ reads it with PSIO's JSON reader and Rust's `package::Meta` requires every member too |
+| `meta.json` | in zip | `pack_service.cmake` `write_meta`; cargo-psibase; reserved-names | C++ `package.cpp` → `PackageMeta` (`Packages.hpp`); Rust `Meta`; `make_package_index.sh` (text) | **Done (S4), definitive.** I-JSON `{name, version, scope, description, depends:[{name,version}], accounts, services, exports:[{name,service}]}`. **Every member must be present**: C++ reads it with `psio::decode_json_checked` (a package whose `meta.json` leaves one out does not load: `meta.json: json: missing required member "services" of PackageMeta`); unknown members are skipped; account names are strict. `write_meta` writes all eight (an empty list as `[]`): no change was needed. The Python test fixture (`programs/psinode/tests/test_psibase.py`) gained `'services': []` |
 | Service info | `service/<acct>.json` | `generate_service_info.cmake`; cargo-psibase | C++ `package.cpp` → `ServiceInfo` (`psibase/package.hpp`); Rust `ServiceInfo` | JSON `{flags:[string], server?: account, schema?: ServiceSchema}`; flags `isPrivileged`, `isVerify`, `isReplacement`. **Done (S2):** `schema` is the I-JSON of section 2; C++ reads the whole file with `psio::from_ijson`-rules (`flags` required; `server` and `schema` may be absent or `null`; unknown members skipped). A file holding a legacy schema is refused: the package does not load |
 | Postinstall script | `script/postinstall.json` | `pack_service.cmake` (generated for `INIT` services, or a hand-written file); cargo-psibase | C++ `package.cpp` (`readPostinstall`, `psibase::toAction`); Rust `package.rs` | **Done (S2), definitive.** I-JSON array of `{sender, service, method, rawData?: hex, data?: JSON}` — the `Action` presentation of section 2.2 (`sender`, `service`, `method` are strings and required; `method` exactly as declared). `data` is packed to PSSZ with the schema of `service`, looked up among the packages being installed: `pssz_ir::json_to_pssz(schema.types, actions[name].params, psio::ijson{}, data, …)` with `action_types`, so `data` is an object keyed by parameter name or the positional array (an action whose parameters are unnamed takes the array only), a missing optional argument is absent, a missing required one is an error, and an `Action` nested anywhere in the arguments is again `{sender, service, method, data \| rawData}` packed with the schema of *its* service. A top-level entry with neither `data` nor `rawData` has the arguments `{}`; a nested action must have one of them. `rawData` (hex of PSSZ) is used as it is. The CMake-generated script of an `INIT` service is `[{"sender":"<svc>","service":"<svc>","method":"init","data":{}}]` (no `rawData`: format-neutral). The accounts a script needs are collected by packing it (`onAction`) |
-| Package index | `<dir>/index.json` | `make_package_index.sh`; Rust registries | C++ `package.cpp` `DirectoryRegistry` → `PackageInfo`; Rust registries | JSON array of `meta.json` objects plus `file`, `sha256` (every hash changes) |
-| Install manifest | argument of `Packages::postinstall`; `GET packages/manifest?package=&owner=` | C++ `package.cpp` `manifest`; Rust `package.rs` | `RPackages.cpp`; Rust CLI; Packages plugin; XAdmin UI | gzip of JSON `{"services":{<acct>:ServiceInfo},"data":[{account, filename}]}`. **Done (S2):** each `ServiceInfo.schema` is the I-JSON of section 2 (the rest of the document is still written by the legacy JSON writer until S4; same text) |
-| Local package registration | `POST x-packages/postinstall` (`/preinstall`, `/prerm`, `/postrm`) | `programs/psinode/init.cpp`; C++ tester; `psibase install --local` | `packages/local/XPackages/src/XPackages.cpp` | JSON `LocalPackage`, every member present: the Rust CLI sends `exports` from the flip on (it does not today) |
+| Package index | `<dir>/index.json` | `make_package_index.sh`; Rust registries | C++ `package.cpp` `DirectoryRegistry` → `PackageInfo`; Rust registries | **Done (S4).** I-JSON array of `meta.json` objects plus `file`, `sha256` (hex, either case); every member of each entry required (`<dir>/index.json: json: missing required member …`) |
+| Install manifest | argument of `Packages::postinstall`; `GET packages/manifest?package=&owner=` | C++ `package.cpp` `manifest`; Rust `package.rs` | `RPackages.cpp`; Rust CLI; Packages plugin; XAdmin UI | gzip of JSON `{"services":{<acct>:ServiceInfo},"data":[{account, filename}]}`. **Done (S2):** each `ServiceInfo.schema` is the I-JSON of section 2. **Done (S4):** the whole document is written with PSIO (`{"services":{"<acct>":{"flags":[…],"server":<acct>\|null,"schema":<schema>\|null}},"data":[{"account":"<acct>","filename":"/path"}]}`), same text as before |
+| Local package registration | `POST x-packages/postinstall` (`/preinstall`, `/prerm`, `/postrm`) | `programs/psinode/init.cpp`; C++ tester; `psibase install --local` | `packages/local/XPackages/src/XPackages.cpp` | **Done (S4).** I-JSON `LocalPackage {name, version, description, depends, accounts, services, exports, sha256}`, **every member required** (unknown members such as `scope`, `file` are skipped): the Rust CLI must send `exports` (`rust/psibase/src/main.rs` `LocalPackage` has no such member today; the request is answered with `json: missing required member "exports" of LocalPackage` until it does). `POST x-http/register_server` is `{service, server}`, both required |
 
 ## 4. HTTP endpoints that pack
 
 | Endpoint | Producer | Consumers | Today | After |
 |---|---|---|---|---|
-| `POST <service>/pack_action/<method>` | C++ `psibase/servePackAction.hpp`; Rust `rust/psibase/src/serve_http.rs` | `common-lib/src/rpc.ts` `packAction`, `SimpleUI.mjs` | JSON object in; fracpack of the argument tuple out | JSON in (object keyed by parameter name, or positional array; a missing required argument is an error, an unknown one is skipped); PSSZ of `method_arg_tuple` out. Not touched by S2 (typed, no schema involved; its JSON reader is still the legacy one until S4). One consequence of S2: `packages/pack_action/setSchema` cannot read its `schema` argument through the legacy reader and aborts with a message; it works after S4 |
-| `GET <service>/action_templates` | C++ `psibase/serveActionTemplates.hpp`; Rust `action_template.rs` | `SimpleUI.mjs` | JSON `{<method>: {<param>: <sample>}}` | same JSON |
-| `POST /common/pack/Transaction`, `/common/pack/SignedTransaction` | `packages/user/CommonApi/src/CommonApi.cpp` | `rpc.ts` (`packTransaction`, `packSignedTransaction`, `packAndDigestTransaction`, `signTransaction`) | JSON → fracpack | I-JSON → PSSZ; digests and signatures are over the PSSZ `Transaction`. `Tapos.flags` is omitted by today's clients (`SimpleUI.mjs`); under I-JSON the client must send it |
+| `POST <service>/pack_action/<method>` | C++ `psibase/servePackAction.hpp`; Rust `rust/psibase/src/serve_http.rs` | `common-lib/src/rpc.ts` `packAction`, `SimpleUI.mjs` | JSON object in; fracpack of the argument tuple out | **Done (S4), definitive.** I-JSON in, read as `psio::reflect<Service>::method_arg_tuple<I>` with `psio::decode_json_checked`: an object keyed by parameter name (any order; an unknown member is skipped; a missing `std::optional` argument is absent; **any other missing argument is an error**) or the positional array with exactly one element per parameter (the array only, when the reflection does not name the parameters); a method without parameters takes `{}` or `[]`. PSSZ of the argument list out. A body that is not such a text aborts the request with `action '<method>': <reader's message>`, e.g. `action 'transfer': json: missing required member "memo"`. (Any other body a C++ service reads with `psio::from_ijson` aborts with `ijson: <reader's message> (at byte N)`.) Before, a missing argument was silently its default and an unknown one aborted |
+| `GET <service>/action_templates` | C++ `psibase/serveActionTemplates.hpp`; Rust `action_template.rs` | `SimpleUI.mjs` | JSON `{<method>: {<param>: <sample>}}` | **Done (S4).** `{<method>: <I-JSON of a value-initialized argument list>}`: `{<param>: <sample>}`; for a method whose parameters the reflection does not name the positional array (`"unnamed":[0,0]`; was an object with the key `error_missing_arg_name` repeated); `null` if such a value has no text. Samples follow I-JSON: an empty account is `""`, a `DbId` is `"service"`, a time point is `"1970-01-01T00:00:00Z"` |
+| `POST /common/pack/Transaction`, `/common/pack/SignedTransaction` | `packages/user/CommonApi/src/CommonApi.cpp` | `rpc.ts` (`packTransaction`, `packSignedTransaction`, `packAndDigestTransaction`, `signTransaction`) | JSON → fracpack | **Done (S4), definitive.** I-JSON → PSSZ (`psio::from_ijson<Transaction>` / `<SignedTransaction>`, then `psio::to_pssz`); digests and signatures are over the PSSZ `Transaction`. `Transaction` is `{"tapos":{"expiration":"2023-11-14T22:13:20Z","refBlockSuffix":16909060,"flags":0,"refBlockIndex":7},"actions":[{"sender","service","method","rawData":"<hex>"}],"claims":[{"service","rawData":"<hex>"}]}`: **all four members of `tapos` are required** (`Tapos` is a fixed record; `SimpleUI.mjs` now sends `flags: 0`) and `expiration` is in **whole seconds** (a fraction of zeros is accepted, `…20.000Z`; milliseconds that are not zero are refused — `SimpleUI.mjs` rounds). **`SignedTransaction` is `{"transaction": <the Transaction object>, "proofs": ["<hex>"…], "subjectiveData"?: ["<hex>"…] \| null}`**: `transaction` is the inner object, **not the hex of the packed transaction** that the legacy JSON held (a hex string there is refused). The packed result holds the canonical PSSZ of that object, which is what `/common/pack/Transaction` returns for the same object, so a signature over the digest of the latter verifies. `common-lib/src/rpc.ts` was changed accordingly (`signTransaction` returns `{transaction: <object with packed actions and claims>, proofs}`; `packSignedTransaction` posts the object). Pinned in `libraries/psibase/common/tests/json.cpp` ("a signed transaction holds its transaction as an object") |
 
 ## 5. JSON conventions (I-JSON, `psio::to_ijson` / `psio::from_ijson`)
 
-Observed at the pin:
+**Definitive (S4).** Every JSON text C++ writes or reads outside GraphQL —
+HTTP request and reply bodies of services and of psinode, package files,
+configuration, traces, test fixtures — is PSIO's I-JSON
+(`external/psio/docs/json.md`); psibase adds only the text forms listed
+under "types with a text form" and the reflected enums. What a reader or
+writer on the other side must do:
 
-* 64-bit integers: bare when |n| ≤ 2^53 − 1, a decimal string beyond; readers accept both for 64-bit; a quoted number for a 32-bit (or smaller) integer is **rejected**;
-* bytes (`std::vector<char>`, `std::vector<uint8_t>`, `std::array<uint8_t, N>`): upper-case hex written, either case read;
-* `std::optional`: `null` or the value; a missing optional member reads as empty;
-* a missing required member is an error; unknown members are skipped; a repeated key: last wins;
-* variants: `{"AlternativeTypeName": value}`;
-* an unreflected enum is its number; a `PSIO_REFLECT_ENUM` enum is its name (reads the name or the number);
-* `std::map<std::string, T>`: an object; other maps: an array of `[key, value]`;
-* tuples and pairs: arrays;
-* time points: RFC 3339 UTC with exactly the unit's fraction digits (`"2026-11-22T10:15:30Z"`, `"…30.123456Z"`); durations: the tick count;
-* `psio::nested<T>`: the inner value's own JSON (legacy `shared_view_ptr<T>` was hex) — this changes the JSON of `SignedTransaction.transaction`;
-* types with a text form (`AccountNumber`, `MethodNumber`, `Decimal`, …): one string; `AccountNumber` text is strict;
-* NaN and infinities have no text.
+* **64-bit integers** (`u64`, `i64`, durations): written **bare when
+  |n| ≤ 2^53 − 1, as a decimal string beyond**. The form depends on the
+  value, so a reader must accept both for every 64-bit member. C++ reads a
+  bare number in that range or a string of any in-range value, and rejects
+  a larger bare number. Members that used to be quoted always and are now
+  bare for ordinary values include `TransactionTrace.totalTime` and every
+  `ActionTrace.totalTime`, `authSequence`, `TxStatsRecord` counters,
+  psinode's `/native/admin/perf` numbers, `service_threads` and
+  `http_timeout` of the node configuration, event row ids in SQL results.
+  Rust reads bare or quoted.
+* **Narrower integers** (8, 16, 32 bits), `bool`, floats: numbers. **A
+  quoted number is rejected** for them (the legacy reader took `"5"` for a
+  `u32`).
+* 128- and 256-bit integers: always a decimal string.
+* bytes (`std::vector<char>`, `std::vector<uint8_t>`, `std::array<uint8_t, N>`, digests): upper-case hex written, either case read; exactly 2N digits for a fixed-size array.
+* `std::optional`: `null` or the value; **a missing optional member reads as empty**; it is written as `null`, never left out.
+* **A missing required member is an error** (`json: missing required member "x" of Record`); unknown members are skipped; a repeated key: last wins.
+* variants: `{"AlternativeTypeName": value}` (`{"CftConsensus": …}`), exactly one member.
+* enums: an unreflected enum is its number (`HttpStatus`: `404`; `RunMode`, `NotifyType`, `LogMessage::Severity`). A `PSIO_REFLECT_ENUM` enum is its **name** and reads the name, the number or the number as a string: `DbId` (section 2.1) and `NewAccountMode` (`"keepExisting"`, `"matchExisting"`, `"requireNew"`; any other number is refused, `mode out of range`, in JSON and in PSSZ).
+* `std::map<std::string, T>`: an object; other maps: an array of `[key, value]`.
+* tuples and pairs: arrays. **Action arguments**: an object keyed by parameter name, or the positional array (section 4).
+* time points: RFC 3339 UTC with exactly the unit's fraction digits (`"2026-11-22T10:15:30Z"`, `"…30.123456Z"`); read with `Z` or a numeric offset and extra zero fraction digits; a finer non-zero fraction, a missing offset and a number are refused. Durations: the tick count (a 64-bit integer).
+* a packed member — `psio::shared_pssz<T>`, `psio::nested<T>`, `psio::pssz_buffer<T>` — is **the inner value's own JSON** (the legacy library wrote hex): `SignedTransaction.transaction` (section 4), `SignedMessage.data`, `BlockMessage.block`, `TypedAction.rawData`.
+* any JSON (`psio::json_value`): passed through with numbers as they were written and members in their order (`PrettyAction.data`, the `host` / `service` parts of the node configuration as `x-admin` sees them, logger options).
+* NaN and infinities have no text: writing one is an error.
+* strings must be UTF-8 and, under I-JSON, hold no Unicode noncharacter; a value that is not has no JSON text.
+
+**Types with a text form** (one JSON string; the shape's own JSON is then
+refused):
+
+| Type | Text | Refused |
+|---|---|---|
+| `AccountNumber` | the name, `"alice"`; `""` is the null account | any text that is not the canonical name of an account (upper case, characters outside the alphabet, more than 10 characters, a non-canonical subaccount): `AccountNumber: not an account name` |
+| `MethodNumber` | the declared name or the `#…` hash form | text that names no method |
+| time points, `Decimal`, `Precision`, `Memo` | as before the flip (`docs/time.md`; sections 1.2, 1.13 of `doc/pssz-conversion.md`) | |
+| `IPAddress` (`psibase/SocketInfo.hpp`) | `"127.0.0.1"`, `"::1"` (what `to_string` writes and `parseIPAddress` reads) | anything else, an endpoint included: `IPAddress: not an IP address` |
+| `SocketEndpoint` | `"127.0.0.1:8080"`, `"[::1]:8080"`; any other text is the path of a local socket (`"/run/psinode.sock"`) | no string is refused; a value that is not a string is |
+| `SubjectPublicKeyInfo` (`services/system/Spki.hpp`) | the PEM armor of the DER bytes: `-----BEGIN PUBLIC KEY-----\n`, base64 in lines of 64 characters, `-----END PUBLIC KEY-----\n`. White space around the armor and inside the body is ignored on input | text that is not that armor around valid base64 (`SubjectPublicKeyInfo: not a PEM encoded public key`), and armor whose bytes are not DER `SEQUENCE { SEQUENCE { OBJECT IDENTIFIER … }, BIT STRING }` with lengths that fit exactly (`SubjectPublicKeyInfo: the PEM content is not a SubjectPublicKeyInfo`). The algorithm and the key material are **not** examined when JSON is read; `AuthSig::setKey` / `newAccount` check them |
+
+In a schema each of these is a `Custom` node with the id in the first
+column (`IPAddress`, `SocketEndpoint` and `SubjectPublicKeyInfo` are new
+ids: a schema-driven reader without a handler presents the wire type — the
+variant, the hex of the DER bytes).
+
+### 5.1 Members a client may leave out
+
+Request and configuration records that C++ reads from JSON, with the
+members that are `std::optional` because real senders omit them (each
+reads as its default):
+
+| Record (endpoint) | Optional members | Default |
+|---|---|---|
+| `ShutdownRequest` (`POST x-admin/shutdown`) | `restart`, `force`, `soft` | `false` |
+| `NewKeyRequest` (`POST x-admin/native/admin/keys`) | `rawData`, `device` | generate a key; a key file |
+| `UnlockKeyringRequest` (`POST x-admin/native/admin/keys/unlock`) | `pin` | the empty PIN |
+| node configuration, `service` part (`HostConfigRow.config` = `{"host":{…},"service":{"argv"?,"config"}}`) | `service.argv`; for `x-admin` also `service` itself | no arguments |
+| node configuration, `host` part | `http_timeout` (`null` or absent: no timeout; else microseconds) | |
+| logger configuration (`host.loggers.<name>`) | everything but `type`; `rotationSize`, `maxSize`, `maxFiles` are numbers or decimal strings | |
+| `LogReaderConfig` (the `/native/admin/log` websocket) | `filter`, `format` | |
+| `OriginServerRow` (`POST x-proxy/set_origin_server`) | `tls`, `endpoint`, `bypassPrefixes` (already optional) | |
+| `AuthorizationRequest` (`POST x-peers/authorization`) | `token` (already optional) | |
+| `ServiceInfo` (`service/<acct>.json`) | `server`, `schema` | |
+| `SignedTransaction` | `subjectiveData` | |
+
+Everything else is required, in particular: every member of `Tapos`,
+`Transaction`, `Action`, `Claim`; `LocalPackage.exports`; `meta.json`
+(all eight); `AdminAccountOp {account, admin}`; `UserRequest {account,
+accept}`; `ConnectRequest {url}`; `DisconnectRequest {id}`;
+`RegisteredServiceRow {service, server}`; `CookieData {name, value, maxAge,
+httpOnly}`; `LockKeyringRequest {device}`; `TLSConfig {certificate, key,
+trustfiles}` and the other members of the node configuration's `host`
+part (`producer`, `pkcs11_modules`, `listen`, `service_threads`,
+`loggers`, and `tls` when the node is built with TLS).
 
 ## 6. GraphQL (C++ services after S5; names observed with PSIO's engine)
 
