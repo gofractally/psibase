@@ -332,3 +332,5 @@ State: `claude/pssz` contains `bytemaster/head` 7fe3cda05; suite baseline is **8
 | 13.13 | Explorer raises the GraphQL complexity limit to 1,000,000 to work at all (PSIO G53 double-counts page size). | OPEN (PSIO) |
 | 13.14 | Shutdown: tests and scripts must use `-TERM`; `kill -INT` did not stop the node cleanly in the end-to-end check. | OPEN — confirm intended |
 | 13.15 | Not exercised by anyone: front ends and plugins in a browser, snapshot tools at run time, `demo/`, LLVM AOT backend with this tree, Linux x86-64, hidden `TransferBench` cases. | OPEN — test coverage |
+
+**Issues filed for the open rows above (2026-11-23):** gofractally/psibase #2233 (r-transact memory over HTTP — 13.1), #2234 (names and pages still called fracpack — 13.5–13.7, 13.11), #2235 (call results and `returns(...)` — 13.2–13.3), #2236 (paths not exercised; `psibase boot` returning early — 13.9, 13.15); gofractally/psio #1 (method results in the schema), #2 (variant labels — 13.4), #3 (strict validation and trusted views in Rust/JS/Python), #4 (Schema IR canonical form). Close them from the fixing commit.
