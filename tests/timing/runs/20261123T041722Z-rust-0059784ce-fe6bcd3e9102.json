@@ -1,0 +1,196 @@
+{
+ "schema": 1,
+ "suite": "rust",
+ "label": "Mac; default build (WASMTIME); psizam 2e93ecd; integration candidate plus canonical signatures; rustc 1.100",
+ "recorded": "2026-11-23T04:17:22Z",
+ "source": {
+  "commit": "0059784ce23d8b27e5c5be1753f94d4ad631156d",
+  "branch": "claude/integration-canonical",
+  "dirty": false,
+  "psitri": "a7c6660de883c6190135e213e2206d006286a7ee"
+ },
+ "system": {
+  "os": "Darwin",
+  "os_release": "25.3.0",
+  "machine": "arm64",
+  "os_version": "26.3.1",
+  "cpu": "Apple M5 Max",
+  "model": "Mac17,6",
+  "logical_cpus": 18,
+  "performance_cores": 6,
+  "memory_bytes": 137438953472,
+  "fingerprint": "fe6bcd3e9102",
+  "test_filesystem": {
+   "type": "APFS",
+   "solid_state": "Yes",
+   "protocol": "Apple Fabric"
+  }
+ },
+ "build": {
+  "type": "Release",
+  "compiler": "Homebrew clang version 22.1.2",
+  "flags": "",
+  "generator": "Ninja"
+ },
+ "ctest_arguments": [
+  "-R",
+  "^rs-",
+  "-j",
+  "4",
+  "--timeout",
+  "1800"
+ ],
+ "wall_seconds": 309.67,
+ "summary": {
+  "tests": 29,
+  "passed": 29,
+  "test_seconds": 1128.929
+ },
+ "tests": [
+  {
+   "name": "rs-subjective-test",
+   "status": "passed",
+   "seconds": 13.8597
+  },
+  {
+   "name": "rs-test-AuthDyn",
+   "status": "passed",
+   "seconds": 36.1912
+  },
+  {
+   "name": "rs-test-AuthRecover",
+   "status": "passed",
+   "seconds": 33.0597
+  },
+  {
+   "name": "rs-test-Branding",
+   "status": "passed",
+   "seconds": 51.8929
+  },
+  {
+   "name": "rs-test-BrotliSvc",
+   "status": "passed",
+   "seconds": 40.6537
+  },
+  {
+   "name": "rs-test-Chainmail",
+   "status": "passed",
+   "seconds": 41.0508
+  },
+  {
+   "name": "rs-test-Credentials",
+   "status": "passed",
+   "seconds": 22.6193
+  },
+  {
+   "name": "rs-test-DiffAdjust",
+   "status": "passed",
+   "seconds": 51.8795
+  },
+  {
+   "name": "rs-test-Evaluations",
+   "status": "passed",
+   "seconds": 47.6726
+  },
+  {
+   "name": "rs-test-FaucetTok",
+   "status": "passed",
+   "seconds": 51.5584
+  },
+  {
+   "name": "rs-test-Fractals",
+   "status": "passed",
+   "seconds": 60.258
+  },
+  {
+   "name": "rs-test-Guilds",
+   "status": "passed",
+   "seconds": 27.5698
+  },
+  {
+   "name": "rs-test-Identity",
+   "status": "passed",
+   "seconds": 35.4898
+  },
+  {
+   "name": "rs-test-NameMarket",
+   "status": "passed",
+   "seconds": 26.872
+  },
+  {
+   "name": "rs-test-Profiles",
+   "status": "passed",
+   "seconds": 59.4318
+  },
+  {
+   "name": "rs-test-Registry",
+   "status": "passed",
+   "seconds": 60.3521
+  },
+  {
+   "name": "rs-test-StagedTx",
+   "status": "passed",
+   "seconds": 33.6426
+  },
+  {
+   "name": "rs-test-Subgroups",
+   "status": "passed",
+   "seconds": 45.845
+  },
+  {
+   "name": "rs-test-TokenStream",
+   "status": "passed",
+   "seconds": 42.8048
+  },
+  {
+   "name": "rs-test-TokenSwap",
+   "status": "passed",
+   "seconds": 61.7312
+  },
+  {
+   "name": "rs-test-Tokens",
+   "status": "passed",
+   "seconds": 64.0837
+  },
+  {
+   "name": "rs-test-VirtualServer",
+   "status": "passed",
+   "seconds": 39.5918
+  },
+  {
+   "name": "rs-test-WsAuth",
+   "status": "passed",
+   "seconds": 26.8586
+  },
+  {
+   "name": "rs-test-contract",
+   "status": "passed",
+   "seconds": 16.5278
+  },
+  {
+   "name": "rs-test-contract-2",
+   "status": "passed",
+   "seconds": 54.5913
+  },
+  {
+   "name": "rs-test-package",
+   "status": "passed",
+   "seconds": 13.5279
+  },
+  {
+   "name": "rs-test-panic",
+   "status": "passed",
+   "seconds": 14.8923
+  },
+  {
+   "name": "rs-test-psibase-macros",
+   "status": "passed",
+   "seconds": 25.3678
+  },
+  {
+   "name": "rs-tests",
+   "status": "passed",
+   "seconds": 29.0527
+  }
+ ]
+}
