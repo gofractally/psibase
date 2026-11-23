@@ -4491,41 +4491,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_fracpack"
-version = "0.29.0"
-dependencies = [
- "cxx",
- "cxx-build",
- "fracpack",
- "hex 0.3.2",
- "indexmap 2.2.6",
- "psibase",
- "psibase-rust-workspace-hack",
- "psibase_macros",
- "serde",
- "serde-aux",
- "serde_json",
- "test_fracpack_macros",
-]
-
-[[package]]
-name = "test_fracpack_macros"
-version = "0.29.0"
-dependencies = [
- "anyhow",
- "fracpack",
- "hex 0.3.2",
- "proc-macro-error",
- "proc-macro2",
- "psibase-rust-workspace-hack",
- "quote",
- "regex",
- "serde",
- "serde_json",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "test_package"
 version = "0.29.0"
 dependencies = [

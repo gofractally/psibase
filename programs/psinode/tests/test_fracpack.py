@@ -142,7 +142,7 @@ class TestFracpack(unittest.TestCase):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     here = pathlib.Path(__file__).parent
-    test_data = (here / '../../../libraries/psio1/tests/fracpack-tests.json').resolve()
+    test_data = here / 'fracpack-tests.json'
     parser.add_argument("--test-data", default=test_data, help="A JSON file containing tests to run")
     global args
     (args, remaining) = parser.parse_known_args(sys.argv)

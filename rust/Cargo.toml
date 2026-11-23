@@ -15,8 +15,6 @@ members = [
     "rust-workspace-hack",
     "test_contract",
     "test_contract_2",
-    "test_fracpack",
-    "test_fracpack_macros",
     "test_package/admin",
     "test_package/plugin",
     "test_package/query",
@@ -36,8 +34,6 @@ default-members = [
     "psibase",
     "psibase_plugin",
     "reserved-names",
-    "test_fracpack",
-    "test_fracpack_macros",
 ]
 
 [workspace.package]

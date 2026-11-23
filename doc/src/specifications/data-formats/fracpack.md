@@ -177,4 +177,4 @@ An serialized object of type `T` may be deserialized as type `U` if any of the f
 
 # Reference implementation
 
-A reference implementation can be found [here](https://github.com/gofractally/psibase/blob/main/libraries/psio1/include/psio1/fracpack.hpp).
+The reference implementation of fracpack (the legacy in-tree serialization library) is deleted: psibase packs with PSSZ, which is specified in PSIO's `docs/pssz-spec.md`. This page describes the legacy format.

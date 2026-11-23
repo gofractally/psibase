@@ -57,7 +57,6 @@ if(DEFINED IS_WASM)
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/psio/external COMPONENT libpsibase)
 endif()
 
-add_subdirectory(psio1)
 add_subdirectory(psibase)
 
 if(DEFINED IS_NATIVE)

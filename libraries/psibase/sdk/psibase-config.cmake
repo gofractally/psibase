@@ -41,17 +41,6 @@ function(add_libs suffix)
         set(lib-suffix $<$<CONFIG:Debug>:-debug>)
     endif()
 
-    add_library(psio1${suffix} INTERFACE)
-    target_include_directories(psio1${suffix} INTERFACE ${root}/include)
-    target_link_libraries(psio1${suffix} INTERFACE
-        -L${root}/lib
-        -lpsio1
-        psio::psio
-        boost
-        wasm-base${suffix}
-    )
-    target_compile_features(psio1${suffix} INTERFACE cxx_std_23)
-
     add_library(psibase${suffix} INTERFACE)
     target_include_directories(psibase${suffix} INTERFACE ${root}/include)
     target_link_libraries(psibase${suffix} INTERFACE
@@ -60,7 +49,6 @@ function(add_libs suffix)
         -lpsibase${lib-suffix}
         -lcrypto
         psio::psio
-        psio1${suffix}
         boost
     )
 

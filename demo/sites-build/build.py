@@ -18,7 +18,7 @@ HEADERS = ROOT / 'libraries/psibase/common/src/HttpHeaders.cpp'
 includes = [ROOT / 'packages/user/Sites/include']
 includes += [p for p in sorted((ROOT / 'packages').glob('**/include')) if 'target' not in p.parts]
 includes += [ROOT / 'libraries/psibase/common/include', ROOT / 'libraries/psibase/wasm32-psibase',
-             ROOT / 'libraries/psio1/include', ROOT / 'external/psio/cpp/include', REL / 'include', REL / 'include/wasm32-psibase']
+             ROOT / 'external/psio/cpp/include', REL / 'include', REL / 'include/wasm32-psibase']
 flags = ['--target=wasm32-wasip1', '-std=c++23', '-O2', '-fno-exceptions',
          '-DCOMPILING_SERVICE', '-DCOMPILING_WASM', '-DPSIO_EXCEPTIONS_ENABLED=0', '-DPSIO_HAVE_SIMDJSON=0', '-mthread-model', 'single',
          '-msign-ext', '-mnontrapping-fptoint', '-msimd128', '-mbulk-memory']
@@ -31,7 +31,7 @@ subprocess.run([str(SDK / 'bin/llvm-ar'), 'd', str(archive), 'Rpc.cpp.obj', 'Htt
 builtins = next((SDK / 'lib/clang').glob('*/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a'))
 service = ['-Wl,--stack-first', '-Wl,--entry,start', '-Wl,--export=called',
            '-Wl,-z,stack-size=8192', '-Wl,--no-merge-data-segments', '-nostdlib',
-           '-Wl,--strip-all', '-lpsibase-service-base', str(archive), '-lpsio1',
+           '-Wl,--strip-all', '-lpsibase-service-base', str(archive),
            '-lcrypto', '-lz', '-lc++', '-lc++abi-replacements', '-lc-simple-malloc', '-lc',
            '-lpsibase-service-wasi-polyfill', str(builtins)]
 cmd = [str(CLANG), *flags, str(SOURCE), str(RPC), str(HEADERS), '-L', str(lib), *service, '-o', str(OUT / 'Sites.wasm')]
@@ -40,7 +40,7 @@ subprocess.run(cmd, check=True)
 test_flags = [flag for flag in flags if flag != '-DCOMPILING_SERVICE']
 schema = [str(CLANG), *test_flags, '-DCOMPILING_TESTS', '-DPSIBASE_GENERATE_SCHEMA',
           str(SOURCE), str(RPC), str(HEADERS), '-L', str(lib), '-Wl,--entry,_start', '-nostdlib', '-Wl,--strip-all',
-          str(archive), '-lcrypto', '-lpsio1', '-lz', '-lc++', '-lc++abi', '-lc', '-lpsitestlib',
+          str(archive), '-lcrypto', '-lz', '-lc++', '-lc++abi', '-lc', '-lpsitestlib',
           '-lSpki', '-lPrivateKeyInfo', str(builtins),
           str(SDK / 'share/wasi-sysroot/lib/wasm32-wasip1/crt1.o'), '-o', str(OUT / 'Sites-schema-gen.wasm')]
 subprocess.run(schema, check=True)
