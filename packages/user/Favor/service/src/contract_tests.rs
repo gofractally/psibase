@@ -1240,6 +1240,8 @@ fn signed_transactions_require_the_senders_key_and_valid_signature() {
         }];
         let bytes = tx.packed();
         let sig: Signature = signer.sign(&bytes);
+        // verify-sig only accepts the low-S form.
+        let sig = sig.normalize_s().unwrap_or(sig);
         signed.transaction = bytes.into();
         signed.proofs = vec![sig.to_bytes().to_vec().into()];
         signed

@@ -177,6 +177,10 @@ class PrivateKey:
         from cryptography.hazmat.primitives.asymmetric import ec, utils
         result = self.private.sign(digest, ec.ECDSA(utils.Prehashed(SHA256())))
         (r, s) = utils.decode_dss_signature(result)
+        # verify-sig only accepts the low-S form, s <= n/2
+        n = self.private.curve.group_order
+        if s > n // 2:
+            s = n - s
         return r.to_bytes(32, byteorder='big') + s.to_bytes(32, byteorder='big')
     def claim(self):
         from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding
