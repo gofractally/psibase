@@ -51,7 +51,7 @@ pub mod tables {
     #[async_graphql::ComplexObject]
     impl StagedTx {
         async fn txid(&self) -> String {
-            psibase::to_hex(&self.txid)
+            psio::to_hex(&self.txid)
         }
     }
     impl StagedTx {

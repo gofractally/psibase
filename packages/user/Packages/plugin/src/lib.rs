@@ -92,9 +92,7 @@ impl From<types::PackageInfo> for psibase::PackageInfo {
                 .map(|a| a.parse().unwrap())
                 .collect(),
             exports: value.exports.into_iter().map(|e| e.into()).collect(),
-            sha256: psibase::from_hex(&value.sha256)
-                .and_then(|bytes| bytes.try_into().ok())
-                .unwrap(),
+            sha256: psio::from_hex_array(&value.sha256).unwrap(),
             file: value.file,
         }
     }
@@ -111,7 +109,7 @@ impl From<psibase::PackageInfo> for types::PackageInfo {
             accounts: value.accounts.into_iter().map(|a| a.to_string()).collect(),
             services: value.services.into_iter().map(|a| a.to_string()).collect(),
             exports: value.exports.into_iter().map(|e| e.into()).collect(),
-            sha256: psibase::to_hex(&value.sha256),
+            sha256: psio::to_hex(&value.sha256),
             file: value.file,
         }
     }

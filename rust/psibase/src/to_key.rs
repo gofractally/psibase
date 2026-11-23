@@ -29,10 +29,10 @@ impl psio::key::KeyPack for RawKey {
 impl CursorType for RawKey {
     type Error = &'static str;
     fn decode_cursor(s: &str) -> Result<Self, Self::Error> {
-        crate::from_hex(s).map(Self::new).ok_or("Hex conversion failed")
+        psio::from_hex(s).map(Self::new).map_err(|error| error.what)
     }
     fn encode_cursor(&self) -> String {
-        crate::to_hex(&self.data)
+        psio::to_hex(&self.data)
     }
 }
 

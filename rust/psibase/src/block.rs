@@ -59,7 +59,7 @@ pub struct Action {
 impl Action {
     #[allow(non_snake_case)]
     async fn rawData(&self) -> String {
-        crate::to_hex(&self.rawData)
+        psio::to_hex(&self.rawData)
     }
 }
 
@@ -110,7 +110,7 @@ pub struct Claim {
 impl Claim {
     #[allow(non_snake_case)]
     async fn rawData(&self) -> String {
-        crate::to_hex(&self.rawData)
+        psio::to_hex(&self.rawData)
     }
 }
 
@@ -330,7 +330,7 @@ pub struct BlockHeaderAuthAccount {
 impl BlockHeaderAuthAccount {
     #[allow(non_snake_case)]
     async fn codeHash(&self) -> String {
-        crate::to_hex(&self.codeHash)
+        psio::to_hex(&self.codeHash)
     }
 }
 

@@ -59,7 +59,7 @@ pub mod service {
     impl SitesContentRow {
         #[allow(non_snake_case)]
         async fn contentHash(&self) -> String {
-            crate::to_hex(&self.contentHash)
+            psio::to_hex(&self.contentHash)
         }
     }
 

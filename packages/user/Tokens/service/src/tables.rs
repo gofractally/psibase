@@ -288,7 +288,7 @@ pub mod tables {
 
         /// Content hash of the token's icon, or null if it has no icon
         pub async fn icon_hash(&self) -> Option<String> {
-            icon_hash(self.id).map(|hash| psibase::to_hex(&hash))
+            icon_hash(self.id).map(|hash| psio::to_hex(&hash))
         }
     }
 
@@ -401,7 +401,7 @@ pub mod tables {
 
         /// Content hash of the token's icon, or null if it has no icon
         pub async fn icon_hash(&self) -> Option<String> {
-            icon_hash(self.token_id).map(|hash| psibase::to_hex(&hash))
+            icon_hash(self.token_id).map(|hash| psio::to_hex(&hash))
         }
 
         pub async fn precision(&self) -> Precision {
@@ -456,7 +456,7 @@ pub mod tables {
 
         /// Content hash of the token's icon, or null if it has no icon
         pub async fn icon_hash(&self) -> Option<String> {
-            icon_hash(self.token_id).map(|hash| psibase::to_hex(&hash))
+            icon_hash(self.token_id).map(|hash| psio::to_hex(&hash))
         }
 
         pub async fn precision(&self) -> Precision {

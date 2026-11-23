@@ -636,7 +636,7 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
         if let Some(Ok(data)) = decoder.args(act) {
             result.insert("data".to_string(), data);
         } else {
-            result.insert("rawData".to_string(), crate::to_hex(&act.rawData).into());
+            result.insert("rawData".to_string(), psio::to_hex(&act.rawData).into());
         }
         result.into()
     }

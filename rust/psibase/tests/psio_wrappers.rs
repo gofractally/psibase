@@ -228,6 +228,7 @@ fn bytes_are_hex_in_a_psio_record() {
     assert!(serde_json::from_str::<Holder>(r#"{"bytes":[0,1],"digest":"00"}"#).is_err());
     assert_eq!(psio::to_pssz(&value.digest), vec![0xab; 32]);
     assert_eq!(psio::to_key(&value.digest), vec![0xab; 32]);
-    assert_eq!(psibase::to_hex(&value.bytes), "0001FF");
-    assert_eq!(psibase::from_hex("0001ff"), Some(value.bytes));
+    // Outside JSON (a URL, a cursor) the same text is psio::to_hex.
+    assert_eq!(psio::to_hex(&value.bytes), "0001FF");
+    assert_eq!(psio::from_hex("0001ff"), Ok(value.bytes));
 }

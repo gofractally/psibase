@@ -498,7 +498,7 @@ pub fn action_handlers_recording(
                 }
                 None => {
                     result.insert("method".to_string(), act.method.to_string().into());
-                    result.insert("rawData".to_string(), crate::to_hex(&act.rawData).into());
+                    result.insert("rawData".to_string(), psio::to_hex(&act.rawData).into());
                 }
             }
             Ok(serde_json::Value::Object(result).to_string())
@@ -527,7 +527,7 @@ pub fn action_handlers_recording(
                 )
                 .map_err(json_error)?
             } else {
-                crate::from_hex(text("rawData")?).ok_or_else(|| json_error("rawData is not hex"))?
+                psio::from_hex(text("rawData")?).map_err(json_error)?
             };
             Ok(psio::to_pssz(&Action {
                 sender,

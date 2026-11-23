@@ -1571,9 +1571,8 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
             progress.inc(1);
         } else if existing_info["sha256"]
             .as_str()
-            .and_then(psibase::from_hex)
-            .as_deref()
-            != Some(&hash[..])
+            .and_then(|text| psio::from_hex_array::<32>(text).ok())
+            != Some(hash)
         {
             progress.suspend(|| {
                 eprintln!(
@@ -1987,7 +1986,7 @@ async fn put_local_manifest<'a, R: Read + Seek>(
             .put(
                 x_packages::SERVICE
                     .url(base_url)?
-                    .join(&format!("/manifest/{}", psibase::to_hex(&info.sha256)))?,
+                    .join(&format!("/manifest/{}", psio::to_hex(&info.sha256)))?,
             )
             .body(manifest_encoder.finish()?)
             .header("Content-Type", "application/json")
@@ -2007,7 +2006,7 @@ async fn delete_local_manifest<'a>(
             .delete(
                 x_packages::SERVICE
                     .url(base_url)?
-                    .join(&format!("/manifest/{}", psibase::to_hex(&info.sha256)))?,
+                    .join(&format!("/manifest/{}", psio::to_hex(&info.sha256)))?,
             )
             .json(&info),
     )

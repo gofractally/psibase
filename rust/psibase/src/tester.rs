@@ -348,7 +348,7 @@ impl Chain {
             requests.push(HttpRequest {
                 host: services::x_packages::SERVICE.to_string() + "." + root_host,
                 method: "PUT".to_string(),
-                target: format!("/manifest/{}", crate::to_hex(package.hash())).into(),
+                target: format!("/manifest/{}", psio::to_hex(package.hash())).into(),
                 contentType: "application/json".to_string(),
                 headers: vec![],
                 body: psio::to_ijson(&package.manifest()).into_bytes(),
@@ -1123,9 +1123,9 @@ impl<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> C
                 if debug {
                     println!(
                         ">>> ChainResult::get - Inner action trace: {} (raw_retval={})",
-                        at.action.method, crate::to_hex(&at.raw_retval)
+                        at.action.method, psio::to_hex(&at.raw_retval)
                     );
-                    println!(">>> ChainResult::get - Unpacking ret: `{}`", crate::to_hex(&ret));
+                    println!(">>> ChainResult::get - Unpacking ret: `{}`", psio::to_hex(&ret));
                 }
                 let unpacked_ret = psio::from_pssz::<T>(ret)?;
                 return Ok(unpacked_ret);

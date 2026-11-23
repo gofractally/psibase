@@ -12,7 +12,6 @@ mod depgraph;
 mod flags;
 mod from_bin;
 mod graph_ql;
-mod hex;
 mod http;
 pub mod image_content_type;
 #[cfg(not(target_family = "wasm"))]
@@ -55,7 +54,6 @@ pub use depgraph::*;
 pub use flags::*;
 pub use from_bin::*;
 pub use graph_ql::*;
-pub use hex::*;
 pub use http::*;
 #[cfg(not(target_family = "wasm"))]
 pub use local_socket::*;

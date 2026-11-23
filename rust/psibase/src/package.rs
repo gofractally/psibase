@@ -2273,7 +2273,7 @@ pub async fn get_local_manifest(
 ) -> Result<PackageManifest, anyhow::Error> {
     let url = x_packages::SERVICE
         .url(base_url)?
-        .join(&format!("/manifest/{}", crate::to_hex(sha256)))?;
+        .join(&format!("/manifest/{}", psio::to_hex(sha256)))?;
     crate::as_json(client.get(url)).await
 }
 

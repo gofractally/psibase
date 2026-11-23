@@ -20,7 +20,7 @@ mod service {
     #[async_graphql::ComplexObject]
     impl Update {
         async fn txid(&self) -> String {
-            psibase::to_hex(&self.txid)
+            psio::to_hex(&self.txid)
         }
     }
 

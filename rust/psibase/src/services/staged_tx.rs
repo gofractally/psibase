@@ -43,7 +43,7 @@ pub mod service {
     #[async_graphql::ComplexObject]
     impl StagedTx {
         async fn txid(&self) -> String {
-            crate::to_hex(&self.txid)
+            psio::to_hex(&self.txid)
         }
     }
 

@@ -32,7 +32,7 @@ pub mod service {
     #[async_graphql::ComplexObject]
     impl AuthRow {
         async fn key_fingerprint(&self) -> String {
-            psibase::to_hex(&self.key_fingerprint)
+            psio::to_hex(&self.key_fingerprint)
         }
     }
 
