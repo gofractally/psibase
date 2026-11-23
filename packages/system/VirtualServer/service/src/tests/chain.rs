@@ -497,6 +497,107 @@ fn settlement_exhausts_resource_buffer(chain: psibase::Chain) -> Result<(), psib
     Ok(())
 }
 
+// A transaction's CPU limit follows the balance it is billed to. alice starts
+// with a small resource balance, buys more in her first action and then does
+// far more work than the small balance allowed. Without the limit following the
+// purchase the transaction is stopped at what she could afford when it began.
+#[psibase::test_case(packages("VirtualServer", "StagedTx"))]
+fn resources_bought_in_a_transaction_raise_its_cpu_limit(
+    chain: psibase::Chain,
+) -> Result<(), psibase::Error> {
+    initial_setup(&chain)?;
+    let sys: tokens::TID = 1;
+    let alice = account!("alice");
+    let bob = account!("bob");
+    // No automatic refill: alice has exactly what is bought for her.
+    Wrapper::push_from(&chain, alice)
+        .conf_buffer(Some(crate::tables::tables::BufferConfig {
+            threshold_percent: 0,
+            capacity: 0,
+        }))
+        .get()?;
+    // What alice will buy with, credited before she has to pay for anything.
+    let purchase: Quantity = 1_000_0000u64.into();
+    Tokens::push_from(&chain, alice)
+        .credit(sys, Wrapper::SERVICE, (purchase.value * 2).into(), "".into())
+        .get()?;
+    setup_enable_billing(&chain)?;
+
+    // The work: enough transfers to take many times the starting allowance.
+    const TRANSFERS: usize = 40;
+    const STARTING_CPU_NS: u64 = 5_000_000; // 5 ms, plus the service's leeway
+    let work = |with_purchase: bool| {
+        let memo: psibase::Memo = "".into();
+        let mut actions = Vec::new();
+        if with_purchase {
+            actions.push(Action {
+                sender: alice,
+                service: Wrapper::SERVICE,
+                method: MethodNumber::new(method_raw!("buy_res")),
+                rawData: (purchase,).packed().into(),
+            });
+        }
+        for _ in 0..TRANSFERS {
+            actions.push(Action {
+                sender: alice,
+                service: Tokens::SERVICE,
+                method: MethodNumber::new(method_raw!("credit")),
+                rawData: (sys, bob, Quantity::from(1u64), memo.clone())
+                    .packed()
+                    .into(),
+            });
+        }
+        let mut trx = Transaction {
+            tapos: Default::default(),
+            actions,
+            claims: vec![],
+        };
+        chain.fill_tapos(&mut trx, 2);
+        chain.push(&SignedTransaction {
+            transaction: trx.packed().into(),
+            proofs: vec![],
+            subjectiveData: None,
+        })
+    };
+    let fund_start = || -> Result<(), psibase::Error> {
+        // Enough for the transaction's bytes and a little CPU, no more.
+        let net = Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .get_net_cost(16_384)
+            .get()?;
+        let cpu = Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .get_cpu_cost(STARTING_CPU_NS)
+            .get()?;
+        let start: Quantity = (net.value + cpu.value).into();
+        Tokens::push_from(&chain, PRODUCER_ACCOUNT)
+            .credit(sys, Wrapper::SERVICE, start, "".into())
+            .get()?;
+        Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .buy_res_for(start, alice, None)
+            .get()?;
+        Ok(())
+    };
+
+    // The same work without the purchase does not fit in the starting balance.
+    fund_start()?;
+    let unfunded = work(false);
+    assert!(
+        unfunded.error.is_some(),
+        "the work was meant to exceed the starting balance"
+    );
+    chain.finish_block();
+
+    // With the purchase as its first action it runs to the end.
+    fund_start()?;
+    let funded = work(true);
+    assert!(
+        funded.error.is_none(),
+        "a transaction that bought resources was still limited to its starting balance: {}",
+        funded.error.unwrap_or_default()
+    );
+    chain.finish_block();
+    Ok(())
+}
+
 // Bytes consumed since init
 fn disk_consumed(chain: &psibase::Chain) -> u64 {
     let disk = get_disk_state(chain);
