@@ -587,8 +587,10 @@ fn resources_bought_in_a_transaction_raise_its_cpu_limit(
     };
 
     // The same work without the purchase is stopped by the CPU limit.
+    // Funding pushes transactions of its own, which moves the chain past a
+    // transaction built beforehand; build once for the size, then again.
+    fund_start(&build(false))?;
     let unfunded = build(false);
-    fund_start(&unfunded)?;
     let trace = chain.push(&unfunded);
     let error = trace.error.unwrap_or_default();
     println!("without the purchase: {error}");
@@ -599,8 +601,8 @@ fn resources_bought_in_a_transaction_raise_its_cpu_limit(
     chain.finish_block();
 
     // With the purchase as its first action it runs to the end.
+    fund_start(&build(true))?;
     let funded = build(true);
-    fund_start(&funded)?;
     let trace = chain.push(&funded);
     assert!(
         trace.error.is_none(),
