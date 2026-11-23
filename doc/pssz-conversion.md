@@ -2768,6 +2768,18 @@ Stages R-A … R-F as the coordinator defined them. Scratch tools:
 `~/psibase-pssz-scripts/rflip/` (`add_jsontext.py`, `add_psio_all.py`,
 `flip.py`); logs `~/psibase-pssz-build.*rflip*.log`.
 
+**Pin moved to PSIO `e12e4f6df7a2422f893d609848ab06194b75e082`** (the
+pin both flip branches converge on). No psibase source changed; the
+checkout in `external/psio` has to be fetched and checked out by hand
+(the CMake check refuses to move an existing checkout), then
+`cmake ~/psibase-pssz-build`. Full rebuild exit 0, ctest 93 / 93 (tag
+`rflip-repin`), 68 schemas identical, fixture regenerated without a
+difference, twin tests 3 / 3. Not yet used from it: `psio::time`
+widening `From` / `Into` and the `*_mixed` methods (RG16 closed: the
+`to_unit().unwrap()` sites become `.into()` in R-B),
+`CustomHandlers::add_json` (RG17: the nested-`Action` presentation of
+`trace.rs`), `pssz::dynamic::{equivalent, evolves_from}`.
+
 **R-A (done): every service declares a PSIO interface.**
 
 * `#[psibase::service]` always generates `PsioActions` / `psio_actions`
