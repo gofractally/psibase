@@ -3261,6 +3261,7 @@ dependencies = [
  "psibase-macros-lib",
  "psibase-rust-workspace-hack",
  "psibase_names",
+ "psio",
  "quote",
  "syn 1.0.109",
  "toml",

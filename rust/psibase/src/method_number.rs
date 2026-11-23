@@ -1,6 +1,6 @@
 use crate::{serialize_as_str, Pack, ToKey, ToSchema, Unpack};
 use custom_error::custom_error;
-use psibase_names::{method_number_from_str, method_number_to_string};
+use psio::compress_name::{method_to_number, number_to_method};
 use std::{num::ParseIntError, str::FromStr};
 
 custom_error! { pub MethodNumberError
@@ -60,15 +60,15 @@ serialize_as_str!(MethodNumber, "method number");
 /// compress. Text that names no method is not a value.
 impl psio::json::TextForm for MethodNumber {
     fn to_text(&self, out: &mut String) {
-        out.push_str(&method_number_to_string(self.value));
+        out.push_str(&number_to_method(self.value));
     }
     fn from_text(text: &str) -> Option<Self> {
         if text.is_empty() {
             return Some(MethodNumber { value: 0 });
         }
-        let value = method_number_from_str(text);
+        let value = method_to_number(text);
         let names_a_method = if text.starts_with('#') {
-            method_number_to_string(value) == text
+            number_to_method(value) == text
         } else {
             value != 0
         };
@@ -94,7 +94,7 @@ impl FromStr for MethodNumber {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(MethodNumber {
-            value: method_number_from_str(s),
+            value: method_to_number(s),
         })
     }
 }
@@ -107,7 +107,7 @@ impl From<&str> for MethodNumber {
 
 impl std::fmt::Display for MethodNumber {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(method_number_to_string(self.value).as_str())
+        f.write_str(number_to_method(self.value).as_str())
     }
 }
 

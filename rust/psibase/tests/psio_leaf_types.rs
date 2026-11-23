@@ -356,6 +356,55 @@ fn method_number_schema_is_a_custom_type() {
     assert_eq!(custom.id, "MethodNumber");
 }
 
+/// `MethodNumber` is numbered by `psio::compress_name`: a name gets its
+/// compressed number only if that number decodes back to it, and its hash
+/// otherwise. The names below are the action names of the tree whose
+/// numbers changed with that rule (the old coders kept a cut-off code).
+#[test]
+fn method_numbers_are_psios() {
+    use psio::compress_name::{method_to_number, number_to_method};
+    for (name, number, text) in [
+        ("getSymbolType", 0xd55df3070b8758eb_u64, "#hmlnslheseoypnnp"),
+        ("checkFirstAuth", 0xcd29c38cde224f8e, "#mlytiimpdlodcipd"),
+        ("get_resources", 0xd5137f98107c0181, "#alaedsealcysoanp"),
+        ("cpu_min_unit", 0x13fb233a1d98cbd8, "#lphdlcpauooihyoa"),
+        ("frozenAccounts", 0x27303f52c1c094da, "#uptcedadinyoeosi"),
+        ("regEvIdx", 0x413db64868a8ec0f, "#yedmlulrltrhpoat"),
+        ("removeCallback", 0x978d530fdfe275cb, "#hdnsimypyeonplsc"),
+        ("rowsBySecondary", 0x83a92f4d480665a6, "#runrreltptyicuol"),
+        ("create_request", 0xf997f22d796b5e2b, "#himnhrcspiiysccy"),
+        ("set_paid_occ", 0x15d82d05366fa15c, "#dnauyrronepilpna"),
+    ] {
+        assert_eq!(method(name).value, number, "{name}");
+        assert_eq!(method(name).to_string(), text, "{name}");
+        assert_eq!(method_to_number(name), number, "{name}");
+        assert_eq!(number_to_method(number), text, "{name}");
+        assert_eq!(
+            psio::from_ijson::<MethodNumber>(&format!("\"{name}\"")).unwrap(),
+            method(name)
+        );
+    }
+    for name in [
+        "",
+        "transfer",
+        "setcode",
+        "setCode",
+        "set_code",
+        "a1",
+        "someVeryLongMethodNameThatHashes",
+        "#nradiemmicaayrpu",
+        "bad name",
+        "#abc",
+    ] {
+        assert_eq!(method(name).value, method_to_number(name), "{name}");
+        assert_eq!(
+            method(name).to_string(),
+            number_to_method(method_to_number(name)),
+            "{name}"
+        );
+    }
+}
+
 // ── The legacy forms are untouched ──────────────────────────────────────────
 
 #[test]

@@ -1,6 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro_error::emit_error;
-use psibase_names::{account_number_from_str, account_number_to_string, method_number_from_str};
+use psibase_names::{account_number_from_str, account_number_to_string};
+use psio::compress_name::method_to_number;
 use quote::quote;
 use syn::{parse_macro_input, LitStr};
 
@@ -19,7 +20,7 @@ pub fn account_macro_impl(as_obj: bool, item: TokenStream) -> TokenStream {
 
 pub fn method_macro_impl(as_obj: bool, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as LitStr);
-    let n = method_number_from_str(&item.value());
+    let n = method_to_number(&item.value());
     if n == 0 && item.value() != "" {
         emit_error!(item, "{} is not a valid MethodNumber", item.value());
     }
