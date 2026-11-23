@@ -27,7 +27,7 @@ Why that matters:
 - **Signatures are no longer a tax.** With secp256k1 keys a signed transfer costs close to an unsigned one.
 - **It is measured, repeatable and still moving.** The benchmark and a per-service call profile are in the tree, suite results are recorded for every commit on two machines, and each step in the table is a specific commit you can check out. More is queued: the serialization change, canonical signatures, and wide arithmetic for Rust services.
 
-What it asks of the team is real, which is why it needs review and not just a merge: the state format changes, the consensus engine becomes a pinned fork of wasmtime, several validity rules change, and one dependency is currently private. The table below lists every such change. The tour after it says where to look and what we would most like challenged.
+What it asks of the team is real, which is why it needs review and not just a merge: the state format changes, the consensus engine becomes a pinned fork of wasmtime, and several validity rules change. The table below lists every such change. The tour after it says where to look and what we would most like challenged.
 
 These are tester figures, one block on one thread, and not network throughput; the caveats are in the Throughput section.
 
@@ -85,7 +85,7 @@ Visible in traces but not consensus: `ActionTrace.totalTime` is now elapsed time
 
 **Where to look.** `libraries/psibase/native/src/psitriStorage.cpp` and `usePsitri.cpp`; commits 3f192a3d6, f73c16e37, 30fbd2477, 638bcf495, cf82d3cdf, d15c31811, e28f472b2, 9a532ff91, 58354e982, 63bd6c49e. Validation records are under `doc/storage/`.
 
-**Access.** The [gofractally/psitri](https://github.com/gofractally/psitri) repository is **private**. Reviewers need access to it to read the engine or to build this branch at all.
+**Where the engine is.** [gofractally/psitri](https://github.com/gofractally/psitri) (public, `main`). The head still fetches it with an SSH URL, so configuring needs a GitHub SSH key until that is changed to HTTPS like the other dependencies.
 
 **Questions for the reviewer.** Crash and unclean-shutdown recovery; the reader/writer model; what "fold once per block" means for a transaction that is interrupted.
 
@@ -174,7 +174,7 @@ Suite results are recorded per commit under `tests/timing/runs/`. On wasmtime:
 ## Known gaps, in one place
 
 - JIT2 and LLVM AOT paused and marked unverified; wasmtime (a pinned fork) is the only qualified engine.
-- psitri is a private repository.
+- psitri is fetched over SSH; an HTTPS URL is still to be switched in. The repository has no license file yet.
 - The `psinode_test_crash` reopen failure: not reproduced on the current line, root cause not found.
 - Four of psitri's own tests fail on the Mac, untriaged.
 - Rust services lack wide arithmetic until `claude/canonical-next` lands.
