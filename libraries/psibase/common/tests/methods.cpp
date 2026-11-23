@@ -452,46 +452,42 @@ TEST_CASE("methods: actions and events of the service schema", "[methods]")
    std::vector<std::string> actions;
    for (const auto& [name, type] : schema.actions)
       actions.push_back(name + (type.result ? ":result" : ":void"));
-   // Ordered by method number.
-   std::vector<std::string> expected;
-   {
-      std::vector<std::pair<MethodNumber, std::string>> byNumber{
-          {MethodNumber{"init"}, "init:void"},
-          {MethodNumber{"transfer"}, "transfer:result"},
-          {MethodNumber{"balance"}, "balance:result"},
-          {MethodNumber{"locate"}, "locate:result"},
-          {MethodNumber{"unnamed"}, "unnamed:result"},
-          {MethodNumber{"get_staged_tx"}, "get_staged_tx:result"}};
-      std::sort(byNumber.begin(), byNumber.end());
-      for (auto& [_, text] : byNumber)
-         expected.push_back(text);
-   }
+   // Ordered by name.
+   std::vector<std::string> expected{"balance:result",  "get_staged_tx:result", "init:void",
+                                     "locate:result",   "transfer:result",      "unnamed:result"};
    CHECK(actions == expected);
 
-   auto params = [&](const psio1::schema_types::AnyType& type)
+   auto params = [&](const psio::schema_types::AnyType& type)
    {
       std::string out;
       const auto* resolved = type.resolve(schema.types);
       REQUIRE(resolved);
-      const auto* object = std::get_if<psio1::schema_types::Object>(&resolved->value);
+      const auto* object = std::get_if<psio::schema_types::Object>(&resolved->value);
       REQUIRE(object);
       for (const auto& member : object->members)
          out += member.name + " ";
+      for (const auto& attribute : object->attributes)
+         if (attribute.name == "tuple")
+            out += "(" + attribute.value.value_or("") + ")";
       return out;
    };
-   CHECK(params(schema.actions.at("init").params) == "");
-   CHECK(params(schema.actions.at("transfer").params) == "from memo amount ");
-   CHECK(params(schema.actions.at("locate").params) == "at dx ");
-   // Parameters the reflection does not name are called by their position.
-   CHECK(params(schema.actions.at("unnamed").params) == "c0 c1 ");
+   CHECK(params(*schema.actions.at("init").params) == "(named)");
+   CHECK(params(*schema.actions.at("transfer").params) == "from memo amount (named)");
+   CHECK(params(*schema.actions.at("locate").params) == "at dx (named)");
+   // Parameters the reflection does not name are positional.
+   CHECK(params(*schema.actions.at("unnamed").params) == "0 1 (positional)");
+   // An action is found by its number, a hashed name included.
+   REQUIRE(schema.findAction(MethodNumber{"get_staged_tx"}));
+   CHECK(schema.findAction(MethodNumber{"get_staged_tx"})->first == "get_staged_tx");
+   CHECK(!schema.findAction(MethodNumber{"get_staged"}));
 
    REQUIRE(schema.history.size() == 2);
-   CHECK(params(schema.history.at("noted").type) == "who text ");
+   CHECK(params(schema.history.at("noted").type) == "who text (named)");
    CHECK(schema.history.at("noted").access == "public");
-   CHECK(params(schema.history.at("quiet").type) == "n ");
+   CHECK(params(schema.history.at("quiet").type) == "n (named)");
    CHECK(schema.history.at("quiet").access == "private");
    REQUIRE(schema.merkle.size() == 1);
-   CHECK(params(schema.merkle.at("sealed").type) == "n ");
+   CHECK(params(schema.merkle.at("sealed").type) == "n (named)");
    CHECK(schema.merkle.at("sealed").access == "private");
 }
 

@@ -993,8 +993,10 @@ namespace psio1::reflection_impl
       static_assert(!::psio::has_adapter_v<T, ::psio::binary_category> &&
                         !::psio::has_adapter_v<T, ::psio::sortable_binary_category>,
                     "psio1 does not bridge binary or key adapters of a type reflected with PSIO");
-      static_assert(!::psio::has_invariant_v<T> || ::psio::is_transparent_v<T>,
-                    "psio1 bridges a PSIO invariant of a transparent() type only");
+      // The PSIO invariant of a transparent() type is checked by this
+      // library's readers; the invariant of a record is NOT. psibase declares
+      // two such records, Action and ServiceMethod, whose invariant accepts
+      // every value (it exists to name the type in a schema).
 
       static constexpr bool is_defined              = true;
       static constexpr bool is_struct               = true;

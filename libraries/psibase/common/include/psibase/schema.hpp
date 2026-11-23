@@ -1,34 +1,44 @@
 #pragma once
 
+// The schema of a service: its actions, events and tables over one PSIO
+// Schema IR document (psio/schema_ir.hpp). The record and its two encodings
+// (I-JSON in files and over HTTP, PSSZ as an action argument and a table
+// row) are specified in doc/flip-interop.md section 2.
+
 #include <map>
 #include <optional>
 #include <psibase/AccountNumber.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/db.hpp>
+#include <psibase/trace.hpp>
+#include <psio/json_value.hpp>
+#include <functional>
+#include <psio/json.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_ir.hpp>
+#include <psio/pssz_ir_compare.hpp>
+#include <psio/pssz_ir_custom.hpp>
+#include <psio/pssz_ir_json.hpp>
 #include <psio/reflect.hpp>
-#include <psio1/schema.hpp>
+#include <psio/schema_builder.hpp>
+#include <psio/schema_ir.hpp>
+#include <psio1/from_json.hpp>  // TEMPORARY, see the end of this file
+#include <psio1/json/any.hpp>
+#include <psio1/to_json.hpp>
+#include <span>
 #include <string>
 #include <type_traits>
 #include <vector>
 
 namespace psibase
 {
-
-   struct CompareMethodNumber
-   {
-      using is_transparent = void;
-      bool operator()(const auto& lhs, const auto& rhs) const
-      {
-         return MethodNumber(lhs) < MethodNumber(rhs);
-      }
-   };
-
+   /// One component of an index key
    struct FieldId
    {
-      std::vector<std::uint32_t>                 path;
-      std::optional<std::string>                 transform;
-      std::optional<psio1::schema_types::AnyType> type;
+      std::vector<std::uint32_t>                 path;       ///< member indexes from the row type down
+      std::optional<std::string>                 transform;  ///< name of a key transform, if any
+      std::optional<psio::schema_types::AnyType> type;       ///< the transform's result type, if any
    };
    PSIO_REFLECT(FieldId, path, attr(transform, utf8), type)
 
@@ -36,10 +46,10 @@ namespace psibase
 
    struct TableInfo
    {
-      std::optional<std::string>  name;
-      std::uint16_t               table;
-      psio1::schema_types::AnyType type;
-      std::vector<IndexInfo>      indexes;
+      std::optional<std::string>  name;     ///< table type name
+      std::uint16_t               table;    ///< table number
+      psio::schema_types::AnyType type;     ///< row type
+      std::vector<IndexInfo>      indexes;  ///< [0] is the primary key
 
       std::string str() const
       {
@@ -61,10 +71,10 @@ namespace psibase
 
    struct EventType
    {
-      psio1::schema_types::AnyType type;
-      std::string                 access = "public";
-      PSIO_REFLECT(EventType, type, attr(access, utf8))
+      psio::schema_types::AnyType type;    ///< the event's argument list
+      std::string                 access;  ///< "public" | "private"
    };
+   PSIO_REFLECT(EventType, type, attr(access, utf8))
 
    template <auto T>
    constexpr std::string_view eventAccess(void*, nt_wrap<T>*)
@@ -75,102 +85,64 @@ namespace psibase
    /// Represents the schema for a service
    struct ServiceSchema
    {
-      psibase::AccountNumber service;
-      psio1::Schema           types;
-      using ActionMap =
-          std::map<std::string, psio1::schema_types::FunctionType, CompareMethodNumber>;
+      psibase::AccountNumber     service;
+      psio::schema_types::Schema types;
+      using ActionMap = std::map<std::string, psio::schema_types::FunctionType>;
       ActionMap actions;
-      using EventMap = std::map<std::string, EventType, CompareMethodNumber>;
+      using EventMap = std::map<std::string, EventType>;
       EventMap history;
       EventMap merkle;
 
       std::optional<std::map<std::string, ServiceDatabaseSchema>> database;
 
+      using Collision = psio::SchemaBuilder::Collision;
+
      private:
-      // An object with one member per element of the argument tuple. A
-      // parameter that the reflection does not name is called c<position>.
-      template <typename... P>
-      static auto makeParams(psio1::SchemaBuilder&             builder,
-                             std::span<const std::string_view> names,
-                             std::tuple<P...>*) -> psio1::schema_types::Object
-      {
-         psio1::schema_types::Object type;
-         std::size_t                 i   = 0;
-         auto                        add = [&](psio1::schema_types::AnyType&& param)
-         {
-            type.members.push_back(
-                {i < names.size() ? std::string(names[i]) : "c" + std::to_string(i),
-                 std::move(param)});
-            ++i;
-         };
-         (add(builder.insert<P>()), ...);
-         return type;
-      }
       template <typename T>
-      static auto makeResult(psio1::SchemaBuilder& builder)
-          -> std::optional<psio1::schema_types::AnyType>
-      {
-         if constexpr (std::is_void_v<T>)
-         {
-            return {};
-         }
-         else
-         {
-            return builder.insert<T>();
-         }
-      }
-      template <typename T>
-      static void makeActions(psio1::SchemaBuilder&                       builder,
-                              ActionMap&                                 out,
-                              std::vector<psio1::schema_types::AnyType*>& eventTypes)
+      static void makeActions(psio::SchemaBuilder& builder, ActionMap& out)
       {
          using reflect = psio::reflect<T>;
          reflect::for_each_method(
              [&](auto index, std::string_view name)
              {
                 constexpr std::size_t I = decltype(index)::value;
-                auto [pos, inserted]    = out.try_emplace(
-                    std::string(name),
-                    psio1::schema_types::FunctionType{
-                        makeParams(builder, reflect::template method_param_names<I>,
-                                   (typename reflect::template method_arg_tuple<I>::tuple_type*)nullptr),
-                        makeResult<psio::wire_type_t<typename reflect::template method_result<I>>>(builder)});
-                if (inserted)
-                {
-                   eventTypes.push_back(&pos->second.params);
-                   if (pos->second.result)
-                      eventTypes.push_back(&*pos->second.result);
-                }
+                using Args              = typename reflect::template method_arg_tuple<I>;
+                using Result = psio::wire_type_t<typename reflect::template method_result<I>>;
+                if (out.contains(std::string(name)))
+                   return;
+                psio::schema_types::FunctionType type{
+                    psio::schema_types::Box<psio::schema_types::AnyType>{builder.insert<Args>()},
+                    std::nullopt};
+                if constexpr (!std::is_void_v<Result>)
+                   type.result = psio::schema_types::Box<psio::schema_types::AnyType>{
+                       builder.insert<Result>()};
+                out.emplace(std::string(name), std::move(type));
              });
       }
 
       template <typename T>
-      static void makeEvents(psio1::SchemaBuilder&                       builder,
-                             EventMap&                                  out,
-                             std::vector<psio1::schema_types::AnyType*>& eventTypes)
+      static void makeEvents(psio::SchemaBuilder& builder, EventMap& out)
       {
          using reflect = psio::reflect<T>;
          reflect::for_each_method(
              [&](auto index, std::string_view name)
              {
                 constexpr std::size_t I = decltype(index)::value;
+                using Args              = typename reflect::template method_arg_tuple<I>;
                 using Event             = nt_wrap<reflect::template method_pointer<I>>;
-                auto [pos, inserted]    = out.try_emplace(
-                    std::string(name),
-                    EventType{.type = makeParams(builder, reflect::template method_param_names<I>,
-                                                 (typename reflect::template method_arg_tuple<I>::tuple_type*)nullptr),
-                              .access = std::string(eventAccess((T*)nullptr, (Event*)nullptr))});
-                if (inserted)
-                {
-                   eventTypes.push_back(&pos->second.type);
-                }
+                if (out.contains(std::string(name)))
+                   return;
+                out.emplace(std::string(name),
+                            EventType{.type   = builder.insert<Args>(),
+                                      .access = std::string(
+                                          eventAccess((T*)nullptr, (Event*)nullptr))});
              });
       }
 
       template <bool Last, auto K, typename T, typename M>
       static void makeKeyImpl(M                    T::*,
                               FieldId&&            prefix,
-                              psio1::SchemaBuilder& builder,
+                              psio::SchemaBuilder& builder,
                               IndexInfo&           out)
       {
          if constexpr (std::is_function_v<M>)
@@ -199,7 +171,7 @@ namespace psibase
       template <bool Last, auto K>
       static void makeNestedKeyImpl(NestedKey<>,
                                     FieldId&&            prefix,
-                                    psio1::SchemaBuilder& builder,
+                                    psio::SchemaBuilder& builder,
                                     IndexInfo&           out)
       {
          if constexpr (Last)
@@ -211,7 +183,7 @@ namespace psibase
       template <bool Last, auto K, auto K0>
       static void makeKeyImpl(CompositeKey<K0>,
                               FieldId&&            prefix,
-                              psio1::SchemaBuilder& builder,
+                              psio::SchemaBuilder& builder,
                               IndexInfo&           out)
       {
          makeKeyImpl<Last, K0>(K0, std::move(prefix), builder, out);
@@ -220,12 +192,10 @@ namespace psibase
       template <bool Last, auto K, auto... KN>
       static void makeKeyImpl(CompositeKey<KN...>,
                               FieldId&&            prefix,
-                              psio1::SchemaBuilder& builder,
+                              psio::SchemaBuilder& builder,
                               IndexInfo&           out)
       {
          static_assert(Last, "CompositeKey can only appear at the end of a NestedKey");
-
-         std::size_t prefixLen = prefix.path.size();
 
          (makeKeyImpl<true, KN>(KN, FieldId(prefix), builder, out), ...);
       }
@@ -233,7 +203,7 @@ namespace psibase
       template <bool Last, auto K, auto K0>
       static void makeKeyImpl(NestedKey<K0>,
                               FieldId&&            prefix,
-                              psio1::SchemaBuilder& builder,
+                              psio::SchemaBuilder& builder,
                               IndexInfo&           out)
       {
          makeKeyImpl<Last, K0>(K0, std::move(prefix), builder, out);
@@ -242,7 +212,7 @@ namespace psibase
       template <bool Last, auto K, auto K0, auto... KN>
       static void makeKeyImpl(NestedKey<K0, KN...>,
                               FieldId&&            prefix,
-                              psio1::SchemaBuilder& builder,
+                              psio::SchemaBuilder& builder,
                               IndexInfo&           out)
       {
          makeKeyImpl<false, K0>(K0, std::move(prefix), builder, out);
@@ -250,7 +220,7 @@ namespace psibase
       }
 
       template <typename T, auto K>
-      static IndexInfo makeKey(psio1::SchemaBuilder& builder)
+      static IndexInfo makeKey(psio::SchemaBuilder& builder)
       {
          IndexInfo result;
          makeKeyImpl<true, K>(K, {}, builder, result);
@@ -258,13 +228,13 @@ namespace psibase
       }
 
       template <typename T, auto... K>
-      static std::vector<IndexInfo> makeIndexes(psio1::SchemaBuilder& builder, Table<T, K...>*)
+      static std::vector<IndexInfo> makeIndexes(psio::SchemaBuilder& builder, Table<T, K...>*)
       {
          return std::vector<IndexInfo>{makeKey<T, K>(builder)...};
       }
 
       template <typename T>
-      static void makeTable(psio1::SchemaBuilder&    builder,
+      static void makeTable(psio::SchemaBuilder&    builder,
                             std::uint16_t           table,
                             std::vector<TableInfo>& out)
       {
@@ -292,9 +262,8 @@ namespace psibase
       }
 
       template <DbId db, typename... T>
-      static void makeDatabase(psio1::SchemaBuilder&                       builder,
-                               ServiceSchema&                             out,
-                               std::vector<psio1::schema_types::AnyType*>& rowTypes,
+      static void makeDatabase(psio::SchemaBuilder& builder,
+                               ServiceSchema&       out,
                                DbTables<db, T...>*)
       {
          if (!out.database)
@@ -303,29 +272,14 @@ namespace psibase
          auto&          tables = (*out.database)[name];
          std::uint16_t  i      = 0;
          (makeTable<T>(builder, i++, tables), ...);
-         for (auto& t : tables)
-         {
-            rowTypes.push_back(&t.type);
-            for (auto& idx : t.indexes)
-            {
-               for (auto& field : idx)
-               {
-                  if (field.type)
-                  {
-                     rowTypes.push_back(&*field.type);
-                  }
-               }
-            }
-         }
       }
 
       template <typename... T>
-      static void makeDatabases(psio1::SchemaBuilder&                       builder,
-                                ServiceSchema&                             out,
-                                std::vector<psio1::schema_types::AnyType*>& rowTypes,
+      static void makeDatabases(psio::SchemaBuilder& builder,
+                                ServiceSchema&       out,
                                 boost::mp11::mp_list<T...>*)
       {
-         (makeDatabase(builder, out, rowTypes, (T*)nullptr), ...);
+         (makeDatabase(builder, out, (T*)nullptr), ...);
       }
 
      public:
@@ -334,72 +288,119 @@ namespace psibase
       {
          return make<T>(T::service);
       }
-      /// Constructs a schema for a service.
+      /// Constructs a schema for a service: every type is interned by one
+      /// builder. Two different reflected types with one unqualified name
+      /// are each named by their qualified name; those names are reported
+      /// through `collisions` when it is given.
       template <typename T>
-      static ServiceSchema make(AccountNumber service)
+      static ServiceSchema make(AccountNumber service, std::vector<Collision>* collisions = nullptr)
       {
-         ServiceSchema                             result{service};
-         std::vector<psio1::schema_types::AnyType*> typeRefs;
-         psio1::SchemaBuilder                       builder;
-         makeActions<T>(builder, result.actions, typeRefs);
+         ServiceSchema       result{service};
+         psio::SchemaBuilder builder;
+         makeActions<T>(builder, result.actions);
          if constexpr (requires { typename T::Events::History; })
          {
-            makeEvents<typename T::Events::History>(builder, result.history, typeRefs);
+            makeEvents<typename T::Events::History>(builder, result.history);
          }
          if constexpr (requires { typename T::Events::Merkle; })
          {
-            makeEvents<typename T::Events::Merkle>(builder, result.merkle, typeRefs);
+            makeEvents<typename T::Events::Merkle>(builder, result.merkle);
          }
          if constexpr (requires { psibase_get_tables((T*)nullptr); })
          {
-            makeDatabases(builder, result, typeRefs,
-                          (decltype(psibase_get_tables((T*)nullptr))*)nullptr);
+            makeDatabases(builder, result, (decltype(psibase_get_tables((T*)nullptr))*)nullptr);
          }
-         result.types = std::move(builder).build(typeRefs);
+         if (auto status = builder.status(); !status.ok())
+            abortMessage("schema: " + std::string(status.error().what));
+         if (collisions)
+            *collisions = builder.collisions();
+         result.types = std::move(builder).build();
          return result;
       }
 
-     private:
-      const EventMap* getDb(psibase::EventDb db) const
-      {
-         switch (db)
-         {
-            case psibase::EventDb::merkleEvent:
-               return &merkle;
-            case psibase::EventDb::historyEvent:
-               return &history;
-            default:
-               return nullptr;
-         }
-      }
+      /// The action whose name has the method number `method`, or null
+      const ActionMap::value_type* findAction(MethodNumber method) const;
+      /// The event of `db` whose name has the method number `event`, or null
+      const EventMap::value_type* findEvent(psibase::EventDb db, MethodNumber event) const;
 
-     public:
-      const psio1::schema_types::AnyType* getType(bool             canReadPrivate,
+      /// The argument list type of an event, if the reader may see it
+      const psio::schema_types::AnyType* getType(bool             canReadPrivate,
                                                  psibase::EventDb db,
-                                                 MethodNumber     event)
-      {
-         if (const auto* dbTypes = getDb(db))
-            if (auto pos = dbTypes->find(event);
-                pos != dbTypes->end() && (canReadPrivate || pos->second.access == "public"))
-               return pos->second.type.resolve(types);
-         return nullptr;
-      }
-      std::vector<const psio1::schema_types::AnyType*> eventTypes() const
-      {
-         std::vector<const psio1::schema_types::AnyType*> result;
-         for (const auto* m : {&history, &merkle})
-         {
-            for (const auto& [_, type] : *m)
-            {
-               result.push_back(&type.type);
-            }
-         }
-         return result;
-      }
-      // checks that all names and indexes are valid
+                                                 MethodNumber     event) const;
+      std::vector<const psio::schema_types::AnyType*> eventTypes() const;
+      // Checks that the Schema IR is well-formed, that every type the other
+      // members name is a type of it, and that event access values and
+      // index paths are valid. Aborts with a message otherwise.
       void checkValid() const;
-      PSIO_REFLECT(ServiceSchema, service, types, actions, history, merkle, database)
    };
+   PSIO_REFLECT(ServiceSchema,
+                service,
+                types,
+                attr(actions, keys(utf8)),
+                attr(history, keys(utf8)),
+                attr(merkle, keys(utf8)),
+                attr(database, keys(utf8)))
 
-   psio1::schema_types::CustomTypes psibase_types();
+   /// The type of the member that `path` leads to from the row type `type`
+   /// (through named types and custom wrappers). Returns null and sets `msg`
+   /// if the path does not resolve.
+   const psio::schema_types::AnyType* getFieldType(const psio::schema_types::Schema&  schema,
+                                                   const psio::schema_types::AnyType& type,
+                                                   std::span<const std::uint32_t>     path,
+                                                   const char*&                       msg);
+
+   /// The handlers of the custom types every psibase schema may name:
+   /// `AccountNumber` and `MethodNumber` (their text form and invariant).
+   psio::pssz_ir::CustomHandlers psibase_types();
+
+   /// An action as JSON: what the "Action" handler of `action_types` reads
+   /// and writes, and one entry of a package's `postinstall.json`.
+   /// `data` holds the arguments, an object keyed by parameter name or the
+   /// positional array, packed with the schema of `service`; `rawData`
+   /// holds them packed already (hex). One of the two is given.
+   struct PrettyAction
+   {
+      std::string                      sender;  ///< "" is the null account
+      std::string                      service;
+      std::string                      method;  ///< exactly as the service declares it
+      std::optional<std::vector<char>> rawData;
+      std::optional<psio::json_value>  data;
+   };
+   PSIO_REFLECT(PrettyAction, sender, service, method, rawData, data)
+
+   /// `psibase_types()` and the two custom types that are presented as JSON
+   /// objects: `Action` as `{sender, service, method, data: {…}}` with the
+   /// arguments decoded by the schema of the called service (`rawData`, hex,
+   /// when `schemas` has no schema for it or the bytes are not its
+   /// arguments), and `ServiceMethod` as `{service, method}`. Both
+   /// directions. `onAction` is called for every action that is read.
+   psio::pssz_ir::CustomHandlers action_types(
+       GetSchemaFn                                                     schemas,
+       std::function<void(AccountNumber sender, AccountNumber service)> onAction = {});
+
+   /// Packs the arguments in `action.data` with the schema of the called
+   /// service (an action without `data` and `rawData` has the arguments
+   /// `{}`). Aborts with a message if the service has no schema, the action
+   /// is not in it or the arguments do not fit.
+   Action toAction(PrettyAction&&                       action,
+                   const GetSchemaFn&                   schemas,
+                   const psio::pssz_ir::CustomHandlers& handlers);
+
+   // TEMPORARY: removed when psio1 is deleted. The legacy JSON library
+   // (psio1::to_json / from_json, still used by the HTTP endpoints and the
+   // package reader until the JSON stage) writes and reads a ServiceSchema
+   // as its I-JSON text.
+   void to_json(const ServiceSchema& schema, auto& stream)
+   {
+      auto text = psio::to_ijson(schema);
+      stream.write(text.data(), text.size());
+   }
+   void from_json(ServiceSchema& schema, auto& stream)
+   {
+      // The legacy reader has no "raw value" primitive: the value is read
+      // into the legacy JSON document type and written back as text.
+      psio1::json::any value;
+      from_json(value, stream);
+      schema = psio::from_ijson<ServiceSchema>(psio1::convert_to_json(value));
+   }
 }  // namespace psibase

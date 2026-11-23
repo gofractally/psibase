@@ -8,6 +8,7 @@
 #include <psio/reflect.hpp>
 #include <psio1/from_json.hpp>
 #include <psio/buffer.hpp>
+#include <psio/invariant.hpp>
 #include <psio/pssz.hpp>
 #include <psio/pssz_view.hpp>
 #include <psio1/to_json.hpp>
@@ -36,10 +37,17 @@ namespace psibase
       friend bool operator==(const Action&, const Action&) = default;
       PSIO_REFLECT(Action, sender, service, method, rawData)
    };
-   inline constexpr bool psio_custom_schema(Action*)
+   // An action has no invariant of its own. It is declared with one so that
+   // a schema names it (the custom type "Action") and psibase's schema
+   // handlers can present it as {sender, service, method, data}.
+   inline psio::codec_status actionSchemaIdentity(const Action&) noexcept
    {
-      return true;
+      return psio::codec_ok();
    }
+}  // namespace psibase
+PSIO_INVARIANT(psibase::Action, psibase::actionSchemaIdentity, "Action")
+namespace psibase
+{
 
    struct GenesisService
    {

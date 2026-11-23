@@ -170,7 +170,25 @@ namespace psibase
          {
             service = Service::service;
          }
-         std::cout << psio1::convert_to_json(ServiceSchema::make<Service>(service));
+         std::vector<ServiceSchema::Collision> collisions;
+         auto schema = ServiceSchema::make<Service>(service, &collisions);
+         if (!collisions.empty())
+         {
+            // Two different types of the service have one unqualified
+            // name: the schema would name each by its qualified C++
+            // spelling. Refused: give one of them another name.
+            for (const auto& collision : collisions)
+            {
+               std::cerr << "schema of " << service.str() << ": the name " << collision.name
+                         << " is used by more than one type:";
+               for (const auto& type : collision.types)
+                  std::cerr << " " << type;
+               std::cerr << std::endl;
+            }
+            return 1;
+         }
+         schema.checkValid();
+         std::cout << psio::to_ijson(schema);
       }
       else
       {

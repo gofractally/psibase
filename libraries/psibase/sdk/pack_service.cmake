@@ -358,8 +358,8 @@ function(psibase_package)
             json_append_key(postinstall sender ${service})
             json_append_key(postinstall service ${service})
             json_append_key(postinstall method init)
-            # init takes no arguments: the PSSZ of the empty tuple is no bytes
-            string(APPEND postinstall ",\"rawData\":\"\"")
+            # init takes no arguments
+            string(APPEND postinstall ",\"data\":{}")
             string(APPEND postinstall "}")
         endforeach()
         string(APPEND postinstall "]")
