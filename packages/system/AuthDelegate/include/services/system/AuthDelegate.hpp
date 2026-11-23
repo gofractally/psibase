@@ -100,12 +100,12 @@ namespace SystemService
                       NewAccountMode         mode);
 
       /// Returns the owner of `account`, if any
-      std::optional<psibase::AccountNumber> getOwner(psibase::AccountNumber account);
+      std::optional<psibase::AccountNumber> getOwner(psibase::AccountNumber owner);
 
       /// Returns the owner of `account`
       ///
       /// Aborts if the account has no owner.
-      psibase::AccountNumber checkOwner(psibase::AccountNumber account);
+      psibase::AccountNumber checkOwner(psibase::AccountNumber owner);
 
      private:
       psibase::Actor<AuthInterface> authServiceOf(psibase::AccountNumber account);

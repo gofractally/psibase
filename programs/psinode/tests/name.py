@@ -415,26 +415,40 @@ def is_hash_name(h):
     return (h & (0x01 << (64 - 8))) > 0
 
 def method_to_number(input):
-    input = input.replace('_', '')
+    """The number of a method name, as psio::compress_name gives it:
+    the compressed number if it decodes back to the name (in canonical
+    form: lower case, a digit or '_' as the letter of its symbol), the
+    hash of the name otherwise; 0 for text that names no method."""
     if len(input) == 0:
         return 0;
 
     model = Model(method_symbol_to_char, method_model_cf)
+    # A digit and '_' are coded as the letter of their symbol.
+    for i in range(10):
+        model.char_to_symbol[ord('0') + i] = i + 1
+    model.char_to_symbol[ord('_')] = 25
 
     if input[0] == '#':
-        input = input.lower()
         if len(input) != 17:
-            raise InvalidName()
+            return 0
 
         output = 0
         for i in range(1, 17):
-            sym = model.char_to_symbol[ord(input[i])] - 1
-            sym <<= 4 * (i - 1);
-            output |= sym
-        return output
+            sym = model.char_to_symbol[ord(input[i])] if ord(input[i]) < 256 else 0
+            if sym < 1 or sym > 16:
+                return 0
+            output |= (sym - 1) << (4 * (i - 1))
+        return output if is_hash_name(output) else 0
 
-    # TODO: handle hash name
-    return model.compress(input.lower(), MethodBitStream()).finish(input)
+    lowered = input.lower()
+    if any(ord(c) >= 256 or model.char_to_symbol[ord(c)] == 0 for c in lowered):
+        return 0
+    result = model.compress(lowered, MethodBitStream()).finish(input)
+    if not is_hash_name(result):
+        canonical = "".join(model.symbol_to_char[model.char_to_symbol[ord(c)]] for c in lowered)
+        if result == 0 or model.uncompress(result) != canonical:
+            result = seahash(input) | (1 << 56)
+    return result
 
 def number_to_method(input):
     model = Model(method_symbol_to_char, method_model_cf)

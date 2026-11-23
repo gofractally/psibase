@@ -9,6 +9,7 @@
 #include <variant>
 #include <vector>
 
+#include <psio/compress_name.hpp>
 #include <psio1/compress_name.hpp>
 
 namespace psio1
@@ -237,14 +238,20 @@ namespace psio1
 
    // TODO: rename. "hash_name" implies it's always a hash and
    //       doesn't indicate which name format
+   //
+   // TEMPORARY: removed when psio1 is deleted. PSIO's coder, so that the
+   // numbers this library looks methods up by (GraphQL, the legacy macro)
+   // are the ones psibase::MethodNumber gives: a name that does not decode
+   // back from its compressed number is hashed, where this library's own
+   // coder (psio1/compress_name.hpp) kept a cut-off code.
    inline constexpr uint64_t hash_name(std::string_view str)
    {
-      return detail::method_to_number(str);
+      return ::psio::detail::method_to_number(str);
    }
 
    inline constexpr bool is_compressed_name(uint64_t c)
    {
-      return not detail::is_hash_name(c);
+      return not ::psio::detail::is_hash_name(c);
    }
 
 }  // namespace psio1

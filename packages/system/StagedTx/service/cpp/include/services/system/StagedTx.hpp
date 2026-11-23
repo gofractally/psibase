@@ -29,7 +29,7 @@ namespace SystemService
       uint64_t               seq;
       bool                   accepted;
    };
-   PSIO_REFLECT(Response, id, account, accepted)
+   PSIO_REFLECT(Response, id, account, seq, accepted)
 
    /// A service for staged transaction proposal and execution
    ///

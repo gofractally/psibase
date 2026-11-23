@@ -356,54 +356,34 @@ fn method_number_schema_is_a_custom_type() {
     assert_eq!(custom.id, "MethodNumber");
 }
 
-/// psibase's method coder and `psio::compress_name` disagree on names whose
-/// arithmetic code runs past 64 bits in its last, partial byte. psibase
-/// (Rust) gives such a name its hash; PSIO (Rust and C++ alike, and
-/// psibase's C++ before it) keeps the truncated code, which is not marked as
-/// a hash and does not read back as the name. (They also differ on text that
-/// starts with `#` and is not 17 characters long, which names no method:
-/// psibase reads 0, PSIO `u64::MAX`.) Until that is settled `MethodNumber`
-/// keeps psibase's coder, so that no method number a Rust service uses today
-/// changes. This test pins the difference: it fails when the two agree, and
-/// the method half of `rust/psibase_names` can then give way to PSIO.
+/// `MethodNumber` is numbered by `psio::compress_name`: a name gets its
+/// compressed number only if that number decodes back to it, and its hash
+/// otherwise. The names below are the action names of the tree whose
+/// numbers changed with that rule (the old coders kept a cut-off code).
 #[test]
-fn method_names_whose_code_overflows_are_hashed_by_psibase_and_truncated_by_psio() {
+fn method_numbers_are_psios() {
     use psio::compress_name::{method_to_number, number_to_method};
-    for (name, psibase_number, psibase_text, psio_number, psio_text) in [
-        (
-            "getSymbolType",
-            0xd55df3070b8758eb_u64,
-            "#hmlnslheseoypnnp",
-            0x7ea96086faa7f7c0_u64,
-            "getsymboltyp",
-        ),
-        (
-            "checkFirstAuth",
-            0xcd29c38cde224f8e,
-            "#mlytiimpdlodcipd",
-            0x02865743c9374c7c,
-            "checkfirstautr",
-        ),
-        (
-            "get_resources",
-            0xd5137f98107c0181,
-            "#alaedsealcysoanp",
-            0xb2a0545cdfc9f9c0,
-            "getqresourcerv",
-        ),
+    for (name, number, text) in [
+        ("getSymbolType", 0xd55df3070b8758eb_u64, "#hmlnslheseoypnnp"),
+        ("checkFirstAuth", 0xcd29c38cde224f8e, "#mlytiimpdlodcipd"),
+        ("get_resources", 0xd5137f98107c0181, "#alaedsealcysoanp"),
+        ("cpu_min_unit", 0x13fb233a1d98cbd8, "#lphdlcpauooihyoa"),
+        ("frozenAccounts", 0x27303f52c1c094da, "#uptcedadinyoeosi"),
+        ("regEvIdx", 0x413db64868a8ec0f, "#yedmlulrltrhpoat"),
+        ("removeCallback", 0x978d530fdfe275cb, "#hdnsimypyeonplsc"),
+        ("rowsBySecondary", 0x83a92f4d480665a6, "#runrreltptyicuol"),
+        ("create_request", 0xf997f22d796b5e2b, "#himnhrcspiiysccy"),
+        ("set_paid_occ", 0x15d82d05366fa15c, "#dnauyrronepilpna"),
     ] {
-        assert_eq!(method(name).value, psibase_number, "{name}");
-        assert_eq!(method(name).to_string(), psibase_text, "{name}");
+        assert_eq!(method(name).value, number, "{name}");
+        assert_eq!(method(name).to_string(), text, "{name}");
+        assert_eq!(method_to_number(name), number, "{name}");
+        assert_eq!(number_to_method(number), text, "{name}");
         assert_eq!(
             psio::from_ijson::<MethodNumber>(&format!("\"{name}\"")).unwrap(),
             method(name)
         );
-        assert_eq!(method_to_number(name), psio_number, "{name}");
-        assert_eq!(number_to_method(psio_number), psio_text, "{name}");
     }
-    assert_eq!(method("#abc").value, 0);
-    assert_eq!(method_to_number("#abc"), u64::MAX);
-    // Everywhere else the two coders agree, in both directions.
     for name in [
         "",
         "transfer",
@@ -414,6 +394,7 @@ fn method_names_whose_code_overflows_are_hashed_by_psibase_and_truncated_by_psio
         "someVeryLongMethodNameThatHashes",
         "#nradiemmicaayrpu",
         "bad name",
+        "#abc",
     ] {
         assert_eq!(method(name).value, method_to_number(name), "{name}");
         assert_eq!(

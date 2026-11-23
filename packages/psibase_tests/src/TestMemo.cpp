@@ -15,13 +15,13 @@ std::string TestMemo::testView(view<const Memo> memo)
 {
    return memo.contents();
 }
-void TestMemo::testJson(const std::string& data)
+void TestMemo::testJson(const std::string& memo)
 {
-   psio1::convert_from_json<Memo>(data);
+   psio1::convert_from_json<Memo>(memo);
 }
-void TestMemo::testConstruct(const std::string& data)
+void TestMemo::testConstruct(const std::string& memo)
 {
-   Memo{data};
+   Memo{memo};
 }
 
 PSIBASE_DISPATCH(TestMemo)

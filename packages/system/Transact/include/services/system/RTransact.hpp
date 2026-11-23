@@ -275,7 +275,7 @@ namespace SystemService
 
       std::optional<psibase::SignedTransaction>                    next();
       std::optional<std::vector<std::optional<psibase::RunToken>>> preverify(
-          psio1::view<const psibase::SignedTransaction> trx);
+          psio1::view<const psibase::SignedTransaction> transaction);
       // Handles transactions coming over P2P
       void recv(const psibase::SignedTransaction& transaction);
       // Callbacks used to track successful/expired transactions

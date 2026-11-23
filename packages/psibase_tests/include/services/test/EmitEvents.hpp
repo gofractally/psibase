@@ -36,7 +36,7 @@ namespace TestService
 
       psibase::EventNumber foo(std::string s, int i);
       void                 foo2(std::string s, int i);
-      psibase::EventNumber emitMerkle(std::string);
+      psibase::EventNumber emitMerkle(std::string s);
       psibase::EventNumber emitFail(std::string s, int i);
       void                 emitExample(ExampleRecord r);
 

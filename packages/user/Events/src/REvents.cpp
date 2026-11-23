@@ -1163,10 +1163,10 @@ static std::vector<char> sqlQueryImpl(AccountNumber                   user,
    return result;
 }
 
-std::vector<char> REvents::sqlQuery(const std::string&              squery,
+std::vector<char> REvents::sqlQuery(const std::string&              query,
                                     const std::vector<std::string>& params)
 {
-   return sqlQueryImpl(getSender(), squery, params);
+   return sqlQueryImpl(getSender(), query, params);
 }
 
 std::optional<HttpReply> REvents::serveSys(const HttpRequest&           request,

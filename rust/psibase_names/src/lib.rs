@@ -1,17 +1,12 @@
-//! Rust support for Psibase name types
+//! Rust support for Psibase account names
 //!
-//! [Psibase](https://psibase.io) compresses account names and method
-//! names into 64 bits. This library provides the raw conversion
-//! functions; the more-usable wrappers live in the
-//! [psibase crate](https://docs.rs/psibase).
+//! [Psibase](https://psibase.io) compresses account names into 64 bits.
+//! This library provides the raw conversion functions; the more-usable
+//! wrapper lives in the [psibase crate](https://docs.rs/psibase).
+//!
+//! Method names are numbered by PSIO (`psio::compress_name`).
 
 mod account_number;
-mod constants;
-mod frequency;
-mod method_number;
-mod method_to_number_converter;
 mod name_encoder;
-mod number_to_string_converter;
 
 pub use account_number::*;
-pub use method_number::*;

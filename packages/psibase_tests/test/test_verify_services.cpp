@@ -70,6 +70,76 @@ namespace
    }
 }  // namespace
 
+// SetCode keeps one copy of each code and counts the accounts (and staged
+// uploads) that name it; the copy is erased with its last reference.
+TEST_CASE("SetCode: code is kept while referenced and erased with its last reference")
+{
+   DefaultTestChain t;
+   constexpr auto   first  = AccountNumber{"refcount1"};
+   constexpr auto   second = AccountNumber{"refcount2"};
+   constexpr auto   stager = AccountNumber{"refcount3"};
+   const char*      file   = "AbortService.wasm";
+
+   auto setCode = [&](AccountNumber account, const char* filename)
+   {
+      transactor<SetCode> setCode{account, SetCode::service};
+      auto                code = filename ? readWholeFile(filename) : std::vector<char>{};
+      // A new block each time: the same action is pushed more than once.
+      t.startBlock();
+      return t.pushTransaction(t.makeTransaction({setCode.setCode(account, 0, 0, code)}));
+   };
+
+   t.addService(first, file);
+   t.addService(second, file);
+   t.addAccount(stager);
+   const auto row = t.kvGet<CodeRow>(CodeRow::db, codeKey(first)).value();
+   {
+      const auto other = t.kvGet<CodeRow>(CodeRow::db, codeKey(second)).value();
+      REQUIRE(other.codeHash == row.codeHash);
+      REQUIRE(other.vmType == row.vmType);
+      REQUIRE(other.vmVersion == row.vmVersion);
+   }
+   auto stored = [&]
+   {
+      return t
+          .kvGet<CodeByHashRow>(CodeByHashRow::db,
+                                codeByHashKey(row.codeHash, row.vmType, row.vmVersion))
+          .has_value();
+   };
+   REQUIRE(stored());
+
+   // Deploying what an account already runs changes nothing.
+   expect(setCode(first, file));
+   CHECK(stored());
+
+   // One of two references goes: the code stays, the other account runs it.
+   expect(setCode(first, nullptr));
+   CHECK(!t.kvGet<CodeRow>(CodeRow::db, codeKey(first)).has_value());
+   CHECK(stored());
+
+   // A staged upload is a reference too.
+   {
+      transactor<SetCode> stage{stager, SetCode::service};
+      expect(t.pushTransaction(
+          t.makeTransaction({stage.stageCode(second, 7, 0, 0, readWholeFile(file))})));
+   }
+   expect(setCode(second, nullptr));
+   CHECK(stored());
+
+   // The last reference goes: the code is erased.
+   {
+      transactor<SetCode> stage{stager, SetCode::service};
+      expect(t.pushTransaction(t.makeTransaction({stage.unstageCode(second, 7)})));
+   }
+   CHECK(!stored());
+
+   // It can be deployed again, and is erased again.
+   expect(setCode(first, file));
+   CHECK(stored());
+   expect(setCode(first, nullptr));
+   CHECK(!stored());
+}
+
 TEST_CASE("Verify service tracking")
 {
    DefaultTestChain t;

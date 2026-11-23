@@ -58,18 +58,18 @@ namespace SystemService
       table.put(AuthDelegateRecord{.account = getSender(), .owner = owner});
    }
 
-   std::optional<psibase::AccountNumber> AuthDelegate::getOwner(psibase::AccountNumber account)
+   std::optional<psibase::AccountNumber> AuthDelegate::getOwner(psibase::AccountNumber owner)
    {
-      if (auto row = open<AuthDelegateTable>(KvMode::read).getIndex<0>().get(account))
+      if (auto row = open<AuthDelegateTable>(KvMode::read).getIndex<0>().get(owner))
          return row->owner;
       return std::nullopt;
    }
 
-   psibase::AccountNumber AuthDelegate::checkOwner(psibase::AccountNumber account)
+   psibase::AccountNumber AuthDelegate::checkOwner(psibase::AccountNumber owner)
    {
-      auto owner = getOwner(account);
-      check(owner.has_value(), "account does not have an owning account");
-      return *owner;
+      auto result = getOwner(owner);
+      check(result.has_value(), "account does not have an owning account");
+      return *result;
    }
 
    Actor<AuthInterface> AuthDelegate::authServiceOf(psibase::AccountNumber account)

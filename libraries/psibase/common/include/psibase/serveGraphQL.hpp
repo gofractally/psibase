@@ -709,7 +709,7 @@ namespace psibase
 
    struct EventQueryInterface
    {
-      std::string sqlQuery(const std::string& squery, const std::vector<std::string>& params);
+      std::string sqlQuery(const std::string& query, const std::vector<std::string>& params);
    };
    PSIO_REFLECT(EventQueryInterface, method(sqlQuery, query, params))
 

@@ -15,9 +15,11 @@ namespace psibase
    /// A memo is a human readable string that is passed as an action argument.
    /// A memo must be valid UTF-8 and not longer than 80 bytes.
    ///
-   /// A memo is its text wherever it is serialized (`transparent()`): the
-   /// same bytes, key and JSON as the string. A reader that checks its
-   /// input rejects text that is not a memo (`invariant(wellFormed)`).
+   /// A memo is its text wherever it is serialized (`transparent()`), and
+   /// that text is a UTF-8 string of at most 80 bytes
+   /// (`attr(contents, utf8 | max<80>)`): the bytes, key, JSON and schema of
+   /// that bounded string. Every reader and writer that checks rejects text
+   /// that is not a memo.
    struct Memo
    {
       static constexpr uint8_t maxBytes = 80;
@@ -56,13 +58,7 @@ namespace psibase
             psibase::check(false, reason);
          return true;
       }
-      static psio::codec_status wellFormed(const Memo& memo) noexcept
-      {
-         if (const char* reason = invalid(memo.contents))
-            return psio::codec_fail(reason, 0, "Memo");
-         return psio::codec_ok();
-      }
-      PSIO_REFLECT(Memo, transparent(), invariant(wellFormed), contents)
+      PSIO_REFLECT(Memo, transparent(), attr(contents, utf8 | max<maxBytes>))
    };
 
 }  // namespace psibase

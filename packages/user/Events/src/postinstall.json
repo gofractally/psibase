@@ -32,7 +32,7 @@
   {
     "sender": "transact",
     "service": "transact",
-    "method": "regevidx",
+    "method": "regEvIdx",
     "data": {
       "service": "events"
     }

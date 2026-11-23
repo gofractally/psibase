@@ -16,7 +16,7 @@ namespace UserService
       std::vector<char> sqlQuery(const std::string& query, const std::vector<std::string>& params);
 
       // Standard HTTP API
-      std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest&,
+      std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest&          request,
                                                  std::optional<std::int32_t>           socket,
                                                  std::optional<psibase::AccountNumber> user);
    };

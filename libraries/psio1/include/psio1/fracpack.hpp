@@ -1,5 +1,6 @@
 #pragma once
 
+#include <psio1/canonical_bounded.hpp>
 #include <psio1/reflect.hpp>
 #include <psio1/stream.hpp>
 
@@ -25,6 +26,16 @@ namespace psio1
    {
       if (auto status = ::psio::check_invariant(value); !status.ok())
          abort_error(status.error().what);
+      return true;
+   }
+
+   // A transparent() type whose member PSIO bounds is checked against that
+   // bound (canonical_bounded.hpp).
+   template <typename T>
+      requires canonical_bounded_wrapper_v<T>
+   bool psio_validate_packable(const T& value)
+   {
+      canonical_check_bounded(value);
       return true;
    }
 
@@ -70,7 +81,8 @@ namespace psio1
    // The PSIO invariant of a transparent() type, checked on packed data that
    // is validated without being unpacked.
    template <typename T>
-      requires(::psio::is_transparent_v<T> && ::psio::has_invariant_v<T>)
+      requires(::psio::is_transparent_v<T> &&
+               (::psio::has_invariant_v<T> || canonical_bounded_wrapper_v<T>))
    bool psio_validate_packable(const view<const T>& value)
    {
       return psio_validate_packable(value.unpack());

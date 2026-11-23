@@ -85,7 +85,10 @@ namespace
    };
 }  // namespace
 
-static_assert(psio::is_transparent_v<Memo> && psio::has_invariant_v<Memo>);
+// A memo is a bounded UTF-8 string: the bound is in its declaration.
+static_assert(psio::is_transparent_v<Memo> && !psio::has_invariant_v<Memo>);
+static_assert(psio::max_encoded_size<Memo>() == 80);
+static_assert(psio::max_encoded_size<Memo>() == psio::max_encoded_size<psio::utf8_string<80>>());
 static_assert(psio::is_transparent_v<Precision> && psio::has_invariant_v<Precision>);
 static_assert(psio::is_transparent_v<LocalService::Auth::Account>);
 static_assert(psio::is_transparent_v<LocalService::Auth::LocalUsername>);
@@ -104,9 +107,10 @@ TEST_CASE("Memo: it is its text in PSSZ, key and I-JSON", "[wrappers]")
    CHECK(psio::to_ijson(memo) == "\"h\xc3\xa9llo\"");
    CHECK(psio::from_pssz<Memo>(psio::to_pssz(memo)).contents == text);
 
-   // In a record it takes the place of a string.
+   // In a record it takes the place of a UTF-8 string of at most 80 bytes
+   // (the bound can select a narrower offset than an unbounded string has).
    CHECK(psio::to_pssz(std::tuple{std::uint8_t{7}, memo}) ==
-         psio::to_pssz(std::tuple{std::uint8_t{7}, text}));
+         psio::to_pssz(std::tuple{std::uint8_t{7}, psio::utf8_string<80>{text}}));
 }
 
 TEST_CASE("Memo: text that is not a memo is rejected by every checking reader", "[wrappers]")
@@ -116,15 +120,14 @@ TEST_CASE("Memo: text that is not a memo is rejected by every checking reader", 
    CHECK(psio::validate_pssz<Memo>(psio::to_pssz(std::string(80, 'a'))).ok());
    CHECK(!psio::validate_pssz<Memo>(psio::to_pssz(longText)).ok());
    CHECK(!psio::validate_pssz<Memo>(psio::to_pssz(notUtf8)).ok());
-   CHECK(std::string_view{psio::validate_pssz<Memo>(psio::to_pssz(longText)).error().what} ==
-         "Memo exceeds 80 bytes");
-   CHECK(std::string_view{psio::validate_pssz<Memo>(psio::to_pssz(notUtf8)).error().what} ==
-         "Memo must be valid UTF-8");
    // inside a record too
    using Args = std::tuple<std::uint32_t, Memo>;
-   CHECK(psio::validate_pssz<Args>(psio::to_pssz(std::tuple{std::uint32_t{1}, std::string{"ok"}}))
-             .ok());
-   CHECK(!psio::validate_pssz<Args>(psio::to_pssz(std::tuple{std::uint32_t{1}, longText})).ok());
+   CHECK(psio::validate_pssz<Args>(psio::to_pssz(std::tuple{std::uint32_t{1}, Memo{"ok"}})).ok());
+   // The bytes of a record whose string is too long for a memo.
+   using Wide = std::tuple<std::uint32_t, psio::utf8_string<255>>;
+   CHECK(!psio::validate_pssz<Args>(
+              psio::to_pssz(Wide{std::uint32_t{1}, psio::utf8_string<255>{longText}}))
+              .ok());
 
    CHECK(readsJson<Memo>("\"hello\""));
    CHECK(!readsJson<Memo>("\"" + longText + "\""));

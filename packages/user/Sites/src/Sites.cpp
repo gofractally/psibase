@@ -831,7 +831,7 @@ namespace SystemService
          std::string            globalCsp = "";
          std::string            proxy     = "";
       };
-      PSIO_REFLECT(SiteConfig, account, spa, cache, globalCsp)
+      PSIO_REFLECT(SiteConfig, account, spa, cache, globalCsp, proxy)
 
       struct Query
       {

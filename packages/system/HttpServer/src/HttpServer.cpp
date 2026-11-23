@@ -87,12 +87,12 @@ namespace SystemService
       }
    }
 
-   void HttpServer::sendProds(const Action& act)
+   void HttpServer::sendProds(const Action& action)
    {
-      if (getSender() != act.service)
-         psibase::abortMessage(getSender().str() + " cannot send messages to " + act.service.str());
-      checkRecvAuth(act);
-      to<XHttp>().send(producer_multicast, psio1::to_frac(act), 0);
+      if (getSender() != action.service)
+         psibase::abortMessage(getSender().str() + " cannot send messages to " + action.service.str());
+      checkRecvAuth(action);
+      to<XHttp>().send(producer_multicast, psio1::to_frac(action), 0);
    }
 
    namespace

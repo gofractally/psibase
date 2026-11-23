@@ -227,12 +227,9 @@ pub fn psio_interface_fn(f: &ItemFn) -> proc_macro2::TokenStream {
 /// Two actions of one service may not share a method number: the
 /// dispatcher could reach only one of them.
 ///
-/// `method_number` is psibase's own method-name coder
-/// (`psibase_names::method_number_from_str`). PSIO's
-/// (`psio::compress_name::method_to_number`) replaces it, here and in
-/// `method_raw!`, once it hashes every name whose code does not read back
-/// (doc/pssz-conversion.md, RG12); `psio::interface::MethodTable` then makes
-/// the same check over the generated interface.
+/// `method_number` is PSIO's method-name coder
+/// (`psio::compress_name::method_to_number`), handed in by the proc-macro
+/// crate; it is the one `MethodNumber` and `method_raw!` use.
 pub fn check_method_number(
     method_number: &dyn Fn(&str) -> u64,
     f: &ItemFn,

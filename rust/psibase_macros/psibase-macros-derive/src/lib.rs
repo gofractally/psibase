@@ -388,7 +388,7 @@ pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
     service_macro_impl(
         proc_macro2::TokenStream::from(attr),
         proc_macro2::TokenStream::from(item),
-        &psibase_names::method_number_from_str,
+        &psio::compress_name::method_to_number,
     )
     .into()
 }

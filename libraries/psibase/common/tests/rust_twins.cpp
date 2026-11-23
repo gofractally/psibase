@@ -22,6 +22,7 @@
 #include <psibase/trace.hpp>
 #include <services/system/AuthDelegate.hpp>
 #include <services/system/SetCode.hpp>
+#include <services/system/StagedTx.hpp>
 #include <services/user/Packages.hpp>
 #include <services/user/tokenTypes.hpp>
 
@@ -258,6 +259,13 @@ namespace
       f.add<NotifyRow>("NotifyRow", {NotifyRow{}, NotifyRow{NotifyType::acceptTransaction, {action}}});
       f.add<RunMode>("RunMode", {RunMode::verify, RunMode::speculative, RunMode::rpc,
                                  RunMode::callback});
+
+      // Records of services that are implemented in Rust and mirrored in a C++
+      // header.
+      f.add<SystemService::Response>(
+          "Response",
+          {SystemService::Response{},
+           SystemService::Response{7, AccountNumber{"alice"}, 0x0102030405060708, true}});
 
       // Services: the interface (functions, parameter names and types,
       // results) and the arguments of sample calls.

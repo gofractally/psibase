@@ -313,8 +313,10 @@ fn rust_and_cpp_declare_the_same_types() {
     same_key::<MethodNumber>(&f, "MethodNumber");
     same_text::<MethodNumber>(&f, "MethodNumber");
 
-    // Wrappers and token amounts (slice R2). `Memo` is checked on its own
-    // below: its two declarations are not the same yet.
+    // Wrappers and token amounts (slice R2). A memo is a UTF-8 string of at
+    // most 80 bytes in both languages, declared as a bound.
+    same_schema_and_bytes::<Memo>(&mut f, "Memo", Same);
+    same_text::<Memo>(&f, "Memo");
     same_schema_and_bytes::<Precision>(&mut f, "Precision", Same);
     same_key::<Precision>(&f, "Precision");
     same_text::<Precision>(&f, "Precision");
@@ -393,6 +395,9 @@ fn rust_and_cpp_declare_the_same_types() {
     same_key::<RunMode>(&f, "RunMode");
     same_text::<RunMode>(&f, "RunMode");
 
+    // Records of services implemented in Rust, mirrored in C++ headers.
+    same_schema_and_bytes::<services::staged_tx::service::Response>(&mut f, "Response", Same);
+
     // What Rust writes today: the legacy declarations pack what C++ packs.
     // (`Decimal` has no legacy codec in Rust.)
     macro_rules! legacy {
@@ -403,7 +408,6 @@ fn rust_and_cpp_declare_the_same_types() {
             assert_eq!(with_legacy, f.checked, "every type's legacy bytes are checked");
         };
     }
-    f.checked.insert("Memo".to_string());
     legacy! {
         "AccountNumber" => AccountNumber, "MethodNumber" => MethodNumber, "Memo" => Memo,
         "Precision" => Precision, "Quantity" => Quantity,
@@ -427,9 +431,8 @@ fn rust_and_cpp_declare_the_same_types() {
         "StateSignature" => StateSignature, "SnapshotStateItem" => SnapshotStateItem,
         "SnapshotRow" => SnapshotRow, "ConfigRow" => ConfigRow, "LogMessage" => LogMessage,
         "NotifyRow" => NotifyRow, "RunMode" => RunMode,
+        "Response" => services::staged_tx::service::Response,
     }
-
-    memo_differs_only_in_its_declared_bound(&mut f);
 
     let in_fixture: BTreeSet<String> = f.vectors.iter().map(|(ty, _)| ty.clone()).collect();
     assert_eq!(
@@ -473,56 +476,6 @@ fn borrowed_records_write_the_bytes_of_the_owned_ones(f: &Fixture) {
             assert_eq!(hex(&psio::to_pssz(shared)), hex(&psio::to_pssz(owned)));
         }
     }
-}
-
-/// `Memo`. Rust declares what the type is to be at the wire flip: a UTF-8
-/// string of at most 80 bytes, stated as a bound (`#[psio(max = 80)]`). C++
-/// still declares a raw string with an invariant that checks the same two
-/// things. A memo's bytes and text are the same in both; the schema
-/// node is not, and inside a record the bound can select a narrower offset
-/// width. This test pins exactly that difference, so it fails when C++
-/// declares the bound and the two can be compared like every other type.
-fn memo_differs_only_in_its_declared_bound(f: &mut Fixture) {
-    f.checked.insert("Memo".to_string());
-    for vector in f.vectors("Memo") {
-        let value = psio::from_pssz::<Memo>(&vector.pssz).unwrap();
-        assert_eq!(hex(&psio::to_pssz(&value)), hex(&vector.pssz));
-        // (No key: a Rust `Memo` is not a PSIO key; see `psibase::Memo`.)
-        assert_eq!(psio::to_ijson(&value), vector.ijson);
-        assert_eq!(
-            hex(&psio::to_pssz(
-                &psio::from_ijson::<Memo>(&vector.ijson).unwrap()
-            )),
-            hex(&vector.pssz)
-        );
-    }
-
-    let (ours, root) = schema_for::<Memo>().unwrap();
-    let ours = resolved(&ours, &root, Same);
-    let theirs = resolved(&f.schema, f.schema.get("Memo").unwrap(), Same);
-    assert_ne!(
-        ours, theirs,
-        "Memo: the schemas are equal now; check it like the others"
-    );
-    // Rust: UTF-8 text of at most 80 bytes.
-    let V::Custom(text) = &ours.value else {
-        panic!("Memo is not a string in Rust's schema: {ours:?}")
-    };
-    assert_eq!(text.id, "utf8");
-    let V::BoundedList(bytes) = &text.r#type.value else {
-        panic!("Memo has no bound in Rust's schema: {ours:?}")
-    };
-    assert_eq!(bytes.maxCount, 80);
-    // C++: the custom type `Memo` over an unbounded raw string.
-    let V::Custom(memo) = &theirs.value else {
-        panic!("Memo is not a custom type in the C++ schema: {theirs:?}")
-    };
-    assert_eq!(memo.id, "Memo");
-    let V::Custom(text) = &memo.r#type.value else {
-        panic!("Memo is not over a string in the C++ schema: {theirs:?}")
-    };
-    assert_eq!(text.id, "string");
-    assert!(matches!(text.r#type.value, V::List(_)));
 }
 
 // ── Services ────────────────────────────────────────────────────────────────

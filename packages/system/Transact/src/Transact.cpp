@@ -252,14 +252,14 @@ namespace SystemService
       }
    }
 
-   void Transact::addCallback(CallbackType type, bool objective, psibase::Action act)
+   void Transact::addCallback(CallbackType type, bool objective, psibase::Action action)
    {
       auto me = getReceiver();
       check(getSender() == me, "Wrong sender");
       auto _ = recurse();
       if (objective)
       {
-         check(act.sender == me, "Objective callbacks must have 'transact' as sender");
+         check(action.sender == me, "Objective callbacks must have 'transact' as sender");
          checkObjectiveCallback(type);
          Tables tables(me);
          auto   table = tables.open<CallbacksTable>();
@@ -269,15 +269,15 @@ namespace SystemService
          {
             value = Callbacks{.type = type};
          }
-         if (!std::ranges::contains(value->actions, act))
+         if (!std::ranges::contains(value->actions, action))
          {
-            value->actions.push_back(std::move(act));
+            value->actions.push_back(std::move(action));
             table.put(*value);
          }
       }
       else
       {
-         check(act.sender == AccountNumber{}, "Subjective callbacks must not have a sender");
+         check(action.sender == AccountNumber{}, "Subjective callbacks must not have a sender");
          auto table = Native::tables().open<NotifyTable>();
          auto ntype = getNotifyType(type);
          auto value = table.get(ntype);
@@ -285,15 +285,15 @@ namespace SystemService
          {
             value = NotifyRow{.type = ntype};
          }
-         if (!std::ranges::contains(value->actions, act))
+         if (!std::ranges::contains(value->actions, action))
          {
-            value->actions.push_back(std::move(act));
+            value->actions.push_back(std::move(action));
             table.put(*value);
          }
       }
    }
 
-   void Transact::removeCallback(CallbackType type, bool objective, psibase::Action act)
+   void Transact::removeCallback(CallbackType type, bool objective, psibase::Action action)
    {
       auto me = getReceiver();
       check(getSender() == me, "Wrong sender");
@@ -305,7 +305,7 @@ namespace SystemService
          auto   index = table.getIndex<0>();
          if (auto value = index.get(type))
          {
-            auto pos = std::ranges::find(value->actions, act);
+            auto pos = std::ranges::find(value->actions, action);
             if (pos != value->actions.end())
             {
                value->actions.erase(pos);
@@ -323,7 +323,7 @@ namespace SystemService
          auto ntype = getNotifyType(type);
          if (auto value = table.get(ntype))
          {
-            auto pos = std::ranges::find(value->actions, act);
+            auto pos = std::ranges::find(value->actions, action);
             if (pos != value->actions.end())
             {
                value->actions.erase(pos);
@@ -1015,14 +1015,14 @@ namespace SystemService
          abortMessage(std::format("Work not completed: {}", remainingWork[0].str()));
    }
 
-   void Transact::execTrx(psio1::view<const psio1::shared_view_ptr<psibase::Transaction>> trx,
+   void Transact::execTrx(psio1::view<const psio1::shared_view_ptr<psibase::Transaction>> transaction,
                           bool                                                          speculative)
    {
       check(trxData.data() == nullptr, "Cannot reenter execTrx");
       auto sender = getSender();
       check(sender == AccountNumber{} || sender == RTransact::service, "Wrong sender");
       auto _ = recurse();
-      processTransactionImpl(trx, speculative);
+      processTransactionImpl(transaction, speculative);
    }
 
    void Transact::kvNotify(AccountNumber service,

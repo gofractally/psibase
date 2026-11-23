@@ -60,7 +60,7 @@ namespace SystemService
       void init();
 
       void setConsensus(psibase::ConsensusData consensus);
-      void setProducers(std::vector<psibase::Producer> prods);
+      void setProducers(std::vector<psibase::Producer> producers);
       void regCandidate(const std::string& endpoint, psibase::Claim claim);
       void unregCand();
 

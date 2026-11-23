@@ -609,45 +609,45 @@ bool XHttp::isSecure(int32_t socket)
    return hasTls(socketRow.value().info);
 }
 
-auto XHttp::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
+auto XHttp::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
     -> std::optional<HttpReply>
 {
    check(getSender() == XHttp::service, "Wrong sender");
 
-   if (auto reply = to<XAdmin>().checkAuth(req, socket))
+   if (auto reply = to<XAdmin>().checkAuth(request, socket))
       return reply;
 
-   if (req.method == "OPTIONS")
-      return HttpReply{.headers = allowCors(req, {XAdmin::service, AccountNumber{"x-proxy"}})};
+   if (request.method == "OPTIONS")
+      return HttpReply{.headers = allowCors(request, {XAdmin::service, AccountNumber{"x-proxy"}})};
 
-   auto target = req.path();
+   auto target = request.path();
    if (target == "/register_server")
    {
-      if (req.method != "POST")
-         return HttpReply::methodNotAllowed(req);
+      if (request.method != "POST")
+         return HttpReply::methodNotAllowed(request);
 
-      if (req.contentType != "application/json")
+      if (request.contentType != "application/json")
          return error(HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
 
       auto body = psio1::convert_from_json<RegisteredServiceRow>(
-          std::string(req.body.begin(), req.body.end()));
+          std::string(request.body.begin(), request.body.end()));
       PSIBASE_SUBJECTIVE_TX
       {
          open<RegServTable>().put(body);
       }
-      return HttpReply{.headers = allowCors(req, {XAdmin::service, AccountNumber{"x-proxy"}})};
+      return HttpReply{.headers = allowCors(request, {XAdmin::service, AccountNumber{"x-proxy"}})};
    }
 
    if (target == "/unregister_server")
    {
-      if (req.method != "POST")
-         return HttpReply::methodNotAllowed(req);
+      if (request.method != "POST")
+         return HttpReply::methodNotAllowed(request);
 
-      if (req.contentType != "application/json")
+      if (request.contentType != "application/json")
          return error(HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
 
       auto service =
-          psio1::convert_from_json<AccountNumber>(std::string(req.body.begin(), req.body.end()));
+          psio1::convert_from_json<AccountNumber>(std::string(request.body.begin(), request.body.end()));
       PSIBASE_SUBJECTIVE_TX
       {
          auto serverTable = open<RegServTable>();
@@ -655,7 +655,7 @@ auto XHttp::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
             return error(HttpStatus::notFound, "Service is not registered");
          serverTable.erase(service);
       }
-      return HttpReply{.headers = allowCors(req, {XAdmin::service, AccountNumber{"x-proxy"}})};
+      return HttpReply{.headers = allowCors(request, {XAdmin::service, AccountNumber{"x-proxy"}})};
    }
 
    return {};
