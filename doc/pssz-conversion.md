@@ -5074,3 +5074,53 @@ seven malformed bodies. Those cases pass with the fix; they were not run
 against the code before it, and some of them would have been answered
 with a 400 there too (a default `SignedTransaction` has no action), so
 they cover the paths rather than prove the defect.
+
+## 7. Merge
+
+The two halves of the flip in one tree: `claude/pssz-flip-cpp` (`7739b4bd1`,
+sections 1.17–1.25) merged into `claude/pssz` (`32237614e`, section 6.26)
+by the merge commit `9e6fc2e29`. This section is the handover of the merge:
+state, what passes, every failure met and its class, and how to repeat
+each check. `doc/merge-checklist.md` is the plan this followed.
+
+### 7.1 The merge commit
+
+Recomputed overlap (22 paths, checklist section 2). Conflicts and their
+resolution: `Nft.hpp`, `Tokens.hpp` and `rust-twins.json` take the C++
+branch (the fixture was regenerated next); `doc/pssz-conversion.md` keeps
+both halves (the two header rows merged). Git merged the rest by itself:
+`rust_twins.cpp` (the C++ branch's version with the `names` addition),
+`Symbol.hpp`, `rust/Cargo.toml`, `rust/CMakeLists.txt`, `rust/Cargo.lock`,
+`rust/gen-cpp-doc/src/main.rs` (without the `psio1` include lines), the
+pin files (identical). `Memo.hpp` needs nothing from the deleted
+`canonical_bounded.hpp`.
+
+**The merge commit builds completely** (`build-merge1.log`, exit 0),
+`share/psibase/packages/index.json` included: the step neither half could
+run.
+
+### 7.2 Failures met, classified
+
+Classes: **Rust** bug, **C++** bug, **interop** (a side deviates from
+`doc/flip-interop.md`, or the document is silent), **PSIO** (bug or gap:
+not worked around, reproduction given), **engine** (VM, storage), **test**
+(an expectation that pinned the old format; updated, not weakened).
+
+| # | Where it showed | Failure | Class | Resolution |
+|---|---|---|---|---|
+| M1 | `psio_twins` | `NewAccountMode`: C++ `Custom{Enum, "NewAccountMode"}` (its invariant), Rust a bare `Enum` | interop, Rust deviated | `#[psio(custom = "NewAccountMode")]` on the Rust enum |
+| M2 | `psio_twins` | types that hold a variant (`IPAddress`, `SocketEndpoint`, `ServiceSchema` through the Schema IR's `AnyValue`): C++ labels the alternatives `"0"`, `"1"` with `ijsonName`, Rust by identifier; same bytes, same text, unequal nodes | PSIO (the open rule of flip-interop 0.1) | not worked around: these three are compared with PSIO's `equivalent(…, Compare::Wire)` and their texts through the values; the test fails when the nodes become equal. Every other type is compared node for node |
+| M3 | writing the twin of `XProxy::onError` / `XPeers::errP2P` | a Rust service could not declare a capped argument list: the service macro dropped `#[pssz(max_dynamic_data = N)]` | Rust | `psio_interface_fn` hands `#[pssz(…)]` / `#[psio(…)]` of an action to the PSIO interface. The spelling in flip-interop (`max_dynamic_data = 4294967295`) is right: same bytes as C++ for both callbacks, with and without a reply |
+| M4 | `verify_schema` (Rust lib tests over the built packages) | `r-events::sqlQuery` returns `std::vector<char>` in C++, `String` in the Rust view | Rust (mirror behind) | the view returns `Vec<u8>`; five callers read the bytes |
+| M5 | `verify_schema` | `WsTicketInfo::path`: the Rust service says `String`, the Rust view `RawString`, the C++ header a raw `std::string` | Rust view and C++ header behind the Rust service | view: `String`; header: `attr(path, utf8)` |
+| M6 | `verify_schema` | results of `http::rootHost`, `http::getSiblingUrl`, `x-http::rootHost`: C++ `std::string` (raw), Rust views `String` | interop: results were not on the list of strings that became UTF-8 (1.20) | the views return `psio::pssz::RawString`, which is what C++ declares; four callers use `to_string_lossy()`. Declaring `returns(utf8)` in C++ is the better end state but cannot reach the service schema today (M7) |
+| M7 | while fixing M6 | the Schema IR node of a method's result under its `returns(…)` annotation is built only inside `SchemaBuilder::insert_interface`; `ServiceSchema::makeActions` (`insert<wire result type>`) loses it | PSIO gap | reproduction `~/psibase-pssz-scratch-merge/psio_gap_result_node.cpp` (prints `"string"` for `insert<result>` and `"utf8"` for `insert_interface`). Wanted: a public `insert_method_result<T, I>()`. Also for the team: `Actor.hpp` reads a result as the plain wire type, not with `psio::decode_method_result` (same bytes for `utf8`; different for a bounded result) |
+| M8 | every `t-*` test (C++ tester boot) | `service 'transact' aborted with message: service exceeded its memory limit` on a boot transaction of 4 371 950 bytes (32 actions, one of 3 480 045) | C++ behaviour change (S6, "strict means canonical") over a PSIO property: `psio::validate_strict` for PSSZ decodes the value and allocates a second, canonical copy (`pssz.hpp` `validate_exact_materialized`); guests never free | **Open, for the owner and the team.** The largest transaction a chain processes dropped from at least 4.4 MiB to between 3.5 and 4.4 MiB (the Rust boot has the 3.48 MiB action in a transaction of its own and passes). Reproduction: `psitest AuthSig-test.wasm` at `6e3c7853d`. What changed here: the C++ tester groups boot transactions as the Rust boot does (flush before 1 MiB is exceeded; the two builders differed, flip-interop 1 "Boot transactions"), which no longer builds the 4.4 MiB transaction. The limit itself needs a non-materializing canonical check in PSIO, or fewer copies in Transact |
+| M9 | `t-Transact-test` | `invalid argument encoding for onverify: pssz: optional selector not 0/1` | C++ (tester; predicted in 1.23) | `TestChain::runQueueItem` packs the token as `optional<RunToken>`, as `BlockContext` does |
+| M10 | `t-Nft-test`, `t-Invite-test` | `Action aborted, no return value` where an action returned an empty optional | C++ (tester) | an empty optional is no bytes in PSSZ; `Result<T>` decodes the return value whatever its size. (`trace.cpp:428` still prints a result only when it has bytes: cosmetic) |
+| M11 | `t-Tokens-test` `CHECK_SCHEMA` | events of `tokens`: C++ header `tokenId`, `counterParty`; Rust service `token_id`, `counter_party` | C++ header behind the Rust service | header renamed |
+| M12 | `t-Events-test` | `json: missing required member "v" of TestEvent` | test | a query that selects some columns is read as a record of those columns (the legacy reader defaulted missing members) |
+| M13 | `t-psibase-tests` memo | `invalid argument encoding for testvalue: pssz: invalid record payload offset` | test: it sent a `std::string` where the service takes a `Memo`; a memo is a bounded string and the two argument lists have different offset widths (decided, flip-interop 0.1) | the test sends memos; the over-long memo as hand-made bytes, refused by the dispatcher; and it pins that the string form is another encoding |
+| M14 | `t-psibase-tests` merkle | four pinned roots | test (old-format bytes) | roots over PSSZ leaves, recomputed independently from the rule (leaf `00`·bytes, node `01`·left·right) |
+| M15 | `rs-test-VirtualServer` | `Expected exactly 93 bytes freed … got 92` | test (old-format size) | the `IncludedTrx` row is one byte shorter in PSSZ (a one-byte header): 92 |
+| M16 | Python tests | `fracpack.py` writes the legacy bytes | harness | 7.4 |

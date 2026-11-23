@@ -1,5 +1,10 @@
 # Merging the C++ flip (`claude/pssz-flip-cpp`) into the Rust flip (`claude/pssz`)
 
+**Done: `doc/pssz-conversion.md` section 7 records the merge, what each
+step found and the state.** The temporary items of section 1 are removed;
+the fixture has the additions listed there. This file is kept as the plan
+that was followed.
+
 For whoever does the merge. Both branches descend from `7ae0dde70`. Each
 half works alone only up to the language boundary: in `claude/pssz` every
 byte Rust writes, reads, keys, describes or prints as JSON is PSIO's while
