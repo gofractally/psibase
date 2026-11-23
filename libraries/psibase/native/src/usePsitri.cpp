@@ -605,7 +605,10 @@ namespace psibase
       std::array<storage::delta, numChainDatabases>  pending;
       std::vector<Frame>                             frames;
       // The changes of one database are folded into its tree early once they
-      // hold this much; their memory is one region of at most 4 GiB.
+      // hold this much; their memory is one region of at most 4 GiB. The most
+      // a session can hold aside is therefore this plus one value (16 MiB at
+      // most) for each chain database. The region is given back to the
+      // allocator, not kept on the thread, once it has grown past 8 MiB.
       static constexpr std::uint64_t foldBytes = std::uint64_t(256) << 20;
       std::vector<char>                       keyBuffer;
       std::vector<char>                       valueBuffer;
@@ -674,6 +677,24 @@ namespace psibase
       // Make the trees current: apply every database's changes to its tree and
       // drop them. Each open nested session's saved trees are brought up to its
       // own mark first, so rolling back to it still gives what it saw.
+      //
+      // The order of the steps is what makes this safe to interrupt. apply()
+      // replaces a root only once its whole edit has succeeded, and it can
+      // throw part-way (the caller's budget is checked for every key). Each
+      // frame's tree is brought up to its mark and the mark reset together,
+      // and the session's own tree is brought up before the changes are
+      // cleared; whichever step an exception leaves from, every frame's tree
+      // plus its mark, and the session's tree plus the changes, still describe
+      // the same contents as before. Do not reorder.
+      //
+      // Cost: one edit per database for the session and one more per open
+      // nested session. Meant for once per block (or per snapshot batch), not
+      // once per transaction.
+      //
+      // When reached from put(), it runs under the budget of whatever
+      // transaction made the write, and a cancellation there fails that
+      // transaction like any other storage call it makes. The fold that ends
+      // a block runs from writeRevision(), outside any transaction.
       void fold()
       {
          check((bool)writeSession, "writeSession is missing");
@@ -1049,6 +1070,9 @@ namespace psibase
              auto        index  = static_cast<std::uint32_t>(DbId::prevAuthServices);
              auto        native = static_cast<std::uint32_t>(DbId::native);
              const auto& root   = revision.roots[index];
+             // Only ever replaced whole (setPrevAuthServices); a write kept
+             // aside for it would not be seen here.
+             check(impl->pending[index].empty(), "prevAuthServices has pending changes");
              if (!session.is_empty(root, {}, {}))
              {
                 auto result           = std::make_shared<Revision>();
