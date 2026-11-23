@@ -65,6 +65,106 @@ fn book(id: u64, bid: bool, price: u64, outgoing: u64) -> Pool {
     }
 }
 
+fn live_zero_gap(sell: bool) -> (Model, u64) {
+    let mut m = if sell {
+        let mut value = market(77_781_745_931, 12_856_486_932, 60_500);
+        value.quote_tick = 10_000;
+        model(value, vec![])
+    } else {
+        model(market(12_856_486_932, 77_781_745_931, 10_000), vec![])
+    };
+    m.market.k = 1_000_000_000_110_001_900_002_u128.into();
+    let price = if sell { 1 } else { 60_500 };
+    m.books.push(book(2, sell, price, 100_000));
+    (m, price)
+}
+
+#[test]
+fn zero_output_gap_before_head_fills_market_and_limit_without_relay_donation() {
+    for sell in [false, true] {
+        let (m, price) = live_zero_gap(sell);
+        let u = if sell { m.market.x } else { m.market.y };
+        let v = if sell { m.market.y } else { m.market.x };
+        let h = book_trigger(
+            m.market.k.get(),
+            sell,
+            price,
+            m.market.base_lot,
+            m.market.quote_tick,
+        );
+        assert_eq!(h - u, 3, "exact live 60500 boundary");
+        assert_eq!(relay(m.market.k.get(), u, v, h - u).2, 0);
+        for limit in [None, Some(price)] {
+            let mut s = seed(sell, 60_500);
+            s.limit = limit;
+            s.min_output = 10_000;
+            s.max_events = 1;
+            let p = plan(&m, Some(&s));
+            assert_eq!((p.seed_used, p.seed_output), (60_500, 10_000));
+            assert_eq!(
+                (p.model.market.x, p.model.market.y, p.model.market.k.get()),
+                (m.market.x, m.market.y, m.market.k.get())
+            );
+            let pool = &p.model.books[0];
+            assert_eq!((pool.incoming, pool.outgoing), (60_500, 90_000));
+            assert_eq!(
+                pool.index.get() * pool.shares as u128 + pool.dust.get(),
+                60_500 * Q
+            );
+            assert!(p.work < MAX_WORK);
+        }
+        let p = plan(&m, Some(&seed(sell, 60_499)));
+        assert_eq!((p.seed_used, p.seed_output), (0, 0));
+        assert_eq!(
+            (p.model.market.x, p.model.market.y),
+            (m.market.x, m.market.y)
+        );
+        assert!(!p.dirty_books[0]);
+    }
+}
+
+#[test]
+fn zero_gap_maker_does_not_bypass_limits_or_earlier_risk_boundaries() {
+    for sell in [false, true] {
+        let (mut m, price) = live_zero_gap(sell);
+        let u = if sell { m.market.x } else { m.market.y };
+        let v = if sell { m.market.y } else { m.market.x };
+        let k = m.market.k.get();
+        let h = book_trigger(k, sell, price, m.market.base_lot, m.market.quote_tick);
+        for risk in [u + 1, h - 1, h] {
+            assert!(!book_reachable(k, u, v, h, Some(risk)));
+        }
+        assert!(book_reachable(k, u, v, h, Some(h + 1)));
+        assert!(
+            !book_reachable(k, u, v, h + 100, None),
+            "real relay output retains price priority"
+        );
+        let mut s = seed(sell, 60_500);
+        s.limit = Some(if sell { price + 1 } else { price - 1 });
+        assert_eq!(
+            plan(&m, Some(&s)).seed_used,
+            0,
+            "maker outside reviewed limit"
+        );
+        m.stops.push(stop(3, sell, price, 60_500));
+        let p = plan(&m, Some(&seed(sell, 60_500)));
+        assert_eq!((p.seed_used, p.seed_output), (0, 0));
+        assert!(
+            !p.activated[0],
+            "a zero-output gap cannot activate an un-crossed stop"
+        );
+    }
+}
+
+#[test]
+#[should_panic(expected = "minimum output")]
+fn zero_gap_maker_still_enforces_seed_minimum() {
+    let (m, _) = live_zero_gap(false);
+    let mut s = seed(false, 60_500);
+    s.min_output = 10_001;
+    plan(&m, Some(&s));
+}
+
 #[test]
 fn sixty_four_stop_domino_completes_after_one_seed_event() {
     let stops = (0..64)

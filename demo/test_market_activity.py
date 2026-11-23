@@ -1,5 +1,6 @@
 """No live feed, blockchain writes, bot restarts or process signals in these tests."""
 from contextlib import redirect_stdout
+from concurrent.futures import Future
 from decimal import Decimal
 import io
 import json
@@ -8,6 +9,7 @@ from tempfile import TemporaryDirectory
 import threading
 import time
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 import market_activity as bot
 
@@ -26,6 +28,13 @@ def feed():
 
 
 class MarketActivityTests(unittest.TestCase):
+    def test_activity_lock_and_pid_use_the_selected_chain_state_directory(self):
+        with TemporaryDirectory() as directory,patch.object(bot,'state_dir',return_value=Path(directory)),patch.object(bot,'active',return_value=None):
+            with bot.activity_lock():
+                self.assertTrue((Path(directory)/'market-activity.lock').exists())
+                self.assertEqual((Path(directory)/'market-activity.pid').read_text(),str(bot.os.getpid()))
+            self.assertFalse((Path(directory)/'market-activity.pid').exists())
+
     def test_external_price_is_absolute_and_never_rebased(self):
         self.assertEqual(bot.target_price(Decimal('57125.25'),57000),Decimal('57125.25'))
         self.assertEqual(bot.target_price(Decimal('56500'),57000),Decimal('56500'))
@@ -69,6 +78,100 @@ class MarketActivityTests(unittest.TestCase):
             actual=v-(int(m['k'])+u+plan['amount']-1)//(u+plan['amount'])
             self.assertGreaterEqual(actual,plan['min_output'])
         with self.assertRaises(ValueError):bot.plan_trade(market(1_000_000),Decimal('56500'),0)
+
+    def test_pending_same_direction_trades_are_reserved_in_the_minimum(self):
+        m=market()
+        for target in (Decimal('56500'),Decimal('57500')):
+            first=bot.plan_trade(m,target,0)
+            pending=[{'sell':first['sell'],'amount':first['amount']} for _ in range(2)]
+            planned=bot.plan_trade(m,target,0,pending)
+            u,v=(m['x'],m['y']) if first['sell'] else (m['y'],m['x'])
+            k=int(m['k'])
+            for preceding in pending:
+                u+=preceding['amount'];v=(k+u-1)//u
+            actual=v-(k+u+planned['amount']-1)//(u+planned['amount'])
+            # The previous stale-snapshot guard rejects this ordinary pipeline.
+            self.assertGreater(first['min_output'],actual)
+            self.assertGreaterEqual(actual,planned['min_output'])
+            self.assertEqual(planned['pending_input'],2*first['amount'])
+            opposite=[{'sell':not first['sell'],'amount':first['amount']}]
+            self.assertEqual(bot.plan_trade(m,target,0,opposite)['min_output'],first['min_output'])
+
+    def test_only_an_explicit_native_minimum_rejection_is_recoverable(self):
+        actions=[bot.action(bot.TAKER,'exchange','trade',{'market':1})]
+        message="service 'exchange' aborted with message: minimum output"
+        complete=lambda body,code:SimpleNamespace(stdout=json.dumps(body),stderr='',returncode=code)
+        rejected={'error':message,'actionTraces':[{'action':actions[0],'error':'minimum output'}]}
+        with patch.object(bot.subprocess,'run',return_value=complete(rejected,1)):
+            with self.assertRaises(bot.MinimumOutputRejected):bot.submit_concurrently(actions)
+        for response in (complete({},0),complete({'error':message},1),complete({'error':message,'actionTraces':[]},1),
+                         complete({'actionTraces':[{'action':{'sender':'other','service':'exchange','method':'trade'}}]},0),
+                         SimpleNamespace(stdout='',stderr='connection closed',returncode=1)):
+            with patch.object(bot.subprocess,'run',return_value=response):
+                with self.assertRaises(Exception) as caught:bot.submit_concurrently(actions)
+                self.assertNotIsInstance(caught.exception,bot.MinimumOutputRejected)
+        trace={'actionTraces':[{'action':actions[0]}]}
+        with patch.object(bot.subprocess,'run',return_value=complete(trace,0)):
+            self.assertIsInstance(bot.submit_concurrently(actions),float)
+
+    def run_after_confirmation_failure(self,failure):
+        fake=MagicMock();fake.current.side_effect=[(Decimal('57500'),'old')]*2+[(Decimal('56500'),'new')]*2
+        handlers={};executor=MagicMock();captured=[]
+        def submit(fn,actions):
+            captured.append(actions)
+            future=Future()
+            if len(captured)==1:future.set_exception(failure)
+            else:
+                future.set_result(123)
+                handlers[bot.signal.SIGTERM]()
+            return future
+        executor.submit.side_effect=submit
+        state={'markets':[market()],'balances':[{'token':1,'spendable':10**10},{'token':2,'spendable':10**10}]}
+        with TemporaryDirectory() as directory,patch.object(bot,'STATUS',Path(directory)/'status.json'),patch.object(bot,'MARKER',Path(directory)/'marker.json'),patch.object(bot,'LiveFeed',return_value=fake),patch.object(bot.signal,'signal',side_effect=lambda sig,handler:handlers.__setitem__(sig,handler)),patch.object(bot,'read_state',return_value=state),patch.object(bot,'inventory',return_value=[]),patch.object(bot,'ThreadPoolExecutor',return_value=executor),redirect_stdout(io.StringIO()):
+            error=None
+            try:bot.run_locked({'market':1,'base':1,'quote':2,'center':57000},0)
+            except BaseException as caught:error=caught
+            status=json.loads(bot.STATUS.read_text())
+        fake.close.assert_called_once()
+        return captured,status,error
+
+    def test_known_rejection_plans_a_new_tick_from_a_fresh_feed(self):
+        actions,status,error=self.run_after_confirmation_failure(bot.MinimumOutputRejected('minimum output'))
+        self.assertIsNone(error)
+        self.assertEqual(len(actions),2)
+        self.assertFalse(actions[0][-1]['data']['sell_base'])
+        self.assertTrue(actions[1][-1]['data']['sell_base'])
+        self.assertEqual((status['state'],status['submitted'],status['confirmed'],status['rejected']),('stopped',2,1,1))
+        self.assertEqual(status['target'],'56500')
+
+    def test_unknown_confirmation_stops_without_replaying_or_a_new_submission(self):
+        actions,status,error=self.run_after_confirmation_failure(TimeoutError('unknown native outcome'))
+        self.assertIsInstance(error,TimeoutError)
+        self.assertEqual(len(actions),1)
+        self.assertEqual((status['state'],status['submitted'],status['confirmed'],status['rejected']),('failed',1,0,0))
+
+    def test_slow_query_then_fast_query_cannot_burst_submissions(self):
+        clock=[0.0];submitted=[];handlers={};reads=[1.5,.01]
+        class StopEvent:
+            stopped=False
+            def set(self):self.stopped=True
+            def is_set(self):return self.stopped
+            def wait(self,seconds):clock[0]+=seconds
+        fake=MagicMock();fake.current.return_value=(Decimal('57500'),'source-time')
+        executor=MagicMock();future=MagicMock()
+        future.done.return_value=True;future.cancelled.return_value=False;future.result.return_value=123
+        def state(_):
+            clock[0]+=reads.pop(0)
+            return {'markets':[market()],'balances':[{'token':1,'spendable':10**10},{'token':2,'spendable':10**10}]}
+        def submit(fn,actions):
+            submitted.append(clock[0])
+            if len(submitted)==2:handlers[bot.signal.SIGTERM]()
+            return future
+        executor.submit.side_effect=submit
+        with TemporaryDirectory() as directory,patch.object(bot,'STATUS',Path(directory)/'status.json'),patch.object(bot,'MARKER',Path(directory)/'marker.json'),patch.object(bot,'LiveFeed',return_value=fake),patch.object(bot.signal,'signal',side_effect=lambda sig,handler:handlers.__setitem__(sig,handler)),patch.object(bot,'read_state',side_effect=state),patch.object(bot,'inventory',return_value=[]),patch.object(bot,'ThreadPoolExecutor',return_value=executor),patch.object(bot.threading,'Event',StopEvent),patch.object(bot.time,'monotonic',side_effect=lambda:clock[0]),redirect_stdout(io.StringIO()):
+            bot.run_locked({'market':1,'base':1,'quote':2,'center':57000},1)
+        self.assertEqual(len(submitted),2)
+        self.assertGreaterEqual(submitted[1]-submitted[0],1)
 
     def test_recentering_does_not_move_operating_band(self):
         config={'center':57000,'operating_center':57000,'quote_center':57000}

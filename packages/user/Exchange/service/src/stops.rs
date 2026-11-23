@@ -295,6 +295,13 @@ impl Plan {
             if used == input || events >= budget || output == output_cap {
                 break;
             }
+            let loan_barrier = self.loan_head(sell).map(|i| self.barriers.loans[i]);
+            self.tick(1);
+            let side = direction(sell);
+            let stop_barrier = self.barriers.stop_order[side]
+                .get(self.stop_heads[side])
+                .map(|i| self.barriers.stops[*i]);
+            let risk = loan_barrier.into_iter().chain(stop_barrier).min();
             let m = &self.model.market;
             let u = if sell { m.x } else { m.y };
             let mut barrier = MAX;
@@ -307,7 +314,7 @@ impl Plan {
                 } else {
                     (mul(p.price, m.quote_tick), m.base_lot)
                 };
-                if u >= h {
+                if book_reachable(m.k.get(), u, if sell { m.y } else { m.x }, h, risk) {
                     let capacity = maker_input_capacity(p);
                     if capacity < inlot {
                         self.model.books[i].active = false;
@@ -347,16 +354,11 @@ impl Plan {
                 }
                 barrier = barrier.min(h);
             }
-            if let Some(i) = self.loan_head(sell) {
-                barrier = barrier.min(self.barriers.loans[i]);
+            if let Some(h) = loan_barrier {
+                barrier = barrier.min(h);
             }
-            self.tick(1);
-            let side = direction(sell);
-            if let Some(i) = self.barriers.stop_order[side]
-                .get(self.stop_heads[side])
-                .copied()
-            {
-                barrier = barrier.min(self.barriers.stops[i]);
+            if let Some(h) = stop_barrier {
+                barrier = barrier.min(h);
             }
             let m = &self.model.market;
             if let Some(h) = limit_barrier {

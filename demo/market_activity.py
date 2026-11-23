@@ -21,14 +21,14 @@ from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from bridge import ROOT, CLI, API, action, push, quantity, read_state, settlements, fund_claims
-from run import active, start
+from run import active, start, state_dir
 
 MAKERS = ("demomakera", "demomakerb", "demomakerc")
 TAKER = "demotaker"
-MARKER = ROOT / "demo/market-activity.json"
+MARKER = state_dir() / "market-activity.json"
 NAME = "market-activity"
 SCRIPT = Path(__file__).resolve()
-STATUS = ROOT / "demo/market-activity-status.json"
+STATUS = state_dir() / "market-activity-status.json"
 BASE_TARGET = 5 * 10**8
 QUOTE_TARGET = 500_000 * 10**4
 MAX_BASE_TRADE = 20_000_000
@@ -49,12 +49,14 @@ def activity_lock():
     current = active(NAME, SCRIPT)
     if current and current != os.getpid():
         raise RuntimeError(f"Demo activity already running (PID {current})")
-    with (ROOT / 'demo/market-activity.lock').open('a') as lock:
+    directory = state_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    with (directory / 'market-activity.lock').open('a') as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:
             raise RuntimeError('Demo activity is already running') from error
-        pidfile = ROOT / f'demo/{NAME}.pid'
+        pidfile = directory / f'{NAME}.pid'
         pidfile.write_text(str(os.getpid()))
         try:
             yield
@@ -85,7 +87,7 @@ def setup():
         config.setdefault('operating_center', config['center'])
         config.setdefault('quote_center', config['center'])
         return config
-    seed = json.loads((ROOT / "demo/seed.json").read_text())
+    seed = json.loads((state_dir() / "seed.json").read_text())
     state = read_state("liquidity")
     market = next(m for m in state["markets"] if int(m["id"]) == seed["market"])
     config = {"market": seed["market"], "base": seed["base"], "quote": seed["quote"],
@@ -244,7 +246,7 @@ class LiveFeed:
                 self.process.wait(timeout=5)
 
 
-def plan_trade(m, target, step):
+def plan_trade(m, target, step, pending=()):
     """At most .2 BTC AND .15% reserve notional; source target is absolute."""
     x, y, lot, tick = (int(m[k]) for k in ('x', 'y', 'base_lot', 'quote_tick'))
     spot = Decimal(y * lot) / Decimal(x * tick)
@@ -255,12 +257,20 @@ def plan_trade(m, target, step):
         raise ValueError('Relay too thin for a bounded demo trade')
     sell = spot > target if abs(spot - target) > Decimal('.1') else bool(step % 2)
     quote_amount = int(Decimal(base_amount) * spot * tick / lot)
-    expected = quote_amount - int(spot * tick) if sell else base_amount - lot
+    amount = base_amount if sell else quote_amount
+    # Read-only snapshots can lag our overlapping confirmation waiters. Reserve
+    # for every still-pending input in this direction, even if a snapshot has
+    # already included it. Opposite-direction trades only improve this bound.
+    # Native min_output still protects us from unrelated users and stop cascades.
+    reserve_in = x if sell else y
+    pending_input = sum(int(p['amount']) for p in pending if p['sell'] == sell)
+    conservative_in = reserve_in + pending_input
+    expected = int(m['k']) * amount // (conservative_in * (conservative_in + amount))
     if expected <= 0:
         raise ValueError('Demo trade below safe output precision')
-    return {'sell': sell, 'amount': base_amount if sell else quote_amount,
+    return {'sell': sell, 'amount': amount,
             'base_amount': base_amount, 'min_output': expected * 998 // 1000,
-            'spot': spot}
+            'pending_input': pending_input, 'spot': spot}
 
 
 def target_price(live_price, operating_center):
@@ -269,6 +279,10 @@ def target_price(live_price, operating_center):
     if not Decimal('.95') <= live_price / Decimal(operating_center) <= Decimal('1.05'):
         raise ValueError("Feed moved outside the demo's 5% operating band; trading paused")
     return live_price
+
+
+class MinimumOutputRejected(RuntimeError):
+    """A native trace proves atomic rejection, rather than an unknown outcome."""
 
 
 def submit_concurrently(actions):
@@ -280,8 +294,40 @@ def submit_concurrently(actions):
     result = subprocess.run([CLI, "push", "-a", API, "--trace", "json", "--console=false", "-"],
                             input=json.dumps(actions), text=True, capture_output=True, timeout=30)
     trace = json.loads(result.stdout or "{}")
+    if not isinstance(trace, dict):
+        raise RuntimeError('Native confirmation returned an invalid transaction trace')
+    if not isinstance(trace.get('actionTraces'), list):
+        raise RuntimeError('Native confirmation did not return action traces; outcome unknown')
+    def walk(entry):
+        yield entry
+        for inner in entry.get('innerTraces', []):
+            child = inner.get('inner', {}).get('ActionTrace')
+            if child:
+                yield from walk(child)
+    entries = [entry for top in trace.get('actionTraces', []) for entry in walk(top)]
+    minimum_error = "service 'exchange' aborted with message: minimum output"
+    if trace.get('error') == minimum_error:
+        for entry in entries:
+            actual = entry.get('action', {})
+            if (entry.get('error') in (minimum_error, 'minimum output')
+                    and any(a['service'] == 'exchange' and a['method'] == 'trade'
+                            and actual.get('sender') == a['sender']
+                            and actual.get('service') == a['service']
+                            and actual.get('method', '').casefold() == a['method'].casefold()
+                            for a in actions)):
+                raise MinimumOutputRejected(minimum_error)
     if result.returncode or trace.get("error"):
         raise RuntimeError(trace.get("error") or result.stderr[-1000:])
+    offset = 0
+    for requested in actions:
+        for index in range(offset, len(entries)):
+            actual = entries[index].get('action', {})
+            if (not entries[index].get('error') and actual.get('sender') == requested['sender'] and actual.get('service') == requested['service']
+                    and actual.get('method', '').casefold() == requested['method'].casefold()):
+                offset = index + 1
+                break
+        else:
+            raise RuntimeError('Native confirmation did not contain the requested action trace; outcome unknown')
     return time.time()
 
 
@@ -295,8 +341,8 @@ def run_locked(config, interval):
     feed = LiveFeed()
     workers = ThreadPoolExecutor(max_workers=3)
     stopping = threading.Event()
-    pending = []
-    confirmed, step = 0, 0
+    pending = {}
+    confirmed, rejected, step = 0, 0, 0
     deadline = time.monotonic()
     last_status, last_recenter = None, float('-inf')
     failure = None
@@ -306,7 +352,7 @@ def run_locked(config, interval):
     def status(state, **extra):
         write_json(STATUS, {**latest, 'state': state, 'pid': os.getpid(),
                            'started_at': started, 'updated_at': time.time(),
-                           'submitted': step, 'confirmed': confirmed,
+                           'submitted': step, 'confirmed': confirmed, 'rejected': rejected,
                            'pending': len(pending), 'interval_seconds': interval, **extra})
 
     # Signal handlers only request shutdown. Cleanup runs once in finally;
@@ -319,8 +365,16 @@ def run_locked(config, interval):
         while not stopping.is_set():
             for future in list(pending):
                 if future.done():
-                    pending.remove(future)
-                    completed = future.result()  # Rejection/unknown confirmation fails closed.
+                    pending.pop(future)
+                    try:
+                        completed = future.result()
+                    except MinimumOutputRejected as error:
+                        # This action rolled back. Do not replay its payload:
+                        # the next ordinary tick reads fresh chain/feed state.
+                        rejected += 1
+                        print(json.dumps({'rejected_at': time.time(), 'rejected': rejected,
+                                          'reason': str(error)}), flush=True)
+                        continue
                     confirmed += 1
                     print(json.dumps({'confirmed_at': completed, 'confirmed': confirmed}), flush=True)
             try:
@@ -333,7 +387,7 @@ def run_locked(config, interval):
                 if (int(m['base']) != config['base'] or int(m['quote']) != config['quote'] or
                         int(m['base_lot']) != 10_000 or int(m['quote_tick']) != 1):
                     raise RuntimeError('Demo market identity/grid changed; absolute USD pricing unavailable')
-                plan = plan_trade(m, target, step)
+                plan = plan_trade(m, target, step, pending.values())
                 token = config['base' if plan['sell'] else 'quote']
                 available = next(int(r['spendable']) for r in state['balances'] if int(r['token']) == token)
                 if plan['amount'] > available:
@@ -360,7 +414,7 @@ def run_locked(config, interval):
                     break
                 live_price, tick_time = feed.current()
                 target = target_price(live_price, config.get('operating_center', config['center']))
-                plan = plan_trade(m, target, step)
+                plan = plan_trade(m, target, step, pending.values())
                 token = config['base' if plan['sell'] else 'quote']
                 available = next(int(r['spendable']) for r in state['balances'] if int(r['token']) == token)
                 if plan['amount'] > available:
@@ -371,13 +425,18 @@ def run_locked(config, interval):
                 if stopping.is_set():
                     break
                 submitted = time.time()
-                pending.append(workers.submit(submit_concurrently, actions))
+                pending[workers.submit(submit_concurrently, actions)] = {
+                    'sell': plan['sell'], 'amount': plan['amount']}
+                # Anchor to this actual submission, including after a slow
+                # query/maintenance pass, instead of bursting to catch up.
+                deadline = time.monotonic() + interval
                 step += 1
                 latest = {'source': 'Coinbase Exchange BTC-USD WebSocket',
                           'feed_price': str(live_price), 'feed_time': tick_time,
                           'target': str(target), 'spot_before': str(plan['spot']),
                           'side': 'sell' if plan['sell'] else 'buy',
                           'base_atoms': plan['base_amount'], 'quote_center': quote_center(config),
+                          'pending_input': plan['pending_input'],
                           'operating_center': config.get('operating_center', config['center']),
                           'submitted_at': submitted}
                 status('running')
@@ -388,9 +447,7 @@ def run_locked(config, interval):
                     print(str(error), flush=True)
                     last_status = str(error)
                 status('paused', reason=str(error))
-            deadline += interval
-            if deadline < time.monotonic():
-                deadline = time.monotonic()  # Never burst to catch up missed ticks.
+                deadline = time.monotonic() + interval
             stopping.wait(max(0, deadline - time.monotonic()))
     except BaseException as error:
         failure = error
@@ -414,6 +471,8 @@ def run_locked(config, interval):
             try:
                 future.result()
                 confirmed += 1
+            except MinimumOutputRejected:
+                rejected += 1
             except BaseException as error:
                 failure = failure or error
         pending.clear()

@@ -1143,3 +1143,6 @@ mod candle_native_tests;
 #[cfg(test)]
 #[path = "pagination_native_tests.rs"]
 mod pagination_native_tests;
+
+#[path = "zero_gap_native_tests.rs"]
+mod zero_gap_native_tests;

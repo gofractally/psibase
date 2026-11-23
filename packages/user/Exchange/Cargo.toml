@@ -16,6 +16,7 @@ HttpServer = "0.29.0"
 Transact = "0.29.0"
 Sites = "0.29.0"
 Events = "0.29.0"
+EventsService = "0.29.0"
 [dependencies]
 exchange = { path = "service" }
 r-exchange = { path = "query-service" }

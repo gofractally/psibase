@@ -69,6 +69,20 @@ crossing order or recursively replanned. Maker fills are whole lots; unposted
 odd-lot remainder is returned.
 The limit price is checked against each actual relay leg's integer output.
 
+If integer rounding leaves no executable relay output before the best maker,
+the maker can fill directly at its quoted price without moving relay reserves
+or charging the taker for a zero-output gap. Due margin work still runs first,
+and this shortcut cannot bypass a loan or stop threshold at or before the maker.
+The exact live 60,500-price boundary is covered by host and native custody,
+limit, minimum-output rollback and refund regressions.
+
+A zero-output gap at a loan or stop threshold remains a liveness limitation:
+the conservative planner can return all input without advancing that direction,
+even with more input available. Cancelling the armed stop or a reserve move from
+the other direction can unblock it. The book-boundary repair does not resolve
+that separate case; a general repair must preserve funded trigger execution,
+aggregate limit protection and the liquidation certificate.
+
 Market trades accept a minimum output and a caller-selected seed routing budget
 (maximum 256). In the legacy path a boundary checkpoint can leave a due
 liquidation pending; no ordinary relay advancement proceeds past it until

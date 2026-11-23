@@ -5,9 +5,12 @@ These are demo assets, not externally backed BTC or dollars. Administration
 NFTs are burned after symbol mapping and issuance. All transactions are real.
 """
 import json
+import argparse
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 import subprocess
 from bridge import ROOT, CLI, API, push, action, quantity
+from run import state_dir
 
 
 def call(sender, service, method, args):
@@ -45,7 +48,18 @@ def issue(symbol, precision, supply):
 
 
 def main():
-    marker = ROOT / "demo/seed.json"
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--price-usd", default="100000", help="Initial BTC/USD price for a fresh relay")
+    args = parser.parse_args()
+    try:
+        price = Decimal(args.price_usd)
+    except InvalidOperation:
+        parser.error("price-usd must be a positive decimal")
+    if not price.is_finite() or not Decimal('10') <= price <= Decimal('1000000'):
+        parser.error("price-usd must be between 10 and 1000000")
+    relay_quote = int(price * 100 * 10**4)
+    marker = state_dir() / "seed.json"
+    marker.parent.mkdir(parents=True, exist_ok=True)
     if marker.exists():
         raise RuntimeError("Demo is already seeded; refusing duplicate issuance")
     for wallet in ("alice", "bob", "carol", "liquidity"):
@@ -63,24 +77,25 @@ def main():
             ])
     for user in ("alice", "bob", "carol", "liquidity"):
         for token, amount in ((btc, (200 if user == "liquidity" else 2) * 10**8),
-                              (usd, (20_000_000 if user == "liquidity" else 200_000) * 10**4)):
+                              (usd, max(20_000_000 * 10**4, relay_quote + 10_000_000 * 10**4)
+                               if user == "liquidity" else 200_000 * 10**4)):
             call(user, "tokens", "credit", {"token_id": token, "debitor": "exchange",
                  "amount": quantity(amount), "memo": "Native shared exchange deposit"})
     market = int(call("liquidity", "exchange", "create", {
         "base": btc, "quote": usd, "base_amount": 100 * 10**8,
-        "quote_amount": 10_000_000 * 10**4, "base_lot": 10_000, "quote_tick": 1}))
+        "quote_amount": relay_quote, "base_lot": 10_000, "quote_tick": 1}))
     call("liquidity", "exchange", "lend", {"market": market, "base": True, "amount": 50 * 10**8})
     call("liquidity", "exchange", "lend", {"market": market, "base": False, "amount": 5_000_000 * 10**4})
-    for user, bid, price, amount in (
-        ("alice", True, 99_000, 50_000 * 10**4),
-        ("carol", True, 99_000, 25_000 * 10**4),
-        ("bob", False, 101_000, 50_000_000),
-        ("carol", False, 102_000, 25_000_000),
+    for user, bid, order_price, amount in (
+        ("alice", True, int(price * Decimal('.99')), 50_000 * 10**4),
+        ("carol", True, int(price * Decimal('.99')), 25_000 * 10**4),
+        ("bob", False, int(price * Decimal('1.01')), 50_000_000),
+        ("carol", False, int(price * Decimal('1.02')), 25_000_000),
     ):
-        call(user, "exchange", "limit", {"market": market, "bid": bid, "price": price, "amount": amount})
+        call(user, "exchange", "limit", {"market": market, "bid": bid, "price": order_price, "amount": amount})
     # A live overcollateralized position, below its shared price trigger.
-    call("alice", "exchange", "borrow", {"market": market, "long": True, "price": 80_000, "units": 100})
-    metadata = {"base": btc, "quote": usd, "market": market, "price_usd": 100_000,
+    call("alice", "exchange", "borrow", {"market": market, "long": True, "price": int(price * Decimal('.8')), "units": 100})
+    metadata = {"base": btc, "quote": usd, "market": market, "price_usd": str(price),
                 "assets": "Local demonstration tokens; no external BTC/USD redemption"}
     marker.write_text(json.dumps(metadata, indent=2) + "\n")
     print(json.dumps(metadata), flush=True)

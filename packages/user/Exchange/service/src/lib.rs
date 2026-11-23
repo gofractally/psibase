@@ -417,6 +417,8 @@ pub mod service {
             }
             let mut barrier = MAX;
             let u = if sell { m.x } else { m.y };
+            let risk = head(m.id, sell)
+                .map(|g| trigger(m.k.get(), sell, g.price, m.base_lot, m.quote_tick));
             if let Some(mut p) = book_head(m.id, sell).filter(|p| {
                 limit_price
                     .map(|lim| if sell { p.price >= lim } else { p.price <= lim })
@@ -435,7 +437,9 @@ pub mod service {
                     events += 1;
                     continue;
                 }
-                if u >= h && amount_in - used >= inlot {
+                if book_reachable(m.k.get(), u, if sell { m.y } else { m.x }, h, risk)
+                    && amount_in - used >= inlot
+                {
                     let n = ((amount_in - used) / inlot)
                         .min(p.outgoing / outlot)
                         .min(capacity / inlot);
@@ -449,8 +453,8 @@ pub mod service {
                     barrier = h;
                 }
             }
-            if let Some(g) = head(m.id, sell) {
-                barrier = barrier.min(trigger(m.k.get(), sell, g.price, m.base_lot, m.quote_tick));
+            if let Some(h) = risk {
+                barrier = barrier.min(h);
             }
             if let Some(lim) = limit_price {
                 let h = book_trigger(m.k.get(), sell, lim, m.base_lot, m.quote_tick);

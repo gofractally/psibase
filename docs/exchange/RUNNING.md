@@ -1,5 +1,47 @@
 # Native Psibase exchange demonstration
 
+## Current head-based demo
+
+The validated current-source demo is **http://exchange.psibase.localhost:8096/**.
+It runs the locally built Wasmtime/psitri node, current native service packages,
+and Exchange on `codex/app-regression`, based on `bytemaster/head` commit
+`054a0c386`. Its BTC/USD relay was funded at the observed live BTC price; the
+background Coinbase follower submits funded native transactions independently
+of the browser. Its normal target is one submission per second, with bounded
+pauses when feed data or confirmations are unavailable.
+
+From this checkout, after the SDK and fresh chain have been prepared:
+
+```sh
+source build-app-regression/head-demo/env.sh
+python3 demo/run.py start
+python3 demo/market_activity.py start --interval 1
+python3 demo/run.py status
+```
+
+`python3 demo/run.py stop` drains the bot and stops this node. The environment
+selects the CLI, node, API and state directory through `EXCHANGE_CLI`,
+`EXCHANGE_NODE`, `EXCHANGE_CHAIN`, and `EXCHANGE_DEMO_STATE_DIR`. Each demo keeps
+its own database, seed marker, bot configuration, PIDs and logs. PID checks
+verify the process before signaling it, and startup checks the listen port.
+
+The current SDK is under `build-app-regression/head-sdk`; its registry contains
+65 packages built from this source. `provenance.json` records binary hashes and
+pinned dependencies. Native Exchange tests passed with this matching tester:
+76 passed, zero failed, six WASI panic tests ignored; all 42 host tests passed.
+The exact live zero-output maker-boundary regression is included. The Exchange
+README documents the remaining zero-output loan/stop boundary limitation.
+
+Fresh seeding supports `python3 demo/seed.py --price-usd PRICE`; it refuses a
+second issuance when its state directory already has a seed marker. This is a
+local development network using demonstration tokens.
+
+See [query performance](QUERY_PERFORMANCE.md) for measured throughput, CPU
+attribution, workload sizes and profiler overhead. CPU profiling is optional;
+the normal demo runs without it.
+
+## Earlier persistent demo on 8089
+
 The running application is **http://exchange.psibase.localhost:8089/**, served
 by the native Sites service under the exchange account's subdomain. The native
 Psibase node listens on **127.0.0.1:8089**. Signing, account connections and

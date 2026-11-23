@@ -9,9 +9,12 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+from urllib.parse import urlsplit
 from bridge import ROOT, CLI, API, action, push
 
 BUILD = ROOT / "build-native-wallet"
+DEMO_PORT = urlsplit(API).port or 80
+SUPERVISOR_ORIGIN = f"http://supervisor.psibase.localhost:{DEMO_PORT}"
 PLATFORM = BUILD / "platform/wasm32-wasip1/release"
 USER = BUILD / "user/wasm32-wasip1/release"
 COMPAT = BUILD / "compat/wasm32-wasip1/release"
@@ -76,7 +79,7 @@ def publish_token_prompt():
     upload("tokens", dist, "/", True)
     upload("tokens", dist / "plugin/web/prompt/transfer/index.html", "/plugin/web/prompt/transfer")
     # Sites upload replaces per-file policy. Apply this after both uploads.
-    supervisor = "http://supervisor.psibase.localhost:8089"
+    supervisor = SUPERVISOR_ORIGIN
     policy = ("default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline';"
               "img-src 'self' data:;font-src 'self';connect-src 'self';"
               f"frame-src {supervisor};frame-ancestors 'self' {supervisor};"
@@ -107,7 +110,7 @@ def main():
                          "/plugin/web/prompt/create"):
                 upload(account, dist / "index.html", path)
     publish_token_prompt()
-    sibling = "http://psibase.localhost:8089 http://*.psibase.localhost:8089"
+    sibling = f"http://psibase.localhost:{DEMO_PORT} http://*.psibase.localhost:{DEMO_PORT}"
     supervisor_policy = (
         "default-src 'self';script-src 'self' 'wasm-unsafe-eval' blob:;"
         "style-src 'self' 'unsafe-inline';img-src 'self' data:;font-src 'self';"
@@ -115,8 +118,8 @@ def main():
         f"frame-ancestors {sibling};base-uri 'none';form-action 'self';object-src 'none';")
     app_policy = ("default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline';"
                   "img-src 'self' data:;font-src 'self';connect-src 'self';"
-                  "frame-src http://supervisor.psibase.localhost:8089;"
-                  "frame-ancestors 'self' http://supervisor.psibase.localhost:8089;base-uri 'none';"
+                  f"frame-src {SUPERVISOR_ORIGIN};"
+                  f"frame-ancestors 'self' {SUPERVISOR_ORIGIN};base-uri 'none';"
                   "form-action 'self';object-src 'none';")
     push([action(account, "sites", "setCsp", {"path": "*", "csp": policy})
           for account, policy in (("supervisor", supervisor_policy), ("host", app_policy),

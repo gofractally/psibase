@@ -100,6 +100,12 @@ pub fn relay(k: u128, u: u64, v: u64, input: u64) -> (u64, u64, u64) {
     assert!(nv <= v, "relay output reserve");
     (nu, nv, v - nv)
 }
+/// The head maker is the next executable offer when no native relay output
+/// exists before its price. Do not donate input to cross an empty integer gap,
+/// and never bypass a loan/stop boundary at or before that maker.
+pub fn book_reachable(k: u128, u: u64, v: u64, h: u64, risk: Option<u64>) -> bool {
+    u >= h || (risk.map(|r| r > h).unwrap_or(true) && relay(k, u, v, h - u).2 == 0)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
