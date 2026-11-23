@@ -1,8 +1,8 @@
 // How many token transfers the chain processes, measured in the tester: no
 // network, no HTTP, one block built in process.
 //
-// For each of {no signature, one signature} it prepares N distinct transfers,
-// then times putting them all into one block. That is the node's full work per
+// For each of {no signature, one P-256 signature, one secp256k1 signature} it
+// prepares N distinct transfers, then times putting them all into one block. That is the node's full work per
 // transaction as a block producer or validator does it: check the signature
 // (if any), then execute. The unsigned run is the same work without the
 // signature check.
@@ -13,6 +13,7 @@
 
 #include <catch2/catch_all.hpp>
 #include <chrono>
+#include <string_view>
 #include <psibase/DefaultTestChain.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/PrivateKeyInfo.hpp>
@@ -47,10 +48,18 @@ namespace
       return std::chrono::duration<double, std::milli>(d).count();
    }
 
-   void run(std::size_t count, bool sign)
+   // `curve` is empty for no signature, or the key's group: "secp256r1" (P-256)
+   // or "secp256k1".
+   void run(std::size_t count, std::string_view curve)
    {
+      const bool       sign = !curve.empty();
       DefaultTestChain t;
-      const auto       keys  = senderKeys();
+      KeyPair          keys = senderKeys();
+      if (curve == "secp256k1")
+      {
+         auto priv = AuthSig::PrivateKeyInfo::create("secp256k1");
+         keys      = KeyPair{AuthSig::getSubjectPublicKeyInfo(priv), priv};
+      }
       auto             alice = t.from(t.addAccount("alice"_a));
       auto             bob   = t.from(t.addAccount("bob"_a));
       bob.to<Tokens>().setUserConf(Tokens::autoDebit, true);
@@ -104,9 +113,10 @@ namespace
 
       const double total = milliseconds(finished - start);
       std::printf(
-          "BENCH scenario=block signatures=%d transfers=%zu failed=%zu bytes_each=%zu "
+          "BENCH scenario=block signatures=%d curve=%s transfers=%zu failed=%zu bytes_each=%zu "
           "execute_ms=%.2f finish_block_ms=%.2f total_ms=%.2f per_second=%.0f ms_each=%.4f\n",
-          sign ? 1 : 0, count, failed, count ? bytes / count : 0, milliseconds(pushed - start),
+          sign ? 1 : 0, sign ? std::string(curve).c_str() : "none", count, failed,
+          count ? bytes / count : 0, milliseconds(pushed - start),
           milliseconds(finished - pushed), total, count * 1000.0 / total, total / count);
       std::fflush(stdout);
       REQUIRE(failed == 0);
@@ -115,22 +125,25 @@ namespace
 
 TEST_CASE("Transfers fill a block, signed and unsigned")
 {
-   run(20, false);
-   run(20, true);
+   run(20, "");
+   run(20, "secp256r1");
+   run(20, "secp256k1");
 }
 
 TEST_CASE("Transfer throughput in one block", "[.][bench]")
 {
    for (std::size_t count : {1000u, 5000u})
    {
-      run(count, false);
-      run(count, true);
+      run(count, "");
+      run(count, "secp256r1");
+      run(count, "secp256k1");
    }
 }
 
 TEST_CASE("Transfer throughput in one full block", "[.][bench-full]")
 {
    // About what a 4 MiB block of signed transfers holds.
-   run(13700, false);
-   run(13700, true);
+   run(13700, "");
+   run(13700, "secp256r1");
+   run(13700, "secp256k1");
 }
