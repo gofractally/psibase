@@ -21,7 +21,7 @@ Schema IR for schemas. No chain data is migrated (fresh genesis).
 | | |
 |---|---|
 | Legacy library | `libraries/psio1`: include prefix `<psio1/…>`, namespace `psio1`, macros `PSIO1_…`, CMake target `psio1`, archive `libpsio1.a`. It is deleted at the end of the conversion. **After the flip (section 1.25): deleted; `git grep psio1` finds only this document and `doc/flip-interop.md`.** |
-| PSIO | **Now `f811c6f982fa62bbdcd77587f123d80cde983bdc` on both halves (sections 1.25, 6.26, and the section "Merge").** Before: `gofractally/psio` at `c6d9940441463c7ba3b6087595770a765f5fffac` (section 1.16; before that `415ea1a6`), pinned in `cmake/PsibaseDependencies.cmake`, fetched to `external/psio`. (Slices 1–4a were built on `e6901feb`; slices 2b and 4b on `86cf8c0f` / `868e37bb`, whose `cpp/`, `cmake/` and `CMakeLists.txt` are identical; the follow-up of section 1.13 on `dfd0db17`, a topic branch; the pin moved to `main` in section 1.14, `224f80de`, and along it in section 1.15.) |
+| PSIO | **Now `fdb5de259f5059861a80a99b10a75d156a63d5eb` (section 7, "Merge"; the two halves met on `f811c6f9`, sections 1.25, 6.26).** Before: `gofractally/psio` at `c6d9940441463c7ba3b6087595770a765f5fffac` (section 1.16; before that `415ea1a6`), pinned in `cmake/PsibaseDependencies.cmake`, fetched to `external/psio`. (Slices 1–4a were built on `e6901feb`; slices 2b and 4b on `86cf8c0f` / `868e37bb`, whose `cpp/`, `cmake/` and `CMakeLists.txt` are identical; the follow-up of section 1.13 on `dfd0db17`, a topic branch; the pin moved to `main` in section 1.14, `224f80de`, and along it in section 1.15.) |
 | Since (sections 1.16, 6.16–6.20) | The integration head `44c57f739` is merged and the pin is `c6d99404`; ctest's baseline is 93. Rust: `Hex<T>` is `transparent` (D29 revised) and 44 of the 78 core records are declared; the stale Rust mirrors of D36 are corrected; the service macro can declare a service's actions as a PSIO interface (`psio = true`, three services); the C++ ↔ Rust fixture has 50 types, 115 values, legacy bytes for each, two service interfaces and 18 calls. |
 | Rust | The `psio` crate is a path dependency into the pinned checkout (`external/psio/rust/psio`). Declared with the official PSIO derives beside the legacy ones, which still write every byte: `AccountNumber`, `MethodNumber` (R1, 6.10); `Memo`, `tokens::Precision`, `Quantity`, `Decimal` (R2, 6.13); 20 core records of `rust/psibase/src` (R3, 6.14). 26 types are proved equal to their C++ twins through one fixture (6.15). Waiting, each for a stated reason: the time types and `Hex<T>` / `Checksum256` and every record that holds one (the JSON flip), 56 core records in all. Two behaviour changes: the name parsers no longer panic on malformed text (D30), and `Quantity::from_str` rejects a quantity over 2^64 − 1 (D17) and a fraction of 256 or more digits (D38). |
 | Native | `libraries/CMakeLists.txt` calls `psibase_acquire_dependency(psio)`; `psibase` and `psio1` link `psio::psio`. PSIO fetches simdjson 5.2.0 by URL and SHA-256; configuration fails if any other simdjson target exists first. PSIO's own install rules are excluded from psibase's install tree. |
@@ -4579,6 +4579,12 @@ GraphQL changes of the time types are covered by unit tests in
 
 ### 6.26 The Rust flip, stage by stage (handover; newest state first)
 
+**After the merge with the C++ flip (section 7): nothing below "needs the
+C++ flip" any more.** The 64 failures classified here cleared with the
+merge; what appeared behind them, and the state of the combined tree
+(ctest 90 / 90), is section 7. The temporary items listed here are
+removed.
+
 Stages R-A … R-F as the coordinator defined them. Scratch tools:
 `~/psibase-pssz-scripts/rflip/` (`add_jsontext.py`, `add_psio_all.py`,
 `flip.py`, `clean_imports.py`); logs `~/psibase-pssz-build.*rflip*.log`.
@@ -5124,3 +5130,169 @@ not worked around, reproduction given), **engine** (VM, storage), **test**
 | M14 | `t-psibase-tests` merkle | four pinned roots | test (old-format bytes) | roots over PSSZ leaves, recomputed independently from the rule (leaf `00`·bytes, node `01`·left·right) |
 | M15 | `rs-test-VirtualServer` | `Expected exactly 93 bytes freed … got 92` | test (old-format size) | the `IncludedTrx` row is one byte shorter in PSSZ (a one-byte header): 92 |
 | M16 | Python tests | `fracpack.py` writes the legacy bytes | harness | 7.4 |
+| M17 | `psinode_test_block_signing` (`generate_verify_with_call`: a C++ tester boot with UIs) | `transaction has expired` during boot | C++ (tester), a consequence of M8's regrouping: more than 30 boot transactions, one block each, all expiring 30 s after the first | the expiration of the boot transactions covers their number |
+| M18 | `psinode_test_txqueue`, `psinode_test_psibase` | Python: `loginSys` is in no schema; bytes in an action's `data` | harness | the login action's argument list is packed directly (`psio.to_pssz((rootHost,), tuple[str])`); bytes are written as hex |
+
+No engine, VM or storage failure was met: no psitri "reference count
+exceeded limits" abort in any run (nothing was copied to
+`~/psitri-refcount-evidence/`), and `psinode_test_crash` passed in every
+full run.
+
+### 7.3 State and verification
+
+Tip: see `git log` (the commit that adds this text). PSIO pin
+`fdb5de259f5059861a80a99b10a75d156a63d5eb` (moved from `f811c6f9` at the
+end, commit "Pin PSIO fdb5de25": G52 `schemaId("Action")` /
+`schemaId("ServiceMethod")` replace the two accept-everything invariants
+and the `mutation_blocked_v` specialization; G53 Explorer's complexity
+limit is 1 000 000 instead of 10 000 000 — `blocks(last: 720)` with
+transactions still counts about 360 000 because of the two nested lists;
+nothing stopped compiling, the twin fixture is unchanged). Trusted views
+were not adopted.
+
+| Step (checklist) | Command | Result |
+|---|---|---|
+| 1 full build | `~/psibase-pssz-scripts/build8.sh <tag>` (`cmake --build ~/psibase-pssz-build -j 8`) | exit 0 at the merge commit (`merge1`) and at every later step; at the tip `merge7`. `share/psibase/packages/index.json` is written (91 entries) |
+| 2 twin fixture | `PSIBASE_WRITE_RUST_TWINS=1 ~/psibase-pssz-build/psibase-psio-tests "[twins]"`, then `cd rust && cargo test -r -p psibase --test psio_twins --test psio_json --test service_schema --test psio_leaf_types --test psio_wrappers` | 4 / 4, 13 / 13, 4 / 4, 13 / 13, 7 / 7. No pass-through; no listed difference (`Reading` is gone). 60 types, 147 values: schema node, PSSZ, key where the type is a key, I-JSON through PSIO and through serde. 36 calls (the 18 of before and 18 more). 2 transactions with ids. 28 services' parameter names |
+| 3 native unit tests | `~/psibase-pssz-build/psibase-psio-tests`; `cd rust && PSIBASE_DATADIR=~/psibase-pssz-build/share/psibase cargo test -r --no-fail-fast -p psibase -p cargo-psibase -p psibase-macros-lib -p psibase-macros-derive -p psibase_plugin` | C++ 1421 assertions in 69 cases; Rust lib 102 / 102 (all 42 `verify_schema`: every Rust view of a C++ service is wire-equivalent to the schema in the C++-built package), the others as before |
+| 4 boot | Rust tester (`rs-test-*`), C++ tester (`t-*`), `psibase boot` against psinode (`psinode_test_*`, 7.5) | all three boot |
+| 5–7 service and node tests | `ctest -R '^t-'`, `'^rs-'`, `'^psinode_test'` | all pass |
+| 8 full suite | `~/psibase-pssz-scripts/ctest.sh <tag>` (`ctest -j4`) | **90 / 90** (`ctest-merge6.log` on pin `f811c6f9`, `ctest-merge7.log` on `fdb5de25`). 90, not 91: `py_test_fracpack` went with the codec it tested. The first full run after the merge (`merge3`) was 56 / 91 |
+| every Rust workspace | `~/psibase-pssz-scripts/re/check_all.sh merge7` | all exit 0 except `packages/user --tests`: `tokens-plugin` and the Favor contract tests, as before the merge (6.26). The six packages CMake never compiles (btcbridge, btcrelay, ethbridge, ethrelay, exchange, signing and their query services / cores) check |
+
+Logs: `~/psibase-pssz-build.{build,ctest}-merge<N>.log`,
+`~/psibase-pssz-build.ctest-merge<N>.LastTest.log`,
+`~/psibase-pssz-build.rust-unit-merge<N>.log`,
+`~/psibase-pssz-build.check-merge7.log`.
+
+What the fixture gained at the merge (`rust_twins.cpp`, `psio_twins.rs`):
+`DbId`, `NewAccountMode`, `SubjectPublicKeyInfo`, `IPAddress`,
+`SocketEndpoint`, `Tapos`, `Transaction`, `SignedTransaction`, a
+`ServiceSchema` (empty, and `setcode`'s as C++ builds it); calls packed
+with `psio::method_args_to_pssz` as `Actor` does — `transact::startBoot`,
+`accounts::newAccount`, `auth-sig::newAccount`, `packages::postinstall`,
+`packages::setSchema`, `sites::storeSys` (with and without an encoding),
+`producers::setProducers`, `http::registerServer`, `tokens::credit` (a
+memo: narrow offsets), `tokens::recall` (an unbounded trailing optional,
+present and absent), `nft::mint` (a bounded optional, present and absent),
+`x-proxy::onError` and `x-peers::errP2P` (capped; with and without a
+reply); a genesis and a boot transaction (bytes, id = SHA-256 of the
+packed `Transaction`, I-JSON), rebuilt in Rust from typed values through
+the callers the service macro generates. The empty argument list is `00`
+in both languages.
+
+### 7.4 The Python harness (checklist step 7)
+
+`programs/psinode/tests/fracpack.py`, `test_fracpack.py` and
+`fracpack-tests.json` are deleted. The tests use PSIO's Python package
+from the pinned checkout (`external/psio/python/src`; CMake sets
+`PYTHONPATH` for `psinode_test_*` and `py_test_psibase_types`; by hand:
+`PYTHONPATH=<root>/external/psio/python/src python3 test_x.py --psinode=…`).
+Decision per use:
+
+| Use | Now |
+|---|---|
+| `Action`, `Claim`, `Tapos`, `Transaction`, `SignedTransaction` (`psibase.py`) | PSIO-declared dataclasses: `psio.to_pssz`, `psio.from_ijson`. `AccountNumber` and `MethodNumber` are transparent wrappers with a text form (`name.py`'s account coder; `psio.method_to_number`). `SignedTransaction.transaction` is `psio.nested(Transaction, deferred=True)`: the packed bytes, which are what is signed |
+| arguments of an action (`ChainPackContext`) | schema-driven: `psio.Schema.from_json(schema["types"], handlers=…)`, the node of `actions[name].params`, `json_to_pssz`. Handlers for `AccountNumber` and `MethodNumber`; any other custom type is its wire type (a public key is hex of the DER bytes, an amount the object of its members). The node's pack endpoints were not needed |
+| `transact/login` | the argument list `(rootHost)` packed directly: `loginSys` is a convention, not an action of a schema |
+| return values (`test_subjective.py`) | `psio.from_pssz(psio.u32, bytes)` |
+| `py_test_psibase_types` | pins the PSSZ of an action and a transaction, reads the two transactions of `rust-twins.json` (bytes, id, text), and packs arguments by name, by position and with names as text over a hand-written service schema |
+
+`name.py` keeps a method coder of its own beside the account coder (it has
+its own test, `py_test_name`); the harness uses PSIO's. For the team: drop
+the duplicate.
+
+### 7.5 End to end, by hand (checklist step 9)
+
+On the tip, pin `fdb5de25`. State directory `~/psibase-pssz-e2e`
+(`node1.log`, `boot.log`, `queries1.log`, `node2.log`, `queries2.log`);
+the queries are `~/psibase-pssz-scratch-merge/e2e_queries.sh`.
+
+```sh
+D=~/psibase-pssz-e2e; cd ~/psibase-pssz-build; P=$PWD/rust/release/psibase
+./psinode $D/db -l $D/sock -p prod --host psibase.localhost > $D/node1.log 2>&1 &
+$P boot   -a http://psibase.localhost --proxy unix:$D/sock -p prod      # exit 0
+$P create -a http://psibase.localhost --proxy unix:$D/sock -i alice     # exit 0 (one transaction)
+~/psibase-pssz-scratch-merge/e2e_queries.sh $D
+kill -TERM <psinode>;  ./psinode $D/db -l $D/sock -p prod --host psibase.localhost > $D/node2.log 2>&1 &
+~/psibase-pssz-scratch-merge/e2e_queries.sh $D
+$P create -a http://psibase.localhost --proxy unix:$D/sock -i dave      # exit 0
+```
+
+Observed (abridged):
+
+```
+GET transact…/common/tapos/head        {"refBlockIndex":68,"refBlockSuffix":4099556359}
+accounts  { getAccount(accountName: "alice") {…} }
+                                        {"data":{"getAccount":{"accountNum":"alice","authService":"auth-any","authSequence":0}}}
+packages  { installed(first: 2) {…} }   {"data":{"installed":{"pageInfo":{"hasNextPage":true,"endCursor":"4163636F756E7473…"},"edges":[{"node":{"name":"Accounts","version":"0.29.0"}},…]}}}
+tokens    { __schema { queryType { name } } }   {"data":{"__schema":{"queryType":{"name":"Query"}}}}   (a Rust service; userBalances answers "permission denied: 'prod' must authorize your app" without a login)
+explorer  { blocks(last: 720) {… transactions {…} } }   {"data":{"blocks":{"pageInfo":{"hasPreviousPage":true,"hasNextPage":false},"edges":[{"cursor":"0000000F","node":{"id":"0000000F3B81…","header":{…"time":"2026-11-23T14:15:56.000000Z","producer":"prod",…}}},…
+GET packages…/schema?service=setcode    {"service":"setcode","types":{"package":{"name":"","version":"","attributes":[]},"interfaces":[],…
+GET accounts…/graphql                   type Query { getAccount(accountName: AccountNumber!): Account … scalar UInt64 … endCursor: String }
+after the restart:                      head {"refBlockIndex":77,…}; the same answers; 14 blocks produced, continuing at 0x45;
+accounts  { getAccounts(accountNames: ["alice","bob","carol","dave"]) }
+                                        all four, "dave" created after the restart
+```
+
+No error line in either node log. (`kill -INT` does not stop psinode; the
+first attempt at a restart failed to lock the database for that reason.)
+Not exercised by hand: a browser, any plugin, a signed transaction, a
+second node.
+
+### 7.6 For the team review log
+
+Client-visible, accommodated at the merge:
+
+1. `http::rootHost`, `http::getSiblingUrl`, `x-http::rootHost` return a raw
+   string to a Rust caller (`RawString`), `r-events::sqlQuery` bytes
+   (M4, M6). Open: declare the three results UTF-8 once PSIO can put
+   `returns(utf8)` into a service schema (M7).
+2. The largest transaction a chain processes is smaller than before the
+   flip (M8): between 3.5 and 4.4 MiB with Transact's 32 MiB. Decide:
+   non-materializing strict validation (PSIO), fewer copies in Transact /
+   `getCurrentActionView`, or a larger memory limit. Until then a
+   transaction should hold one large action at most; both boot builders
+   now do.
+3. An empty optional result is no bytes (M10): any client that treats an
+   empty `rawRetval` as "no result" is wrong for optional results. The
+   trace printer (`trace.cpp`) does not print such a result.
+4. `tokens` events: the C++ header says `token_id`, `counter_party` (the
+   names the Events SQL tables always had, from the Rust service).
+5. `WsTicketInfo::path` is UTF-8 in the C++ header.
+6. A Rust service declares a capped argument list with
+   `#[pssz(max_dynamic_data = N)]` on the action (M3); needed for an `err`
+   callback of `x-http::setCallback`.
+7. `Explorer`'s GraphQL complexity limit is 1 000 000.
+8. Rust GraphQL clients changed as flip-interop 6 lists (committed
+   `55349208a`): compiled, **not run** — no test drives a plugin.
+
+Built but not run by any test: every UI (`packages/**/ui`), every plugin
+(the component build compiles them; `Invite`, `Packages`, `Explorer`
+plugins were edited), `common-lib` (`rpc.ts`, `SimpleUI.mjs` for the new
+`SignedTransaction` JSON and `tapos.flags`), the XAdmin wasm helper,
+`demo/`, `package-templates/`. Compile-checked only: the six unbuilt Rust
+packages and the EthBridge relayer.
+
+Documentation that still describes the old formats (not edited):
+`doc/src/specifications/data-formats/fracpack.md` and `schema.md`,
+`doc/src/specifications/blockchain/entry-points.md`,
+`doc/src/default-apps/common-api.md`, `transact.md`,
+`x-admin/http-endpoints.md`,
+`doc/src/development/front-ends/reference/js-libraries.md`,
+`doc/src/development/services/rust-service/tables.md`, `doc/src/SUMMARY.md`
+(the entry); comments that say "fracpack" in `Rpc.hpp`, `Table.hpp`,
+`api.hpp`, `BlockContext.cpp`, `TransactionContext.cpp`, `tester.hpp`,
+`tester.cpp`, `RTransact.cpp`, three C++ tests, `rust/psibase/src`
+(`from_bin.rs`, `to_bin.rs`, `native_raw.rs`, `tester_raw.rs`,
+`serve_http.rs`), the macro READMEs, `rust/.config/hakari.toml`, two
+`.wit` files, `key-conversions.ts` (two dead functions),
+`Explorer/ui/src/lib/types.ts`, the Exchange and Favor READMEs
+(`git grep -il fracpack`). `git grep psio1` finds only documents.
+
+### 7.7 What is left
+
+Nothing blocks the hand-over. Open, in order of weight: M8 (transaction
+size against Transact's memory), M7 and M2 (PSIO), the trust refinement
+and the size caps (team review log 0.1, 0.2), the unexercised front ends
+and plugins (0.3), the documentation above.

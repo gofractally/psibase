@@ -16,9 +16,10 @@ schemas flipped in its section 1.21 (stage S2); JSON in its section 1.22
 (stage S4); GraphQL in its section 1.24 (stage S5): a C++ GraphQL answer
 is written by PSIO's engine. The legacy library is deleted (section 1.25).
 
-PSIO pin for both languages: `f811c6f982fa62bbdcd77587f123d80cde983bdc`
-(`cmake/PsibaseDependencies.cmake`; PSIO `main`: `f03f7304` plus one
-commit under `rust/psio`; no C++ or wire change).
+PSIO pin for both languages: `fdb5de259f5059861a80a99b10a75d156a63d5eb`
+(`cmake/PsibaseDependencies.cmake`; PSIO `main`). No wire change from
+`f811c6f9`, on which the two halves were merged: `rust-twins.json` is
+identical on both.
 
 ## 0. Already in force with the pin (before any flip commit)
 
@@ -448,9 +449,9 @@ Schema-driven conversion is `psio::pssz_ir` (`json_to_pssz`,
 | `Action` | `Object{sender: AccountNumber, service: AccountNumber, method: MethodNumber, rawData: hex}` | `{"sender":"alice","service":"svc","method":"credit","data":{"to":"bob","amount":5,"memo":null}}`: `method` is the action's name as the schema of `service` declares it and `data` its arguments decoded with that schema (through the same registry, so actions nest). When there is no schema for `service`, the action is not in it or the bytes are not its arguments: `"method"` is the text of the number and `"rawData":"<HEX>"` replaces `data` | an object with `sender` (`""` is the null account), `service`, `method` (exactly as declared), and `data` (object keyed by parameter name, or the positional array; packed with the schema of `service`) or `rawData` (hex); `data` wins when both are given. Errors: `invalid account: …`, `Invalid service account …`, `Missing field rawData`, `Cannot find schema for <service>`, `Action not found: <service>::<method>`, `<service>::<method>: <codec error>` |
 | `ServiceMethod` | `Object{service: AccountNumber, method: MethodNumber}` | `{"service":"svc","method":"credit"}` (the declared name when the schema of `service` has the method) | the same object |
 
-Both ids are declared in C++ with `PSIO_INVARIANT(Type, fn, "Id")` over a
-check that accepts every value (PSIO has no other way to name a record's
-schema node); no byte of an `Action` changes. In a schema they are
+Both ids are declared in C++ with `schemaId("Id")` in the type's
+`PSIO_REFLECT` (Rust: `#[psio(custom = "Id")]`); no byte of an `Action`
+changes. In a schema they are
 `Custom{Object{…}, "Action"}` / `Custom{…, "ServiceMethod"}`: **the Rust
 declarations must produce the same nodes** for a `contract` comparison
 (`wire` ignores custom ids), and `rust-twins.json` `schema_ir` changed
@@ -629,9 +630,11 @@ itself is nullable.
 "column"}], "path": […]}]}`; `{"errors": […]}` when the document does not
 parse or validate. HTTP status 200 in both cases.
 
-**Limits.** PSIO's defaults (complexity 100 000, counted as
-`1 + N × (1 + 10 × (1 + node fields))` for a connection with `first: N`;
-response 16 MiB; depth 32); Explorer allows complexity 10 000 000.
+**Limits.** PSIO's defaults (complexity 100 000: a connection with
+`first: N` counts its page once, `2 + N × (1 + node fields)`, and a list
+without a page size counts 10 elements; response 16 MiB; depth 32).
+Explorer allows complexity 1 000 000: its UI asks for `blocks(last: 720)`
+with transactions and their actions, about 360 000.
 
 **Clients of the C++ GraphQL services and what they must change**
 (`doc/pssz-conversion.md` section 1.24 has the full survey):
