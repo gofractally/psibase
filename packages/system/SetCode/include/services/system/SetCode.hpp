@@ -10,13 +10,16 @@ namespace SystemService
       psibase::Checksum256 codeHash  = {};
       std::uint8_t         vmType    = 0;
       std::uint8_t         vmVersion = 0;
+      // The number of code rows and staged-code rows that name this code.
+      // It is part of the stored row: the code is erased from the native
+      // code-by-hash table when it drops to zero.
       std::uint32_t        numRefs   = 0;
 
       using Key = psibase::CompositeKey<&CodeRefCountRow::codeHash,
                                         &CodeRefCountRow::vmType,
                                         &CodeRefCountRow::vmVersion>;
       auto key() const { return Key{}(*this); }
-      PSIO_REFLECT(CodeRefCountRow, codeHash, vmType, vmVersion)
+      PSIO_REFLECT(CodeRefCountRow, codeHash, vmType, vmVersion, numRefs)
    };
    using CodeRefCountTable = psibase::Table<CodeRefCountRow, CodeRefCountRow::Key{}>;
    PSIO_REFLECT_TYPENAME(CodeRefCountTable)
