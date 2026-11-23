@@ -57,6 +57,8 @@ impl Api for WebCryptoShim {
         let signature: Signature = signing_key
             .sign_prehash(&hashed_message)
             .map_err(|e| CryptoError(e.to_string()))?;
+        // verify-sig only accepts the low-S form.
+        let signature = signature.normalize_s().unwrap_or(signature);
         Ok(signature.to_bytes().to_vec())
     }
 

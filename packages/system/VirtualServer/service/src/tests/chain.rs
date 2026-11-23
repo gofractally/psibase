@@ -677,6 +677,8 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let signature: Signature = signing_key
         .sign_prehash(&psibase::sha256(&tx_packed).0)
         .map_err(|e| psibase::Error::new(e))?;
+    // verify-sig only accepts the low-S form.
+    let signature = signature.normalize_s().unwrap_or(signature);
     let strx = SignedTransaction {
         transaction: tx_packed.into(),
         proofs: vec![signature.to_bytes().to_vec().into()],

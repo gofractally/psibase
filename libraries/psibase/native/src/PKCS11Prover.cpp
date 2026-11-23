@@ -294,6 +294,12 @@ namespace
    {
       if (service == AccountNumber{"verify-sig"})
       {
+         // The token returns whichever s it computed.
+         auto p = reinterpret_cast<const unsigned char*>(pubkey.data());
+         std::unique_ptr<EVP_PKEY, OpenSSLDeleter> key(d2i_PUBKEY(nullptr, &p, pubkey.size()));
+         if (!key)
+            handleOpenSSLError();
+         normalizeSignature(key.get(), sig);
          return std::move(sig);
       }
       else

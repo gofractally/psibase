@@ -23,8 +23,14 @@ extern "C"
 // Both use their 64-bit code, which relies on the wide-arithmetic instructions.
 //
 // Accepted encodings:
-// - Keys: uncompressed or compressed points, on both curves.
-// - Signatures: any s in [1, n-1] on both curves (high-S is not rejected).
+// - Keys: exactly the DER SubjectPublicKeyInfo for the curve, holding an
+//   uncompressed (04 || X || Y) or compressed (02/03 || X) point. Nothing else
+//   that a general DER parser would tolerate is accepted: no trailing bytes,
+//   no unused bits, no alternative identifier encodings, no hybrid points.
+// - Signatures: only the low-S form, s <= n/2, on both curves. (r, s) and
+//   (r, n - s) are both mathematically valid for the same message, so without
+//   this rule every signature would have a second encoding that anyone could
+//   produce. A signer normalizes with s = n - s when s > n/2.
 
 using namespace psibase;
 
@@ -60,14 +66,16 @@ namespace
 
    void verifyK1(Bytes point, const unsigned char* hash, const unsigned char* signature)
    {
+      // libsecp256k1 would also take the "hybrid" form (06/07 || X || Y), a
+      // third encoding of the same point.
+      check(point[0] == (point.size() == 65 ? 0x04 : (0x02 | (point[0] & 1))), "invalid public key");
       const secp256k1_context* ctx = secp256k1_context_static;
       secp256k1_pubkey         pubkey;
       check(secp256k1_ec_pubkey_parse(ctx, &pubkey, point.data(), point.size()),
             "invalid public key");
       secp256k1_ecdsa_signature sig;
       check(secp256k1_ecdsa_signature_parse_compact(ctx, &sig, signature), "signature invalid");
-      // libsecp256k1 only verifies low-S signatures. Normalizing first accepts both forms.
-      secp256k1_ecdsa_signature_normalize(ctx, &sig, &sig);
+      // libsecp256k1 rejects high-S signatures.
       check(secp256k1_ecdsa_verify(ctx, &sig, hash, &pubkey), "signature invalid");
    }
 
@@ -166,8 +174,15 @@ namespace
       }
    }
 
+   // n / 2 for P-256, where n is the group order.
+   constexpr unsigned char r1HalfOrder[32] = {
+       0x7f, 0xff, 0xff, 0xff, 0x80, 0x00, 0x00, 0x00, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+       0xde, 0x73, 0x7d, 0x56, 0xd3, 0x8b, 0xcf, 0x42, 0x79, 0xdc, 0xe5, 0x61, 0x7e, 0x31, 0x92, 0xa8};
+
    void verifyR1(Bytes point, const unsigned char* hash, const unsigned char* signature)
    {
+      // BearSSL accepts any s in [1, n-1]. Big-endian, so memcmp orders by value.
+      check(std::memcmp(signature + 32, r1HalfOrder, 32) <= 0, "signature invalid");
       unsigned char expanded[65];
       if (point.size() == 33)
       {
