@@ -29,7 +29,7 @@ Why that matters:
 
 What it asks of the team is real, which is why it needs review and not just a merge: the state format changes, the consensus engine becomes a pinned fork of wasmtime, and several validity rules change. The table below lists every such change. The tour after it says where to look and what we would most like challenged.
 
-These are tester figures, one block on one thread, and not network throughput; the caveats are in the Throughput section.
+These are tester figures, one block on one thread. Submitted over TCP to a single running node, unsigned transfers went from 108 per second on `main` to 485 on this head (4.5×); the network table and the caveats are in the Throughput section.
 
 ## Read this first: what changes consensus or formats
 
@@ -155,12 +155,24 @@ So the head today against `main` is about 5.7 times faster unsigned and about 5.
 
 Where the gains came from, measured in isolation on the 44c57f739 base: the psitri transaction stack alone took unsigned from 300–308 to 346–351, and adding per-block event indexing took it to 646–654. The new `verify-sig` alone took one verification from about 896 µs to about 135 µs.
 
-What these numbers are not:
-- They are one block on one thread in the tester, not network throughput. Over a network at 44c57f739 a single node applied about 199 unsigned transfers per second; a network figure for 054a0c386 is not available yet.
+**Over a network.** Transfers submitted over TCP to one running node, applied per second, 20 seconds per case, one run each, x86:
+
+| | Team `main` | 44c57f739 | c45c060cd | 054a0c386 (head now) | Increase |
+|---|---|---|---|---|---|
+| Unsigned, 16 connections | 108 | 197 | 250 | 485 | 4.5× vs `main` |
+| Unsigned, 64 connections | 108 | 193 | 250 | 405 | 3.7× vs `main` |
+| Signed secp256k1, 16 connections | — | 165 | 224 | 306 | 1.9× vs 44c57f739 |
+| Signed secp256k1, 64 connections | — | 172 | 233 | 305 | 1.8× vs 44c57f739 |
+
+On `main`, signed P-256 over the network was 99 per second at 16 connections and 101 at 64; P-256 was not measured over the network at the later commits.
+
+What to keep in mind:
+- The tester figures are one block on one thread, not network throughput.
+- The network figures are a single node with the load generator on the same machine, one run per case. There is no multi-node run at c45c060cd or 054a0c386. Signed throughput rose less than unsigned.
 - Per-block event indexing means indexing time is no longer in a transaction's billed CPU, and objective pricing of events is not built.
 - The tester verified every signature twice when this was last checked, which overstates signature cost there. That has not been rechecked at 054a0c386.
 
-The benchmark report itself is not in the repository yet.
+The full report, with raw output, is on branch `claude/benchmark-report` under `doc/benchmarks/transfer-throughput/` and will be carried into the head.
 
 ## Test results
 
@@ -182,7 +194,7 @@ Suite results are recorded per commit under `tests/timing/runs/`. On wasmtime:
 - The tester verified each signature twice when last checked; not rechecked at 054a0c386.
 - Crypto library sources are fetched from their upstream sites, not mirrored.
 - Canonical signatures and the browser/Rust key default are not in the head.
-- The benchmark report and the verifier differential test are not in the tree.
+- The benchmark report and the verifier differential test are on topic branches, not yet in the head.
 
 ## Still to come in this pull request
 
