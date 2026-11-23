@@ -36,6 +36,33 @@ const CARGO_PSIBASE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const SERVICE_ARGS: &[&str] = &["--lib"];
 
+/// Target features of code that runs in a psibase node, beyond rustc's
+/// defaults for the target. Every psibase engine executes wide arithmetic, so
+/// 128-bit math compiles to it instead of calls into compiler-rt. Plugins run
+/// in browsers and do not get this.
+///
+/// rustc still calls the feature unstable and warns that the flag will become
+/// an error; when a toolchain update does that, this is the line to change.
+const SERVICE_TARGET_FEATURES: &str = "-Ctarget-feature=+wide-arithmetic";
+
+/// Compiles the crate and its dependencies with SERVICE_TARGET_FEATURES. Cargo
+/// reads RUSTFLAGS in preference to the per-target variable, so the flag goes
+/// wherever the caller's own flags already are.
+fn service_rustflags(command: &mut tokio::process::Command) {
+    const TARGET_VARIABLE: &str = "CARGO_TARGET_WASM32_WASIP1_RUSTFLAGS";
+    let variable = if std::env::var_os("RUSTFLAGS").is_some() {
+        "RUSTFLAGS"
+    } else {
+        TARGET_VARIABLE
+    };
+    let mut flags = std::env::var(variable).unwrap_or_default();
+    if !flags.is_empty() {
+        flags.push(' ');
+    }
+    flags.push_str(SERVICE_TARGET_FEATURES);
+    command.env(variable, flags);
+}
+
 const SERVICE_POLYFILL: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
 
@@ -696,6 +723,7 @@ async fn build_service_impl(
     rustc_args: &[OsString],
 ) -> Result<Vec<PathBuf>, Error> {
     let mut command = tokio::process::Command::new(get_cargo());
+    service_rustflags(&mut command);
     command
         .arg("rustc")
         .arg("--release")
@@ -823,6 +851,7 @@ async fn build(
     extra: &[&PackageId],
 ) -> Result<Vec<ServiceArtifacts>, Error> {
     let mut command = tokio::process::Command::new(get_cargo());
+    service_rustflags(&mut command);
     command
         .arg("build")
         .args(SERVICE_ARGS)
@@ -1084,6 +1113,7 @@ async fn test(
     let mut packages = Vec::new();
 
     let mut command = tokio::process::Command::new(get_cargo());
+    service_rustflags(&mut command);
     command
         .arg("build")
         .arg("--tests")
