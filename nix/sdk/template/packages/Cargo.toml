@@ -12,7 +12,7 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
-# Pin to the SDK train (see nix/release.nix psibaseCrateVersion).
+# Pin to the published crates.io psibase train.
 psibase = "=0.29.0"
 psibase_macros = "=0.29.0"
 async-graphql = "=7.0.17"

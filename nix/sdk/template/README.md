@@ -1,39 +1,13 @@
-# Psibase package workspace
+# Out-of-tree package workspace (`packages/`)
 
-Scaffolded with:
-
-```bash
-nix flake init -t github:gofractally/psibase#package
-# Until this lands on main:
-#   nix flake init -t github:gofractally/psibase/mm/nix-pkg-dev-prep#package
-```
-
-## Layout
+Source of truth for the Cargo workspace skeleton used by out-of-tree app
+repos (crates.io `psibase` / `psibase_macros`, not monorepo `path =` deps).
 
 ```text
-.
-├── flake.nix / .envrc      # pulls in psibase-dev-tools Package SDK shell
-└── packages/
-    ├── Cargo.toml          # workspace (crates.io psibase pin)
-    └── <App>/              # from `psiapp new` — service, query, plugin, ui
+packages/
+├── Cargo.toml          # workspace + crate pins
+└── <App>/              # service, query-service, plugin, ui
 ```
 
-## Develop
-
-```bash
-direnv allow   # or: nix develop
-psiapp chain up 8090  # avoid ports already in use (e.g. 8080)
-
-psiapp new my-app
-cd packages/MyApp/ui && yarn && yarn build
-cd .. && cargo-psibase package
-cargo-psibase install -a http://psibase.localhost:8090/
-
-psiapp chain down
-```
-
-Use the SDK shell’s `psibase` (same release as the chain). A monorepo `build/`
-`psibase` from a newer train will mis-encode account names on an SDK-booted chain.
-
-`packages/Cargo.lock` (after the first `cargo` / `cargo-psibase` run) should be
-committed so Cargo does not pull crates that need a newer rustc than the SDK pin.
+In-tree apps still use root [`package-templates/`](../../../package-templates/)
+into `packages/user/`.

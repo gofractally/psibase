@@ -105,22 +105,11 @@ nix flake update
 nix develop
 ```
 
-# Out-of-tree package workspace template
-
-Scaffold a standalone package workspace (Package SDK shell from
-[psibase-dev-tools](https://github.com/gofractally/psibase-dev-tools)):
-
-```bash
-nix flake init -t github:gofractally/psibase#package
-```
-
-Template sources: `nix/sdk/template/` (`templates.package` in the root flake).
-
 # Files
 
 - `flake.nix` / `flake.lock` — Nix flake at repo root
 - `nix/rust-toolchain.toml` — Rust version and targets
-- `nix/sdk/template/` — flake template for out-of-tree package workspaces
+- `nix/sdk/template/packages/` — out-of-tree workspace skeleton (crates.io pins)
 
 # Relationship to Docker
 
