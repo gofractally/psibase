@@ -37,12 +37,13 @@ if(NOT PSIBASE_BOOST_INCLUDE_DIR)
     set(PSIBASE_BOOST_INCLUDE_DIR "")
 endif()
 # The PKCS #11 signer test in the psibase crate needs a token; it uses SoftHSM
-# when that is installed and skips itself otherwise.
-find_library(RS_TESTS_LIBSOFTHSM2 libsofthsm2.so PATH_SUFFIXES softhsm)
-find_program(RS_TESTS_SOFTHSM2_UTIL softhsm2-util)
+# when that is installed and skips itself otherwise. These are the cache
+# variables the psinode tests use, so -DLIBSOFTHSM2=... applies to both.
+find_library(LIBSOFTHSM2 libsofthsm2.so PATH_SUFFIXES softhsm)
+find_program(SOFTHSM2_UTIL softhsm2-util)
 set(rs_tests_softhsm)
-if(RS_TESTS_LIBSOFTHSM2 AND RS_TESTS_SOFTHSM2_UTIL)
-    set(rs_tests_softhsm PSIBASE_TEST_SOFTHSM2=${RS_TESTS_LIBSOFTHSM2} PSIBASE_TEST_SOFTHSM2_UTIL=${RS_TESTS_SOFTHSM2_UTIL})
+if(LIBSOFTHSM2 AND SOFTHSM2_UTIL)
+    set(rs_tests_softhsm PSIBASE_TEST_SOFTHSM2=${LIBSOFTHSM2} PSIBASE_TEST_SOFTHSM2_UTIL=${SOFTHSM2_UTIL})
 endif()
 add_test(
     NAME rs-tests
