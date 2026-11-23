@@ -53,7 +53,7 @@ Visible in traces but not consensus: `ActionTrace.totalTime` is now elapsed time
 
 ### 1. Execution engine (suggested reviewer: Steven)
 
-**What changed.** eos-vm is replaced by psizam (interpreter, JIT1, JIT2, LLVM AOT), with wasmtime added as an engine and made the default. A build can carry several engines and pick one at run time.
+**What changed.** eos-vm is replaced by wasmtime as the node's engine, with psizam (interpreter, JIT1, JIT2, LLVM AOT) providing validation and the other engines. A build can carry several engines and pick one at run time, which is how they are compared against each other.
 
 - **Compilation.** With wasmtime a service is compiled at first use, in tens of milliseconds, and the result is kept in a per-user cache on disk. Compiling stored services in the background ahead of first use applies to the LLVM AOT engine only.
 - **Instance pool** (ff905f61a, bc22a3953). wasmtime's pooling allocator with 256 slots per engine; a slot stays warm for the module that last used it. An instance the pool cannot serve (no free slot, a memory16 module, an oversized table) is created by a second engine without a pool running the same compiled code, and if the pool's address space cannot be reserved the node runs without one. `PSIBASE_WASMTIME_POOL=0` turns it off; the test `t-Tokens-test-one-pool-slot` forces the fallback. Resetting a slot is wasmtime's own mechanism: a copy-on-write image and in-place zeroing on Linux, a fresh mapping on macOS, where it gains almost nothing.
@@ -76,7 +76,7 @@ Visible in traces but not consensus: `ActionTrace.totalTime` is now elapsed time
 - Wide arithmetic is lowered in JIT2 and LLVM as 64-bit operations plus a carry compare, with two new high-multiply operations, and is tested against a 128-bit oracle on every engine. Is unconditional acceptance what the team wants?
 
 **Known limits.**
-- wasmtime is the engine. There is no plan to use JIT2 now that wasmtime is in place; its known issues are being written down and work on it has stopped. LLVM AOT is paused. c45c060cd marks the psizam-engine execution context as unverified after the CPU budget change, and the suites are qualified on wasmtime only (#2228).
+- wasmtime is the engine. psizam's interpreter, JIT1 and JIT2 are kept only as a cross-check for wasmtime and for LLVM AOT, and are to be marked experimental with their failures documented. They are largely compatible, with only minor known issues, and could be revived later for something wasmtime lacks, such as debugging. LLVM AOT is paused. c45c060cd marks the psizam-engine execution context as unverified after the CPU budget change, and the suites are qualified on wasmtime only (#2228).
 - psizam tests a reviewer will see fail, all predating this work: the `memory_grow_2` spec cases on every engine, `psizam_host_tail_reentry_tests` (intentionally red), and on x86 "Test call depth dynamic - jit_llvm".
 - Rust services are not compiled with wide arithmetic in this head. Branch `claude/canonical-next` adds it and is next to land. It moves `cargo-psibase` to newer walrus, wasmparser and wasm-opt versions and passes `--enable-multivalue` beside `--enable-wide-arithmetic` to the optimizer. rustc calls the wide-arithmetic target feature unstable and warns that using it will become an error.
 
@@ -193,7 +193,7 @@ Suite results are recorded per commit under `tests/timing/runs/`. On wasmtime:
 
 Open items are tracked as issues and closed as they are fixed.
 
-- wasmtime (a pinned fork) is the only qualified engine. JIT2 is not planned for use and LLVM AOT is paused; both are unverified: #2228. Engine tests red on psizam main: [psizam#1](https://github.com/gofractally/psizam/issues/1), [psizam#2](https://github.com/gofractally/psizam/issues/2).
+- wasmtime (a pinned fork) is the only qualified engine. The interpreter, JIT1 and JIT2 are experimental cross-checks, and LLVM AOT is paused; none is verified on this head: #2228. Engine tests red on psizam main: [psizam#1](https://github.com/gofractally/psizam/issues/1), [psizam#2](https://github.com/gofractally/psizam/issues/2).
 - One monotonic clock for trace time, the limit and billing: #2227.
 - Deterministic stack check on wasmtime costs memory traffic on every call: #2221.
 - Buying resources during a transaction does not raise that transaction's CPU limit: #2217 (fix on a branch).
