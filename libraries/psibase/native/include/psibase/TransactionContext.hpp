@@ -66,6 +66,18 @@ namespace psibase
 
       std::chrono::nanoseconds getBillableTime();
 
+      // Stops the transaction's CPU budget while a service is compiled or its
+      // compiled code is loaded: a node that already has the code must not
+      // behave differently from one that does not. The budget runs again when
+      // the returned object is destroyed.
+      struct BillingPause
+      {
+         explicit BillingPause(TransactionContext& context);
+         ~BillingPause();
+         BillingPause(const BillingPause&) = delete;
+         TransactionContext& context;
+      };
+
       // Set watchdog timer; it will expire at startTime + serviceLoadTime + watchdogLimit.
       // This may be called multiple times with different limits; the most-recent limit applies.
       /// The VM limits this context executes services under.

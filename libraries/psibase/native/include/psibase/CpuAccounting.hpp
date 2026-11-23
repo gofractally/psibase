@@ -102,20 +102,23 @@ namespace psibase::accounting
       bool                  closed     = false;
       unsigned              publishing = 0;
       std::function<bool()> withinBudget;
-      // The budget costs a thread CPU clock read, which is a system call, and
-      // storage checks it around every operation. Between evaluations a
-      // check only looks for a cancellation: `settled` is true while nothing
-      // is cancelled, closed or publishing, and `evaluateAfter` is when the
-      // budget is next worth reading. A cancellation from the watchdog still
+      // Storage checks the request around every operation, so a check is one
+      // atomic load: `settled` is true while nothing is cancelled, closed or
+      // publishing. The executing thread does not read a clock to enforce its
+      // own budget. Whoever owns the budget (the watchdog thread, which sleeps
+      // until the budget could have run out) cancels the request, and that
       // takes effect at the very next check.
-      // Zero evaluates the budget at every check.
-      std::chrono::microseconds evaluationInterval;
+      //
+      // A request given an interval also evaluates the budget itself, no more
+      // often than that; zero evaluates it at every check. This is for
+      // requests nothing else watches.
+      std::optional<std::chrono::microseconds> evaluationInterval;
       std::atomic<bool>                          settled{true};
       std::atomic<std::chrono::steady_clock::rep> evaluateAfter{0};
 
      public:
-      explicit Request(std::function<bool()>     check,
-                       std::chrono::microseconds interval = std::chrono::microseconds{100})
+      explicit Request(std::function<bool()>                    check,
+                       std::optional<std::chrono::microseconds> interval = std::nullopt)
           : withinBudget(std::move(check)), evaluationInterval(interval)
       {
       }
@@ -138,25 +141,32 @@ namespace psibase::accounting
       }
       void check()
       {
-         const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
-         if (settled.load(std::memory_order_acquire) &&
-             now < evaluateAfter.load(std::memory_order_relaxed))
-            return;
+         std::chrono::steady_clock::rep now = 0;
+         if (settled.load(std::memory_order_acquire))
+         {
+            if (!evaluationInterval)
+               return;
+            now = std::chrono::steady_clock::now().time_since_epoch().count();
+            if (now < evaluateAfter.load(std::memory_order_relaxed))
+               return;
+         }
          std::lock_guard lock(mutex);
          if (closed)
             throw Cancelled();
          if (publishing)
             return;
-         if (cancelled || !withinBudget || !withinBudget())
+         if (cancelled || !withinBudget || (evaluationInterval && !withinBudget()))
          {
             settled.store(false, std::memory_order_release);
             cancelled = true;
             throw Cancelled();
          }
-         evaluateAfter.store(
-             now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(evaluationInterval)
-                       .count(),
-             std::memory_order_relaxed);
+         if (evaluationInterval)
+            evaluateAfter.store(
+                now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                          *evaluationInterval)
+                          .count(),
+                std::memory_order_relaxed);
       }
       void beginPublication()
       {

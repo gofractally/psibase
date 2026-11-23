@@ -329,6 +329,10 @@ namespace psibase::vm_wasmtime
                "max_stack_bytes is larger than the wasmtime engine's native stack allows");
 
          module      = cache.get(code.codeHash, vmOptions, code.vmVersion);
+         // Loading or compiling the code is not billed to the transaction.
+         std::optional<TransactionContext::BillingPause> unbilled;
+         if (!module)
+            unbilled.emplace(transactionContext);
          if (!module)
          {
             // An artifact stored under this key was admitted and compiled from
@@ -429,20 +433,18 @@ namespace psibase::vm_wasmtime
          initialized = true;
       }
 
+      // The time an action took, for its trace. This is elapsed time, read
+      // without a system call; the thread's CPU clock is read only where a
+      // value is billed.
       struct RecordActionTime
       {
-         explicit RecordActionTime(ActionContext& actionContext) : actionContext(actionContext)
-         {
-            actionContext.actionTrace.totalTime =
-                actionContext.transactionContext.getBillableTime();
-         }
+         explicit RecordActionTime(ActionContext& actionContext) : actionContext(actionContext) {}
          ~RecordActionTime()
          {
-            actionContext.actionTrace.totalTime =
-                actionContext.transactionContext.getBillableTime() -
-                actionContext.actionTrace.totalTime;
+            actionContext.actionTrace.totalTime = std::chrono::steady_clock::now() - start;
          }
-         ActionContext& actionContext;
+         ActionContext&                        actionContext;
+         std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
       };
 
       template <typename F>
