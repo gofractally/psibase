@@ -5,7 +5,7 @@ This document records the first three slices of the conversion, slices 4a,
 (branch `claude/pssz`), the pattern they established, everything that
 remains, a proposed order for the remaining slices, the decisions that need
 the owner's confirmation, and the places where PSIO lacks something psibase
-needs. Section 6 is the Rust side: the survey, the plan in slices R1–R9, the
+needs. Section 6.25 is the handover: the current state and how to verify it. Section 6 is the Rust side: the survey, the plan in slices R1–R9, the
 old → new mapping, what PSIO's Rust crate lacks, slice R1 (6.10), what of
 slices R2 and R3 could be done and what waits (6.13, 6.14) and the
 C++ ↔ Rust cross-check (6.15); sections 6.11 and 6.12 are JavaScript and
@@ -21,7 +21,7 @@ Schema IR for schemas. No chain data is migrated (fresh genesis).
 | | |
 |---|---|
 | Legacy library | `libraries/psio1`: include prefix `<psio1/…>`, namespace `psio1`, macros `PSIO1_…`, CMake target `psio1`, archive `libpsio1.a`. It is deleted at the end of the conversion. |
-| PSIO | `gofractally/psio` at `c6d9940441463c7ba3b6087595770a765f5fffac` (section 1.16; before that `415ea1a6`), which is its `main`, pinned in `cmake/PsibaseDependencies.cmake`, fetched to `external/psio`. (Slices 1–4a were built on `e6901feb`; slices 2b and 4b on `86cf8c0f` / `868e37bb`, whose `cpp/`, `cmake/` and `CMakeLists.txt` are identical; the follow-up of section 1.13 on `dfd0db17`, a topic branch; the pin moved to `main` in section 1.14, `224f80de`, and along it in section 1.15.) |
+| PSIO | **Now `0e6a1b7216a47620b9eafc69c2556b124f3796b0` (sections 6.23, 6.25).** Before: `gofractally/psio` at `c6d9940441463c7ba3b6087595770a765f5fffac` (section 1.16; before that `415ea1a6`), pinned in `cmake/PsibaseDependencies.cmake`, fetched to `external/psio`. (Slices 1–4a were built on `e6901feb`; slices 2b and 4b on `86cf8c0f` / `868e37bb`, whose `cpp/`, `cmake/` and `CMakeLists.txt` are identical; the follow-up of section 1.13 on `dfd0db17`, a topic branch; the pin moved to `main` in section 1.14, `224f80de`, and along it in section 1.15.) |
 | Since (sections 1.16, 6.16–6.20) | The integration head `44c57f739` is merged and the pin is `c6d99404`; ctest's baseline is 93. Rust: `Hex<T>` is `transparent` (D29 revised) and 44 of the 78 core records are declared; the stale Rust mirrors of D36 are corrected; the service macro can declare a service's actions as a PSIO interface (`psio = true`, three services); the C++ ↔ Rust fixture has 50 types, 115 values, legacy bytes for each, two service interfaces and 18 calls. |
 | Rust | The `psio` crate is a path dependency into the pinned checkout (`external/psio/rust/psio`). Declared with the official PSIO derives beside the legacy ones, which still write every byte: `AccountNumber`, `MethodNumber` (R1, 6.10); `Memo`, `tokens::Precision`, `Quantity`, `Decimal` (R2, 6.13); 20 core records of `rust/psibase/src` (R3, 6.14). 26 types are proved equal to their C++ twins through one fixture (6.15). Waiting, each for a stated reason: the time types and `Hex<T>` / `Checksum256` and every record that holds one (the JSON flip), 56 core records in all. Two behaviour changes: the name parsers no longer panic on malformed text (D30), and `Quantity::from_str` rejects a quantity over 2^64 − 1 (D17) and a fraction of 256 or more digits (D38). |
 | Native | `libraries/CMakeLists.txt` calls `psibase_acquire_dependency(psio)`; `psibase` and `psio1` link `psio::psio`. PSIO fetches simdjson 5.2.0 by URL and SHA-256; configuration fails if any other simdjson target exists first. PSIO's own install rules are excluded from psibase's install tree. |
@@ -2631,6 +2631,136 @@ with the wire flip: `RawString` has no legacy codec.
    `LocalPackage::exports`.
 5. Deleting `rust/fracpack`, the legacy derives, `rust/test_fracpack*`,
    and `rust/fracpack/src/psio_time.rs` with them.
+
+### 6.25 Handover: the state at the end of this round, for whoever takes the service macro and the Rust wire flip
+
+**State.** Branch `claude/pssz`, not pushed. PSIO pin
+`0e6a1b7216a47620b9eafc69c2556b124f3796b0` (the C++ flip branch
+`claude/pssz-flip-cpp` in `~/psibase-flip-cpp` uses the same; section
+6.23 describes `b5cea0d4`, which was the pin for two steps; what `0e6a1b72`
+changed here: `std::vector<char>` and `std::vector<std::uint8_t>` are one
+Schema IR node, RG14 closed, so the fixture no longer lists a `char`
+difference; RG15 closed). ctest baseline 93. Everything psibase puts on
+the wire is still packed by the legacy libraries (`psio1` in C++,
+`rust/fracpack` in Rust); nothing in production calls a PSIO codec.
+
+**Milestone 3 (Rust readiness) leaves undone**
+
+1. The service macro is still dual: `psio = true` on three services only
+   (`setcode`, `auth-delg`, `minrecvr`); events are not declared as PSIO
+   interfaces (naming undecided, D43). To make it the only mode every
+   parameter type needs `psio::JsonText` (not derived on the service
+   records yet: the derive pass added `PsszPack, PsszUnpack, PsszView,
+   ToPsszSchema` and `Key`), result types must be named as the module
+   sees them (several views write `super::Record`), and a service whose
+   signature names a type of the "refused" list below cannot compile it.
+   A first attempt at this step was started and cancelled; nothing of it
+   is in the tree.
+2. Types still without PSIO derives, and why:
+   `package::Meta` (`#[serde(default)]`), `accounts::Account`
+   (`#[serde(deserialize_with)]` on `authSequence`), `ActionTrace`
+   (`deserialize_with`; its `totalTime` is also an `i64` where C++ has
+   `std::chrono::nanoseconds`) and with it `InnerTrace`, `InnerTraceEnum`,
+   `TransactionTrace`; the legacy schema records `psibase::Schema`,
+   `EventType`, `FieldId`, `TableInfo`, `packages::InstalledSchema` (to be
+   replaced by the `ServiceSchema` record over PSIO's Schema IR that the
+   C++ side defines); Permissions plugin `PackablePromptContext`,
+   `Permission`, `Permissions` (they hold the wit-bindgen `TrustLevel`,
+   packed by a hand-written codec in `Permissions/plugin/src/types.rs`).
+3. `String` → `psio::pssz::RawString` for the Rust twins of the members
+   C++ keeps raw (list in 6.24); the C++ `utf8` list is with the C++ side.
+4. Mirror *type* names (6.22, last row of the interface table) and the
+   C++ reflections `packages::setSchema` / `getSchema`, `x-admin::isAdmin`,
+   `x-packages::serveSys` (with the C++ side).
+
+**The flip checklist** is the numbered list at the end of 6.24; the
+contract for everything that crosses the language boundary is
+`~/psibase-flip-cpp/doc/flip-interop.md` (read-only from here).
+
+**Pinned exceptions of the parameter-name cross-check** (`psio_twins.rs`,
+`rust_views_name_parameters_as_the_implementation_does`; each fails when
+it is gone, so remove the entry with the fix): `transact::addCallback`,
+`transact::removeCallback` (the view says `type_`: `type` is a Rust
+keyword); `packages::setSchema`, `packages::getSchema`,
+`x-admin::isAdmin`, `x-packages::serveSys` (C++ reflections to correct).
+
+**Temporary code, and where it goes**
+
+| Where | What | Deleted with |
+|---|---|---|
+| `rust/fracpack/src/psio_time.rs` (+ `psio` in `rust/fracpack/Cargo.toml`) | legacy `Pack / Unpack / ToSchema` for the four `psio::time` types | `rust/fracpack` |
+| `rust/psibase/src/time.rs` | `ToKey` for the same | the legacy key trait |
+| `libraries/psio1/include/psio1/canonical_bounded.hpp` and its uses in `fracpack.hpp`, `from_json.hpp` | the bound of a `transparent()` type with an annotated member (`Memo`), checked where the legacy library validates | `psio1` |
+| `libraries/psio1/include/psio1/get_type_name.hpp` (`hash_name`, `is_compressed_name`) | forward to PSIO's method coder | `psio1` |
+| the `"frac"` member of `rust-twins.json` and `same_legacy_bytes` in `psio_twins.rs` | legacy bytes of each twin | the legacy libraries |
+
+**How to verify** (scratch tools in `~/psibase-pssz-scripts`, not in the
+tree; build directory `~/psibase-pssz-build`, wasmtime backend, Node 22 on
+`PATH`: `/opt/homebrew/opt/node@22/bin`).
+
+* Everything: `~/psibase-pssz-scripts/step.sh <tag>` = full build
+  (`cmake --build … -j 6`), `ctest -j4`, `cargo check` of the six
+  packages the build never compiles
+  (`~/psibase-pssz-scratch-r/check-unbuilt.sh`), and the generated
+  `*-schema.json` (68) against a snapshot. Logs:
+  `~/psibase-pssz-build.{build,ctest,compare}-<tag>.log`,
+  `…<tag>-check-unbuilt.log`, one-line result
+  `~/psibase-pssz-build.step-<tag>.log`.
+* Schema snapshots (`snap.sh make | compare <dir>`):
+  `~/psibase-pssz-snap-head` (before this round),
+  `~/psibase-pssz-snap-omissions` (after `numRefs`: `SetCode`, `XAdmin`
+  changed), `~/psibase-pssz-snap-d` (current baseline: `Transact` also
+  changed, in the order of its actions).
+* The C++ ↔ Rust fixture: `libraries/psibase/common/tests/rust-twins.json`
+  is written by `~/psibase-pssz-build/psibase-psio-tests '[twins]'` with
+  `PSIBASE_WRITE_RUST_TWINS=1` and read by
+  `cargo test -r -p psibase --test psio_twins` in `rust/` (3 tests: types
+  — 51 types, schema node, pSSZ, key, text, legacy bytes; the interfaces
+  of `setcode` and `auth-delg` with 18 calls; parameter names of 28
+  services, 265 methods). A change of either side's declaration or of
+  the pin makes the native test fail until the fixture is regenerated
+  and the Rust test passes.
+* Rust, outside ctest: `cargo check --workspace` in `rust/` needs
+  `PSIBASE_BOOST_INCLUDE_DIR=/opt/homebrew/include` (for
+  `test_fracpack`'s build script); `packages/system` and `packages/`:
+  `cargo check --workspace --target wasm32-wasip1`; `packages/user`: the
+  same with `CC_wasm32_wasip1=/Users/dlarimer/psibase/build/wasi-sdk-prefix/src/wasi-sdk/bin/clang`
+  and `--keep-going`. Five plugin crates fail there on a generated
+  `bindings.rs` (`btcbridge-plugin`, `btcrelay-plugin`, `ethbridge-plugin`,
+  `exchange-plugin`, `favor-plugin-legacy`), before and after any change.
+  The `verify_schema` unit tests of `rust/psibase` need CMake's
+  environment: run them through `ctest -R '^rs-tests$'`.
+* Names: `~/psibase-pssz-scripts/reflect_check.py` (C++ reflection
+  against declaration, 6.22) and `iface_names.py` (C++ / Rust view / Rust
+  implementation by account).
+
+**Slow or fragile steps.** The machine is shared: a full build after a
+header of `libraries/psibase` changes takes 10–25 minutes at `-j 6` and
+`ctest -j4` 10–40 minutes depending on load. `psinode_test_crash` failed
+intermittently on one earlier pin (1.14; the storage engine at restart,
+"reference count exceeded limits"); it passed in every run of this round.
+A hashed method name is the hash of its exact bytes: a `method` string in
+a hand-written `postinstall.json` must be spelled as declared (6.23).
+`cargo` in a tree that was never configured cannot find
+`external/psio/rust/psio`; after a pin move run `cmake ~/psibase-pssz-build`
+once (it checks the checkout against the pin).
+
+**What was checked in this round**
+
+| Step | Tag | ctest | Schemas |
+|---|---|---|---|
+| Declared = reflected parameter names | `names` | 93 / 93 | identical to `snap-head` |
+| `numRefs`, `Response.seq`, `SiteConfig.proxy`, comments | `omissions` | 93 / 93 | `SetCode`, `XAdmin` differ (approved) |
+| Pin `b5cea0d4`, one method coder, `Memo` bounded | `d2` | 93 / 93 (first run, `d`: 37 / 93 until `regevidx` was respelled) | `Transact` differs in order (approved) |
+| Variants, time, derive passes, names, cross-check | `twins` | 93 / 93 | identical to `snap-d` |
+| Pin `0e6a1b72` | `repin-0e6a` | 92 / 93: the fixture-is-current test, as expected; fixture regenerated, native and Rust PSIO tests pass; the full suite was not run again | identical to `snap-d` |
+
+The six unbuilt packages checked (exit 0) in every row. Not verified: the
+C++ mirror header renames of `nft` / `symbol` / `tokens` are compiled by
+the build and by the fixture test but no test calls those actions by
+named JSON arguments; `SiteConfig.proxy` has no test; the JSON and
+GraphQL changes of the time types are covered by unit tests in
+`rust/psibase/src/time.rs` only, no UI or plugin was exercised.
 
 ### 6.21 What was checked after each of these steps
 
