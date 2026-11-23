@@ -24,19 +24,19 @@ namespace UserService
 
       void init();
 
-      void create(SID newSymbol);
-      void admin_create(SID newSymbol, psibase::AccountNumber recipient);
+      void create(SID symbol);
+      void admin_create(SID symbol, psibase::AccountNumber recipient);
 
       SymbolRecord           getSymbol(SID symbol);
       bool                   exists(SID symbol);
-      Quantity               getPrice(uint8_t numChars);
-      SymbolLengthRecord     getSymbolType(uint8_t numChars);
-      void                   mapSymbol(TID tokenId, SID symbol);
+      Quantity               getPrice(uint8_t length);
+      SymbolLengthRecord     getSymbolType(uint8_t length);
+      void                   mapSymbol(TID token_id, SID symbol);
       void                   sellLength(uint8_t  length,
                                         Quantity initial_price,
                                         uint32_t target,
                                         Quantity floor_price);
-      SID                    getTokenSym(TID tokenId);
+      SID                    getTokenSym(TID token_id);
       std::optional<Mapping> getByToken(TID token_id);
       std::optional<Mapping> getMapBySym(psibase::AccountNumber symbol);
       void                   delLength(uint8_t length);
@@ -56,15 +56,15 @@ namespace UserService
    // clang-format off
    PSIO_REFLECT(Symbol,
       method(init),
-      method(create, newSymbol),
-      method(admin_create, newSymbol, recipient),
-      method(mapSymbol, tokenId, symbol),
+      method(create, symbol),
+      method(admin_create, symbol, recipient),
+      method(mapSymbol, token_id, symbol),
       method(sellLength, length, initial_price, target, floor_price),
       method(getSymbol, symbol),
       method(exists, symbol),
-      method(getPrice, numChars),
-      method(getTokenSym, tokenId),
-      method(getSymbolType, numChars),
+      method(getPrice, length),
+      method(getTokenSym, token_id),
+      method(getSymbolType, length),
       method(getByToken, token_id),
       method(getMapBySym, symbol),
       method(delLength, length),
