@@ -1,0 +1,149 @@
+{
+ "schema": 1,
+ "suite": "native",
+ "label": "x86 cloud; single-engine LLVM_AOT; head 34fced88e + AOT link fix",
+ "recorded": "2026-11-23T11:20:36Z",
+ "source": {
+  "commit": "77e4e4d60e34399b3ac64b26feecfaaecd68fc6e",
+  "branch": "HEAD",
+  "dirty": false,
+  "psitri": "94fa32878b1cd71765323aebd7665e196b870b73"
+ },
+ "system": {
+  "os": "Linux",
+  "os_release": "6.17.0-22-generic",
+  "machine": "x86_64",
+  "cpu": "AMD EPYC-Turin Processor",
+  "logical_cpus": 16,
+  "memory_bytes": 130497327104,
+  "fingerprint": "9504829d18fa",
+  "test_filesystem": {
+   "type": "ext4"
+  }
+ },
+ "build": {
+  "type": "Release",
+  "compiler": "Ubuntu clang version 20.1.8 (0ubuntu4)",
+  "flags": "",
+  "generator": "Ninja"
+ },
+ "ctest_arguments": [
+  "-R",
+  "Tests$|^test_|^n-|^py_|CpuAccounting|PsizamAltTimeout",
+  "--timeout",
+  "900"
+ ],
+ "wall_seconds": 98.0,
+ "summary": {
+  "tests": 21,
+  "passed": 21,
+  "test_seconds": 97.986
+ },
+ "tests": [
+  {
+   "name": "CpuAccountingContract",
+   "status": "passed",
+   "seconds": 1.02567
+  },
+  {
+   "name": "MountTests",
+   "status": "passed",
+   "seconds": 0.0148429
+  },
+  {
+   "name": "NativeAotCacheTests",
+   "status": "passed",
+   "seconds": 0.00378279
+  },
+  {
+   "name": "PsitriDatabaseTests",
+   "status": "passed",
+   "seconds": 1.2751
+  },
+  {
+   "name": "PsizamAltTimeout",
+   "status": "passed",
+   "seconds": 0.835038
+  },
+  {
+   "name": "PsizamTests",
+   "status": "passed",
+   "seconds": 1.01441
+  },
+  {
+   "name": "SecrestsTests",
+   "status": "passed",
+   "seconds": 0.327952
+  },
+  {
+   "name": "StorageTimeoutTests",
+   "status": "passed",
+   "seconds": 0.0776179
+  },
+  {
+   "name": "VmConsensusTests",
+   "status": "passed",
+   "seconds": 2.3924
+  },
+  {
+   "name": "WatchdogTests",
+   "status": "passed",
+   "seconds": 14.3184
+  },
+  {
+   "name": "n-psibase-common-tests",
+   "status": "passed",
+   "seconds": 0.00266408
+  },
+  {
+   "name": "n-psio-tests",
+   "status": "passed",
+   "seconds": 0.0922899
+  },
+  {
+   "name": "py_test_fracpack",
+   "status": "passed",
+   "seconds": 0.0368357
+  },
+  {
+   "name": "py_test_name",
+   "status": "passed",
+   "seconds": 0.0257672
+  },
+  {
+   "name": "py_test_psibase_types",
+   "status": "passed",
+   "seconds": 0.0276933
+  },
+  {
+   "name": "test_consensus",
+   "status": "passed",
+   "seconds": 62.3634
+  },
+  {
+   "name": "test_consensus-bft",
+   "status": "passed",
+   "seconds": 10.2632
+  },
+  {
+   "name": "test_consensus-cft",
+   "status": "passed",
+   "seconds": 2.39295
+  },
+  {
+   "name": "test_mock_timer",
+   "status": "passed",
+   "seconds": 0.0018474
+  },
+  {
+   "name": "test_random_timer",
+   "status": "passed",
+   "seconds": 1.49069
+  },
+  {
+   "name": "test_shortest_path_routing",
+   "status": "passed",
+   "seconds": 0.00320277
+  }
+ ]
+}
