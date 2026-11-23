@@ -25,6 +25,7 @@ speed, with these deliberate shortcuts that the team is expected to refine after
 | # | Shortcut taken for speed | What the team refines later |
 |---|---|---|
 | 0.1 | **No size caps applied** (inferred widths only; `Memo` is the one bounded type). | Apply/adjust the caps in `~/psibase-pssz-audit/v2/caps.json` (§6). This changes bytes again. |
+| 0.1a | Consequence of 0.1 the team must act on BEFORE anything is published as a real chain: a record or action whose members are all bounded gets a narrow inferred width (1 or 2 bytes), and then an unbounded optional field cannot be added later — it would change the width and is refused by the compatibility check (e.g. `(int32)` → `(int32, optional<vector<u64>>)`). Any type expected to grow must declare `maxDynamicData` from its first publication. This is the settled PSSZ design, not a bug. | Decide caps per type (§6) before launch. |
 | 0.2 | **Trust = parity with today**: validate where the old code validated, trusted where it used `prevalidated`. | Apply the trust rule properly (§4): own table rows trusted (big win in Rust), foreign reads validated (adds checks in C++). |
 | 0.3 | Binary wire, schemas, keys, JSON (I-JSON) and GraphQL all change in one push, because deleting `psio1` requires all of them. | Front ends, plugins and external clients are **not covered by the test suite** and may need updating for the JSON/GraphQL forms (§8). |
 | 0.4 | C++ and Rust flipped in parallel in two worktrees, then merged and debugged together. | Review the merged result; the six unbuilt Rust packages and the plugins are only compile-checked (§9). |
@@ -251,6 +252,7 @@ Proposal in `~/psibase-pssz-audit/v2/`. Every cap carries a one-line reason comm
 | 10.6h | Two contradictions inside the PSSZ spec: §4.1 says accept any non-zero bool but the code rejects; §7.1 gives appended non-optional fields defaults but §7.2/§7.5 forbid them. Being fixed to match the settled rules (bools are 0/1; new fields are optional). | INFO |
 | 10.6i | Design decisions recorded only in psiserve's `.issues/` (psio-v2-design.md, psio-language-principles.md) are not in the PSIO repo; `@final`/`@canonical` became reserved no-ops; WIT is emit-only (no WIT → Schema IR path); a missing `psio-tool` CLI; no typed zero-copy spans over an mmap'd file; no `dynamic_view` for PSSZ. | OPEN — which to bring over |
 | 10.7 | Raw `std::string` emits WIT `string` (utf8 strings too); by the bytes-vs-text rule raw should be `list<u8>`, which changes every `std::string` in every interface. | OPEN |
+| 10.13 | Schema IR has no canonical normal form: the same type declared by annotation, by wrapper type, or in another language yields equal but differently interned/numbered nodes (and Rust `String` vs C++ `std::string` + `utf8` vs `utf8_string<>` differ in spelling). Schemas are therefore compared with `equivalent`/`evolves_from`, not by bytes or hash. If schema hashes or byte-identical schemas across languages are wanted, PSIO needs a canonicalisation pass. Also: argument-list member attributes (`lengthBound`, `jsonInt`) are emitted by Rust but not C++; Python orders interface `types(...)` after funcs where C++ puts them before. | OPEN (PSIO) |
 | 10.9 | Compatibility check and renamed fields: JS rejects a renamed field/alternative; C++, Rust and Python compare by position only (the binary carries no names, but JSON and schemas do). Options: (a) reject renames always, (b) reject unless annotated `renamed_from`, (c) ignore names and document it. Agent recommends (a). | OPEN |
 | 10.10 | A lone C++ `char` member is one byte on the wire and a number in JSON, but WIT/capnp emit it as a character. Make it plain `u8` in the schema (recommended), keep as is, or make it a real Unicode character (wire change)? `std::vector<char>` is being unified with the byte-list schema node (no byte change). | OPEN |
 | 10.11 | WIT emitter (C++ and JS) prints placeholders for interface argument lists and unnamed parameters; capnp/protobuf/fbs emitters have similar gaps. Matters if WIT output is used by psiserve. | OPEN |
@@ -262,3 +264,49 @@ Proposal in `~/psibase-pssz-audit/v2/`. Every cap carries a one-line reason comm
 - Integration line is `bytemaster/head` on gofractally/psibase; conversion work is on topic branch `claude/pssz`. Team `main` is untouched; the goal is to convince the team to adopt the head. | INFO
 - The head needs binaryen ≥ 133 and psizam `63b2ee3`. | INFO
 - The wire flip itself (C++ ~1,600 uses in 161 files, Rust 292 call sites, boot data regenerated) has not happened yet. | INFO
+
+## 12. Flip results: behaviour changes the team will notice (C++ and Rust halves, 2026-11-23)
+
+Sources: the C++ flip's final report (`doc/pssz-conversion.md` §1.17–1.25, `doc/flip-interop.md`) and the Rust flip's handover (§6.26). Status of all rows: DONE-ON-BRANCH, please review. The combined tree was still being merged and debugged when this was written.
+
+**Binary and ids**
+- Every packed byte, transaction id, block id and Merkle root changed (fracpack → PSSZ). Method numbers changed for ten names (see 3.4).
+- A guest now refuses NON-CANONICAL actions and transactions, not only ones with unknown members. Dispatch errors read `invalid argument encoding for <method>: <reason>`.
+- `SubjectPublicKeyInfo` is opaque DER on the wire, no longer parsed on unpack; `AuthSig::setKey` and `newAccount` check it themselves.
+- Null packed values are `std::optional<shared_pssz<T>>` (`Table::getView`, `ForkDb::get`). Removed: `JsonHttpReply`, `MethodArgs.hpp`, `libraries/debug_eos_vm` (dead code).
+- No key type in the C++ tree changed bytes.
+
+**Strings**
+- 83 C++ members/parameters are UTF-8 now. A non-UTF-8 `Host` or `Content-Type` gets HTTP 400. **OPEN:** a non-UTF-8 log message now fails the calling action and is not logged — drop, escape, or keep failing?
+
+**Schemas**
+- `ServiceSchema` is over the PSIO Schema IR; action/event maps ordered by name (were by method number); unnamed parameters are positional ("0", "1").
+- `setSchema` is stricter: no offset width may move, and renames are refused. Packages holding a legacy schema do not load. Generated schema files are about four times larger.
+- Events: a `float` query key is 4 bytes (was the double); wider-than-64-bit integers become JSON instead of an error.
+
+**Method caps**
+- `XProxy::onError` and `XPeers::errP2P` declare `maxDynamicData(0xffffffff)` so the optional argument can be appended; the one-argument form is still a different call. Four places read one declaration's bytes as another (e.g. `Transact.cpp:474` `getDlgsSys`, `tester.cpp:743` continuation token) — listed in `doc/pssz-conversion.md` §1.23, found by reading, none executed. **OPEN:** review and cap as needed (see 0.1a).
+
+**JSON (I-JSON)**
+- 64-bit integers are bare below 2^53; a QUOTED 8/16/32-bit number is refused. A missing required member is an error naming it; unknown members are skipped (`/pack_action` used to abort).
+- `DbId` and `NewAccountMode` are written by name; a `NewAccountMode` above 2 is refused at dispatch.
+- `SignedTransaction.transaction` is the inner object, not hex (`rpc.ts` changed). `SubjectPublicKeyInfo` JSON is PEM (armor and outer DER shape checked only).
+- A seconds time point with a fraction, or a time without an offset, is refused. Account names are strict (Rust serde used to read "Alice" as 0).
+- Now optional (real input omits them): `ShutdownRequest` restart/force/soft, `NewKeyRequest::device`, `UnlockKeyringRequest::pin`, `PsinodeServiceConfig::argv`, `service` in XAdmin's config view, `http_timeout`, `LogReaderConfig` filter/format. `ExtraConfigField` no longer turns JSON booleans into strings.
+- `IPAddress` / `SocketEndpoint` are one text string in both languages. `meta.json` / package index entries need every member.
+- Bytes are upper-case hex (unchanged from before).
+
+**GraphQL**
+- Scalars: `uint32` is `Int` (was `Float`); 64-bit is `UInt64`/`Int64`; bytes are `Bytes`; time is `DateTimeSeconds`/`DateTimeMicroseconds`; named scalars `AccountNumber`, `MethodNumber`, `Decimal`, `Memo`, `Precision`, `IPAddress`, `SocketEndpoint`. A quoted `Int` argument is refused. Input objects are `<T>Input`.
+- Object, union, connection, edge and root type names are unchanged; no field or argument was renamed.
+- `startCursor`/`endCursor` are `null` on an empty page; `first` with `last`, a bad cursor or a negative size is a field error; event cursors are 16 hex digits; marker types expose `_: Boolean`; errors carry `locations` and `path` with partial data. New: variables, named fragments, introspection; a complexity limit applies (Explorer raises it — PSIO gap G53: a connection's complexity counts the page size twice).
+- Rust (async-graphql) side: bytes cannot be a GraphQL scalar (RG20) — eight objects and four `icon_hash` resolvers return hex text via field resolvers; `SignedTransaction` lost its GraphQL derives; digest type is `String` instead of scalar `Hex`.
+- Rust clients of C++ GraphQL that had to change: Invite plugin (`inviteId` unquoted), Packages plugin and CLI (`endCursor` nullable), CLI empty query, Explorer plugin retry hides rejections.
+
+**Bugs fixed during the flip (C++)**: a non-UTF-8 response `Content-Type` would have thrown out of a completion handler in `send_request.cpp` (now a failed read; `x-proxy` answers 502); `psinode/main.cpp` parsed the combined host/service document as `PsinodeConfig`; the IPv6 parser could not read back `"::"`, `"fe80::"`, `"::ffff:1.2.3.4"` that the printer writes; tester `getKey` did not strip the prefix of the handle a key was found through; `SimpleUI.mjs` sent the expiration in milliseconds and omitted `tapos.flags`.
+
+**Hazard for future Rust code**: a bare `Vec<u8>` / `[u8; N]` handed to serde directly (outside a PSIO type) is a number array, not hex, and the compiler does not catch it.
+
+**Not verified at the time of writing**: nothing had run on a booted chain with both halves; front ends (TypeScript, `SimpleUI.mjs`) compile but were not run in a browser; snapshot tools compile but were not run; `demo/` is not built; nine user-doc pages still describe the old formats; the Python test harness still had its legacy codec.
+
+**Open PSIO items from the flip**: G52 — the only way to give a record a schema id is an invariant, and an invariant blocks mutable views (psibase sets a PSIO `detail` trait for `Action` as a stop-gap); G53 above; RG20 (GraphQL bytes scalar in Rust).
