@@ -1,0 +1,73 @@
+{
+  "machine": {
+    "cpu_model": "Apple M5 Max",
+    "logical_cores": 18,
+    "physical_cores": 18,
+    "memory_bytes": 137438953472
+  },
+  "configured_service_threads": 4,
+  "runtime_note": "Head054a0c386-based native engine with current QA Exchange package and EventsService metadata repair deployed by root. Existing8089 runtime measured separately; do not use its figures as head capacity.",
+  "observed_best_public_requests_per_second": 2925.8021891160556,
+  "observed_best_public_concurrency": 32,
+  "observed_best_snapshot_requests_per_second": 1806.3632091777058,
+  "observed_best_snapshot_concurrency": 8,
+  "primary_sources": [
+    "query-throughput-head-unprofiled.json",
+    "query-throughput-head-unprofiled-public-extended.json"
+  ],
+  "diagnostic_cpu_sources": [
+    "query-throughput-head-profiled-v2.json",
+    "query-profile-v2-observed-comparison.json"
+  ],
+  "v1_probe_problem_source": "query-profile-observed-comparison.json",
+  "v2_cpu_splits_percent": [
+    {
+      "workload": "public-refresh",
+      "concurrency": 1,
+      "database": 5.131263973396657,
+      "wasm": 29.779096777350805,
+      "native": 65.08963924925254
+    },
+    {
+      "workload": "public-refresh",
+      "concurrency": 4,
+      "database": 4.926769268927877,
+      "wasm": 28.243572939096,
+      "native": 66.82965779197612
+    },
+    {
+      "workload": "snapshot",
+      "concurrency": 1,
+      "database": 5.58541846224046,
+      "wasm": 42.80786738677554,
+      "native": 51.606714150984004
+    },
+    {
+      "workload": "snapshot",
+      "concurrency": 4,
+      "database": 5.579549151533921,
+      "wasm": 41.54202670361045,
+      "native": 52.87842414485563
+    }
+  ],
+  "caveats": [
+    "Warm repeated reads of one selected BTC/USD market and one authenticated owner; cardinalities recorded in each preflight.",
+    "Public refresh mix is three round-robin HTTP endpoints per equivalent refresh, not a parallel browser refresh latency.",
+    "Bots, block production and competing host work continued; these are observed throughputs, not a theoretical maximum-user count.",
+    "CPU percentages are measured exclusive diagnostic CPU categories, not wall-time fractions; exact uninstrumented shares remain uncertain because instrumentation and changing host load affect costs.",
+    "Current UI native plugin/browser VM overhead, candle/history traffic and cold storage are outside these core HTTP workloads."
+  ],
+  "validation": {
+    "benchmark_unit_tests_passed": 9,
+    "request_failures_across_all_recorded_stages": 0,
+    "v1_and_v2_profile_clock_errors": 0,
+    "v1_and_v2_profile_active_scopes_at_checkpoints": 0,
+    "v1_and_v2_profile_bucket_balance_error_ns": 0,
+    "temporary_authorizations_removed": true
+  },
+  "measured_base_commit": "054a0c38665f5e378be2089dc7eabe005c95fc0d",
+  "live_demo_url": "http://exchange.psibase.localhost:8096/",
+  "capacity_binary_sha256": "95df680f58c7b4eaa56b78c590697206ad25f8fd1e726b0c31e30c427d401dd9",
+  "profile_v2_binary_sha256": "b19e2d2e565ab6ab7faa5589dfb1f698358c3d4cd67579d2ef6707182de0ceac",
+  "performance_detail": "../QUERY_PERFORMANCE.md"
+}

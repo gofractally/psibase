@@ -3,6 +3,7 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/Mount.hpp>
 #include <psibase/PsizamPolicy.hpp>
+#include <psibase/QueryCpuProfile.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/saturating.hpp>
@@ -518,6 +519,7 @@ namespace psibase
 
    uint32_t NativeFunctions::getResult(std::span<char> dest, uint32_t offset)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       if (offset < result_value.size() && dest.size())
          memcpy(dest.data(), result_value.data() + offset,
                 std::min(result_value.size() - offset, dest.size()));
@@ -526,6 +528,7 @@ namespace psibase
 
    uint32_t NativeFunctions::getKey(std::span<char> dest)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       if (!result_key.empty())
          memcpy(dest.data(), result_key.data(), std::min(result_key.size(), dest.size()));
       return result_key.size();
@@ -533,6 +536,7 @@ namespace psibase
 
    void NativeFunctions::writeConsole(std::span<const char> str)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       // TODO: limit total console size across all executions within transaction
       if (currentActContext->actionTrace.innerTraces.empty() ||
           !std::holds_alternative<ConsoleTrace>(
@@ -545,6 +549,7 @@ namespace psibase
 
    void NativeFunctions::abortMessage(std::span<const char> str)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       throw std::runtime_error("service '" + code.codeNum.str() +
                                "' aborted with message: " + std::string(str.data(), str.size()));
    }
@@ -552,6 +557,7 @@ namespace psibase
    int32_t NativeFunctions::clockTimeGet(uint32_t                                  id,
                                          psizam::detail::argument_proxy<uint64_t*> time)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       check(isSubjectiveContext(*this), "clockGetTime cannot be called in a deterministic context");
       clearResult(*this);
       std::chrono::nanoseconds result;
@@ -577,6 +583,7 @@ namespace psibase
 
    void NativeFunctions::getRandom(std::span<char> dest)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       check(isSubjectiveContext(*this), "getRandom cannot be called in a deterministic context");
       std::random_device rng;
       std::ranges::generate(dest, [&] { return rng(); });
@@ -584,6 +591,7 @@ namespace psibase
 
    void NativeFunctions::setMaxCpuTime(uint64_t nanoseconds)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       check(code.flags & CodeRow::isPrivileged, "setMaxCpuTime requires privileges");
       clearResult(*this);
       // Ensure no overflow by capping the value. The exact value is not visible to
@@ -596,11 +604,13 @@ namespace psibase
 
    uint32_t NativeFunctions::getCurrentAction()
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       return setResult(*this, psio::convert_to_frac(currentActContext->action));
    }
 
    uint32_t NativeFunctions::call(std::span<const char> data, std::uint64_t flagsRaw)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       auto& transactionStack = currentActContext->transactionContext.remainingStack;
       auto  saved            = transactionStack;
       auto  restoreStack     = psio::finally{[&] { transactionStack = saved; }};
@@ -642,12 +652,14 @@ namespace psibase
 
    void NativeFunctions::setRetval(std::span<const char> data)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       currentActContext->actionTrace.rawRetval.assign(data.begin(), data.end());
       clearResult(*this);
    }
 
    uint32_t NativeFunctions::kvOpen(uint32_t dbRaw, std::span<const char> prefix, uint32_t mode)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       check(prefix.size() <= transactionContext.config.maxKeySize, "key is too big");
 
       auto db = static_cast<DbId>(dbRaw);
@@ -714,6 +726,7 @@ namespace psibase
 
    uint32_t NativeFunctions::kvOpenAt(uint32_t handle, std::span<const char> prefix, uint32_t mode)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       const auto& bucket    = buckets[static_cast<KvHandle>(handle)];
       auto        newPrefix = bucket.key(prefix);
       check(newPrefix.size() <= transactionContext.config.maxKeySize, "key is too big");
@@ -727,11 +740,13 @@ namespace psibase
 
    void NativeFunctions::kvClose(uint32_t handle)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       buckets.close(static_cast<KvHandle>(handle));
    }
 
    void NativeFunctions::exportHandles(std::span<const char> data)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       using Handles = std::vector<KvHandle>;
       check(psio::fracpack_validate_strict<Handles>(data), "Expected list of handles");
       auto handles = psio::view<const Handles>{psio::prevalidated{data}};
@@ -747,6 +762,7 @@ namespace psibase
 
    uint32_t NativeFunctions::importHandles()
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       return setResult(*this,
                        psio::to_frac(buckets.add(std::move(transactionContext.importedHandles),
                                                  transactionContext.getWasmConfig().maxHandles)));
@@ -756,6 +772,7 @@ namespace psibase
                                std::span<const char> key,
                                std::span<const char> value)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       timeDbVoid(
           *this,
           [&]
@@ -818,6 +835,7 @@ namespace psibase
 
    void NativeFunctions::kvRemove(uint32_t handle, std::span<const char> key)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       timeDbVoid(*this,
                  [&]
                  {
@@ -851,6 +869,7 @@ namespace psibase
 
    uint32_t NativeFunctions::kvGet(uint32_t handle, std::span<const char> key)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       return timeDb(  //
           *this,
           [&]
@@ -867,6 +886,7 @@ namespace psibase
                                             std::span<const char> key,
                                             uint32_t              matchKeySize)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       return timeDb(  //
           *this,
           [&]
@@ -886,6 +906,7 @@ namespace psibase
                                         std::span<const char> key,
                                         uint32_t              matchKeySize)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       return timeDb(  //
           *this,
           [&]
@@ -903,6 +924,7 @@ namespace psibase
 
    uint32_t NativeFunctions::kvMax(uint32_t handle, std::span<const char> key)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       return timeDb(  //
           *this,
           [&]
@@ -919,26 +941,31 @@ namespace psibase
    //       maybe include intrinsic usage so transact can veto?
    uint32_t NativeFunctions::kvGetTransactionUsage()
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       auto size = setResult(*this, psio::convert_to_frac(transactionContext.kvResourceDeltas));
       return size;
    }
 
    void NativeFunctions::checkoutSubjective()
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       database.checkoutSubjective();
    }
    bool NativeFunctions::commitSubjective()
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       return database.commitSubjective(*transactionContext.blockContext.systemContext.sockets,
                                        transactionContext.ownedSockets);
    }
    void NativeFunctions::abortSubjective()
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       database.abortSubjective();
    }
 
    int32_t NativeFunctions::socketOpen(std::span<const char> args)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::isPrivileged, "Service is not allowed to open sockets");
       check(code.flags & ExecutionContext::isLocal, "Service is not allowed to open sockets");
@@ -970,6 +997,7 @@ namespace psibase
 
    int32_t NativeFunctions::socketSend(int32_t fd, std::span<const char> msg, std::uint32_t flags)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::isPrivileged, "Service is not allowed to write to socket");
       check(code.flags & ExecutionContext::isLocal, "Service is not allowed to write to socket");
@@ -980,6 +1008,7 @@ namespace psibase
 
    int32_t NativeFunctions::socketSetFlags(int32_t fd, std::uint32_t mask, std::uint32_t value)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::isPrivileged, "Service is not allowed to write to socket");
       check(code.flags & ExecutionContext::isLocal, "Service is not allowed to write to socket");
@@ -991,6 +1020,7 @@ namespace psibase
 
    std::uint32_t NativeFunctions::readFile(std::span<const char> filename)
    {
+      query_cpu_profile::ScopeNative queryCpuScope;
       check(isSubjectiveContext(*this), "Files are only available during subjective execution");
       check(code.flags & CodeRow::isPrivileged, "Service is not allowed to read files");
       check(code.flags & ExecutionContext::isLocal, "Service is not allowed to read files");

@@ -18,6 +18,7 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/NativeAotCache.hpp>
 #include <psibase/PsizamPolicy.hpp>
+#include <psibase/QueryCpuProfile.hpp>
 #include <psibase/VmEngine.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/db.hpp>
@@ -428,8 +429,11 @@ namespace psibase::vm_wasmtime
                interrupter->fire();
          }
          instance->set_stack_remaining(stack);
-         instance->run_start();
-         instance->call_discarding_results("start", currentActContext->action.service.value);
+         {
+            query_cpu_profile::ScopeWasm queryCpuGuestScope;
+            instance->run_start();
+            instance->call_discarding_results("start", currentActContext->action.service.value);
+         }
          initialized = true;
       }
 
@@ -450,6 +454,7 @@ namespace psibase::vm_wasmtime
       template <typename F>
       void run(ActionContext& actionContext, F f)
       {
+         query_cpu_profile::ScopeNative queryCpuScope;
          auto prev         = currentActContext;
          currentActContext = &actionContext;
          // A service can be re-entered while one of its calls is suspended in
@@ -472,7 +477,10 @@ namespace psibase::vm_wasmtime
                init(stack);
             else
                instance->set_stack_remaining(stack);
-            f();
+            {
+               query_cpu_profile::ScopeWasm queryCpuGuestScope;
+               f();
+            }
          }
          catch (const accounting::Cancelled&)
          {

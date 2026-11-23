@@ -5,6 +5,7 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <psibase/CpuAccounting.hpp>
+#include <psibase/QueryCpuProfile.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/storage.hpp>
@@ -1189,6 +1190,7 @@ namespace psibase
    }
    void Database::kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value)
    {
+      query_cpu_profile::ScopeDb queryCpuScope;
       if (countWrites)
          ++writeCounts[writeSlot(db)];
       impl->write(
@@ -1207,6 +1209,7 @@ namespace psibase
 
    void Database::kvRemoveRaw(DbId db, psio::input_stream key)
    {
+      query_cpu_profile::ScopeDb queryCpuScope;
       if (countWrites)
          ++writeCounts[writeSlot(db)];
       impl->write(
@@ -1225,6 +1228,7 @@ namespace psibase
 
    std::optional<psio::input_stream> Database::kvGetRaw(DbId db, psio::input_stream key)
    {
+      query_cpu_profile::ScopeDb queryCpuScope;
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<psio::input_stream>
           {
@@ -1248,6 +1252,7 @@ namespace psibase
 
    bool Database::kvContains(DbId db, psio::input_stream key)
    {
+      query_cpu_profile::ScopeDb queryCpuScope;
       return impl->read(
           [&](auto& session, auto& revision) -> bool
           {
@@ -1265,6 +1270,7 @@ namespace psibase
                                                                  psio::input_stream key,
                                                                  size_t             matchKeySize)
    {
+      query_cpu_profile::ScopeDb queryCpuScope;
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
@@ -1296,6 +1302,7 @@ namespace psibase
                                                              psio::input_stream key,
                                                              size_t             matchKeySize)
    {
+      query_cpu_profile::ScopeDb queryCpuScope;
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
@@ -1325,6 +1332,7 @@ namespace psibase
 
    std::optional<Database::KVResult> Database::kvMaxRaw(DbId db, psio::input_stream key)
    {
+      query_cpu_profile::ScopeDb queryCpuScope;
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
