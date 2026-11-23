@@ -128,6 +128,12 @@ if(PSIBASE_VM_BACKEND STREQUAL "LLVM_AOT")
     set_target_properties(psibase-artifact-codec PROPERTIES
         IMPORTED_LOCATION "${codec_prefix}/install/lib/libpsizam-artifact-codec.a")
     add_dependencies(psibase-artifact-codec psibase-artifact-codec-build)
+    # The codec's symbol table names the runtime helpers and softfloat routines
+    # that psibase-psizam provides, and psibase-psizam calls the codec. Linkers
+    # that resolve archives in order (GNU ld) need the cycle stated, so that
+    # the providers are listed again after the codec.
+    set_target_properties(psibase-artifact-codec PROPERTIES
+        INTERFACE_LINK_LIBRARIES "psibase-psizam;softfloat")
     target_link_libraries(psibase-psizam PUBLIC psibase-artifact-codec)
     set(vm_engine_namespaces vm_llvm_aot)
     set(vm_engine_sources native/src/ExecutionContext.cpp)
