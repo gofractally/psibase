@@ -2340,6 +2340,182 @@ the survey of 6.1: every row and action with a time point (`TimePointSec`
 / `TimePointUSec`: 141 uses in 37 files), the 25 `ToKey` records only
 where a member waits, and whatever holds `SubjectPublicKeyInfo`.
 
+### 6.22 Names: declarations, reflections and mirrors (the owner's naming rule)
+
+The rule (owner): for each type or service one language is the authority,
+the one it was written in — the node, the native tables and the services
+implemented in C++ → C++; a service implemented in Rust → Rust (its C++
+header and its view in `rust/psibase/src/services` are mirrors). Mirrors
+rename their structs, members, variants and parameters to match; a rename
+annotation is for an externally imposed name only; where a declared name
+and its reflected name disagree, the declaration changes so both agree.
+Casing is a language convention and is not bridged per member (see the end
+of this section for where it is bridged today).
+
+**C++: reflected name against declared name** (commit `c663d0f45`).
+Scripted (`~/psibase-pssz-scripts/reflect_check.py`, log
+`~/psibase-pssz-build.reflect-names.log`): every `PSIO_REFLECT`,
+`PSIBASE_REFLECT_*_EVENTS` and `PSIO1_REFLECT` site of the tree outside
+`external/` and `libraries/psio1` (593 files, 601 sites, 581 `method(...)`
+items, 1,169 data-member items) is parsed, the struct body it names is
+located and its member functions and data members are parsed, and the two
+are compared; 309 out-of-class definitions are compared with the
+reflection as well. Found: 24 methods whose declared parameter names
+differ from the reflected ones, 10 whose number of names differs from the
+number of parameters, no reflected data member under another name.
+
+Renamed, declaration to reflection (what clients and the generated schemas
+already say; all 68 schemas byte-identical after it):
+
+| Method | Declared → reflected |
+|---|---|
+| `AuthDelegate::getOwner`, `checkOwner` | `account` → `owner` (D42) |
+| `serveSys` of `XHttp`, `XProxy`, `RDynLd`, `AsyncQueryService`, `SocketListService`; `XBasic::checkAuth` | `req` → `request` |
+| `XPeers::serveSys` | `user` → `socket` (it is the socket) |
+| `XHttp::giveSocket` | `account` → `service` |
+| `XTransact::addCallback`, `removeCallback` | `callback` → `action` |
+| `Transact::addCallback`, `removeCallback` | `act` → `action` |
+| `Transact::execTrx`, `RTransact::preverify` | `trx` → `transaction` |
+| `Producers::setProducers` | `prods` → `producers` |
+| `EventQueryInterface::sqlQuery`, `REvents::sqlQuery` | `squery` → `query` |
+| `TestMemo::testJson`, `testConstruct` | `data` → `memo` |
+| unnamed in the declaration: `EmitEvents::emitMerkle` (`s`), `GetUser::serveSys` (`socket`), `REvents::serveSys` (`request`), `Ledger::transfer` in `methods.cpp` (`amount`) | named |
+| `XHttp::accept` | the reflection listed two names (`callback`, `err`) for parameters the method does not have; removed (the schema never showed them) |
+
+Out-of-class definitions were renamed with their declaration where the new
+name was free in the body; 19 definitions keep another spelling than the
+declaration (an unnamed unused parameter, or a body that already uses the
+name: `Producers::setProducers`, `RTransact::preverify` / `recv`,
+`Transact::checkFirstAuth`, `HttpServer::sendReply` / `serve`,
+`XHttp::sendReply`, `Db::open`, `XDb::open`, `Invite::createAccount`, the
+`AuthNone` methods, `NotifyService::onTrx`, `RSetCode::serveSys`).
+
+Left for the team, because correcting them changes a generated schema or
+the JSON of an action's arguments:
+
+| Where | What | Reading |
+|---|---|---|
+| `AuthDelegate::getOwner(owner)` | the parameter is the account whose owner is returned ("Returns the owner of `account`"); `owner` is the reflected and now the declared name | the reflected name looks like the mistake; correcting it changes `AuthDelegate-schema.json` |
+| `Packages::setSchema(schema)` reflected `method(setSchema, account, schema)` | the one parameter is called `account` in the schema and in JSON | a stale reflection; should be `method(setSchema, schema)` |
+| `Packages::getSchema(service)` reflected `method(getSchema)` | the parameter has no name (`c0` in the schema) | should be `method(getSchema, service)` |
+| `XAdmin::isAdmin(account, socket, forwardedFor)` | third name missing (`c2`) | add `forwardedFor` |
+| `XPackages::serveSys(request, socket)`, `Explorer::serveSys(request, socket, user)`, `REvents::serveSys(request, socket, user)` | only `request` is named | add the names |
+| `AuthInterface::getDlgsSys(sender, method)` | `method` not named | add it |
+| `TestExport::doExport(initialValue, subjective)` | `subjective` not named | add it (a test service) |
+| `Events` test `TestService::sendAccount(account)` reflected `a` | the declared name is the better one | change the reflection (a test service) |
+| `XAdmin::serveSys`, `checkAuth`, `RSetCode::serveSys`, `GetUser`, `CookieProbe` reflect `req` where every other service says `request` | consistent with their declarations, not with each other | rename both at a flip |
+
+**Members a struct has and its reflection does not list** (17 found; the
+owner's rule: an omission may be deliberate — working state, a cache).
+
+| Member | Evidence | Reading | Done |
+|---|---|---|---|
+| `SystemService::CodeRefCountRow::numRefs` | incremented and decremented and then `put`; never stored, so every read saw 0 | a bug | reflected (`556ae9fb5`); test added; `SetCode-schema.json` and `XAdmin-schema.json` change |
+| staged-tx `Response::seq` (C++ mirror) | the Rust service, the authority, stores `id, account, seq, accepted` | the mirror was wrong | reflected (`a92a404d1`); in the fixture; no schema changes |
+| `SiteConfig::proxy` (`Sites.cpp`, a query result) | `getConfig` fills it; added with the proxy actions | forgotten | reflected (`a4fa77740`); query output only; untested |
+| `WasmConfigRow::maxHandles` | read by the node; the row is written from `BlockHeaderWasmConfig`, which does not carry it; the Rust twin has no such member | deliberate (a node-side constant) | comment (`8adac6a0e`) |
+| `GQLUrl::refcount` (`XPeers.cpp`) | read by `connected()`, which is reflected | deliberate (working state) | comment |
+| zip records: `LocalFileHeader::{filename, extra}`, `FileHeader::{filename, extra, comment}`, `ExtraHeader::data`, `Zip64EndOfCentralDirectoryRecord::{versionMadeBy, versionNeededToExtract, extData}`, `EndOfCentralDirectoryRecord::comment` | `zip.cpp` reads the reflected fixed part with `readStruct` and the variable parts by hand | deliberate | none |
+| `PsinodeConfig::{tls, http_timeout}` | listed in the reflection, `tls` under `#ifdef PSIBASE_ENABLE_SSL` | not omissions (the script does not read the preprocessor) | none |
+
+Seen with `numRefs` and left: `SetCode::setCodeStaged` returns early when
+the account already runs the staged code, after removing the staged row
+and without dropping the reference that row held.
+
+**Interfaces by name, three ways** (`~/psibase-pssz-scripts/iface_names.py`,
+log `~/psibase-pssz-build.iface-names.log`): the methods and parameter
+names of the 76 C++ classes that state a `service` account, the 49 Rust
+views and the 37 Rust service implementations, compared per account.
+60 parameter-name differences. **Not corrected yet** (the priority moved
+to the wire flip); the list for whoever does:
+
+| Account | Authority | Mirror differs |
+|---|---|---|
+| `accounts` | C++ | view: `exists`, `getAccount`, `incAuthSeq` say `num` for `name` |
+| `cpu-limit` | C++ | view: `setCpuLimit(limit)` for `limit_ns` |
+| `producers` | C++ | view: `setConsensus(prods)` for `consensus`, `setMaxProds(max_prods)` for `maxProds`, `setProducers(prods)` for `producers` |
+| `transact` | C++ | view: `addCallback` / `removeCallback` `(type_, objective, act)` for `(type, objective, action)`; `execTrx(trx, ..)` for `transaction` |
+| `x-http` | C++ | view: `giveSocket(socket, account, local)` for `service`; `serveSys(req, ..)` for `request` |
+| `x-admin`, `x-packages`, `packages` | C++ | the view names a parameter the C++ reflection leaves unnamed or misnames (the table above) |
+| `nft` | Rust | C++ header: `credit`, `transfer` say `receiver` for `debitor`; view: `nftId` for `nft_id` |
+| `symbol` | Rust | C++ header: `newSymbol` for `symbol`, `numChars` for `length` |
+| `tokens` | Rust | C++ header: `getBalance(tokenId, account)` for `user`; `setBalConf` / `setTokenConf` / `setUserConf` say `enable` for `enabled`; 25 methods differ in casing only (`tokenId` / `token_id`, `subAccount` / `sub_account`, `maxIssuedSupply` / `max_issued_supply`) |
+| `auth-dyn`, `auth-rcovr`, `credential`, `vserver` | — | the Rust implementation names an unused parameter `_flags`, `_sender`, `_socket`, …; the service macro copies the name, so that is the parameter's JSON name. The interface they implement says `flags`, `sender`, `socket` |
+| type names | Rust | `nft`: `NftHolder` (C++ and view `NftHolderRecord`), `Nft` (C++ `NftRecord`: `Nft` is the service class there); `tokens`: `Token` (C++ and view `TokenRecord`), `UserConfig` (view `Holder`), `InitRow` (C++ `TokensInitRecord`); view `SharedBalance` lacks the first member, `shared_bal_id`; `symbol`: `Symbol` (C++ and view `SymbolRecord`), `SymbolLength` (C++ `SymbolLengthRecord`) |
+
+**Casing today.** There is no crate-level casing rule. `rust/psibase`
+spells the members of the records it mirrors from C++ as C++ does
+(`rawData`, `vmType`; `#![allow(non_snake_case)]` in `block.rs`, `http.rs`,
+`native_tables.rs`, `services/accounts.rs`), and the Rust services spell
+their own snake_case, which their C++ mirror headers copy for members
+(`nft_id`) and do not copy for parameters (`tokenId`). The service macro
+copies parameter names as written. `#[serde(rename_all = "camelCase")]` is
+on 65 types in 24 files: `rust/psibase` 4 files, `VirtualServer` service 2,
+`Tokens`, `SingleProd`, `Registry`, `Favor` services 1 each, and 14 plugin
+crates. Per-member renames (`#[serde(rename = ..)]`, `#[graphql(name =
+..)]`): 21 in 14 files — `Nft` query service 4, the two schema files 3
+each, `Producers` plugin 2, and one each in `native_tables.rs`
+(`NotifyRow::type`), `cargo-psibase`, the `TokenSwap`, `Symbol`,
+`SingleProd`, `Fractals` services, the `TokenSwap` and `StagedTx` plugins
+and two test crates. The owner's decision: keep it as it is for now; a
+team discussion.
+
+### 6.23 Pin moved to PSIO `b5cea0d4`; one method-name coder; `Memo` bounded
+
+**Pin** (commit `ab0076b85`): `b5cea0d44613740f75fd5c3a428e406908ea9afc`,
+PSIO's consistency round. No psibase source changed for it; the tree
+built as it was.
+
+**Method numbers.** psibase C++ has taken its method numbers from PSIO
+since slice 1 (`psibase::MethodNumber` is `psio::detail::method_to_number`:
+call proxies, dispatch, schemas); the legacy library's own copy of the
+coder served only its GraphQL method lookup and its macro. PSIO now gives
+a compressed number only to a name that decodes back to it and hashes
+every other (RG12 closed). With the pin, and with Rust moved onto
+`psio::compress_name` in the same step, every language has one coder:
+
+| | Before | Now |
+|---|---|---|
+| C++ `MethodNumber` | PSIO's (cut-off codes) | PSIO's |
+| C++ `psio1::hash_name` | the legacy copy | forwards to PSIO's (temporary, in `psio1/get_type_name.hpp`) |
+| Rust `MethodNumber`, `method!`, `method_raw!`, the service macro | `rust/psibase_names` (hashed five of the eight) | `psio::compress_name`; the method half of `psibase_names` is deleted (5 files); the crate keeps the account-name coder |
+| Python `name.py` | a third implementation (dropped `_`, no decode-back rule) | follows PSIO's rule; `test_name.py` pins 15 vectors |
+
+Numbers that changed (old → new):
+
+| Name | Old | New |
+|---|---|---|
+| `checkFirstAuth` | `0x02865743c9374c7c` | `0xcd29c38cde224f8e` |
+| `cpu_min_unit` | `0x0e7af790922c457d` | `0x13fb233a1d98cbd8` |
+| `frozenAccounts` | `0xda8039f811aaaad5` | `0x27303f52c1c094da` |
+| `get_resources` | `0xb2a0545cdfc9f9c0` | `0xd5137f98107c0181` |
+| `getSymbolType` | `0x7ea96086faa7f7c0` | `0xd55df3070b8758eb` |
+| `regEvIdx` | `0x0040b0a625283b52` | `0x413db64868a8ec0f` |
+| `removeCallback` | `0x8a0905b7cb153252` | `0x978d530fdfe275cb` |
+| `rowsBySecondary` | `0xf0817995f79ba054` | `0x83a92f4d480665a6` |
+| `create_request` (Rust) | `0xfc7b80faf272bd7a` | `0xf997f22d796b5e2b` |
+| `set_paid_occ` (Rust) | `0x6471b2808a8eb95b` | `0x15d82d05366fa15c` |
+
+(The C++ column of the first eight is what C++ sent; Rust already sent the
+new number for `checkFirstAuth`, `cpu_min_unit`, `get_resources`,
+`getSymbolType`, `removeCallback`.) What pinned them: nothing in the tree
+held an old number. One spelling did: a hashed name is the hash of its
+bytes, so its case matters, and `packages/user/Events/src/postinstall.json`
+called `regevidx`; it says `regEvIdx` now (without it the chain does not
+boot: "Missing action transact::#aualyrdoumydndpe"). `Transact-schema.json`
+changes in the order of its actions only.
+
+**`Memo` in C++** is `PSIO_REFLECT(Memo, transparent(), attr(contents,
+utf8 | max<maxBytes>))`: the bounded UTF-8 string Rust already declared
+(D37 closed; the fixture compares the two like any other type now, and
+the pinned-difference test is gone). A record that holds a memo can have
+a narrower offset in pSSZ than one that holds a string. The legacy
+library has no bounded types: `psio1/canonical_bounded.hpp` (temporary)
+checks the bound of such a transparent type where the legacy library
+validates, with the messages `Memo` always had ("Memo exceeds 80 bytes",
+"Memo must be valid UTF-8"); legacy bytes are unchanged (`test_memo.cpp`
+and the pinned forms pass as they were).
+
 ### 6.21 What was checked after each of these steps
 
 Each row: full build exit 0, full `ctest -j4`, the generated
