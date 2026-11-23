@@ -21,7 +21,7 @@ function(psibase_declare_dependencies)
         GIT_SHALLOW FALSE
         SOURCE_DIR "${psibase_root}/external/psio")
     FetchContent_Declare(psitri
-        GIT_REPOSITORY git@github.com:gofractally/psitri.git
+        GIT_REPOSITORY https://github.com/gofractally/psitri.git
         GIT_TAG b7b8647a3fd40277b965f5f60bc2b320529a37cd
         GIT_SHALLOW FALSE
         SOURCE_DIR "${psibase_root}/external/psitri"

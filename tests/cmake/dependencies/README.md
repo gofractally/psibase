@@ -16,7 +16,7 @@ The defaults are immutable Git revisions:
 | Name | Revision | Acquisition boundary |
 | --- | --- | --- |
 | psio | `f6b10ec7d7bba4022cd1c9394f88ad1440b4b2b7` | Maintained upstream CMake target |
-| psitri | `a7c6660de883c6190135e213e2206d006286a7ee` | Sources only |
+| psitri | `b7b8647a3fd40277b965f5f60bc2b320529a37cd` | Sources only |
 | ucc | `d79166da0290fdf9d1f9d5880d4dfb45b2822cf3` | Sources only |
 | psizam | `2e93ecd1561ed7d4808a1a83af1d0137bac17b41` | Sources only |
 
@@ -27,8 +27,8 @@ published `checkpoint/native-runtime-2026-11-21` revision.
 UCC is the public standalone extraction with its two qualified header fixes;
 its checkpoint covers the existing container tests and header consumer, not
 the complete database engine.
-The psitri repository remains private; its SSH URL requires authorized GitHub
-access. Dependency acquisition does not change that repository's visibility.
+All four repositories are public and are fetched over HTTPS; no GitHub
+credentials are needed to configure.
 
 For psitri, UCC, and psizam, the first declaration MUST retain
 `SOURCE_SUBDIR .psibase-no-top-level-cmake`. `psibase_acquire_dependency(name)`
