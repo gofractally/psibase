@@ -24,7 +24,18 @@ mod service {
         unimplemented!()
     }
 
-    #[derive(Debug, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+    #[derive(
+        Debug,
+        Pack,
+        Unpack,
+        ToSchema,
+        Serialize,
+        Deserialize,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+    )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct WsTicketInfo {
         pub user: AccountNumber,

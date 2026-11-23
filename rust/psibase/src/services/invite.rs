@@ -5,7 +5,19 @@ use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Debug, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+    ToSchema,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "InviteRecordInput")]
@@ -30,7 +42,9 @@ pub struct InviteRecord {
     secret: String,
 }
 
-#[derive(Clone, Pack, Unpack)]
+#[derive(
+    Clone, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct InvPayload {
     pub fingerprint: Vec<u8>,

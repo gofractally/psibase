@@ -7,7 +7,20 @@ use crate::AccountNumber;
 pub type NID = u32;
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
+    Debug,
+    Copy,
+    Clone,
+    Pack,
+    Unpack,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+    ToSchema,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "NftRecordInput")]
@@ -18,7 +31,20 @@ pub struct Nft {
 }
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
+    Debug,
+    Copy,
+    Clone,
+    Pack,
+    Unpack,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+    ToSchema,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "NftHolderRecordInput")]
@@ -28,7 +54,20 @@ pub struct NftHolderRecord {
 }
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
+    Debug,
+    Copy,
+    Clone,
+    Pack,
+    Unpack,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+    ToSchema,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "CreditRecordInput")]

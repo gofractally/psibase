@@ -4,7 +4,20 @@ use serde::{Deserialize, Serialize};
 
 /// The specs of the virtual server and the specs required by each node
 /// and are used to configure the network specs.
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema, SimpleObject)]
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Pack,
+    Unpack,
+    ToSchema,
+    SimpleObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct ServerSpecs {
     /// Amount of bandwidth capacity per second per server
@@ -14,7 +27,20 @@ pub struct ServerSpecs {
 }
 
 /// Variables that are used to derive the specs of the network from the server specs.
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema, SimpleObject)]
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Pack,
+    Unpack,
+    ToSchema,
+    SimpleObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct NetworkVariables {
     /// How much faster a node replays blocks compared to the live network
@@ -29,7 +55,20 @@ pub struct NetworkVariables {
 }
 
 /// Parameters related to the automatic management of an account resource buffer.
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema, SimpleObject)]
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Pack,
+    Unpack,
+    ToSchema,
+    SimpleObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct BufferConfig {
     /// A threshold (specified in integer percentage values) at or below which the client should

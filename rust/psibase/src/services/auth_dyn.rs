@@ -5,7 +5,20 @@ pub mod policy {
 
     use crate::AccountNumber;
 
-    #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema, SimpleObject)]
+    #[derive(
+        Debug,
+        Clone,
+        Serialize,
+        Deserialize,
+        Pack,
+        Unpack,
+        ToSchema,
+        SimpleObject,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+    )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct WeightedAuthorizer {
         pub account: AccountNumber,
@@ -18,7 +31,20 @@ pub mod policy {
         }
     }
 
-    #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema, SimpleObject)]
+    #[derive(
+        Debug,
+        Clone,
+        Serialize,
+        Deserialize,
+        Pack,
+        Unpack,
+        ToSchema,
+        SimpleObject,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+    )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct DynamicAuthPolicy {
         pub threshold: u8,

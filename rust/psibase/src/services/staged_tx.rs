@@ -6,7 +6,18 @@ mod service {
     use fracpack::ToSchema;
     use serde::{Deserialize, Serialize};
 
-    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject)]
+    #[derive(
+        Pack,
+        Unpack,
+        Serialize,
+        Deserialize,
+        ToSchema,
+        SimpleObject,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+    )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct ActionList {
         pub actions: Vec<Action>,

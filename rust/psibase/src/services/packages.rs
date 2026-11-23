@@ -2,7 +2,20 @@ use crate::{Pack, ToSchema, Unpack};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Serialize,
+    Deserialize,
+    Pack,
+    Unpack,
+    ToSchema,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct PackageSource {
     pub url: Option<String>,
@@ -21,7 +34,20 @@ mod service {
 
     #[table(name = "InstalledPackageTable", index = 0)]
     #[derive(
-        Debug, Clone, Default, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq, ToSchema,
+        Debug,
+        Clone,
+        Default,
+        Serialize,
+        Deserialize,
+        Pack,
+        Unpack,
+        PartialEq,
+        Eq,
+        ToSchema,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
     )]
     pub struct InstalledPackage {
         pub name: String,

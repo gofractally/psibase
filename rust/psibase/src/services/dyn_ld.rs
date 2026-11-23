@@ -5,7 +5,19 @@ pub mod service {
     use fracpack::{Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+    #[derive(
+        Debug,
+        Clone,
+        Serialize,
+        Deserialize,
+        Pack,
+        Unpack,
+        ToSchema,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+    )]
     pub struct DynDep {
         pub name: String,
         pub service: AccountNumber,

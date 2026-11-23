@@ -33,7 +33,20 @@ pub mod service {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "SitesContentTable", index = 0)]
-    #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack)]
+    #[derive(
+        Debug,
+        Clone,
+        Serialize,
+        Deserialize,
+        SimpleObject,
+        ToSchema,
+        Pack,
+        Unpack,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+    )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct SitesContentRow {
         pub account: AccountNumber,
@@ -52,7 +65,20 @@ pub mod service {
     }
 
     #[table(name = "SiteConfigTable", index = 1)]
-    #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack)]
+    #[derive(
+        Debug,
+        Clone,
+        Serialize,
+        Deserialize,
+        SimpleObject,
+        ToSchema,
+        Pack,
+        Unpack,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+    )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct SiteConfigRow {
         #[primary_key]
@@ -64,7 +90,19 @@ pub mod service {
     }
 
     #[table(name = "SitesDataTable", index = 2)]
-    #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Pack, Unpack)]
+    #[derive(
+        Debug,
+        Clone,
+        Serialize,
+        Deserialize,
+        ToSchema,
+        Pack,
+        Unpack,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+    )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct SitesDataRow {
         #[primary_key]
@@ -73,7 +111,19 @@ pub mod service {
     }
 
     #[table(name = "SitesDataRefTable", index = 3)]
-    #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Pack, Unpack)]
+    #[derive(
+        Debug,
+        Clone,
+        Serialize,
+        Deserialize,
+        ToSchema,
+        Pack,
+        Unpack,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+    )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct SitesDataRefRow {
         #[primary_key]

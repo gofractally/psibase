@@ -20,7 +20,20 @@ struct SymbolLength {
 }
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug,
+    Copy,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct SymbolRecord {
@@ -29,7 +42,20 @@ pub struct SymbolRecord {
 }
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug,
+    Copy,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Mapping {

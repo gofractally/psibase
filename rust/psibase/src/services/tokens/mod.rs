@@ -23,7 +23,20 @@ custom_error! { pub TokensError
 pub type TID = u32;
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug,
+    Copy,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct TokenRecord {
@@ -42,7 +55,20 @@ crate::define_flags!(TokenFlags, u8, {
 });
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug,
+    Copy,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Holder {
@@ -51,7 +77,20 @@ pub struct Holder {
 }
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug,
+    Copy,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct SharedBalance {
@@ -62,7 +101,20 @@ pub struct SharedBalance {
 }
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug,
+    Copy,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Balance {

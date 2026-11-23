@@ -1369,7 +1369,8 @@ R8 unless D29 is reopened.
 | R3 (done for 20 of 76 records; 6.14) | Records of `rust/psibase/src` outside `services`. Additive `PsszPack, PsszUnpack, PsszView, ToPsszSchema` (+ `Key` where `ToKey`) on the 20 whose members are all PSIO values and whose C++ twin is finally declared and equal. **Waiting:** 31 behind `Hex<T>` (R8), 7 behind time, 7 behind the socket variants' text form in C++, 4 (and 2 of the above) whose Rust declaration is not the C++ one today (D36), 5 of the legacy schema format, `Meta` (a serde attribute), `ConsensusBytes` (no C++ twin). | 20 derives / 5 files | unchanged | `psio_twins.rs` against the fixture C++ writes (6.15): schema IR, pSSZ, key, text; ctest 92 / 92 |
 | R4 (done as far as it is additive; 6.19) | `#[psibase::service(psio = true)]` also declares the actions with `#[psio::interface]`; on for `setcode`, `auth-delg`, `minrecvr`; two services cross-checked against C++ (18 functions, 18 calls); two actions with one method number are a compile error. Events, record-building callers and key bounds are left to R7. | 1 macro; 3 services | unchanged | `psibase-macros-lib` tests, `psio_twins.rs`, `rs-test-psibase-macros`; schemas identical |
 | R4 (as first planned) | The macros. `action_structs` and `event_structs` gain the PSIO derives (`#[psio(crate = "…")]` where the macro names the crate today); callers and emitters build the action record instead of a tuple (same bytes in fracpack; removes the dependence on tuple ≡ record and gives argument caps a place to live, RG6); `service_tables` emits `psio::Key` bounds beside `ToKey`; the dispatcher refuses two actions with one method number at macro time (C++ D23). | 2 macros, ~2,000 lines; 809 action and 81 event records generated | unchanged | `rs-test-psibase-macros`, `psibase-macros-lib` tests, every `rs-test-*`; generated schemas of the 28 packages compared before / after |
-| R5 | Service declarations: `rust/psibase/src/services` (42 derives, 422 actions: the Rust statement of C++ interfaces), `packages/system` (25), `packages/user` (123 + 22 in plugins). Each crate that derives gets `psio` in its manifest (`psio.workspace = true`; the derives resolve `::psio`). Per type, the decisions that select bytes: `definition_will_not_change`, `String` vs `RawString` against the C++ parameter (99 `String` in 22 files of `services/` against C++ signatures that say `std::string` today), bounds (RG6). | 212 derives / 67 files | unchanged | as R4; per service that exists in both languages, action bytes pinned once and asserted in both |
+| R5 (started; 6.20) | `rust/psibase/src/services`: 30 of its 37 `Pack` types declared (27 added), 7 wait. `packages/system` and `packages/user` not started. | 27 derives / 13 files | unchanged | compiles; not yet in the fixture |
+| R5 (as planned) | Service declarations: `rust/psibase/src/services` (42 derives, 422 actions: the Rust statement of C++ interfaces), `packages/system` (25), `packages/user` (123 + 22 in plugins). Each crate that derives gets `psio` in its manifest (`psio.workspace = true`; the derives resolve `::psio`). Per type, the decisions that select bytes: `definition_will_not_change`, `String` vs `RawString` against the C++ parameter (99 `String` in 22 files of `services/` against C++ signatures that say `std::string` today), bounds (RG6). | 212 derives / 67 files | unchanged | as R4; per service that exists in both languages, action bytes pinned once and asserted in both |
 | R6 | Keys. A test that `ToKey` and `psio::Key` agree for every table key type in the tree (25 `ToKey` derives, 151 primary and 52 secondary keys); then `table.rs`, `native.rs` and the macro use `psio::to_key`, `psio::key::key_prefix`; `RawKey` / `KeyView` implement `psio::key::KeyPack` (D8). With C++ slice 6. | `to_key.rs` 286 lines, `to_key_macro.rs` deleted | unchanged where the formats agree | the agreement test; all service tests |
 | R7 | **The wire flip, with C++ slice 7.** `Pack` / `UnpackOwned` bounds → `psio::Encode<Pssz>` / `Decode<Pssz>`; `.packed()` → `psio::to_pssz`; action arguments and cross-service data → `psio::from_pssz` (validates); own rows → `psio::from_pssz_trusted`; `Nested`, `SharedAction`; schemas → Schema IR (`schema.rs`, 563 lines; the macros' schema output; `trace.rs` and `package.rs` onto `psio::pssz::dynamic`); the legacy derive names, `#[fracpack]`, `#[to_key]` and the 25 hand-written codec and key impls deleted; plugins and the XAdmin wasm rebuilt. | 198 + 62 + 32 call sites; 41 generic bounds; 331 derive lists | everything binary changes | all tests; fresh genesis; cross-language vectors for transactions and blocks |
 | R8 | **The JSON flip, with C++ slice 8.** Wire types: `serde::Serialize, Deserialize` → `psio::JsonText, psio::Serde`; `serialize_as_str!` → `TextForm` + `psio::Serde`; `Hex<T>` deleted; serde attributes PSIO's text rejects removed where the type is on the wire; `serde_json::to_string(&wire)` → `psio::to_ijson`. Plugins, CLI and configuration types that only talk JSON keep serde (D10). | 376 / 522 derives to classify; 283 `serde_json` conversion calls | JSON changes | all tests; UI builds |
@@ -2276,3 +2277,98 @@ is marked at `check_method_number` in `service_macro/actions.rs`; `method_raw!`
   generated trait, but the action function itself would then carry an
   attribute rustc does not know; the macro must strip it there when the
   first bound is declared.
+
+### 6.20 Slice R5: service declarations (started: the Rust views in `rust/psibase`)
+
+**Done: `rust/psibase/src/services`.** Of the 37 types there that derive
+`Pack` (found by parsing the derive lists; `Decimal` has no legacy codec
+and was declared in R2), 30 are declared with PSIO now: 3 from the earlier
+slices (`Precision`, `Quantity`, `NewAccountMode`) and 27 added here, each
+with `PsszPack, PsszUnpack, ToPsszSchema`, `PsszView` for a record with
+named members, `Key` where it derives `ToKey`, and `#[psio(transparent)]`
+for a struct of one unnamed member (which is what the legacy derive makes
+of it):
+
+| File | Types |
+|---|---|
+| `auth_dyn.rs` | `WeightedAuthorizer`, `DynamicAuthPolicy` |
+| `dyn_ld.rs` | `DynDep` |
+| `events.rs` | `EventDb` (transparent) |
+| `invite.rs` | `InviteRecord`, `InvPayload` |
+| `nft.rs` | `Nft`, `NftHolderRecord`, `CreditRecord` |
+| `packages.rs` | `PackageSource`, `InstalledPackage` |
+| `producers.rs` | `CandidateInfo` |
+| `sites.rs` | `SitesContentRow`, `SiteConfigRow`, `SitesDataRow`, `SitesDataRefRow` |
+| `staged_tx.rs` | `ActionList` |
+| `symbol.rs` | `SymbolRecord`, `Mapping` |
+| `tokens/mod.rs` | `TokenRecord`, `Holder`, `SharedBalance`, `Balance` |
+| `virtual_server.rs` | `ServerSpecs`, `NetworkVariables`, `BufferConfig` |
+| `ws_auth.rs` | `WsTicketInfo` |
+
+How: the derives were added to every type and removed again from each one
+the compiler refused, so "every member type is already convertible" was
+decided by the compiler, not by reading.
+
+**Waiting in that directory (7).**
+
+| Type | Why |
+|---|---|
+| `diff_adjust::RateLimit`, `staged_tx::StagedTx`, `token_stream::Stream` | a time member (D34) |
+| `accounts::Account` | `#[serde(deserialize_with)]`, which PSIO's schema derive refuses (R8) |
+| `packages::InstalledSchema` | holds the legacy `Schema` (R7) |
+| `auth_sig::SubjectPublicKeyInfo`, `auth_sig::AuthRecord` | the key type waits for its C++ twin (D26); it would compile as `transparent` over its bytes, which is the form D26 leans to |
+
+**What this does not show.** These 27 are not in the C++ ↔ Rust fixture:
+they compile and nothing has compared them with their C++ twins (member
+names and order, raw or UTF-8 strings, `char`). 6.17 and 6.19 found a
+wrong mirror in each small sample taken, so expect some here; each joins
+the fixture with one line in `rust_twins.cpp` and one in `psio_twins.rs`.
+No service was switched to `psio = true` in this step either: most of the
+views name a waiting type or write a result type as `super::Record`.
+
+**Not started: `packages/system` and `packages/user`** (the Rust services
+themselves and their query services; plugins belong to R7). Nothing
+blocks them that does not block the views above; what they need first is
+mechanical: `psio.workspace = true` in each service crate's manifest (the
+derives name `::psio`), `psio` in the `[workspace.dependencies]` of
+`packages/system/Cargo.toml` and `packages/user/Cargo.toml`, and the lock
+files that follow. The same add-and-let-the-compiler-refuse pass
+(`~/psibase-pssz-scripts/r5.py`, `r5_loop.py`; scratch tools, not in the
+tree) then applies per workspace with `--target wasm32-wasip1`, including
+the six packages the build never compiles. Expected to wait there, from
+the survey of 6.1: every row and action with a time point (`TimePointSec`
+/ `TimePointUSec`: 141 uses in 37 files), the 25 `ToKey` records only
+where a member waits, and whatever holds `SubjectPublicKeyInfo`.
+
+### 6.21 What was checked after each of these steps
+
+Each row: full build exit 0, full `ctest -j4`, the generated
+`*-schema.json` (68) against `~/psibase-pssz-snap-head/`, and `cargo check
+--target wasm32-wasip1` of the six packages the build never compiles.
+Logs: `~/psibase-pssz-build.{build,ctest,compare}-<tag>.log`,
+`~/psibase-pssz-build.<tag>-check-unbuilt.log`.
+
+| Step | Tag | ctest | Schemas | Unbuilt packages |
+|---|---|---|---|---|
+| Merge of the integration head | `head` | 93 / 93 | identical to the snapshot of 0167a3056 (new baseline taken) | — |
+| Pin `c6d99404` | `repin-c6d9` | 93 / 93 | identical | exit 0 |
+| `Hex<T>` and 20 records (6.16) | `hex` | 93 / 93 | identical | exit 0 |
+| Stale mirrors (6.17) | `mirrors` | 93 / 93 | identical | exit 0 |
+| RTransact body validation, and slice R4 (6.19) | `r4` | 93 / 93 | identical | exit 0 |
+| Slice R5, the views (6.20) | `r5` | 93 / 93 | identical | exit 0 |
+
+`rs-tests` at the end: `psio_twins.rs` 2 tests (50 types, 115 values, 2
+interfaces, 18 calls), `psio_wrappers.rs` 8, `psio_leaf_types.rs` 13,
+`psibase-macros-lib` 6. `psinode_test_crash` passed in all six runs; the
+evidence watcher captured nothing. wasm binaries were not compared (the
+head changed how every service is compiled).
+
+The RTransact change (commit `d208308ab`, not part of the conversion):
+`parseBody<T>` inserted the JSON body at another container's iterator and
+ignored the result of `from_frac`; `/login` read views over a transaction
+a JSON body supplies as unvalidated hex. Fixed at the points of use
+(`psio1` unchanged); `Transact-test` "Test login" posts a JSON login and
+seven malformed bodies. Those cases pass with the fix; they were not run
+against the code before it, and some of them would have been answered
+with a 400 there too (a default `SignedTransaction` has no action), so
+they cover the paths rather than prove the defect.

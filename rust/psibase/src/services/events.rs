@@ -3,7 +3,20 @@ use serde::{Deserialize, Serialize};
 
 use crate as psibase;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Serialize,
+    Deserialize,
+    Pack,
+    Unpack,
+    ToSchema,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::ToPsszSchema,
+)]
+#[psio(transparent)]
 pub struct EventDb(u8);
 
 #[allow(non_upper_case_globals)]

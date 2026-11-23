@@ -13,7 +13,19 @@ mod service {
     use crate::{Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+    #[derive(
+        Debug,
+        Clone,
+        Serialize,
+        Deserialize,
+        Pack,
+        Unpack,
+        ToSchema,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+    )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct CandidateInfo {
         pub account: AccountNumber,
