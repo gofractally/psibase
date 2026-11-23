@@ -143,7 +143,12 @@ class ChainPackContext:
         function = self.get_schema(str(service)).actions.get(method.value)
         if function is None:
             raise Exception('Action not found: %s::%s' % (service, method))
-        return function.params.json_to_pssz(json.dumps(data if data is not None else {}))
+        # Bytes are hex in I-JSON
+        def hex_bytes(value):
+            if isinstance(value, (bytes, bytearray)):
+                return value.hex()
+            raise TypeError('%s has no JSON text' % type(value).__name__)
+        return function.params.json_to_pssz(json.dumps(data if data is not None else {}, default=hex_bytes))
     def get_schema(self, service):
         if service not in self._schemas:
             with self._api.get('/schema?service=%s' % service, service='packages') as reply:
