@@ -1925,6 +1925,228 @@ member takes a number only.
   to `psio::to_ijson`, not compiled.
 * The installed (SDK) form of the headers.
 
+### 1.23 Pin f03f7304, workarounds removed, streams and bin (S6)
+
+Four code commits: the pin moved to PSIO `50092a4b` (gaps G46–G51 closed),
+the interim workarounds of section 5.2 removed, the remaining non-GraphQL
+uses of `psio1` moved, and the pin moved on to `f03f7304` (PSIO `main`: the
+same closures, list elements bounded by the offsets around them on
+unvalidated bytes, a record view that reads its header once; a record view
+object is 40 bytes, was 32). Neither pin move needed a psibase source
+change, and `rust-twins.json` stayed what the C++ declarations give.
+Nothing in psibase asserts the size of a view or stores views in a packed
+structure (searched `sizeof(` on lines naming `pssz_view`, `view<`,
+`shared_pssz`: no hit).
+
+**The workarounds, one by one.**
+
+| Gap | What psibase does now |
+|---|---|
+| G46 | `packMethodArgs` and `detail::methodArg` are deleted. `action_builder_proxy`, `ActionViewProxy` and `EventEmitter` (`Actor.hpp`) call `psio::method_args_to_pssz<T, I>(std::forward<Args>(args)...)`. PSIO converts implicitly only. One call site in the tree relied on an explicit constructor and converts at the call: `packages/user/Invite/test/src/Invite-test.cpp:99`, `accounts.newAccount(AccountNumber{"bob"}, …)` (was the literal `"bob"`; `AccountNumber(std::string_view)` is explicit). Found by building the whole wasm tree with `-k 0`. |
+| G47 | `XHttp`'s `serve` export decodes `std::tuple<std::int32_t, HttpRequestRef>` (`BasicHttpRequest<std::span<const char>>`): the body is borrowed from the action bytes, as before S1. `getUrl` and `sendNotFound` take `const HttpRequestRef&` again. No other site had been changed for this reason. |
+| G48 | `psio::validate_strict<T>(psio::pssz{}, bytes)` at the three guest sites: `intrinsic.cpp` (`checkActionFormat`, behind `getCurrentActionView` / `getCurrentActionPacked`), `Transact.cpp` (the transaction check), `TestServiceEntry.cpp`. |
+| G49 | Not a codec gap (below). `XProxy::onError` and `XPeers::errP2P` declare `maxDynamicData(0xffffffff)`. |
+| G50 | 69 `.unpack()` removed in 14 files (a scripted pass over accessors of account and method numbers, checksums, time points, then the compiler): 129 → 60 in those files. Kept where the type is deduced (`auto x = v.id().unpack()`, `std::tuple(…)`, a function returning `auto`, a template argument such as `saturatingCast`, `switch`, `<<`), where a member is called on the result (`.str()`), and where the value is not trivially copyable (`Claim`, `BlockHeader`, lists). Two of the scripted removals compiled and were wrong, and were put back by reading: `ForkDb::get_prev_id` (returns `auto`: it would have returned a view into a temporary) and `by_best_prepared` in `bft.hpp` (a `std::tuple` of a view). |
+| G51 | `Table::put` is `requires psio::packs_as<U, T> || std::is_convertible_v<const U&, T>`; a record that packs as the row is packed and stored, without the run-time `validate_pssz<T>`. A wrong record does not compile. |
+| G52 | Unchanged: `psio::detail::mutation_blocked_v<psibase::Action> = false` in `block.hpp`. Neither pin offers a schema-id marker without an invariant (`docs/schema-builder.md`: the id is the text adapter's `schema_id`, else the id given to `PSIO_INVARIANT`, else the reflected name), and `docs/pssz-spec.md` §17 documents `mutation_blocked_v` as the extension point. |
+
+**G49: width, not compatibility.** A record, tuple or argument list
+without `maxDynamicData` takes its offset width from the bound inferred
+from its members. `(int32)` is 5 bytes at most: 1-byte offsets,
+`04 07000000`. `(int32, optional<HttpReply>)` is unbounded: 4-byte offsets,
+`04000000 07000000`. They are two encodings, so "the same call without its
+last optional" does not exist between them. Under one cap both lists have
+one width, and the shorter list *is* the longer one with the optional
+absent (pinned in `methods.cpp`, "the error callback's argument list keeps
+its width", with `psio::require_pssz_evolves_from`).
+
+The cap is `maxDynamicData(0xffffffff)` on `method(onError, socket, reply)`
+(`XProxy.hpp`) and `method(errP2P, socket, reply)` (`XPeers.hpp`). Reason
+for the number: the reply is an HTTP reply of any size, so the list is in
+the 4-byte class, and the top of the class adds no size limit of its own.
+The cap does not change a byte of these two calls (they were 4 bytes wide
+already); it states the width. What it does **not** do is make the
+uncapped `psio::to_pssz(std::tuple(socket))` that x-http's close hook
+packs a valid call of them: that needs 1-byte offsets, a cap of at most
+255, and then a reply of more than about 240 bytes (the rejected handshake
+of `recv`) could not be passed at all. Checked with
+`~/psibase-flip-cpp-scratch/wire/s6_onerror_cap.cpp` for caps 255, 65536
+and 0xffffffff. So the close hook keeps the two shapes S1 gave it:
+`(socket, no reply)` for the error callback of a request or handshake,
+`(socket)` for the close callback of an established websocket
+(`XProxy::close`, `XPeers::closeP2P`, `WSEcho::close`: uncapped, 1 byte
+wide). One shape for both would need the same cap on every websocket close
+callback, C++ and Rust: a decision for the team. `XHttp::autoClose` also
+stays as S1 left it (`PendingRequestRow` is declared in `HttpServer.hpp`
+and mirrored in Rust; capping it is the same kind of decision).
+
+**Declarations that rely on, or invite, width-compatible growth** (not
+changed; candidates for a cap). Found by a script over the 589
+`PSIO_REFLECT` blocks of `libraries/psibase`, `libraries/net`,
+`libraries/psibase_http`, `packages` and `programs` (436 records, 545
+methods): flag a record or method whose trailing members are
+`std::optional`, whose earlier members are all fixed-size or bounded, and
+which has neither `definitionWillNotChange()` nor `maxDynamicData`; then
+each of the 72 hits was read. No declaration in those directories used
+`maxDynamicData` before this stage. Not covered: Rust declarations, tuples
+packed ad hoc, exact inferred bounds (none was computed), and types
+declared through macros the script does not parse (the event macros were
+read by hand).
+
+*Width already moved by an unbounded trailing optional* (4 bytes wide
+today; the same record without that member is narrower, so no earlier
+or later revision without it reads these bytes):
+
+| Declaration | Members | Kind |
+|---|---|---|
+| `TempPendingRequestRow` (`XHttp.cpp:17`, `HttpServer.cpp:129`) against `PendingRequestRow` (`HttpServer.hpp:9`) | `socket, owner` + `prevOwners: optional<vector<AccountNumber>>` | table rows (temporary / session) |
+| `TransactStatus` (`Transact.hpp:150`) | `enforceAuth: bool`, `bootTransactions: optional<vector<Checksum256>>` | table row |
+| `SiteConfigRow` (`Sites.hpp:51`) | `account, spa, cache`, `globalCsp: optional<string>`, `proxyAccount: optional<AccountNumber>` | table row |
+| `BlockDataRow` (`nativeTables.hpp:193`) | `blockId`, `auxConsensusData: optional<vector<char>>` | native row |
+| `BlockHeader` (`block.hpp:277`) | nine fixed members, `newConsensus: optional<Consensus>`, `authCode: optional<vector<BlockHeaderCode>>` | block header (blocks, block log, `StatusRow`) |
+| `HttpSocketInfo`, `WebSocketInfo`, `HttpClientSocketInfo`, `P2PSocketInfo` (`SocketInfo.hpp:166–193`) | `endpoint: optional<SocketEndpoint>`, `tls: optional<TLSInfo>` | alternatives of `SocketRow::info` (native row) |
+| `PackageSource` (`Packages.hpp:74`) | `url: optional<string>`, `account: optional<AccountNumber>` | row element, action argument |
+| `Tokens::recall` (`Tokens.hpp:211`) | `token_id, from, amount, memo`, `sub_account: optional<string>` | action arguments |
+| `Accounts` history events `froze`, `unfroze` (`Accounts.hpp:162`) | `account`, `memo: optional<string>` | event arguments |
+| `XPeers::errP2P`, `XProxy::onError` | `socket`, `reply: optional<HttpReply>` | callback arguments: **capped in this stage** |
+
+*Narrow, with a bounded trailing optional* (the optional fits the width
+class; any later unbounded member would move it):
+`AuthTarget` (`Transact.hpp:143`, element of `Transact::isAuth`),
+`AuthInterface::getDlgsSys(sender, optional<ServiceMethod>)`
+(`Transact.hpp:84`), `VirtualServer::buy_res_for(amount, for_user,
+optional<Memo>)` and `conf_buffer(optional<BufferConfig>)`,
+`Nft::mint(optional<NID>)`, `Nft::setAutoDebit(optional<bool>)`,
+`CpuLimit::setCpuLimit(optional<uint64>)`.
+
+*Bytes of one declaration read as another* (worth a test each; none was
+run here):
+
+* `Transact.cpp:474` calls `AuthInterface::getDlgsSys(sender, method)`;
+  the six auth services declare `getDlgsSys(sender)` only. Both lists are
+  narrow, so the bytes agree when the optional is absent; when it is
+  present the callee sees an unknown member.
+* `isAuthSys` / `isRejectSys` (three parameters in `AuthInterface`, two in
+  the services) and `ServerInterface::serveSys(request, socket, user)`
+  against services declaring one, two or three parameters: already 4 bytes
+  wide (a list or a request comes first), so these are ordinary appended
+  optionals.
+* `XHttp.cpp` `recv`, handshake: `(socket, optional(reply))` is sent to the
+  accept callback, declared `(socket, HttpReply)`
+  (`XPeers::onP2P`, `XProxy::onAccept`).
+* `tester.cpp:743` packs the continuation arguments with the token as a
+  plain byte list; `RTransact::onVerify` declares `optional<RunToken>` and
+  psinode packs an optional (`BlockContext.cpp:522`). An optional of a list
+  that may be empty has a selector byte, so these two may differ.
+* `Table.hpp:826` still tells service authors to "add new `optional<…>`
+  fields to the end of `T`", without the width condition.
+
+**Streams and `bin` (S6).** Names outside `libraries/psio1`, `doc`, `rust`,
+`external` and `libraries/debug_eos_vm`, before → after:
+
+| Legacy | Before | Now |
+|---|---|---|
+| `psio1::input_stream` | 110 | 0. 107 were a byte-range parameter, result or local: `std::span<const char>` (`api.hpp` 11, `intrinsic.cpp`, native `db.hpp` 9 — `KVResult` is two spans —, `usePsitri.cpp` 8, `NativeFunctions.cpp` 40, `ExecutionContext.hpp`, `VmEngine.cpp`, tester 6, `LightValidator.hpp` 3, `routing_base.hpp` 4, psitest 3 of which two were unused locals, `TestKV.cpp`, two native tests); `.pos` / `.end` / `.remaining()` / `.string_view()` / `.skip(n)` became the span's `data()` / `size()` / `begin()` / `end()` / `subspan(n)`. 2 are a parsing cursor: `psio::input_stream` in `log.cpp` (`remaining()`, `read_raw`, `rest()`) |
+| `psio1::vector_stream` | 2 | `psio::vector_stream` (`REvents.cpp`, the `CREATE TABLE` text) |
+| `psio1::convert_to_bin` / `convert_from_bin` | 3 | `psio::to_pssz` / `psio::from_pssz<uint8_t>` in `TestKV.cpp`; the unused `using` in psitest deleted |
+| `psio1::convert_to_frac` | 1 | deleted (`rust_twins.cpp`) |
+| `using namespace psio1;` | 4 | deleted (two fuzz tests, `TestMemo.cpp`, `test_subjective.cpp`: none used a name of it) |
+| `#include <psio1/stream.hpp>` | 3 | deleted (`api.hpp`, `block.hpp`, `LightValidator.hpp`) |
+
+*`bin`.* Outside `debug_eos_vm` the legacy `bin` format had one user: the
+test service `TestKV`, which stored a `uint8_t` row with `convert_to_bin`
+and read it back. One byte either way; nothing hashed, nothing a node or
+another service reads. It is PSSZ now (the same byte). psitest only named
+`convert_to_bin` in a `using`.
+
+*The twins fixture.* `rust_twins.cpp` wrote each value's fracpack bytes
+(`frac`) for the Rust test of the legacy declarations. The flipped Rust
+test (`~/psibase-pssz/rust/psibase/tests/psio_twins.rs`) reads `pssz`,
+`key` and `ijson` only, so the generator and the fixture drop the field:
+117 lines of `rust-twins.json` change, each by losing `frac`; `schema_ir`,
+`calls` and every other member are identical (compared as JSON). The Rust
+test of *this* worktree still reads `frac` (it is the pre-flip test, and
+`rs-tests` was failing before this stage).
+
+*`libraries/debug_eos_vm` is not converted: it is dead code.* No CMake
+file adds the directory (`libraries/CMakeLists.txt` adds `psio1` and
+`psibase` only); `ExecutionContext.cpp` and psitest use
+`namespace dwarf = psizam::debug`, the copy in `external/psizam`, which
+has its own `psizam::debug::binary::input_stream`. `dwarf.cpp` includes
+`<elf.h>` and cannot be compiled on this machine, so a conversion of its
+363 `psio1` lines (`to_bin` 145, `from_bin` 59, `input_stream` 50, `check`
+36, the varint helpers 72, streams 19, `finally` 1) could not have been
+compiled, let alone compared byte for byte. It was left untouched; deleting
+the directory (three headers, `dwarf.cpp`, `locals.hpp`, a CMake file)
+removes its dependency on `psio1`. No DWARF verification was done, since
+no DWARF code changed.
+
+**What remains on `psio1`** (`git grep psio1` outside `libraries/psio1`,
+these two documents, `rust`, `external`: 429 lines):
+
+| Reason | Where | Lines |
+|---|---|---|
+| GraphQL (S5) | `psibase/serveGraphQL.hpp`: `psio1/graphql.hpp`, `gql_query`, `get_gql_schema`, `gql_stream`, `gql_query_inline`, `make_field_resolver`, `generate_gql_*`, `fill_gql_schema_members`, `write_str`, `detail::write_field_name`. No service file names `psio1`: they reach it through this header | 12 |
+| Legacy forms of the time types, reached by the GraphQL writer | `#include <psio1/chrono.hpp>` in `trace.hpp`, `Accounts.hpp`, `CpuLimit.hpp`, `MockCpuLimit.cpp`. Left for S5: whether GraphQL output of a time member needs them was not tested | 4 |
+| Build of the `psio1` target | `libraries/CMakeLists.txt`, `libraries/psibase/CMakeLists.txt`, the SDK's `psibase-config.cmake` (6) and `.build` (8), `demo/*-build/build.py` and `compile-command.json` (21), two commented lines in `libraries/net/test/CMakeLists.txt`, `.vscode/.clangd`, `tests/cmake/dependencies/README.md` | 42 |
+| Dead code | `libraries/debug_eos_vm` | 370 |
+| A file of `libraries/psio1` used as test data | `programs/psinode/tests/test_fracpack.py` reads `libraries/psio1/tests/fracpack-tests.json` (the Python fracpack codec, G9) | 1 |
+| Documentation of the legacy format | `doc/src/specifications/data-formats/fracpack.md` links the legacy header as the reference implementation; the page describes fracpack and goes with it | 1 |
+
+The two TEMPORARY blocks S4 kept in `libraries/psio1` for GraphQL are
+untouched.
+
+**Behaviour changes.**
+
+* A service refuses an action, and Transact a transaction, that is not
+  the canonical encoding (`pssz: noncanonical encoding`), besides one with
+  unknown members: S1 had dropped the canonical requirement in guests.
+  Strict validation decodes and re-encodes the value once: the check in
+  `getCurrentActionView` costs about a validate, a decode and an encode of
+  the action (it was one validation).
+* `XHttp::serve` no longer copies the request body.
+* A record that does not pack as the row is refused by `Table::put` when
+  the service is compiled, not when the action runs.
+* An argument that needs an explicit conversion no longer compiles.
+* `rust-twins.json` has no `frac` member.
+
+**Checked.**
+
+* Full builds with `-k 0`: `build-s6a.log` (pin `50092a4b`),
+  `build-s6e.log` (workarounds), `build-s6g.log` (S6), `build-s6h.log`
+  (pin `f03f7304`). In each the one failed edge is
+  `share/psibase/packages/index.json` (the `reserved-names` step, the Rust
+  side's).
+* The 29 tests that pass in `ctest-s4-regress.log` pass after each
+  commit: `ctest-s6a-regress.log`, `ctest-s6b-regress.log`,
+  `ctest-s6c-regress.log` (this one ran every test: 29 / 93 pass, the
+  failed set identical to `ctest-s4-full.log`). After the move to
+  `f03f7304` the full run again: `ctest-s6-full.log`, 29 / 93, the failed
+  set identical to `ctest-s4-full.log`.
+* `psibase-psio-tests`, natively and in the guest, with the new cases:
+  `Table<Row>::put` accepts the row, a view, a packed row and a record of
+  references and refuses a record with a member missing or of another
+  integer size (`static_assert` on `psio::packs_as` and on the call);
+  `AccountNumber`, `MethodNumber`, `Checksum256` are trivially copyable
+  and their views, a time point's and byte lists convert; strict
+  validation of an action accepts it and refuses one with an appended
+  member that compatible validation accepts; the error callback's
+  argument list.
+* The six gap probes (`s1_gaps.sh`) against the new pin: G46, G47, G50,
+  G51 compile; G48 prints `ok`; G49 prints what it printed (by design).
+
+**Not verified.**
+
+* `XHttp::serve` with the borrowed request, the close hook and the capped
+  callbacks at run time: `psinode_test_fetch` and `psinode_test_websocket`
+  fail before and after (they need the Rust side), so these paths were
+  compiled and unit-tested, not run in a node.
+* The cost of strict validation per action in a guest was not measured.
+* The list of width-dependent declarations comes from reading; none of
+  the "read as another declaration" cases was executed.
+* `demo/` was not built (its build files still name the `psio1` target).
+* The installed (SDK) form of the headers.
+
 ## 2. Inventory of what remains
 
 Counts are occurrences / files in the tree outside `libraries/psio1`,
@@ -2453,6 +2675,15 @@ The six things section 1.19 lists as A–F, numbered. Each reproduction is in
 it has output) against the pin `e12e4f6d` — C++ identical to `3bf2b94b` —
 with the command of 5.1 (`s1_gaps.sh` in the same directory runs all six).
 **All six still reproduce.**
+
+**Status at `f03f7304` (first closed at `50092a4b`): G46, G47, G48, G50 and
+G51 are closed and every psibase workaround in the table below is removed;
+G49 is not a codec gap but the rule that an uncapped record's offset width
+follows its members, answered with `maxDynamicData` and
+`psio::require_pssz_evolves_from`.** What psibase did with each, the cap on
+the error callback, the declarations that depend on width-compatible
+growth, and G52 (unchanged: no id-only schema marker exists) are in
+section 1.23. The table is kept as the record of what was found.
 
 | # | Missing | Reproduction → first error / output at `3bf2b94b` | What psibase does meanwhile |
 |---|---|---|---|

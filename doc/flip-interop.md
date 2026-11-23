@@ -18,9 +18,9 @@ I-JSON, and sections 3, 4, 5 and 5.1 say what the code does. Section 6
 stage S5; until then a C++ GraphQL answer is written by the legacy
 library (64-bit integers always quoted, `DbId` a number).
 
-PSIO pin for both languages: `e12e4f6df7a2422f893d609848ab06194b75e082`
-(`cmake/PsibaseDependencies.cmake`; PSIO `main`, its C++ identical to
-`3bf2b94b`, where gaps G42–G45 closed).
+PSIO pin for both languages: `f03f7304cd0e6b9dcb9bcccc3939743e1b96ddec`
+(`cmake/PsibaseDependencies.cmake`; PSIO `main`; gaps G46–G51 closed at
+`50092a4b`, which it contains. No wire change against `e12e4f6d`).
 
 ## 0. Already in force with the pin (before any flip commit)
 
@@ -120,19 +120,64 @@ worktree):
 **Definitive since S1 (the binary wire of C++ flipped; section 1.19 of
 `doc/pssz-conversion.md`), except the two rows marked "schema stage".**
 Every value below is PSSZ in its automatic profile (`psio::to_pssz`): offset
-widths are inferred from the declared types; psibase declares no
-`maxDynamicData` cap and no bound except `Memo` (UTF-8, at most 80 bytes).
+widths are inferred from the declared types; psibase declares no bound
+except `Memo` (UTF-8, at most 80 bytes) and one `maxDynamicData` cap, on
+the error callback of an HTTP request (below).
+
+**Changed with section 1.23 of `doc/pssz-conversion.md` (pin `f03f7304`):**
+
+* **The error callback of a request or websocket handshake is capped.**
+  `XProxy::onError(socket: i32, reply: optional<HttpReply>)` and
+  `XPeers::errP2P(socket: i32, reply: optional<HttpReply>)` are declared
+  `method(…, socket, reply, maxDynamicData(0xffffffff))`: cap 4294967295,
+  offset width **4 bytes** (what the uncapped list already had, so no
+  byte of the call changes). x-http calls such a callback with
+  `(socket, reply)`, or with `(socket)` and no reply when the socket
+  closes first: `04000000` · socket (little-endian i32), 8 bytes. A Rust
+  service that registers an `err` callback for `sendRequest` /
+  `websocket` through `setCallback` must declare it with these two
+  parameters and the same cap on the method's argument list (PSIO's
+  Rust spelling of the cap is `max_dynamic_data = 4294967295`; for a
+  record it is `#[pssz(max_dynamic_data = N)]`), and the Rust mirror of
+  these two methods likewise. The `err` callback of an *established* websocket
+  (`XProxy::close`, `XPeers::closeP2P`) takes `(socket)` without a cap:
+  offset width 1 byte, `04` · socket, 5 bytes.
+* **Strict means canonical.** A C++ service checks the action it is handed,
+  and Transact the transaction, with `psio::validate_strict`: valid PSSZ,
+  no unknown members, and the canonical encoding (re-encoding gives the
+  same bytes; a stored trailing absent optional is refused). Everything
+  the Rust side packs must be canonical.
+* `rust-twins.json` has no `frac` member in its vectors.
+
+**Candidates for caps (team).** These declarations have only fixed-size or
+bounded members before a trailing optional, and no cap, so their offset
+width depends on what is appended (an unbounded optional moves a narrow
+list to 4 bytes: another encoding, in both directions). A cap must be the
+same number in C++ and Rust and cannot be added later where it changes the
+width. Already 4 bytes wide because the trailing optional is unbounded:
+the rows `TransactStatus`, `SiteConfigRow`, `BlockDataRow`,
+`TempPendingRequestRow` (against `PendingRequestRow`, 1 byte wide),
+`PackageSource`, the `SocketInfo` alternatives, `BlockHeader`; the
+arguments of `Tokens::recall` and of the `Accounts` events `froze` /
+`unfroze`. Narrow today, with a bounded trailing optional:
+`AuthTarget`, `AuthInterface::getDlgsSys(sender, optional<ServiceMethod>)`
+(called against services that declare `getDlgsSys(sender)`),
+`VirtualServer::buy_res_for` and `conf_buffer`, `Nft::mint`,
+`Nft::setAutoDebit`, `CpuLimit::setCpuLimit`. The websocket close
+callbacks (`(socket)`, 1 byte) and the request error callbacks (4 bytes)
+could share one shape if all were capped alike. File and line for each,
+and how the list was made, are in section 1.23 of `doc/pssz-conversion.md`.
 
 | Artifact | Producer | Consumers | Format |
 |---|---|---|---|
-| Action (`psibase::Action`, `block.hpp`) | every caller; the node hands the current action to a service packed (`getCurrentAction`) | services, the node (`call`) | PSSZ of `Action {sender: AccountNumber, service: AccountNumber, method: MethodNumber, rawData: bytes}`. Example (`methods.cpp`, "the bytes of an action"): sender 1, service 2, method 3, rawData `010203` is `1C000000` `0100000000000000` `0200000000000000` `0300000000000000` `1C000000` `010203`. A service checks the action it is handed with `psio::validate_pssz_compatible` and refuses unknown members; the node checks the argument of `call` with `psio::validate_strict` |
-| Action arguments (`Action::rawData`) | C++ `psibase/Actor.hpp` (`packMethodArgs`, used by `Actor`, `transactor`, `ActionViewBuilder`, the tester); Rust service wrappers; JS through `/pack_action` | `psibase/dispatch.hpp` (C++ services), Rust dispatch | PSSZ of `psio::reflect<Service>::method_arg_tuple<I>`: the tuple of the parameters' **wire types**, in declaration order. A parameter declared `psio::pssz_view<X>` / `psio::pssz_view<const X>` is an `X`; `std::string_view` is a `std::string`; `std::span<const char>` is a `std::vector<char>`; `const X&` / `X&&` / `X` is an `X`. No method declares a cap or a parameter annotation, so the bytes are those of the plain `std::tuple` of those types (`psio::to_pssz(std::tuple{...})`); a method with no parameters has the bytes of the empty tuple. A caller may pass a view, a `std::string_view`, a span or a value convertible to the parameter: the bytes are the same. The dispatcher validates the bytes (`psio::validate_method_args`; unknown trailing optional members of a record are accepted, as PSSZ's compatible rule says) and aborts with `invalid argument encoding for <method>: <reason>` |
+| Action (`psibase::Action`, `block.hpp`) | every caller; the node hands the current action to a service packed (`getCurrentAction`) | services, the node (`call`) | PSSZ of `Action {sender: AccountNumber, service: AccountNumber, method: MethodNumber, rawData: bytes}`. Example (`methods.cpp`, "the bytes of an action"): sender 1, service 2, method 3, rawData `010203` is `1C000000` `0100000000000000` `0200000000000000` `0300000000000000` `1C000000` `010203`. A service checks the action it is handed with `psio::validate_strict` (canonical, no unknown members); the node checks the argument of `call` with `psio::validate_strict` |
+| Action arguments (`Action::rawData`) | C++ `psibase/Actor.hpp` (`psio::method_args_to_pssz`, used by `Actor`, `transactor`, `ActionViewBuilder`, the tester); Rust service wrappers; JS through `/pack_action` | `psibase/dispatch.hpp` (C++ services), Rust dispatch | PSSZ of `psio::reflect<Service>::method_arg_tuple<I>`: the tuple of the parameters' **wire types**, in declaration order. A parameter declared `psio::pssz_view<X>` / `psio::pssz_view<const X>` is an `X`; `std::string_view` is a `std::string`; `std::span<const char>` is a `std::vector<char>`; `const X&` / `X&&` / `X` is an `X`. No method declares a cap or a parameter annotation, so the bytes are those of the plain `std::tuple` of those types (`psio::to_pssz(std::tuple{...})`); a method with no parameters has the bytes of the empty tuple. A caller may pass a view, a `std::string_view`, a span or a value convertible to the parameter: the bytes are the same. The dispatcher validates the bytes (`psio::validate_method_args`; unknown trailing optional members of a record are accepted, as PSSZ's compatible rule says) and aborts with `invalid argument encoding for <method>: <reason>` |
 | Return values | C++ `dispatch.hpp` (`psio::call_method_pssz` → `setRetval`); Rust | C++ `Actor.hpp` (`fraccall`), Rust | PSSZ of the result's wire type (a method that returns a view of `X` returns an `X`); nothing is set for `void`. The caller validates what it receives (`value returned from <method> was not serialized as expected`). A result with a `psibaseExport` (table handles) is the PSSZ of the exported value, with the handle list passed beside it as the PSSZ of `std::vector<KvHandle>` |
 | Method numbers | `MethodNumber{"name"}` | dispatch | `psio::compress_name` method coder (section 0) |
 | Events | C++ `Actor.hpp` `EventEmitter`; Rust event macro | `Events` service (index and SQL), history queries | An action to `events::event` whose `rawData` is the PSSZ of `std::tuple{EventDb db, MethodNumber type, bytes payload}`, where `payload` is the PSSZ of `method_arg_tuple<I>` of the events struct (a byte list: the same bytes as a nested value). The `Events` service validates and reads the payload with the service's schema (`psio::pssz_ir::decode_auto` over `history[name].type` / `merkle[name].type`); a payload that is not a value of that type is not indexed and its SQL columns are errors |
 | Table rows | C++ `psibase/Table.hpp` `put`; Rust table macro | same service; foreign readers; `Events`, `Packages`, tester | PSSZ of the row record. A secondary-index entry's value is the primary key as the table's handle sees it (`00` + key). `Table.hpp` reads its rows without validating (a service's own rows) |
 | Table keys | C++ `psibase/Table.hpp`; native tables `nativeTables.hpp`; Rust `ToKey` | native KV store; every reader of a table | Every key is `psio::key` (`external/psio/cpp/docs/key-spec.md`, `psio/key.hpp`): `psio::to_key`. Layout of a `DbTables` row key, as bytes: `service` (u64, big-endian) · `table` (u16, big-endian) · `index` (one byte: 0 = primary, 1…255 = secondary, in declaration order) · `psio::key` of the index's key. The first two are `psibase::tablePrefix(service, table)` = `psio::to_key(std::tuple{service, table})`; a record or tuple key is its members concatenated, so a query by the first *n* components is a byte prefix (`psio::key_prefix<Key>(e0, …)`), and the end of a prefix range is `psio::key_prefix_upper_bound`. `ExternTables` (a handle already opened on a service prefix) uses `table` · `index` · key. Native tables: `psio::to_key` of `std::tuple{u16 table, u8 index, …}` (`nativeTables.hpp`). Bytes are the same as before the flip for integers, bool, enums, floats, strings, `vector<u8>` / `vector<i8>`, optionals of multi-byte types, lists of those, tuples, records, `AccountNumber`, `MethodNumber`, time, digests. **They differ** for: a bare `char` and `std::array<char, N>` where `char` is signed; `optional` of any one-byte type; `vector<bool>`; `vector` of a one-byte enum; `vector<optional<one-byte>>`; `vector<char>` with signed `char`. None of these shapes occurs in a key in the C++ tree. The per-column part of an `Events` secondary-index key (internal to that service) is `psio::key` too since S2: `psio::pssz_ir::to_key` of the column's value by its schema type |
-| Transaction (`psibase::Transaction`) and its id | clients, C++ tester, Rust | Transact, the node | PSSZ of `Transaction {tapos, actions, claims}`. **The id is SHA-256 of exactly those bytes**: the content of `SignedTransaction::transaction`, without the length that frames it inside the signed transaction (`sha256(signedTrx.transaction.data(), signedTrx.transaction.size())` = `sha256(transaction)`). Signatures (proofs) sign that id. Transact refuses a transaction that is not valid PSSZ or that has members it does not know |
+| Transaction (`psibase::Transaction`) and its id | clients, C++ tester, Rust | Transact, the node | PSSZ of `Transaction {tapos, actions, claims}`. **The id is SHA-256 of exactly those bytes**: the content of `SignedTransaction::transaction`, without the length that frames it inside the signed transaction (`sha256(signedTrx.transaction.data(), signedTrx.transaction.size())` = `sha256(transaction)`). Signatures (proofs) sign that id. Transact refuses a transaction that is not valid, canonical PSSZ or that has members it does not know |
 | `SignedTransaction` | clients, C++ tester, Rust | the node (`pushTransaction`), Transact, RTransact (`/push_transaction`, `/login`) | PSSZ of `SignedTransaction {transaction, proofs: list<bytes>, subjectiveData: optional<list<bytes>>}`. `transaction` is declared `psio::shared_pssz<Transaction>`: on the wire **a byte list holding the PSSZ of the transaction** — the same bytes as a `std::vector<char>` member holding `to_pssz(transaction)`, or a `psio::nested<Transaction>` (pinned in `methods.cpp`, "a signed transaction holds its transaction packed"). Every checking reader of a signed transaction validates those bytes as a `Transaction`. `ProcessTransactionArgs::transaction` is the same |
 | Genesis transaction (first boot transaction) | C++ `DefaultTestChain.cpp` `pushGenesisTransaction`, `libraries/net/test/test_util.cpp` `makeBoot`; Rust `boot.rs` `genesis_transaction` | native transaction context (psinode, psitest) | PSSZ `SignedTransaction` whose transaction has exactly one action; its `rawData` is the PSSZ of `GenesisActionData` (`nativeTables.hpp`), checked with `psio::validate_strict` (no unknown members, canonical) |
 | Boot transactions | C++ `DefaultTestChain.cpp` (`getInitialActions`, `makeTransactions`, `TestChain::boot`), `test_util.cpp` `makeBoot`; Rust `boot.rs` | `Transact::startBoot(list<Checksum256>)`, then each service | PSSZ. `startBoot` is given the ids of the boot transactions: each is SHA-256 of the PSSZ `Transaction`. C++ and Rust must produce identical bytes for identical input. The C++ builders put actions built by `transactor<Service>` (argument rule above) into transactions of about 1 MiB of action data |
