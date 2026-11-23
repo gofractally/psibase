@@ -9,9 +9,9 @@ import datetime
 import calendar
 from hashlib import sha256
 from collections import namedtuple
-import psibase
-from psibase import MethodNumber, Action, Transaction, SignedTransaction, ServiceSchema
-import fracpack
+import json
+import psio
+from psibase import Action, Claim, Transaction, SignedTransaction, ServiceSchema
 
 class _LocalConnection(urllib3.connection.HTTPConnection):
     def __init__(self, *args, **kwargs):
@@ -128,23 +128,27 @@ def _get_producer_claim(producer):
         return producer
 
 class ChainPackContext:
+    '''Packs transactions, with the schemas of the services of a chain for the arguments of actions'''
     def __init__(self, api):
         self._api = api
         self._schemas = {}
-        self._custom = dict(**psibase.default_custom, **{"Action": Action.with_context(self)})
-    def pack(self, value, ty=None):
-        return fracpack.pack(value, ty, custom=self._custom)
+    def pack_transaction(self, trx):
+        '''The PSSZ of a Transaction. The arguments of its actions that are not packed yet are packed in place.'''
+        for action in trx.actions:
+            if action.rawData is None:
+                action.rawData = self.pack_action_data(action.service, action.method, action.data)
+        return psio.to_pssz(trx)
     def pack_action_data(self, service, method, data):
-        if isinstance(type(data), fracpack.TypeBase):
-            return fracpack.pack(data, custom=self._custom)
-        if isinstance(method, str):
-            method = MethodNumber(method)
-        return fracpack.pack(data, self.get_schema(service).actions[method].params)
+        '''The PSSZ of the arguments of an action: data is the object keyed by parameter name or the positional list'''
+        function = self.get_schema(str(service)).actions.get(method.value)
+        if function is None:
+            raise Exception('Action not found: %s::%s' % (service, method))
+        return function.params.json_to_pssz(json.dumps(data if data is not None else {}))
     def get_schema(self, service):
         if service not in self._schemas:
             with self._api.get('/schema?service=%s' % service, service='packages') as reply:
                 reply.raise_for_status()
-                self._schemas[service] = ServiceSchema(reply.json(), custom=self._custom)
+                self._schemas[service] = ServiceSchema(reply.json())
         return self._schemas[service]
 
 class TransactionError(Exception):
@@ -234,17 +238,14 @@ class API:
         return self.request('DELETE', path, service, **kw)
 
     # Transaction processing
-    def pack_action(self, act):
-        '''Pack an action and return a json object suitable for use in pack_transaction'''
-        return ChainPackContext(self).pack(trx, Action)
     def pack_transaction(self, trx):
         '''Pack a transaction and return the result as bytes'''
-        return ChainPackContext(self).pack(trx, Transaction)
+        return ChainPackContext(self).pack_transaction(trx)
     def pack_signed_transaction(self, trx, keys=[]):
         '''Pack a signed transactions and return the result as bytes'''
         trx = self.sign_transaction(trx, keys)
         if isinstance(trx, SignedTransaction):
-            return SignedTransaction.packed(trx)
+            return psio.to_pssz(trx)
         elif isinstance(trx, str):
             return bytes.fromhex(trx)
         else:
@@ -252,7 +253,7 @@ class API:
     def sign_transaction(self, trx, keys=[]):
         if isinstance(trx, Transaction):
             if keys is not None:
-                trx.claims += [key.claim() for key in keys]
+                trx.claims += [Claim(**key.claim()) for key in keys]
             trx = self.pack_transaction(trx)
             digest = sha256(trx).digest()
             signatures = [key.sign_prehashed(digest) for key in keys]

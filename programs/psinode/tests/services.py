@@ -1,6 +1,7 @@
 from psinode import Action, PrivateKey, Transaction, TransactionError, Service
 import time
 import json
+import psio
 
 class Tokens(Service):
     service = 'tokens'
@@ -28,13 +29,10 @@ class Transact(Service):
         tapos = self.api.get_tapos(timeout=timeout, flags=flags)
         return self.push_transaction(Transaction(tapos, actions=[Action(sender, service, method, data)], claims=[]), keys)
     def login(self, account, timeout=10, keys=[]):
-        from fracpack import Object, String
         import urllib3
-        class LoginData(Object):
-            rootHost: String
         tapos = self.api.get_tapos(timeout=timeout, flags=1)
         rootHost = urllib3.util.parse_url(self.api.url).host
-        packed = self.api.pack_signed_transaction(Transaction(tapos, actions=[Action(account, self.service, 'loginSys', LoginData(rootHost))], claims=[]), keys)
+        packed = self.api.pack_signed_transaction(Transaction(tapos, actions=[Action(account, self.service, 'loginSys', rawData=psio.to_pssz((rootHost,), tuple[str]))], claims=[]), keys)
         with self.post('/login', headers={'Content-Type': 'application/octet-stream', 'Accept': 'application/json'}, data=packed) as reply:
             reply.raise_for_status()
             return reply.json()['access_token']

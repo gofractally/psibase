@@ -63,16 +63,16 @@ if(Python_Interpreter_FOUND)
     else()
         set(LIBSOFTHSM2_ARG)
     endif()
+    # The tests pack and read with PSIO's Python package, from the pinned checkout.
+    set(PSINODE_TEST_PYTHONPATH ${PSIBASE_PSIO_SOURCE_DIR}/python/src)
     function(add_psinode_test name)
         add_test(
             NAME psinode_${name}
             COMMAND ${Python_EXECUTABLE} ${name}.py --psinode=$<TARGET_FILE:psinode> ${ARGN}
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+        set_tests_properties(psinode_${name} PROPERTIES
+            ENVIRONMENT PYTHONPATH=${PSINODE_TEST_PYTHONPATH})
     endfunction()
-    add_test(
-        NAME py_test_fracpack
-        COMMAND ${Python_EXECUTABLE} test_fracpack.py
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     add_test(
         NAME py_test_name
         COMMAND ${Python_EXECUTABLE} test_name.py
@@ -81,6 +81,8 @@ if(Python_Interpreter_FOUND)
         NAME py_test_psibase_types
         COMMAND ${Python_EXECUTABLE} test_psibase_types.py
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    set_tests_properties(py_test_psibase_types PROPERTIES
+        ENVIRONMENT PYTHONPATH=${PSINODE_TEST_PYTHONPATH})
     add_psinode_test(test_connect)
     add_psinode_test(test_routing)
     set_tests_properties(psinode_test_routing PROPERTIES PROCESSORS 7)
