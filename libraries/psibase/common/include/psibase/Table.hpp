@@ -60,11 +60,6 @@ namespace psibase
          return UniqueKvHandle{handles.at(value)};
       }
 
-      friend auto to_schema(auto& builder, const UniqueKvHandle*)
-      {
-         return builder.template insert<std::uint32_t>();
-      }
-
      private:
       KvHandle value;
    };

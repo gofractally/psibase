@@ -14,7 +14,6 @@
 using namespace psibase;
 using namespace SystemService;
 using namespace UserService;
-using namespace psio1::schema_types;
 
 HttpRequest makeQuery(std::string_view s)
 {
@@ -113,7 +112,7 @@ TEST_CASE("events")
    auto mallory     = chain.from(chain.addAccount("mallory"));
 
    auto schema = ServiceSchema::make<TestService>();
-   std::cout << psio1::format_json(schema) << std::endl;
+   std::cout << psio::format_json(psio::to_ijson(schema)) << std::endl;
    expect(testService.to<Packages>().setSchema(schema).trace());
    expect(testService.to<TestService>().send(42, 1.414, std::vector{1}, "a").trace());
    expect(testService.to<TestService>().send(72, 3.14159, std::vector{2}, "b").trace());

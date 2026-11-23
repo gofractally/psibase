@@ -1,13 +1,1 @@
-{
-   "service": "nop",
-   "types": {},
-   "actions": {
-      "nop": {
-         "params": {
-            "Object": {}
-         }
-      }
-   },
-   "history": {},
-   "merkle": {}
-}
+{"service":"nop","types":{"package":{"name":"","version":"","attributes":[]},"interfaces":[],"worlds":[],"uses":[],"types":[{"name":"@0","type":{"value":{"Object":{"members":[],"attributes":[{"name":"tuple","value":"named"}]}}},"attributes":[]}],"ir_version":1},"actions":{"nop":{"params":{"value":{"Type":{"type":"@0"}}},"result":null}},"history":{},"merkle":{},"database":null}

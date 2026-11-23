@@ -307,10 +307,13 @@ namespace psibase
          ServiceInfo info = {};
          if (auto pos = info_files.find(account); pos != info_files.end())
          {
+            // {flags, server?, schema?}: the schema is I-JSON
             auto contents = archive.getEntry(pos->second).read();
-            contents.push_back('\0');
-            psio1::json_token_stream stream(contents.data());
-            psio1::from_json(info, stream);
+            if (auto status =
+                    psio::decode_json_checked(psio::ijson{}, std::span<const char>{contents}, info);
+                !status.ok())
+               abortMessage("service/" + account.str() + ".json: " +
+                            std::string(status.error().what));
          }
          services.push_back({account, file, info});
       }

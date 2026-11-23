@@ -169,8 +169,8 @@ namespace UserService
                 .contentType = "application/json",
                 .headers     = psibase::allowCors(),
             };
-            psio1::vector_stream stream{reply.body};
-            psio1::to_json(row->schema, stream);
+            auto text = psio::to_ijson(row->schema);
+            reply.body.assign(text.begin(), text.end());
             return std::move(reply);
          }
          else

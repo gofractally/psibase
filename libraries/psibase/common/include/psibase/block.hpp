@@ -9,6 +9,7 @@
 #include <psio1/from_json.hpp>
 #include <psio/buffer.hpp>
 #include <psio/invariant.hpp>
+#include <psio/mutable_view.hpp>
 #include <psio/pssz.hpp>
 #include <psio/pssz_view.hpp>
 #include <psio1/to_json.hpp>
@@ -46,6 +47,12 @@ namespace psibase
    }
 }  // namespace psibase
 PSIO_INVARIANT(psibase::Action, psibase::actionSchemaIdentity, "Action")
+// PSIO refuses a mutable view of a type with an invariant (a write beneath
+// it would not run the check). This one accepts every value, and services
+// overwrite sender / service / method of a packed action in place
+// (psio::as_mutable_view): its extension point says so.
+template <>
+inline constexpr bool psio::detail::mutation_blocked_v<psibase::Action> = false;
 namespace psibase
 {
 

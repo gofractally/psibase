@@ -7,16 +7,15 @@ the C++ file that defines it). The Rust side (`cargo-psibase`, the `psibase`
 CLI, Rust services and plugins) must produce and accept exactly the "after"
 column.
 
-Status of this file: sections 0, 0.1, 1, 2 and 2.1 are **definitive**:
-keys flipped in section 1.18 and the binary wire in section 1.19 of
-`doc/pssz-conversion.md`; string kinds were applied in its section 1.20;
-the `ServiceSchema` record of section 2 and `DbId` in 2.1 are settled.
-Two rows of section 1 (events, `setSchema`) and the "Status in C++" note
-of section 2 say what still runs on the legacy schema code until stage S2
-lands. Sections 3–6 state the intended formats and are still to be
-confirmed by the C++ stages: section 3 (package files) and section 4
-(endpoints that pack) by S2 (schemas) and S4 (JSON), section 5 (JSON
-conventions) by S4, section 6 (GraphQL) by S5. Line numbers in those
+Status of this file: sections 0, 0.1, 1, 2, 2.1 and 2.2 are
+**definitive**: keys flipped in section 1.18 and the binary wire in
+section 1.19 of `doc/pssz-conversion.md`; string kinds were applied in its
+section 1.20; schemas flipped in its section 1.21 (stage S2), which
+implements the `ServiceSchema` record of section 2. Everything
+schema-related in sections 3 and 4 is definitive too (each row says so);
+the rest of sections 3–6 states the intended formats and is still to be
+confirmed by the C++ stages: S4 (JSON) for sections 3, 4 and 5, S5 for
+section 6 (GraphQL). Line numbers in those
 sections are from the survey at `bc71f6bb0` and were read, not re-checked
 one by one.
 
@@ -131,9 +130,9 @@ widths are inferred from the declared types; psibase declares no
 | Action arguments (`Action::rawData`) | C++ `psibase/Actor.hpp` (`packMethodArgs`, used by `Actor`, `transactor`, `ActionViewBuilder`, the tester); Rust service wrappers; JS through `/pack_action` | `psibase/dispatch.hpp` (C++ services), Rust dispatch | PSSZ of `psio::reflect<Service>::method_arg_tuple<I>`: the tuple of the parameters' **wire types**, in declaration order. A parameter declared `psio::pssz_view<X>` / `psio::pssz_view<const X>` is an `X`; `std::string_view` is a `std::string`; `std::span<const char>` is a `std::vector<char>`; `const X&` / `X&&` / `X` is an `X`. No method declares a cap or a parameter annotation, so the bytes are those of the plain `std::tuple` of those types (`psio::to_pssz(std::tuple{...})`); a method with no parameters has the bytes of the empty tuple. A caller may pass a view, a `std::string_view`, a span or a value convertible to the parameter: the bytes are the same. The dispatcher validates the bytes (`psio::validate_method_args`; unknown trailing optional members of a record are accepted, as PSSZ's compatible rule says) and aborts with `invalid argument encoding for <method>: <reason>` |
 | Return values | C++ `dispatch.hpp` (`psio::call_method_pssz` → `setRetval`); Rust | C++ `Actor.hpp` (`fraccall`), Rust | PSSZ of the result's wire type (a method that returns a view of `X` returns an `X`); nothing is set for `void`. The caller validates what it receives (`value returned from <method> was not serialized as expected`). A result with a `psibaseExport` (table handles) is the PSSZ of the exported value, with the handle list passed beside it as the PSSZ of `std::vector<KvHandle>` |
 | Method numbers | `MethodNumber{"name"}` | dispatch | `psio::compress_name` method coder (section 0) |
-| Events | C++ `Actor.hpp` `EventEmitter`; Rust event macro | `Events` service (index and SQL), history queries | An action to `events::event` whose `rawData` is the PSSZ of `std::tuple{EventDb db, MethodNumber type, bytes payload}`, where `payload` is the PSSZ of `method_arg_tuple<I>` of the events struct (a byte list: the same bytes as a nested value). **Schema stage:** the `Events` service still walks the payload with the legacy schema decoder until schemas flip |
+| Events | C++ `Actor.hpp` `EventEmitter`; Rust event macro | `Events` service (index and SQL), history queries | An action to `events::event` whose `rawData` is the PSSZ of `std::tuple{EventDb db, MethodNumber type, bytes payload}`, where `payload` is the PSSZ of `method_arg_tuple<I>` of the events struct (a byte list: the same bytes as a nested value). The `Events` service validates and reads the payload with the service's schema (`psio::pssz_ir::decode_auto` over `history[name].type` / `merkle[name].type`); a payload that is not a value of that type is not indexed and its SQL columns are errors |
 | Table rows | C++ `psibase/Table.hpp` `put`; Rust table macro | same service; foreign readers; `Events`, `Packages`, tester | PSSZ of the row record. A secondary-index entry's value is the primary key as the table's handle sees it (`00` + key). `Table.hpp` reads its rows without validating (a service's own rows) |
-| Table keys | C++ `psibase/Table.hpp`; native tables `nativeTables.hpp`; Rust `ToKey` | native KV store; every reader of a table | Every key is `psio::key` (`external/psio/cpp/docs/key-spec.md`, `psio/key.hpp`): `psio::to_key`. Layout of a `DbTables` row key, as bytes: `service` (u64, big-endian) · `table` (u16, big-endian) · `index` (one byte: 0 = primary, 1…255 = secondary, in declaration order) · `psio::key` of the index's key. The first two are `psibase::tablePrefix(service, table)` = `psio::to_key(std::tuple{service, table})`; a record or tuple key is its members concatenated, so a query by the first *n* components is a byte prefix (`psio::key_prefix<Key>(e0, …)`), and the end of a prefix range is `psio::key_prefix_upper_bound`. `ExternTables` (a handle already opened on a service prefix) uses `table` · `index` · key. Native tables: `psio::to_key` of `std::tuple{u16 table, u8 index, …}` (`nativeTables.hpp`). Bytes are the same as before the flip for integers, bool, enums, floats, strings, `vector<u8>` / `vector<i8>`, optionals of multi-byte types, lists of those, tuples, records, `AccountNumber`, `MethodNumber`, time, digests. **They differ** for: a bare `char` and `std::array<char, N>` where `char` is signed; `optional` of any one-byte type; `vector<bool>`; `vector` of a one-byte enum; `vector<optional<one-byte>>`; `vector<char>` with signed `char`. None of these shapes occurs in a key in the C++ tree. One exception to "every key": the per-column part of an `Events` secondary-index key is still written by the legacy schema walker (flips with schemas) |
+| Table keys | C++ `psibase/Table.hpp`; native tables `nativeTables.hpp`; Rust `ToKey` | native KV store; every reader of a table | Every key is `psio::key` (`external/psio/cpp/docs/key-spec.md`, `psio/key.hpp`): `psio::to_key`. Layout of a `DbTables` row key, as bytes: `service` (u64, big-endian) · `table` (u16, big-endian) · `index` (one byte: 0 = primary, 1…255 = secondary, in declaration order) · `psio::key` of the index's key. The first two are `psibase::tablePrefix(service, table)` = `psio::to_key(std::tuple{service, table})`; a record or tuple key is its members concatenated, so a query by the first *n* components is a byte prefix (`psio::key_prefix<Key>(e0, …)`), and the end of a prefix range is `psio::key_prefix_upper_bound`. `ExternTables` (a handle already opened on a service prefix) uses `table` · `index` · key. Native tables: `psio::to_key` of `std::tuple{u16 table, u8 index, …}` (`nativeTables.hpp`). Bytes are the same as before the flip for integers, bool, enums, floats, strings, `vector<u8>` / `vector<i8>`, optionals of multi-byte types, lists of those, tuples, records, `AccountNumber`, `MethodNumber`, time, digests. **They differ** for: a bare `char` and `std::array<char, N>` where `char` is signed; `optional` of any one-byte type; `vector<bool>`; `vector` of a one-byte enum; `vector<optional<one-byte>>`; `vector<char>` with signed `char`. None of these shapes occurs in a key in the C++ tree. The per-column part of an `Events` secondary-index key (internal to that service) is `psio::key` too since S2: `psio::pssz_ir::to_key` of the column's value by its schema type |
 | Transaction (`psibase::Transaction`) and its id | clients, C++ tester, Rust | Transact, the node | PSSZ of `Transaction {tapos, actions, claims}`. **The id is SHA-256 of exactly those bytes**: the content of `SignedTransaction::transaction`, without the length that frames it inside the signed transaction (`sha256(signedTrx.transaction.data(), signedTrx.transaction.size())` = `sha256(transaction)`). Signatures (proofs) sign that id. Transact refuses a transaction that is not valid PSSZ or that has members it does not know |
 | `SignedTransaction` | clients, C++ tester, Rust | the node (`pushTransaction`), Transact, RTransact (`/push_transaction`, `/login`) | PSSZ of `SignedTransaction {transaction, proofs: list<bytes>, subjectiveData: optional<list<bytes>>}`. `transaction` is declared `psio::shared_pssz<Transaction>`: on the wire **a byte list holding the PSSZ of the transaction** — the same bytes as a `std::vector<char>` member holding `to_pssz(transaction)`, or a `psio::nested<Transaction>` (pinned in `methods.cpp`, "a signed transaction holds its transaction packed"). Every checking reader of a signed transaction validates those bytes as a `Transaction`. `ProcessTransactionArgs::transaction` is the same |
 | Genesis transaction (first boot transaction) | C++ `DefaultTestChain.cpp` `pushGenesisTransaction`, `libraries/net/test/test_util.cpp` `makeBoot`; Rust `boot.rs` `genesis_transaction` | native transaction context (psinode, psitest) | PSSZ `SignedTransaction` whose transaction has exactly one action; its `rawData` is the PSSZ of `GenesisActionData` (`nativeTables.hpp`), checked with `psio::validate_strict` (no unknown members, canonical) |
@@ -142,7 +141,7 @@ widths are inferred from the declared types; psibase declares no
 | Merkle roots (transaction / event Merkle trees, `psibase::Merkle`, `crypto.hpp`) | the node | light validators, Rust tools | A leaf is SHA-256 of `00` followed by the PSSZ of the value; an inner node is SHA-256 of `01` · left · right (unchanged rule; leaves hash PSSZ now). `psibase::sha256(const T&)` is SHA-256 of `psio::to_pssz(value)` |
 | P2P messages, snapshots | C++ only (`libraries/net`, `programs/snapshot`) | C++ only | One byte for the message type, then the PSSZ of the message. `SignedMessage<M>::data`, `BlockMessage::block` and `BlockHeaderMessage::block` are `psio::shared_pssz` members (a byte list holding the PSSZ of the message / block); a signature signs the type byte followed by the PSSZ of the message. Snapshot rows are the PSSZ rows of the tables they copy |
 | Host calls with packed arguments (`socketOpen`, `exportHandles` / `importHandles`, `kvPut` of native rows, `call`) | services | the node | PSSZ of the documented argument (`std::tuple{HttpRequest, optional<TLSInfo>, optional<SocketEndpoint>}` for `socketOpen`, `std::vector<KvHandle>` for handles, the native row records of `nativeTables.hpp`). The node validates what a service writes to a native table (`psio::validate_strict` for status, code, config and socket rows) |
-| `Packages::setSchema` argument and `InstalledSchemaTable` row | C++ `package.cpp` `setSchema`; Rust `package.rs` `set_schema`, `main.rs` `deploy` | `Packages.cpp`; `Events/src/SchemaCache.cpp`; testers | **Schema stage.** Until schemas flip, `psibase::ServiceSchema` is a PSSZ record whose legacy members (`types`, each action's `FunctionType`, each event's type) are opaque payloads holding their fracpack form (temporary glue in `psio1/schema.hpp`); the schema-driven packers (`package.cpp`, `trace.cpp`, `/pack_action` through a schema) still emit fracpack. After: PSSZ of the new `psibase::ServiceSchema` record (section 2). The C++ declaration of `setSchema` now names its one parameter (`schema`); it listed two names before |
+| `Packages::setSchema` argument and `InstalledSchemaTable` row | C++ `package.cpp` `setSchema`; Rust `package.rs` `set_schema`, `main.rs` `deploy` | `Packages.cpp`; `Events/src/SchemaCache.cpp`; testers | PSSZ of the `psibase::ServiceSchema` record of section 2 (`psio::to_pssz`), as the one argument `schema` of `setSchema` and as the `schema` member of the row `InstalledSchema{account, schema}`. `setSchema` refuses a schema that is not well-formed (`checkValid`: `pssz_ir::validate_schema`, every node the record names is a type of `types`, event access is `public` / `private`, index paths resolve) and one that is not an upgrade of the installed one (section 2, "Compatibility") |
 | `Packages::postinstall(PackageMeta, manifest)` | C++ `package.cpp` `commitInstall`; Rust `package.rs` | `Packages` service | PSSZ of the argument tuple; `PackageMeta` is `packages/user/Packages/include/services/user/Packages.hpp`; the manifest is unchanged (gzip of JSON, section 3) |
 | Guest abort on a failed decode | PSIO, in a guest | the node (the action's error message) | Guests are compiled with `-DPSIO_CODEC_ABORT_HANDLER=psibase_psio_codec_abort` (set on the `psio` CMake target for wasm and in the SDK's `psibase-config.cmake`; defined once in `libpsibase`, `common/src/codecAbort.cpp`). A checked decode of invalid bytes (`psio::from_pssz<T>(bytes)`), a value with no encoding, or an overrun aborts the action with the message `<format>: <reason> (at byte <offset>)`, for example `pssz: offset out of range (at byte 12)`. A Rust guest reports its own decode errors |
 | Hand-written packed bytes in JS | `common-lib/src/key-conversions.ts` (`publicKeyPairToFracpack`, `signatureToFracpack`) | none in the tree | delete |
@@ -290,9 +289,20 @@ reading the JSON back and packing gives the same bytes. (Re-run with the UTF-8 a
 are the builder's and are not part of the contract: two schemas are
 compared with `pssz_ir::equivalent`, not by text.
 
-Status in C++: the header still holds the legacy (`psio1`) definition
-until the rest of stage S2 lands; the record above is what it becomes,
-member for member.
+Status in C++: implemented, member for member, by commit `597441828`
+("S2 part 1: ServiceSchema over the PSIO Schema IR") in
+`libraries/psibase/common/include/psibase/schema.hpp`; no deviation from
+the record above. The example below is pinned as a test
+(`libraries/psibase/common/tests/schema.cpp`, "the I-JSON of a service
+schema": the same text, natively and in a guest). Two additions that the
+record's text did not say, both observed while implementing:
+
+* A method whose result carries table handles (`psibaseExport`, e.g.
+  `x-db::open` returning `UniqueKvHandle`) has as `result` the node of what
+  it exports (`uint32`: the index into the handle list passed beside the
+  return value), as section 1 "Return values" says of the bytes.
+* The empty argument list packs to **one byte, `00`** (PSSZ of the empty
+  tuple), not to no bytes: `"data":{}` gives `rawData` = `00`.
 
 Differences from today's JSON that every reader will see (observed by
 encoding a `psio::schema_types::Schema` with `psio::encode(psio::ijson{}, …)`
@@ -309,15 +319,28 @@ at the pin):
 
 Two schemas of one service built by C++ and by Rust must be *equivalent*
 (`psio::pssz_ir::equivalent` with `compare::wire`, section 0.1; gap G33 is
-closed). C++ does not check this yet: its schemas are still the legacy
-ones until stage S2.
+closed). C++ compares schemas in three places, all with
+`compare::contract` (they compare a service with itself):
+`Packages::setSchema` (rows and event argument lists: `evolves_from`;
+index key types: `equivalent`), `CHECK_SCHEMA` in the tester (a C++
+service against the schema in its package; if that package was built by
+Rust the check would need `compare::wire` — the tester does not know the
+language of a package, so `CHECK_SCHEMA` of a C++ mirror of a Rust service
+reports variant label and custom id differences), and `test_schema.cpp`
+(`schema-schema.json`). A consequence of `evolves_from` every service
+author meets: **no offset width may move**. A row or event whose members
+are all fixed-size or bounded has a 1- or 2-byte offset width, and
+appending an unbounded member (`optional<string>`) to it would make it 4:
+refused (`width-changed`). Appending an optional fixed-size member is
+accepted; a row that already has an unbounded member (width 4) accepts
+any appended optional member.
 
 | Artifact | Path / endpoint | Producer | Consumers | Today | After |
 |---|---|---|---|---|---|
-| C++ service schema file | `<build>/<Target>-schema.json` | `libraries/psibase/sdk/pack_service.cmake` `psibase_schema`: runs `psitest <target>-schema-gen.wasm --schema`; emitter `psibase/dispatch.hpp` `serviceMain` | `psibase_package(… SCHEMA <file>)` → `generate_service_info.cmake` (text splice, no parsing); Rust `psibase deploy` (`rust/psibase/src/main.rs`) | JSON of legacy `ServiceSchema` | I-JSON (`psio::ijson`) of `ServiceSchema` above |
+| C++ service schema file | `<build>/<Target>-schema.json` | `libraries/psibase/sdk/pack_service.cmake` `psibase_schema`: runs `psitest <target>-schema-gen.wasm --schema`; emitter `psibase/dispatch.hpp` `serviceMain` | `psibase_package(… SCHEMA <file>)` → `generate_service_info.cmake` (text splice, no parsing); Rust `psibase deploy` (`rust/psibase/src/main.rs`) | JSON of legacy `ServiceSchema` | **Done (S2):** `psio::to_ijson(ServiceSchema::make<Service>(service))`, compact, no trailing newline. Generation fails (exit 1, message on stderr) when two types of the service have one unqualified name. The one hand-written file, `packages/user/Nop/src/Nop-schema.json`, was rewritten |
 | Rust service schema file | `<target-dir>/wasm32-wasip1/release/<crate>.schema.json` | `rust/cargo-psibase/src/main.rs` `build_service` (runs `psitest <wrapper>.wasm`, `rust/psibase/src/schema.rs` `print_schema_impl`) | `cargo-psibase/src/package.rs` | JSON of Rust `psibase::Schema` (same shape as C++) | the same I-JSON document as the C++ row |
-| Schema of the schema | `doc/src/specifications/data-formats/schema-schema.json` | hand-maintained | `packages/psibase_tests/test/test_schema.cpp` | legacy schema JSON | regenerated from the new record |
-| Schema endpoint | `GET <packages>/schema?service=<acct>` | `packages/user/Packages/src/RPackages.cpp` `serveSchema` | Rust CLI and `rpc.rs` `HttpSchemaFetcher`, Packages plugin, EthBridge relayer; Python `programs/psinode/tests/psinode.py` | JSON `ServiceSchema` | the new I-JSON |
+| Schema of the schema | `doc/src/specifications/data-formats/schema-schema.json` | hand-maintained | `packages/psibase_tests/test/test_schema.cpp` | legacy schema JSON | **Done (S2):** the Schema IR (`psio::schema_types::Schema`, I-JSON, pretty-printed) built by `psio::SchemaBuilder().insert<ServiceSchema>("ServiceSchema")`; the test compares it with `pssz_ir::equivalent` (contract) |
+| Schema endpoint | `GET <packages>/schema?service=<acct>` | `packages/user/Packages/src/RPackages.cpp` `serveSchema` | Rust CLI and `rpc.rs` `HttpSchemaFetcher`, Packages plugin, EthBridge relayer; Python `programs/psinode/tests/psinode.py` | JSON `ServiceSchema` | **Done (S2):** `psio::to_ijson` of the installed row's schema, `application/json`; 404 with a text body when the service has none |
 
 ## 2.1 `DbId`
 
@@ -350,6 +373,36 @@ databases, and `beginIndependent` (64), `endPersistent` (66),
 constant if it needs the count). No C++ database lacks a Rust name and no
 name differs in substance.
 
+## 2.2 Custom ids and schema-driven JSON (definitive, S2)
+
+Schema-driven conversion is `psio::pssz_ir` (`json_to_pssz`,
+`pssz_to_json`, `validate_pssz`, `decode_auto`, `to_key`) with a
+`psio::pssz_ir::CustomHandlers` registry. psibase has two
+(`psibase/schema.hpp`, implemented in `common/src/schema.cpp` and
+`common/src/trace.cpp`):
+
+* `psibase_types()`: `AccountNumber`, `MethodNumber` — text form and
+  invariant from the C++ type (`handlers.add<T>()`).
+* `action_types(schemas, onAction)`: the above plus the two ids that are
+  presented as JSON **objects**, in both directions:
+
+| Custom id | Wire type | JSON written | JSON read |
+|---|---|---|---|
+| `Action` | `Object{sender: AccountNumber, service: AccountNumber, method: MethodNumber, rawData: hex}` | `{"sender":"alice","service":"svc","method":"credit","data":{"to":"bob","amount":5,"memo":null}}`: `method` is the action's name as the schema of `service` declares it and `data` its arguments decoded with that schema (through the same registry, so actions nest). When there is no schema for `service`, the action is not in it or the bytes are not its arguments: `"method"` is the text of the number and `"rawData":"<HEX>"` replaces `data` | an object with `sender` (`""` is the null account), `service`, `method` (exactly as declared), and `data` (object keyed by parameter name, or the positional array; packed with the schema of `service`) or `rawData` (hex); `data` wins when both are given. Errors: `invalid account: …`, `Invalid service account …`, `Missing field rawData`, `Cannot find schema for <service>`, `Action not found: <service>::<method>`, `<service>::<method>: <codec error>` |
+| `ServiceMethod` | `Object{service: AccountNumber, method: MethodNumber}` | `{"service":"svc","method":"credit"}` (the declared name when the schema of `service` has the method) | the same object |
+
+Both ids are declared in C++ with `PSIO_INVARIANT(Type, fn, "Id")` over a
+check that accepts every value (PSIO has no other way to name a record's
+schema node); no byte of an `Action` changes. In a schema they are
+`Custom{Object{…}, "Action"}` / `Custom{…, "ServiceMethod"}`: **the Rust
+declarations must produce the same nodes** for a `contract` comparison
+(`wire` ignores custom ids), and `rust-twins.json` `schema_ir` changed
+accordingly (one line; no value's bytes). Every other custom id of a
+service's own types — `Decimal`, `Precision`, `Memo`, any type with a
+text adapter or an invariant — is visible in its schema under the type's
+name; a reader without a handler for it reads the wire type (for
+`Decimal`: the object of its members, not the decimal string).
+
 ## 3. Package files
 
 Container and layout do not change.
@@ -358,17 +411,17 @@ Container and layout do not change.
 |---|---|---|---|---|
 | Package archive | `<build>/share/psibase/packages/<Name>.psi` | `pack_service.cmake` `psibase_package`; Rust `cargo-psibase/src/package.rs`; `rust/reserved-names` | C++ `libraries/psibase/common/src/package.cpp` `PackagedService` (tester, `psinode` init / precompile); Rust `rust/psibase/src/package.rs` | zip: `meta.json`, `service/<acct>.wasm`, `service/<acct>.json`, `data/<acct>/<path>`, `script/postinstall.json`; sub-account `a+1` is `service/a/1.*` |
 | `meta.json` | in zip | `pack_service.cmake` `write_meta`; cargo-psibase; reserved-names | C++ `package.cpp` → `PackageMeta` (`Packages.hpp`); Rust `Meta`; `make_package_index.sh` (text) | JSON `{name, version, scope, description, depends:[{name,version}], accounts, services, exports:[{name,service}]}`. **Every member must be present** in both languages: C++ reads it with PSIO's JSON reader and Rust's `package::Meta` requires every member too |
-| Service info | `service/<acct>.json` | `generate_service_info.cmake`; cargo-psibase | C++ `package.cpp` → `ServiceInfo` (`psibase/package.hpp`); Rust `ServiceInfo` | JSON `{flags:[string], server?: account, schema?: ServiceSchema}`; flags `isPrivileged`, `isVerify`, `isReplacement`. After: `schema` is the new I-JSON |
-| Postinstall script | `script/postinstall.json` | `pack_service.cmake` (generated for `INIT` services, or a hand-written file); cargo-psibase | C++ `package.cpp` (`readPostinstall`, `to_action`); Rust `package.rs` | JSON array of `{sender, service, method, rawData?: hex, data?: JSON}`. After: `data` is packed to PSSZ with the target service's schema (action arguments as an object keyed by parameter name, or an array). The CMake-generated `"rawData":"0000"` (fracpack of no arguments) is replaced by `"data":{}`; any hand-written `rawData` hex must be re-encoded |
+| Service info | `service/<acct>.json` | `generate_service_info.cmake`; cargo-psibase | C++ `package.cpp` → `ServiceInfo` (`psibase/package.hpp`); Rust `ServiceInfo` | JSON `{flags:[string], server?: account, schema?: ServiceSchema}`; flags `isPrivileged`, `isVerify`, `isReplacement`. **Done (S2):** `schema` is the I-JSON of section 2; C++ reads the whole file with `psio::from_ijson`-rules (`flags` required; `server` and `schema` may be absent or `null`; unknown members skipped). A file holding a legacy schema is refused: the package does not load |
+| Postinstall script | `script/postinstall.json` | `pack_service.cmake` (generated for `INIT` services, or a hand-written file); cargo-psibase | C++ `package.cpp` (`readPostinstall`, `psibase::toAction`); Rust `package.rs` | **Done (S2), definitive.** I-JSON array of `{sender, service, method, rawData?: hex, data?: JSON}` — the `Action` presentation of section 2.2 (`sender`, `service`, `method` are strings and required; `method` exactly as declared). `data` is packed to PSSZ with the schema of `service`, looked up among the packages being installed: `pssz_ir::json_to_pssz(schema.types, actions[name].params, psio::ijson{}, data, …)` with `action_types`, so `data` is an object keyed by parameter name or the positional array (an action whose parameters are unnamed takes the array only), a missing optional argument is absent, a missing required one is an error, and an `Action` nested anywhere in the arguments is again `{sender, service, method, data \| rawData}` packed with the schema of *its* service. A top-level entry with neither `data` nor `rawData` has the arguments `{}`; a nested action must have one of them. `rawData` (hex of PSSZ) is used as it is. The CMake-generated script of an `INIT` service is `[{"sender":"<svc>","service":"<svc>","method":"init","data":{}}]` (no `rawData`: format-neutral). The accounts a script needs are collected by packing it (`onAction`) |
 | Package index | `<dir>/index.json` | `make_package_index.sh`; Rust registries | C++ `package.cpp` `DirectoryRegistry` → `PackageInfo`; Rust registries | JSON array of `meta.json` objects plus `file`, `sha256` (every hash changes) |
-| Install manifest | argument of `Packages::postinstall`; `GET packages/manifest?package=&owner=` | C++ `package.cpp` `manifest`; Rust `package.rs` | `RPackages.cpp`; Rust CLI; Packages plugin; XAdmin UI | gzip of JSON `{"services":{<acct>:ServiceInfo},"data":[{account, filename}]}`; after: new-format schemas inside |
+| Install manifest | argument of `Packages::postinstall`; `GET packages/manifest?package=&owner=` | C++ `package.cpp` `manifest`; Rust `package.rs` | `RPackages.cpp`; Rust CLI; Packages plugin; XAdmin UI | gzip of JSON `{"services":{<acct>:ServiceInfo},"data":[{account, filename}]}`. **Done (S2):** each `ServiceInfo.schema` is the I-JSON of section 2 (the rest of the document is still written by the legacy JSON writer until S4; same text) |
 | Local package registration | `POST x-packages/postinstall` (`/preinstall`, `/prerm`, `/postrm`) | `programs/psinode/init.cpp`; C++ tester; `psibase install --local` | `packages/local/XPackages/src/XPackages.cpp` | JSON `LocalPackage`, every member present: the Rust CLI sends `exports` from the flip on (it does not today) |
 
 ## 4. HTTP endpoints that pack
 
 | Endpoint | Producer | Consumers | Today | After |
 |---|---|---|---|---|
-| `POST <service>/pack_action/<method>` | C++ `psibase/servePackAction.hpp`; Rust `rust/psibase/src/serve_http.rs` | `common-lib/src/rpc.ts` `packAction`, `SimpleUI.mjs` | JSON object in; fracpack of the argument tuple out | JSON in (object keyed by parameter name, or positional array; a missing required argument is an error, an unknown one is skipped); PSSZ of `method_arg_tuple` out |
+| `POST <service>/pack_action/<method>` | C++ `psibase/servePackAction.hpp`; Rust `rust/psibase/src/serve_http.rs` | `common-lib/src/rpc.ts` `packAction`, `SimpleUI.mjs` | JSON object in; fracpack of the argument tuple out | JSON in (object keyed by parameter name, or positional array; a missing required argument is an error, an unknown one is skipped); PSSZ of `method_arg_tuple` out. Not touched by S2 (typed, no schema involved; its JSON reader is still the legacy one until S4). One consequence of S2: `packages/pack_action/setSchema` cannot read its `schema` argument through the legacy reader and aborts with a message; it works after S4 |
 | `GET <service>/action_templates` | C++ `psibase/serveActionTemplates.hpp`; Rust `action_template.rs` | `SimpleUI.mjs` | JSON `{<method>: {<param>: <sample>}}` | same JSON |
 | `POST /common/pack/Transaction`, `/common/pack/SignedTransaction` | `packages/user/CommonApi/src/CommonApi.cpp` | `rpc.ts` (`packTransaction`, `packSignedTransaction`, `packAndDigestTransaction`, `signTransaction`) | JSON → fracpack | I-JSON → PSSZ; digests and signatures are over the PSSZ `Transaction`. `Tapos.flags` is omitted by today's clients (`SimpleUI.mjs`); under I-JSON the client must send it |
 

@@ -1300,6 +1300,230 @@ booted chain — in particular a service receiving an annotated parameter
 through real dispatch (covered only by `validate_method_args` in the
 unit test).
 
+### 1.21 Schemas flipped (S2)
+
+Two commits on the flip branch ("S2 part 1: ServiceSchema over the PSIO
+Schema IR", `597441828`, and "S2 part 2"). No psibase code outside
+`libraries/psio1` uses the legacy schema library any more: a service's
+schema is a PSIO Schema IR document, and everything that packs, prints,
+validates, indexes or compares through a schema runs on `psio::pssz_ir`.
+The record and every format that crosses to Rust are in
+`doc/flip-interop.md` sections 2, 2.2, 3 and 4, which are definitive for
+schemas now. The record was implemented **without deviation** from its
+section 2.
+
+**What changed, by area.**
+
+| Area | Before | Now |
+|---|---|---|
+| `psibase/schema.hpp`, `common/src/schema.cpp` | `ServiceSchema` over `psio1::Schema`, maps ordered by method number (`CompareMethodNumber`), `psio1::SchemaBuilder` plus a list of type references to rewrite | The record of flip-interop section 2. `make<Service>(service, collisions*)` interns everything with one `psio::SchemaBuilder`: `insert<method_arg_tuple<I>>()` for every action and event, `insert<Result>()` for a result (`insert<exportType<Result>>()` when the result carries table handles: the legacy `to_schema` hook of `UniqueKvHandle` is gone), `insert<Row>()` and the key transforms' result types for tables. `findAction(MethodNumber)` / `findEvent(db, MethodNumber)` compare `MethodNumber{key}` (the exact name first, then a scan); `getType`, `eventTypes`, `getFieldType(schema, type, path, msg)` (through named types and custom wrappers). `checkValid()`: `pssz_ir::validate_schema`, every node the record names is well-formed in `types` (`pssz_ir::auto_width`), access is `public` / `private`, index paths resolve |
+| Custom ids | `psio_custom_schema(Action*)` (`block.hpp`), `psio_custom_schema(ServiceMethod*)` (`nativeTables.hpp`) | `PSIO_INVARIANT(psibase::Action, psibase::actionSchemaIdentity, "Action")` and the same for `ServiceMethod`: a check that accepts every value, declared so that the schema names the type. No byte of an `Action` changes (pinned). Side effect met: PSIO refuses a mutable view of a type with an invariant, and services overwrite a packed action in place, so `block.hpp` specializes `psio::detail::mutation_blocked_v<psibase::Action> = false` (gap G52) |
+| `--schema` (`dispatch.hpp` `serviceMain`) | `psio1::convert_to_json` | `psio::to_ijson(schema)` after `checkValid()`; exit 1 with the colliding names on stderr when `builder.collisions()` is not empty. `pack_service.cmake`: the generated `init` postinstall says `"data":{}` (S1 had left `"rawData":""`, which is not the PSSZ of no arguments: that is the one byte `00`) |
+| `common/src/trace.cpp` | `ServiceMethodFormatter`, `ActionFormatter` over `CompiledSchema` / `FracParser`; `psio1::json::any` for pruning | `action_types(schemas, onAction)`: `CustomHandlers` with `to_json` / `from_json` for `Action` and `ServiceMethod` (shapes and errors in flip-interop 2.2), `psibase::PrettyAction`, `toAction`. `prettyTrace` decodes arguments and return values with `pssz_ir::pssz_to_json` and prunes a `psio::json_value` |
+| `common/src/package.cpp` | `ActionParser`, `ActionAccountCollector`, `to_action` over `CompiledSchema`; legacy reader for `postinstall.json` and `service/<acct>.json` | `postinstall.json` is read with PSIO (`std::vector<PrettyAction>`, I-JSON) and each entry packed by `toAction` with `action_types` over the schemas of the packages being installed; the accounts a script names are collected by the handler's `onAction` while packing. `service/<acct>.json` (`ServiceInfo`) is read with PSIO. `meta.json`, `index.json` and the manifest writer stay on the legacy JSON code (S4) |
+| `Packages` (`Packages.cpp`, `RPackages.cpp`) | `TypeMatcher` (`upgrade` / `equivalent`) | `pssz_ir::evolves_from` for table rows and event argument lists, `pssz_ir::equivalent` for index key types, both `compare::contract`; the abort message carries PSIO's path and reason. `GET /schema?service=` writes `psio::to_ijson` |
+| Tester (`checkSchema.cpp`, `tester.cpp`, `DefaultTestChain.cpp`) | `TypeMatcher` | `findDifference` / `CHECK_SCHEMA` with `pssz_ir::equivalent` (`contract`; messages carry path and reason). `TestChainSchemas` and `setSchema` needed no change (the row is the record) |
+| `Events` (`packages/user/Events/src`) | `CompiledSchema`, `FracParser` walking fracpack, hand-built `CompiledType` (`u64`, `EventWrapper`), `ExtraCustom` tables keyed on compiled custom ids, hand-written fracpack readers in `REvents.cpp` | `EventSchema{types, type, columns}` per event, built once and cached (`types.{hpp,cpp}`, `SchemaCache`); an event is decoded once with `pssz_ir::decode_auto` into a `pssz_ir::Value`; an index key column is `pssz_ir::to_key` of the member's value; SQL columns are produced from the value by the column's kind. `EventWrapper` was dead code and is gone |
+| `test_schema.cpp`, `schema-schema.json` | hand-maintained legacy schema of the legacy record | the Schema IR of `ServiceSchema` (I-JSON, pretty-printed, generated by `~/psibase-flip-cpp-scratch/schema/gen_schema_schema.cpp`), compared with `pssz_ir::equivalent`; the schema of a small service is also validated and printed through it |
+| `packages/user/Nop/src/Nop-schema.json` | hand-written legacy schema (the service is a `.wat` file) | hand-written I-JSON of the new record |
+
+Counts (outside `libraries/psio1`, `doc`, `rust`, `external`): 30 files
+changed in the two commits. `psio1::schema_types::*` 75 → 0,
+`psio1::SchemaBuilder` 16 → 0, `psio1::FracStream` 16 → 0, `psio1::Schema`
+4 → 0, `SchemaDifference` 2 → 0, `psio_custom_schema` 2 → 0, and no file includes
+`psio1/schema.hpp`; the two fracpack column readers and the two
+`unpack_numeric` in `REvents.cpp` are gone. The acceptance search
+
+```
+git grep -nE 'psio1::(Schema|SchemaBuilder|schema_types|FracStream|SchemaDifference)|psio_custom_schema|psio1/schema.hpp' \
+   -- ':!libraries/psio1' ':!doc' ':!rust' ':!external'
+```
+
+returns nothing.
+
+**Generated schema files.** 61 `<Target>-schema.json` in the build
+directory (60 generated, `Nop` hand-written; the 62nd file matching the
+pattern is the copy of `schema-schema.json`). Every one was read back with
+`psio::decode_json_checked(psio::ijson{}, …)` into a `ServiceSchema`,
+passed `checkValid()`, was packed, unpacked and printed to the identical
+text (`~/psibase-flip-cpp-scratch/schema/check_schemas.cpp`, a native
+one-off; output `check-schemas-s2.log`). **No service has a type-name
+collision.** Sizes, legacy JSON → I-JSON (PSSZ of the record):
+`Accounts` 1,697 → 6,673 (4,156); `Packages` 3,962 → 25,501 (15,356);
+`Transact` 4,839 → 19,646 (12,217); all 61 together 75,581 → 322,973
+(194,701). The growth is the Schema IR's explicit form (`{"value":{…}}`
+wrappers, `attributes` on every node) and, for `Packages`, the schema of
+its own `setSchema(ServiceSchema)` argument, which is the whole IR.
+
+**Behaviour changes.**
+
+* Every schema text and the packed `setSchema` argument / row (the format).
+  `actions`, `history`, `merkle` are ordered by name.
+* An action or event whose parameters the reflection does not name is
+  positional: its JSON arguments are an array (the legacy schema called
+  them `c0`, `c1` in an object). The `Events` SQL table of such an event
+  keeps the column names `c0`, `c1`, ….
+* Strings declared `attr(m, utf8)` say `utf8` in the schema (1.20), and the
+  custom ids of `Decimal`, `Precision`, `Memo` and of every other type with
+  a text adapter or an invariant are visible. psibase's handlers know
+  `AccountNumber`, `MethodNumber`, `Action`, `ServiceMethod`; a value of
+  another custom type is presented as its wire type (a `Decimal` argument
+  in a trace or an `Events` JSON column is the object of its members; in
+  `postinstall.json` it must be written that way).
+* `Packages::setSchema` follows PSSZ's evolution rules, which are stricter
+  than fracpack's in one respect: **no offset width may move**. A row or
+  event whose members are all fixed-size or bounded cannot gain an
+  unbounded optional member (`width-changed`); an optional fixed-size
+  member is fine. The seven table cases and three event cases of
+  `Packages-test.cpp` have the same verdicts under the new rules
+  (`~/psibase-flip-cpp-scratch/schema/s2_packages_cases.cpp`). A renamed
+  member or parameter is refused (`field-renamed`): the comparison is
+  `contract`. Error texts keep their first words (`Incompatible update for
+  table …`, `Cannot change indexes for table …`, `Incompatible update to
+  event history.…`) and gain `: <path>: <reason>`.
+* `postinstall.json`: an unknown method is `Action not found:
+  <service>::<method>` (was `Action not found`); a malformed script or
+  service file aborts with the file's name and PSIO's reason. A package
+  whose `service/<acct>.json` holds a legacy schema does not load
+  (`json: missing required member "package" of Schema`): **every package
+  built by Rust is refused until the Rust side writes the new record**.
+* Traces: arguments that are not valid for the schema are left out (the
+  legacy printer aborted or printed garbage); a nested action whose bytes
+  are not its arguments is printed with `rawData`.
+* `Events`:
+  * the per-column part of a secondary-index key is `psio::key`
+    (`pssz_ir::to_key`); the query side builds the same bytes. An optional
+    column is `00` / `01` + key for every type (the legacy special case for
+    optional one-byte values is gone). A `float` column's query key is now
+    4 bytes like the stored key (the old code wrote the `double`).
+    Existing index rows are not readable across the change (no live chain);
+  * which columns exist and their SQL types are unchanged: integers up to
+    64 bits INTEGER (REAL above 2^63 − 1), floats REAL, `bool` INTEGER,
+    strings TEXT (now also `utf8` strings and wrappers such as `Memo`),
+    bytes BLOB, `AccountNumber` TEXT with the collation `ACCOUNT`,
+    everything else its JSON text. JSON columns are I-JSON (64-bit
+    integers beyond 2^53 − 1 are strings; bytes upper-case hex); integers
+    wider than 64 bits are JSON instead of the error `Integer too large`;
+  * an event whose bytes are not a value of its type is skipped by the
+    indexer as before; reading one of its columns is the SQL error `The
+    event does not match its schema`.
+* `packages/pack_action/setSchema` (legacy JSON reader, S4) cannot read a
+  schema and aborts with a message: the legacy tokenizer hands numbers
+  over as strings. Nothing in the tree calls it.
+* `rust-twins.json`: `schema_ir` changed (one line: `Action` is a custom
+  node); no value's bytes changed.
+
+**Glue removed from `libraries/psio1`:** `legacy_frac_adapter` (the legacy
+`Schema`, `AnyType`, `FunctionType` as opaque payloads inside PSSZ) and the
+treatment of a PSIO packed value as a legacy `FracPack` node
+(`psio1/schema.hpp`). `canonical_glue_tests.cpp` lost the three pins that
+depended on them (the legacy schema of `SignedTransaction` and of
+`TypedAction`, and the fracpack / JSON / schema of the legacy
+`ServiceSchema` record). One assertion was relaxed
+(`psio1/reflect.hpp`: a non-transparent PSIO type with an invariant is
+bridged; psibase's two accept every value). `libraries/psio1`'s own schema
+code and tests remain until the library is deleted; nothing outside uses
+them.
+
+**What PSIO lacks** (reproduction in `~/psibase-flip-cpp-scratch/schema/`):
+
+| # | Missing | Reproduction → first error | What psibase does |
+|---|---|---|---|
+| G52 | A reflected record can be given a schema id of its own (`Custom{Object, "Action"}`) only through `PSIO_INVARIANT(Type, fn, "Id")`, and a type with an invariant has no mutable view, also when the check accepts every value. | `s2_gap_schema_id_blocks_mutation.cpp` → `mutable_view.hpp:293: static assertion failed … psio::mutable_view: in-place mutation is blocked for this type` | `block.hpp` specializes PSIO's own extension point `psio::detail::mutation_blocked_v<psibase::Action> = false` (three lines; not a wrapper). A schema-id keyword of `PSIO_REFLECT` without an invariant would remove both the vacuous check and the specialization |
+
+Not gaps, but learned: the PSSZ of the empty argument list is one byte;
+`pssz_to_json` without the registry prints an `AccountNumber` as its wire
+record, so every schema-driven call passes `psibase_types()`; the legacy
+`to_schema` ADL hook has no PSIO counterpart and was not needed (the
+exported type is inserted where the result is described). No PSIO
+spelling in the brief turned out wrong.
+
+**Left on `psio1`** (outside the library; `git grep -ohP 'psio1::\w+(::\w+)?'`):
+
+| Category | Names (count) |
+|---|---|
+| Byte-range parameter types and streams | `input_stream` 159, `vector_stream` 48, `string_stream` 1, `size_stream` 4, `fixed_buf_stream` 1, `check` 36 (`dwarf.cpp`) |
+| `bin` | `to_bin` 145, `from_bin` 59, `varuint32_to_bin` 33, `varuint32_from_bin` 25, `sleb64_to_bin` 9, `sleb64_from_bin` 3, `varuint64_from_bin` 2, `convert_to_bin` 2, `convert_from_bin` 1, `finally` 1 |
+| JSON | `convert_to_json` 53, `convert_from_json` 48, `to_json` 32, `from_json` 8, `json_token_stream` 15, `json::any` 14, `json::any_object` 12, `json::any_array` 4, `json_token_type::*` 4, `from_json_object` 2, `write_str` 3, `json::from_json`, `json::entry`, `from_json_skip_value`, `parse_system_time`; in the schema area: `meta.json` / `index.json` reading and the manifest writer in `package.cpp`, the SQL result writer in `REvents.cpp`, and the two ADL functions at the end of `psibase/schema.hpp` (marked TEMPORARY) through which the legacy writer prints a `ServiceSchema` as I-JSON |
+| Schemas | none |
+| GraphQL | `gql_stream`, `gql_query`, `gql_query_inline`, `get_gql_schema`, `generate_gql_*` 2, `fill_gql_schema_members`, `make_field_resolver`, `detail::write_field_name` |
+| Utilities, fixture | `unhex` 2, `convert_to_frac` 1 (`rust_twins.cpp`) |
+
+**Checked.**
+
+* **Build.** Everything C++ builds: natively and for WASM, all services,
+  tests and the 60 generated schemas (`build-p2e.log`, run with `-k 0`).
+  **The full build does not exit 0**: one step fails, and it is Rust —
+  `rust/release/reserved-names` (run to make `ReservedNames.psi` for
+  `share/psibase/packages/index.json`) reads every package through the
+  Rust `psibase` crate, whose schema type is still the legacy one:
+  `Failed to read package …/AccountsService.psi: data did not match any
+  variant of untagged enum AnyType`. `rust/` is not this side's to edit.
+  `index.json` is therefore the one of the previous build.
+* **Unit tests.** `psibase-psio-tests`: 51 test cases natively, 48 in
+  the guest (`ctest-s2-regress.log`). New file
+  `libraries/psibase/common/tests/schema.cpp` (6 cases, native and
+  guest): `Action` / `ServiceMethod` are custom nodes and their bytes are
+  those of the plain record; the I-JSON of a small service's schema is
+  pinned as text and equals the example of flip-interop section 2
+  (members, `tuple=named` / `positional`, index paths, a composite
+  secondary key, `getFieldType`, lookup by number); I-JSON → record → PSSZ
+  → validate → the same text, and a map key that is not UTF-8 is refused;
+  `json_to_pssz` of action arguments as an object in two orders, as the
+  positional array, with a missing optional, for a positional-only and an
+  empty list, each equal to `psio::method_args_to_pssz`, and the two
+  refusals; an argument list holding an `Action` printed through the
+  handler as `{sender, service, method, data:{…}}` and read back to the
+  same bytes, positional and `rawData` input, the `rawData` fallbacks,
+  the handler's error as the status, `toAction`, `ServiceMethod`;
+  `evolves_from` accepts an appended optional member, rejects a changed
+  member type (`.text`, `type-changed`), a rename under `contract`
+  (accepted under `wire`) and an unbounded member appended to a
+  fixed-size row (`width-changed`); `equivalent` of one service's schema
+  built twice and read back from PSSZ. `methods.cpp`'s schema case
+  follows the new record.
+* `Verify schema schema` (`psitest psibase-tests.wasm "Verify schema
+  schema"`, run by hand: 9 assertions pass).
+* **Regression set** (the 36 tests that passed after S1): **29 pass, 7
+  fail** (`ctest-s2-regress.log`), and all seven need the Rust side:
+  `t-StagedTx-test`, `t-VirtualServer-test`, `t-BrotliSvc-test`,
+  `t-Chainmail-test`, `t-Subgroups-test` load a package built by Rust
+  whose service file holds a legacy schema; `psinode_test_fetch` and
+  `psinode_test_websocket` run the Rust CLI (`psibase install --local`),
+  which cannot read the new schema of a C++ package. They passed before
+  because both sides spoke the legacy schema; keeping them green would
+  have taken a reader for the legacy format (a compatibility shim).
+* **Full `ctest`** (`ctest-s2-full.log`): 29 / 93.
+
+| Tests | First failure | Class |
+|---|---|---|
+| 22 `t-*` (every C++ tester test that loads packages: `XBasic`, `XKeys`, `XSites`, `AuthDelegate`, `AuthSig`, `Producers`, `Transact`, `Credentials`, `StagedTx`, `VirtualServer`, `Events`, `Explorer`, `Invite`, `Nft`, `Packages`, `Symbol`, `Tokens`, `TransferBench`, `BrotliSvc`, `Chainmail`, `Subgroups`, `psibase-tests`) | `tester wasm asserted: service/brotli-svc.json: json: missing required member "package" of Schema` (or `staged-tx`, `vserver`, `chainmail`, `subgroups`, `credential`): the first package built by Rust | needs the Rust side: Rust-built package schema in legacy JSON (`cargo-psibase`), then Rust services on PSSZ |
+| 13 `psinode_test_*` | `Error: data did not match any variant of untagged enum AnyType` from `psibase boot` / `psibase install` | needs the Rust side: the Rust CLI reads schemas of C++ packages as the legacy type (and packs fracpack) |
+| 27 `rs-test-*`, `rs-subjective-test`, `rs-test-psibase-macros` | panic in `rust/psibase/src/tester.rs:283` | needs the Rust side: the Rust tester |
+| `rs-tests` | `psibase/src/schema.rs:232` in every `services::*::verify_schema` (the C++ schema files no longer parse as the Rust schema type), `psio_twins.rs` | needs the Rust side: Rust schema type; twins fixture |
+
+  No failure is classified as a C++ bug or as waiting for the JSON /
+  GraphQL stage: none gets that far. **No `t-*` test that boots a chain
+  passes**, because no such chain uses only C++ services: the default
+  chain installs `BrotliSvc` (Rust) among its first packages. The two
+  `t-*` that pass are the guest unit-test binaries.
+
+**Not verified.**
+
+* Anything on a booted chain: `Packages::setSchema` as a service (its
+  comparison code ran only through the native probe of the
+  `Packages-test.cpp` cases, not through the action), the whole `Events`
+  service (index writer, SQL columns, query keys, `addIndex`: compiled,
+  never run), `GET /schema`, `CHECK_SCHEMA` against real packages,
+  `prettyTrace` in the tester, the packing of the real `postinstall.json`
+  files (`Transact`'s nested callbacks were only imitated in the unit
+  test), and the generated `"data":{}` reaching `init`.
+* Whether `CHECK_SCHEMA` of a C++ mirror header against a Rust-built
+  package passes under `contract` (variant labels differ by design; such
+  checks would need `wire`).
+* The hand-written `Nop-schema.json` against the `.wat` service on a chain.
+* The installed (SDK) form of `pack_service.cmake`.
+
 ## 2. Inventory of what remains
 
 Counts are occurrences / files in the tree outside `libraries/psio1`,
@@ -1433,7 +1657,7 @@ I-JSON differs from the legacy JSON visibly to clients:
 | `psio1::Schema`, `schema_types::` | 83 / 13 | `psio::schema_types` (`schema_ir.hpp`) |
 | `CompiledSchema` | 107 / 9 | `psio::pssz_ir` (`validate_pssz`, `auto_width`, `JsonNames` bound once per schema) |
 | `FracParser` | 14 / 4 | `pssz_ir::pssz_to_json` / `json_to_pssz` / `value_to_json` with `CustomHandlers` |
-| `psibase/schema.hpp` (`ServiceSchema`, per-service `*-schema.json`) | | Schema IR `Interface`s from `PSIO_INTERFACE`; JSON form: G1 |
+| `psibase/schema.hpp` (`ServiceSchema`, per-service `*-schema.json`) | | done in S2 (section 1.21): psibase's own record over Schema IR types; the rows above are 0 now |
 | `psio1/graphql.hpp`, `gql_query` | 12 / 6; `serveGraphQL`, `makeConnection`, `TableIndex` users 89 / 23 | the PSIO GraphQL engine being built separately (not in the pinned commit) |
 
 ### 2.6 C++: utilities

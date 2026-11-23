@@ -6,7 +6,6 @@
 #include "SchemaCache.hpp"
 
 using namespace psibase;
-using namespace psio1::schema_types;
 using namespace UserService;
 using namespace SystemService;
 
@@ -43,9 +42,9 @@ void Events::addIndex(psibase::EventDb       db,
                       std::uint8_t           column)
 {
    check(getSender() == service, "Wrong sender");
-   const CompiledType* type = SchemaCache::instance().getSchemaType({}, db, service, event);
+   const EventSchema* type = SchemaCache::instance().getSchemaType({}, db, service, event);
    check(!!type, "Unknown event");
-   check(column < type->children.size(), "Unknown column");
+   check(column < type->columns.size(), "Unknown column");
    auto secondary = EventConfig{}.open<SecondaryIndexTable>();
    auto row       = secondary.getIndex<0>().get(std::tuple(db, service, event));
    if (!row)

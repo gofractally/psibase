@@ -3,7 +3,6 @@
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psio1/schema.hpp>
 #include <regex>
 #include <services/user/Events.hpp>
 
@@ -12,7 +11,6 @@
 #include "types.hpp"
 
 using namespace psibase;
-using namespace psio1::schema_types;
 using namespace UserService;
 
 void EventIndex::update(EventDb db, psibase::AccountNumber service, psibase::MethodNumber event)
@@ -51,6 +49,21 @@ namespace
       return {db, service, event, {SecondaryIndexInfo{}}};
    }
 
+   // Appends the key (psio::key) of one column of a decoded event
+   void columnToKey(const EventSchema&          type,
+                    const psio::pssz_ir::Value& event,
+                    std::uint8_t                column,
+                    std::vector<char>&          key)
+   {
+      check(column < type.columns.size(), "Unknown column");
+      const auto& member = eventMember(event, column);
+      if (auto status =
+              psio::pssz_ir::to_key(*type.types, *type.columns[column].type, member, key);
+          !status.ok())
+         abortMessage("Cannot index column " + type.columns[column].name + ": " +
+                      std::string(status.error().what));
+   }
+
    struct IndexWriter
    {
       std::vector<char>   key;
@@ -59,7 +72,6 @@ namespace
       SecondaryIndexTable secondary{
           DbId::writeOnly,
           psio::encode(psio::key{}, std::tuple(EventIndex::service, secondaryIndexTableNum))};
-      EventWrapper     wrapper{nullptr};
       EventIndexHandle handle{KvMode::write};
       bool             operator()(EventTable& events, EventDb db, std::uint64_t eventNum)
       {
@@ -67,18 +79,15 @@ namespace
          if (!row)
             return false;
 
-         const CompiledType* ctype = cache.getSchemaType({}, db, (*row)->service().unpack(), (*row)->type().unpack());
-         if (!ctype)
+         const EventSchema* type =
+             cache.getSchemaType({}, db, (*row)->service().unpack(), (*row)->type().unpack());
+         if (!type)
             return true;
 
-         FracParser parser(psio1::FracStream{(*row)->rawData()}, ctype, psibase_builtins, false);
-
-         // validate remaining data
-         while (auto item = parser.next())
-         {
-            if (item.kind == FracParser::error)
-               return true;
-         }
+         // An event whose bytes are not its argument list is not indexed
+         psio::pssz_ir::Value value;
+         if (!decodeEvent(*type, (*row)->rawData().unpack(), value))
+            return true;
 
          auto indexes = secondary.getIndex<0>().get(
              std::tuple(db, (*row)->service().unpack(), (*row)->type().unpack()));
@@ -88,15 +97,8 @@ namespace
          {
             psio::to_key(EventIndexTable{db, (*row)->service().unpack(), (*row)->type().unpack()}, key);
             psio::to_key(index.indexNum, key);
-            // The columns are read from the packed event by its schema
-            psio1::vector_stream stream{key};
             for (const auto& column : index.columns())
-            {
-               parser.set_pos(0);
-               parser.parse(ctype);
-               parser.push(parser.select_child(column));
-               to_key(parser, stream);
-            }
+               columnToKey(*type, value, column, key);
             psio::to_key(eventNum, key);
             psibase::raw::kvPut(handle, key.data(), key.size(), nullptr, 0);
             key.clear();
@@ -159,13 +161,10 @@ namespace
       };
       if (item.endKey != 0)
       {
-         auto&               cache = SchemaCache::instance();
-         EventWrapper        wrapper;
-         auto                events = EventConfig{}.openEvents(item.db, KvMode::read);
-         std::vector<char>   data;
-         const CompiledType* ctype = cache.getSchemaType({}, item.db, item.service, item.event);
-         wrapper.set(ctype);
-         std::vector<char> subkey{key.begin(), key.begin() + prefixLen};
+         auto&              cache  = SchemaCache::instance();
+         auto               events = EventConfig{}.openEvents(item.db, KvMode::read);
+         const EventSchema* type   = cache.getSchemaType({}, item.db, item.service, item.event);
+         std::vector<char>  subkey{key.begin(), key.begin() + prefixLen};
          subkey.back() = item.info.indexNum;
          bool more     = processRows(
              [&]
@@ -174,22 +173,16 @@ namespace
                 if (eventNum >= item.endKey)
                    return false;
                 auto event = events.getView(eventNum);
-                if (!event)
+                if (!event || !type)
                    return true;
-                FracParser parser{psio1::FracStream{(*event)->rawData()}, ctype, psibase_builtins,
-                                  false};
-                psio1::vector_stream stream{subkey};
+                psio::pssz_ir::Value value;
+                if (!decodeEvent(*type, (*event)->rawData().unpack(), value))
+                   return true;
                 for (const auto& column : item.info.columns())
-                {
-                   parser.set_pos(0);
-                   parser.parse(ctype);
-                   parser.push(parser.select_child(column));
-                   to_key(parser, stream);
-                }
+                   columnToKey(*type, value, column, subkey);
                 psio::to_key(eventNum, subkey);
                 psibase::raw::kvPut(handle, subkey.data(), subkey.size(), nullptr, 0);
                 subkey.resize(prefixLen);
-                data.clear();
                 return true;
              });
          if (!more)
@@ -221,9 +214,6 @@ namespace
    {
       auto queue = EventIndex{}.open<PendingIndexTable>();
 
-      auto&             cache = SchemaCache::instance();
-      EventWrapper      wrapper;
-      std::vector<char> data;
       for (auto item : queue.getIndex<0>())
       {
          bool more = (item.endKey != 0 && item.nextKey.empty())

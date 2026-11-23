@@ -520,8 +520,6 @@ TEST_CASE("psibase records: a transaction", "[canonical][records]")
    // SignedTransaction::transaction is a psio::shared_pssz<Transaction> since
    // the binary wire flipped: the record is no longer packed by this library
    // (its bytes are pinned in libraries/psibase/common/tests/methods.cpp).
-   // Its legacy schema is unchanged: a packed member is a FracPack node.
-   CHECK(fnv(schemaOf<psibase::SignedTransaction>("SignedTransaction")) == 0x782a90f11ef1a02bull);
 }
 
 TEST_CASE("psibase records: a block header", "[canonical][records]")
@@ -749,10 +747,6 @@ TEST_CASE("psibase records: the types slice 2b declared with PSIO", "[canonical]
    CHECK(schemaOf<DynDepGroups>("DynDepGroups") ==
          R"({"@1":{"Custom":{"type":{"Struct":{"value":{"Int":{"bits":64,"isSigned":false}}}},"id":"AccountNumber"}},"@5":{"Custom":{"type":{"List":{"Int":{"bits":8,"isSigned":false}}},"id":"string"}},"DynDepGroups":{"Object":{"service":"@1","groups":{"Custom":{"type":{"List":{"Object":{"first":"@5","second":{"List":{"Object":{"name":"@5","service":"@1"}}}}}},"id":"map"}}}}})");
 
-   // A class template with a nested member
-   CHECK(schemaOf<psibase::TypedAction<std::tuple<std::uint32_t, std::string>>>("TypedAction") ==
-         R"({"@1":{"Custom":{"type":{"Struct":{"value":"@2"}},"id":"AccountNumber"}},"@2":{"Int":{"bits":64,"isSigned":false}},"TypedAction":{"Object":{"sender":"@1","service":"@1","method":{"Custom":{"type":{"Struct":{"value":"@2"}},"id":"MethodNumber"}},"rawData":{"Custom":{"type":{"FracPack":{"Tuple":[{"Int":{"bits":32,"isSigned":false}},{"Custom":{"type":{"List":{"Int":{"bits":8,"isSigned":false}}},"id":"string"}}]}},"id":"hex"}}}}})");
-
    // Variant alternatives that are transparent wrappers
    using LocalService::Auth::AuthResult;
    const AuthResult account{LocalService::Auth::Account{AccountNumber{"alice"}}};
@@ -763,15 +757,6 @@ TEST_CASE("psibase records: the types slice 2b declared with PSIO", "[canonical]
          "010800000004000000726f6f74");
    CHECK(schemaOf<AuthResult>("AuthResult") ==
          R"({"@4":{"Custom":{"type":{"List":{"Int":{"bits":8,"isSigned":false}}},"id":"string"}},"AuthResult":{"Variant":{"Account":{"Custom":{"type":{"Struct":{"value":{"Int":{"bits":64,"isSigned":false}}}},"id":"AccountNumber"}},"LocalUsername":"@4","Unauthenticated":{"Object":{"challenges":{"List":"@4"}}}}}})");
-
-   // The service schema record
-   psibase::ServiceSchema schema;
-   schema.service = AccountNumber{"alice"};
-   CHECK(frac(schema) ==
-         "180000b82a1b83aedf0400000000000000000000000000000000");
-   CHECK(json(schema) ==
-         R"({"service":"alice","types":{},"actions":{},"history":{},"merkle":{},"database":null})");
-   CHECK(fnv(schemaOf<psibase::ServiceSchema>("ServiceSchema")) == 0xd44785d5866f6705ull);
 }
 
 namespace glue

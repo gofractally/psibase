@@ -11,6 +11,7 @@
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/db.hpp>
+#include <psibase/export.hpp>
 #include <psibase/trace.hpp>
 #include <psio/json_value.hpp>
 #include <functional>
@@ -23,9 +24,6 @@
 #include <psio/reflect.hpp>
 #include <psio/schema_builder.hpp>
 #include <psio/schema_ir.hpp>
-#include <psio1/from_json.hpp>  // TEMPORARY, see the end of this file
-#include <psio1/json/any.hpp>
-#include <psio1/to_json.hpp>
 #include <span>
 #include <string>
 #include <type_traits>
@@ -113,7 +111,12 @@ namespace psibase
                 psio::schema_types::FunctionType type{
                     psio::schema_types::Box<psio::schema_types::AnyType>{builder.insert<Args>()},
                     std::nullopt};
-                if constexpr (!std::is_void_v<Result>)
+                // A result that carries table handles is on the wire what
+                // it exports (psibaseExport): the handles travel beside it.
+                if constexpr (hasExport<Result>)
+                   type.result = psio::schema_types::Box<psio::schema_types::AnyType>{
+                       builder.insert<exportType<Result>>()};
+                else if constexpr (!std::is_void_v<Result>)
                    type.result = psio::schema_types::Box<psio::schema_types::AnyType>{
                        builder.insert<Result>()};
                 out.emplace(std::string(name), std::move(type));
@@ -387,20 +390,20 @@ namespace psibase
                    const psio::pssz_ir::CustomHandlers& handlers);
 
    // TEMPORARY: removed when psio1 is deleted. The legacy JSON library
-   // (psio1::to_json / from_json, still used by the HTTP endpoints and the
-   // package reader until the JSON stage) writes and reads a ServiceSchema
-   // as its I-JSON text.
+   // (psio1::to_json / from_json, still used by the HTTP endpoints until the
+   // JSON stage) writes a ServiceSchema as its I-JSON text. It cannot read
+   // one: its tokenizer hands numbers over as strings, which the Schema IR
+   // does not accept for its 32-bit members. Nothing reads a schema through
+   // it (package.cpp reads service files with PSIO); the overload exists
+   // because the argument tuples of Packages::setSchema are instantiated
+   // for the legacy /pack_action endpoint, which answers with this message.
    void to_json(const ServiceSchema& schema, auto& stream)
    {
       auto text = psio::to_ijson(schema);
       stream.write(text.data(), text.size());
    }
-   void from_json(ServiceSchema& schema, auto& stream)
+   void from_json(ServiceSchema&, auto&)
    {
-      // The legacy reader has no "raw value" primitive: the value is read
-      // into the legacy JSON document type and written back as text.
-      psio1::json::any value;
-      from_json(value, stream);
-      schema = psio::from_ijson<ServiceSchema>(psio1::convert_to_json(value));
+      abortMessage("a service schema is read as I-JSON (psio::from_ijson), not by the legacy reader");
    }
 }  // namespace psibase

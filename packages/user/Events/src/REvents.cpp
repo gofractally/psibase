@@ -6,7 +6,6 @@
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psio1/schema.hpp>
 #include <regex>
 #include <services/local/XAdmin.hpp>
 #include <services/system/HttpServer.hpp>
@@ -19,45 +18,10 @@
 #include "types.hpp"
 
 using namespace psibase;
-using namespace psio1::schema_types;
+namespace ir = psio::pssz_ir;
+using psio::schema_types::Float;
+using psio::schema_types::Int;
 using namespace UserService;
-
-template <typename T>
-struct ExtraCustom
-{
-   ExtraCustom(const CustomTypes& origin, std::initializer_list<std::pair<std::string, T>> v)
-   {
-      for (const auto& [key, value] : v)
-      {
-         add(origin, key, value);
-      }
-   }
-   void add(std::size_t index, T value)
-   {
-      if (index >= values.size())
-         values.resize(index + 1);
-      values[index] = std::move(value);
-   }
-   void add(const CustomTypes& origin, const std::string& name, T value)
-   {
-      if (const std::size_t* idx = origin.find(name))
-      {
-         add(*idx, std::move(value));
-      }
-   }
-   const T* find(std::size_t index) const
-   {
-      if (index >= values.size())
-         return nullptr;
-      if constexpr (requires { !values[index]; })
-      {
-         if (!values[index])
-            return nullptr;
-      }
-      return &values[index];
-   }
-   std::vector<T> values;
-};
 
 int compare_account_number(void*, int lsize, const void* ldata, int rsize, const void* rdata)
 {
@@ -71,10 +35,10 @@ int compare_account_number(void*, int lsize, const void* ldata, int rsize, const
       return 0;
 }
 
-const auto& custom_collation()
+// The collation of a column, if it is not the default
+const char* custom_collation(const EventColumn& column)
 {
-   static const ExtraCustom<const char*> result{psibase_builtins, {{"AccountNumber", "ACCOUNT"}}};
-   return result;
+   return column.kind == ColumnKind::account ? "ACCOUNT" : nullptr;
 }
 
 void register_collation(void*, sqlite3* db, int eTextRep, const char* name)
@@ -85,37 +49,27 @@ void register_collation(void*, sqlite3* db, int eTextRep, const char* name)
    }
 }
 
-void getColumns(const CompiledType* ctype, const Object& type, auto& stream)
+void getColumns(const EventSchema& type, auto& stream)
 {
-   for (std::size_t i = 0; i < ctype->children.size(); ++i)
+   bool first = true;
+   for (const auto& column : type.columns)
    {
-      check(i < type.members.size(), "Internal error: wrong number of members");
-      const auto& member = type.members[i];
-      if (i != 0)
+      if (first)
+         first = false;
+      else
          stream.write(',');
-      stream.write(member.name.data(), member.name.size());
-      if (const char* const* collate = custom_collation().find(ctype->children[i].type->custom_id))
+      stream.write(column.name.data(), column.name.size());
+      if (const char* collate = custom_collation(column))
       {
          stream.write(" TEXT COLLATE ", 14);
-         stream.write(*collate, std::strlen(*collate));
+         stream.write(collate, std::strlen(collate));
       }
    }
 }
 
-void getColumns(const CompiledType*, const auto& type, auto&)
-{
-   abortMessage("Unsupported row type: " + psio1::convert_to_json(AnyType{type}));
-}
-
-void getColumns(const CompiledType* type, auto& stream)
-{
-   std::visit([&](const auto& t) { return getColumns(type, t, stream); },
-              type->original_type->value);
-}
-
 struct EventVTab : sqlite3_vtab
 {
-   EventVTab(EventDb db, AccountNumber service, MethodNumber event, const CompiledType* type)
+   EventVTab(EventDb db, AccountNumber service, MethodNumber event, const EventSchema* type)
        : index{db, service, event}, rowType(type)
    {
       auto secondary = SecondaryIndexTable(
@@ -128,14 +82,13 @@ struct EventVTab : sqlite3_vtab
    }
    EventIndexTable                 index;
    std::vector<SecondaryIndexInfo> indexes;
-   const CompiledType*             rowType;
+   const EventSchema*              rowType;
    std::vector<char>               key() const { return psio::encode(psio::key{}, index); }
    std::string_view                get_collation(int column) const
    {
-      if (const char* const* collate =
-              custom_collation().find(rowType->children[column].type->custom_id))
+      if (const char* collate = custom_collation(rowType->columns[column]))
       {
-         return *collate;
+         return collate;
       }
       return "BINARY";
    }
@@ -146,7 +99,10 @@ struct EventCursor : sqlite3_vtab_cursor
    std::vector<char> key;
    std::vector<char> end;
    std::vector<char> data;
-   std::size_t       prefixLen;
+   // The arguments of the current event, decoded when a column is first read
+   std::optional<ir::Value> value;
+   bool                     invalid = false;
+   std::size_t              prefixLen;
    bool              descending = false;
    EventIndexHandle  handle{KvMode::read};
    EventTable        events;
@@ -190,6 +146,8 @@ struct EventCursor : sqlite3_vtab_cursor
                check(false, "Internal error: event service does not match index");
             }
             data = (*row)->rawData().unpack();
+            value.reset();
+            invalid = false;
          }
       }
    }
@@ -232,208 +190,116 @@ int event_rowid(sqlite3_vtab_cursor* cursor, sqlite_int64* result)
    return SQLITE_OK;
 }
 
-int scalar_to_sql(const Int& type, std::span<const char> in, sqlite3_context* ctx)
+int number_to_sql(const ir::Value& value, sqlite3_context* ctx)
 {
-   std::uint64_t result = 0;
-   if (in.size() > sizeof(result))
+   if (auto* v = std::get_if<ir::Signed>(&value.value))
    {
-      sqlite3_result_text(ctx, "Integer too large", -1, SQLITE_STATIC);
-      return SQLITE_ERROR;
+      sqlite3_result_int64(ctx, static_cast<sqlite3_int64>(v->value));
    }
-   std::memcpy(&result, in.data(), in.size());
-   if (type.isSigned)
+   else if (auto* v = std::get_if<ir::Unsigned>(&value.value))
    {
-      auto sext = 64 - type.bits;
-      sqlite3_result_int64(ctx, static_cast<sqlite3_int64>(result << sext) >> sext);
-   }
-   else
-   {
+      auto result = static_cast<std::uint64_t>(v->value);
       if (result & (1ull << 63))
-      {
          sqlite3_result_double(ctx, result);
-      }
       else
-      {
          sqlite3_result_int64(ctx, static_cast<sqlite_int64>(result));
-      }
    }
-   return SQLITE_OK;
-}
-
-int scalar_to_sql(const Float& type, std::span<const char> in, sqlite3_context* ctx)
-{
-   if (type == Float{.exp = 11, .mantissa = 53})
+   else if (auto* v = std::get_if<float>(&value.value))
    {
-      double value;
-      assert(in.size() == sizeof(value));
-      std::memcpy(&value, in.data(), in.size());
-      sqlite3_result_double(ctx, value);
-      return SQLITE_OK;
+      sqlite3_result_double(ctx, *v);
    }
-   else if (type == Float{.exp = 8, .mantissa = 24})
+   else if (auto* v = std::get_if<double>(&value.value))
    {
-      float value;
-      assert(in.size() == sizeof(value));
-      std::memcpy(&value, in.data(), in.size());
-      sqlite3_result_double(ctx, value);
-      return SQLITE_OK;
+      sqlite3_result_double(ctx, *v);
    }
    else
    {
-      sqlite3_result_text(ctx,
-                          "Only single and double precision floating point numbers are supported",
-                          -1, SQLITE_STATIC);
+      sqlite3_result_text(ctx, "Internal error: unhandled scalar type", -1, SQLITE_STATIC);
       return SQLITE_ERROR;
    }
-}
-
-int scalar_to_sql(const auto&, std::span<const char>, sqlite3_context* ctx)
-{
-   sqlite3_result_text(ctx, "Internal error: unhandled scalar type", -1, SQLITE_STATIC);
-   return SQLITE_ERROR;
-}
-
-struct SqlCustomHandler
-{
-   int (*to_sql)(const CompiledType*, psio1::FracStream&, sqlite3_context* ctx);
-   explicit operator bool() const { return to_sql != nullptr; }
-};
-
-int bool_to_sql(const CompiledType* type, psio1::FracStream& in, sqlite3_context* ctx)
-{
-   bool value;
-   if (!psio1::is_packable<bool>::unpack<true, true>(&value, in.has_unknown, in.known_end, in.src,
-                                                    in.pos, in.end_pos))
-   {
-      sqlite3_result_text(ctx, "Not a valid bool value", -1, SQLITE_STATIC);
-      return SQLITE_ERROR;
-   }
-   sqlite3_result_int(ctx, value ? 1 : 0);
    return SQLITE_OK;
-}
-
-int string_to_sql(const CompiledType* type, psio1::FracStream& in, sqlite3_context* ctx)
-{
-   std::uint32_t size;
-   if (!psio1::unpack_numeric<true>(&size, in.src, in.pos, in.end_pos))
-   {
-      sqlite3_result_text(ctx, "cannot read string size", -1, SQLITE_STATIC);
-      return SQLITE_ERROR;
-   }
-   std::uint32_t end = in.pos + size;
-   if (end > in.end_pos || end < size)
-   {
-      sqlite3_result_text(ctx, "string size out of bounds", -1, SQLITE_STATIC);
-      return SQLITE_ERROR;
-   }
-   sqlite3_result_text64(ctx, in.src + in.pos, size, SQLITE_TRANSIENT, SQLITE_UTF8);
-   in.pos = end;
-   return SQLITE_OK;
-}
-
-int blob_to_sql(const CompiledType* type, psio1::FracStream& in, sqlite3_context* ctx)
-{
-   if (type->is_container())
-   {
-      std::uint32_t size;
-      if (!psio1::unpack_numeric<true>(&size, in.src, in.pos, in.end_pos))
-      {
-         sqlite3_result_text(ctx, "cannot read container size", -1, SQLITE_STATIC);
-         return SQLITE_ERROR;
-      }
-      std::uint32_t end = in.pos + size;
-      if (end > in.end_pos || end < size)
-      {
-         sqlite3_result_text(ctx, "container size out of bounds", -1, SQLITE_STATIC);
-         return SQLITE_ERROR;
-      }
-      sqlite3_result_blob64(ctx, in.src + in.pos, size, SQLITE_TRANSIENT);
-      in.pos = end;
-      return SQLITE_OK;
-   }
-   else if (!type->is_variable_size)
-   {
-      std::uint32_t end = in.pos + type->fixed_size;
-      if (end > in.end_pos || end < in.pos)
-      {
-         sqlite3_result_text(ctx, "blob out of bounds", -1, SQLITE_STATIC);
-         return SQLITE_ERROR;
-      }
-      sqlite3_result_blob64(ctx, in.src + in.pos, type->fixed_size, SQLITE_TRANSIENT);
-      in.pos = end;
-      return SQLITE_OK;
-   }
-   else
-   {
-      sqlite3_result_text(ctx, "wrong type for blob", -1, SQLITE_STATIC);
-      return SQLITE_ERROR;
-   }
-}
-
-int account_to_sql(const CompiledType* type, psio1::FracStream& in, sqlite3_context* ctx)
-{
-   AccountNumber value;
-   if (!psio1::is_packable<AccountNumber>::unpack<true, true>(&value, in.has_unknown, in.known_end,
-                                                             in.src, in.pos, in.end_pos))
-   {
-      sqlite3_result_text(ctx, "Not a valid AccountNumber", -1, SQLITE_STATIC);
-      return SQLITE_ERROR;
-   }
-   auto s = value.str();
-   sqlite3_result_text64(ctx, s.data(), s.size(), SQLITE_TRANSIENT, SQLITE_UTF8);
-   return SQLITE_OK;
-}
-
-const auto& psibase_sql_builtins()
-{
-   static const ExtraCustom<SqlCustomHandler> result{psibase_builtins,
-                                                     {{"bool", {&bool_to_sql}},
-                                                      {"string", {&string_to_sql}},
-                                                      {"hex", {&blob_to_sql}},
-                                                      {"AccountNumber", {&account_to_sql}}}};
-   return result;
 }
 
 std::string_view jsonPrefix("\x2f\x0a\xc4\x5b\xc1\xe1\x4d\xcc\x60\x02\xd4\xbe\x67\xb9\x06\xd4", 16);
 
 int event_column(sqlite3_vtab_cursor* cursor, sqlite3_context* ctx, int n)
 {
-   auto*      c = static_cast<EventCursor*>(cursor);
-   FracParser parser(psio1::FracStream{c->data}, c->vtab()->rowType, psibase_builtins);
-   auto       item = parser.select_child(n);
-   switch (item.kind)
+   auto*       c    = static_cast<EventCursor*>(cursor);
+   const auto& type = *c->vtab()->rowType;
+   if (!c->value && !c->invalid)
    {
-      case FracParser::error:
-         sqlite3_result_text64(ctx, item.data.data(), item.data.size(), SQLITE_STATIC, SQLITE_UTF8);
-         return SQLITE_ERROR;
-      case FracParser::start:
-      case FracParser::end:
-         break;
-      case FracParser::scalar:
-         return std::visit([&](const auto& type) { return scalar_to_sql(type, item.data, ctx); },
-                           item.type->original_type->value);
-      case FracParser::empty:
+      c->value.emplace();
+      if (!decodeEvent(type, c->data, *c->value))
+      {
+         c->value.reset();
+         c->invalid = true;
+      }
+   }
+   if (c->invalid || n < 0 || static_cast<std::size_t>(n) >= type.columns.size())
+   {
+      sqlite3_result_text(ctx, "The event does not match its schema", -1, SQLITE_STATIC);
+      return SQLITE_ERROR;
+   }
+   const auto&      column = type.columns[n];
+   const ir::Value* value  = &eventMember(*c->value, n);
+   if (column.optional)
+   {
+      auto* optional = std::get_if<ir::Optional>(&value->value);
+      if (!optional || !optional->some)
+      {
          sqlite3_result_null(ctx);
          return SQLITE_OK;
-      case FracParser::custom:
-         if (auto* handler = psibase_sql_builtins().find(item.type->custom_id))
+      }
+      value = optional->some.get();
+   }
+   switch (column.kind)
+   {
+      case ColumnKind::integer:
+      case ColumnKind::real:
+         return number_to_sql(*value, ctx);
+      case ColumnKind::boolean:
+         if (auto* v = std::get_if<bool>(&value->value))
          {
-            if (item.data.empty())
-            {
-               return handler->to_sql(item.type, parser.in, ctx);
-            }
-            else
-            {
-               psio1::FracStream tmpin{item.data};
-               return handler->to_sql(item.type, tmpin, ctx);
-            }
+            sqlite3_result_int(ctx, *v ? 1 : 0);
+            return SQLITE_OK;
          }
+         break;
+      case ColumnKind::text:
+         if (auto* v = std::get_if<std::string>(&value->value))
+         {
+            sqlite3_result_text64(ctx, v->data(), v->size(), SQLITE_TRANSIENT, SQLITE_UTF8);
+            return SQLITE_OK;
+         }
+         break;
+      case ColumnKind::blob:
+         if (auto* v = std::get_if<ir::Bytes>(&value->value))
+         {
+            sqlite3_result_blob64(ctx, v->data(), v->size(), SQLITE_TRANSIENT);
+            return SQLITE_OK;
+         }
+         break;
+      case ColumnKind::account:
+         // The wire type of an AccountNumber is a record of one u64
+         if (auto* v = std::get_if<ir::Record>(&value->value); v && v->size() == 1)
+            if (auto* number = std::get_if<ir::Unsigned>(&(*v)[0].second.value))
+            {
+               auto s = AccountNumber{static_cast<std::uint64_t>(number->value)}.str();
+               sqlite3_result_text64(ctx, s.data(), s.size(), SQLITE_TRANSIENT, SQLITE_UTF8);
+               return SQLITE_OK;
+            }
+         break;
+      case ColumnKind::json:
+         break;
    }
    // json as text
-   parser.push(std::move(item));
-   std::vector<char>   result(jsonPrefix.begin(), jsonPrefix.end());
-   psio1::vector_stream stream{result};
-   to_json(parser, stream);
+   std::string result(jsonPrefix);
+   if (auto status = ir::value_to_json(*type.types, *column.value, psio::ijson{}, *value, result,
+                                       &psibase_builtins());
+       !status.ok())
+   {
+      sqlite3_result_text(ctx, "The column has no JSON text", -1, SQLITE_STATIC);
+      return SQLITE_ERROR;
+   }
    sqlite3_result_text64(ctx, result.data(), result.size(), SQLITE_TRANSIENT, SQLITE_UTF8);
    return SQLITE_OK;
 }
@@ -481,7 +347,7 @@ int event_connect(sqlite3*           db,
    }
    auto* user = (const AccountNumber*)sqlite3_get_clientdata(db, "user");
    check(user != nullptr, "username not set");
-   const CompiledType* type =
+   const EventSchema* type =
        SchemaCache::instance().getSchemaType(*user, event_db, service, event);
    if (type == nullptr)
       return SQLITE_ERROR;
@@ -489,7 +355,7 @@ int event_connect(sqlite3*           db,
    std::vector<char>   index;
    psio1::vector_stream stream{index};
    stream.write("CREATE TABLE e(", 15);
-   getColumns(vtab->rowType, stream);
+   getColumns(*vtab->rowType, stream);
    stream.write(")", 2);
    if (int err = sqlite3_declare_vtab(db, index.data()))
       return err;
@@ -558,7 +424,7 @@ void applyOrderByLimitCost(sqlite3_index_info* info, IndexConstraints& orderByCo
 int event_best_index(sqlite3_vtab* base_vtab, sqlite3_index_info* info)
 {
    auto                          vtab = static_cast<EventVTab*>(base_vtab);
-   std::vector<IndexConstraints> constraints(vtab->rowType->children.size() + 1);
+   std::vector<IndexConstraints> constraints(vtab->rowType->columns.size() + 1);
    constraints[0] = {.usable = true, .unique = true};
    for (const auto& index : vtab->indexes)
    {
@@ -740,7 +606,7 @@ KeyResult double_to_key(const Float& type, double value, std::vector<char>& out)
    {
       auto fvalue = static_cast<float>(value);
       auto result = KeyResult::exact;
-      psio::to_key(value, out);
+      psio::to_key(fvalue, out);
       if (fvalue != value)
       {
          result = KeyResult::rounded;
@@ -781,12 +647,7 @@ KeyResult sql_to_key(const Float& type, sqlite3_value* key, std::vector<char>& o
    }
 }
 
-KeyResult sql_to_key(const auto& type, sqlite3_value* key, std::vector<char>& out)
-{
-   abortMessage("Not implemented: " + psio1::convert_to_json(AnyType{type}));
-}
-
-KeyResult string_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
+KeyResult string_to_key(sqlite3_value* key, std::vector<char>& out)
 {
    psio::to_key(std::string{reinterpret_cast<const char*>(sqlite3_value_text(key)),
                             static_cast<std::size_t>(sqlite3_value_bytes(key))},
@@ -794,7 +655,7 @@ KeyResult string_to_key(const CompiledType* type, sqlite3_value* key, std::vecto
    return KeyResult::exact;
 }
 
-KeyResult account_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
+KeyResult account_to_key(sqlite3_value* key, std::vector<char>& out)
 {
    auto s = std::string_view{reinterpret_cast<const char*>(sqlite3_value_text(key)),
                              static_cast<std::size_t>(sqlite3_value_bytes(key))};
@@ -802,78 +663,40 @@ KeyResult account_to_key(const CompiledType* type, sqlite3_value* key, std::vect
    return KeyResult::exact;
 }
 
-KeyResult blob_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
+KeyResult blob_to_key(sqlite3_value* key, std::vector<char>& out)
 {
    auto data = static_cast<const unsigned char*>(sqlite3_value_blob(key));
    psio::to_key(std::vector<unsigned char>{data, data + sqlite3_value_bytes(key)}, out);
    return KeyResult::exact;
 }
 
-struct ToKeyCustomHandler
+// The key (psio::key) of an SQL value as the value of a column
+KeyResult value_to_key(const EventColumn& column, sqlite3_value* key, std::vector<char>& out)
 {
-   KeyResult (*to_key)(const CompiledType*, sqlite3_value*, std::vector<char>&);
-   explicit operator bool() const { return to_key != nullptr; }
-};
-
-const auto& psibase_to_key_builtins()
-{
-   static const ExtraCustom<ToKeyCustomHandler> result{psibase_builtins,
-                                                       {{"string", {&string_to_key}},
-                                                        {"hex", {&blob_to_key}},
-                                                        {"AccountNumber", {&account_to_key}}}};
-   return result;
-}
-
-KeyResult sql_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
-{
-   switch (type->kind)
+   switch (column.kind)
    {
-      case CompiledType::scalar:
-         return std::visit([&](auto& t) { return sql_to_key(t, key, out); },
-                           type->original_type->value);
-      default:
-         if (auto* handler = psibase_to_key_builtins().find(type->custom_id))
-         {
-            return handler->to_key(type, key, out);
-         }
-         abortMessage("Not implemented: " + std::to_string(type->custom_id) + " " +
-                      psio1::convert_to_json(*type->original_type));
+      case ColumnKind::integer:
+         return sql_to_key(std::get<Int>(column.scalar->value), key, out);
+      case ColumnKind::real:
+         return sql_to_key(std::get<Float>(column.scalar->value), key, out);
+      case ColumnKind::text:
+         return string_to_key(key, out);
+      case ColumnKind::blob:
+         return blob_to_key(key, out);
+      case ColumnKind::account:
+         return account_to_key(key, out);
+      case ColumnKind::boolean:
+      case ColumnKind::json:
+         break;
    }
+   abortMessage("Not implemented: a key of the column " + column.name);
 }
 
-KeyResult sql_to_key(const CompiledMember& member, sqlite3_value* key, std::vector<char>& out)
+KeyResult sql_to_key(const EventColumn& column, sqlite3_value* key, std::vector<char>& out)
 {
-   if (member.is_optional)
+   if (column.optional)
    {
-      if (isOctet(member.type))
-      {
-         if (sqlite3_value_type(key) == SQLITE_NULL)
-         {
-            out.push_back(0);
-            out.push_back(0);
-            return KeyResult::exact;
-         }
-         else
-         {
-            auto result = sql_to_key(member.type, key, out);
-            switch (result)
-            {
-               case KeyResult::exact:
-               case KeyResult::rounded:
-                  if (out.back() == 0)
-                     out.push_back(1);
-                  break;
-               case KeyResult::overflow:
-                  break;
-               case KeyResult::underflow:
-                  result = KeyResult::rounded;
-                  out.push_back(0);
-                  out.push_back(1);
-                  break;
-            }
-            return result;
-         }
-      }
+      // psio::key of an optional: 00, or 01 and the key of the value
       if (sqlite3_value_type(key) == SQLITE_NULL)
       {
          out.push_back(0);
@@ -882,7 +705,7 @@ KeyResult sql_to_key(const CompiledMember& member, sqlite3_value* key, std::vect
       else
       {
          out.push_back(1);
-         auto result = sql_to_key(member.type, key, out);
+         auto result = value_to_key(column, key, out);
          if (result == KeyResult::underflow)
             return KeyResult::rounded;
          return result;
@@ -890,7 +713,7 @@ KeyResult sql_to_key(const CompiledMember& member, sqlite3_value* key, std::vect
    }
    else
    {
-      return sql_to_key(member.type, key, out);
+      return value_to_key(column, key, out);
    }
 }
 
@@ -909,7 +732,8 @@ int event_filter(sqlite3_vtab_cursor* cursor,
    // xFilter may be called multiple times to restart a scan on the same
    // cursor; the upper bound must not leak from a previous filter.
    c->end.clear();
-   auto keyType = index >= 0 ? vtab->rowType->children[index] : CompiledMember{.type = &u64};
+   const EventColumn& keyType =
+       index >= 0 ? vtab->rowType->columns[index] : eventNumberColumn();
    auto incKey  = [&](std::vector<char>& k)
    {
       std::size_t i = k.size();
