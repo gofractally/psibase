@@ -76,7 +76,7 @@ Visible in traces but not consensus: `ActionTrace.totalTime` is now elapsed time
 - Wide arithmetic is lowered in JIT2 and LLVM as 64-bit operations plus a carry compare, with two new high-multiply operations, and is tested against a 128-bit oracle on every engine. Is unconditional acceptance what the team wants?
 
 **Known limits.**
-- Work on JIT2 and LLVM AOT is paused; c45c060cd marks the psizam-engine execution context as unverified after the CPU budget change. The suites are qualified on wasmtime only.
+- wasmtime is the engine. There is no plan to use JIT2 now that wasmtime is in place; its known issues are being written down and work on it has stopped. LLVM AOT is paused. c45c060cd marks the psizam-engine execution context as unverified after the CPU budget change, and the suites are qualified on wasmtime only (#2228).
 - psizam tests a reviewer will see fail, all predating this work: the `memory_grow_2` spec cases on every engine, `psizam_host_tail_reentry_tests` (intentionally red), and on x86 "Test call depth dynamic - jit_llvm".
 - Rust services are not compiled with wide arithmetic in this head. Branch `claude/canonical-next` adds it and is next to land. It moves `cargo-psibase` to newer walrus, wasmparser and wasm-opt versions and passes `--enable-multivalue` beside `--enable-wide-arithmetic` to the optimizer. rustc calls the wide-arithmetic target feature unstable and warns that using it will become an error.
 
@@ -192,7 +192,7 @@ Suite results are recorded per commit under `tests/timing/runs/`. On wasmtime:
 
 Open items are tracked as issues and closed as they are fixed.
 
-- JIT2 and LLVM AOT paused and marked unverified; wasmtime (a pinned fork) is the only qualified engine: #2228. Engine tests red on psizam main: [psizam#1](https://github.com/gofractally/psizam/issues/1), [psizam#2](https://github.com/gofractally/psizam/issues/2).
+- wasmtime (a pinned fork) is the only qualified engine. JIT2 is not planned for use and LLVM AOT is paused; both are unverified: #2228. Engine tests red on psizam main: [psizam#1](https://github.com/gofractally/psizam/issues/1), [psizam#2](https://github.com/gofractally/psizam/issues/2).
 - One monotonic clock for trace time, the limit and billing: #2227.
 - Deterministic stack check on wasmtime costs memory traffic on every call: #2221.
 - Buying resources during a transaction does not raise that transaction's CPU limit: #2217 (fix on a branch).
