@@ -2,7 +2,6 @@
 
 #include <psibase/Service.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psio1/chrono.hpp>
 
 #include <chrono>
 

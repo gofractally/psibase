@@ -13,29 +13,22 @@ namespace
 {
    struct Query
    {
-      auto installed(const std::optional<std::string>& gt,
-                     const std::optional<std::string>& ge,
-                     const std::optional<std::string>& lt,
-                     const std::optional<std::string>& le,
-                     std::optional<uint32_t>           first,
-                     std::optional<uint32_t>           last,
-                     const std::optional<std::string>& before,
-                     const std::optional<std::string>& after) const
+      auto installed(psio::graphql::key_range<std::string> range,
+                     psio::graphql::page_args              page) const
       {
-         using NodeType = LocalPackage;
-         using EdgeType = Edge<NodeType, psio::reflect<NodeType>::fixed_name + "Edge">;
-         using ConnType = Connection<NodeType, psio::reflect<NodeType>::fixed_name + "Connection",
-                                     psio::reflect<NodeType>::fixed_name + "Edge">;
-         ConnType result;
+         using Page = psio::graphql::result<
+             psio::graphql::connection<psio::shared_pssz<LocalPackage>>>;
+         std::optional<Page> result;
          PSIBASE_SUBJECTIVE_TX
          {
-            result = makeConnection<ConnType>(XPackages{}.open<LocalPackagesTable>().getIndex<0>(),
-                                              gt, ge, lt, le, first, last, before, after);
+            result.emplace(psio::graphql::paginate(
+                IndexView{XPackages{}.open<LocalPackagesTable>().getIndex<0>()}, range, page,
+                allRows));
          }
-         return result;
+         return std::move(*result);
       }
    };
-   PSIO_REFLECT(Query, method(installed, gt, ge, lt, le, first, last, before, after))
+   PSIO_REFLECT(Query, method(installed, range, page))
 
    HttpReply error(const HttpRequest& req, HttpStatus status, std::string_view msg)
    {

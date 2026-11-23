@@ -84,10 +84,6 @@ namespace psibase
    };
 
    using SocketEndpoint = std::variant<IPV4Endpoint, IPV6Endpoint, LocalEndpoint>;
-   inline auto get_gql_name(SocketEndpoint*)
-   {
-      return "SocketEndpoint";
-   }
 
    std::string to_string(const IPV4Endpoint&);
    std::string to_string(const IPV6Endpoint&);
@@ -201,12 +197,24 @@ namespace psibase
                                    WebSocketInfo,
                                    P2PSocketInfo>;
 
-   inline auto get_gql_name(SocketInfo*)
-   {
-      return "SocketInfo";
-   }
-
 }  // namespace psibase
+
+// The GraphQL names of the unions
+namespace psio::graphql
+{
+   template <typename T>
+   struct type_name;
+   template <>
+   struct type_name<psibase::SocketEndpoint>
+   {
+      static constexpr std::string_view value = "SocketEndpoint";
+   };
+   template <>
+   struct type_name<psibase::SocketInfo>
+   {
+      static constexpr std::string_view value = "SocketInfo";
+   };
+}  // namespace psio::graphql
 
 PSIO_ADAPTER(psibase::IPAddress, psio::text_category, psibase::IPAddressText)
 PSIO_ADAPTER(psibase::SocketEndpoint, psio::text_category, psibase::SocketEndpointText)

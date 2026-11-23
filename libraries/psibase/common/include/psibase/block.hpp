@@ -228,11 +228,6 @@ namespace psibase
 
    using ConsensusData = std::variant<CftConsensus, BftConsensus>;
 
-   inline auto get_gql_name(ConsensusData*)
-   {
-      return "ConsensusData";
-   }
-
    struct Consensus
    {
       ConsensusData                       data;
@@ -388,3 +383,15 @@ namespace psibase
    };
 
 }  // namespace psibase
+
+// The GraphQL name of the union
+namespace psio::graphql
+{
+   template <typename T>
+   struct type_name;
+   template <>
+   struct type_name<psibase::ConsensusData>
+   {
+      static constexpr std::string_view value = "ConsensusData";
+   };
+}  // namespace psio::graphql

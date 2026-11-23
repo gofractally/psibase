@@ -127,9 +127,36 @@ TEST_CASE("tables: a key is read through a view of the packed row", "[tables]")
 // a key prefix; handle 0 is the whole store.
 namespace
 {
-   std::map<std::vector<char>, std::vector<char>> store;
-   std::vector<std::vector<char>>                 handles{{}};
-   std::vector<char>                              lastResult;
+   // Keys are ordered as bytes
+   struct KeyLess
+   {
+      bool operator()(const std::vector<char>& lhs, const std::vector<char>& rhs) const
+      {
+         return psibase::compare_wknd(lhs, rhs) == std::weak_ordering::less;
+      }
+   };
+   std::map<std::vector<char>, std::vector<char>, KeyLess> store;
+   std::vector<std::vector<char>>                          handles{{}};
+   std::vector<char>                                       lastResult;
+   std::vector<char>                                       lastKey;
+   // The row at `pos` is the result if its key, as the handle sees it, starts
+   // with the first `matchKeySize` bytes of `key`.
+   uint32_t found(psibase::KvHandle db,
+                  decltype(store)::const_iterator pos,
+                  const char*                     key,
+                  uint32_t                        matchKeySize)
+   {
+      const auto& prefix = handles.at(static_cast<std::uint32_t>(db));
+      lastResult.clear();
+      lastKey.clear();
+      if (pos == store.end() || pos->first.size() < prefix.size() + matchKeySize ||
+          !std::equal(prefix.begin(), prefix.end(), pos->first.begin()) ||
+          !std::equal(key, key + matchKeySize, pos->first.begin() + prefix.size()))
+         return -1;
+      lastKey.assign(pos->first.begin() + prefix.size(), pos->first.end());
+      lastResult = pos->second;
+      return lastResult.size();
+   }
    std::vector<char> storeKey(psibase::KvHandle db, const char* key, std::uint32_t len)
    {
       auto result = handles.at(static_cast<std::uint32_t>(db));
@@ -159,6 +186,40 @@ namespace psibase::raw
          return -1;
       lastResult = pos->second;
       return lastResult.size();
+   }
+   uint32_t getKey(const char* dest, uint32_t destSize)
+   {
+      std::memcpy(const_cast<char*>(dest), lastKey.data(),
+                  std::min<std::size_t>(destSize, lastKey.size()));
+      return lastKey.size();
+   }
+   uint32_t kvGreaterEqual(KvHandle db, const char* key, uint32_t keyLen, uint32_t matchKeySize)
+   {
+      return found(db, store.lower_bound(storeKey(db, key, keyLen)), key, matchKeySize);
+   }
+   uint32_t kvLessThan(KvHandle db, const char* key, uint32_t keyLen, uint32_t matchKeySize)
+   {
+      auto pos = store.lower_bound(storeKey(db, key, keyLen));
+      if (pos == store.begin())
+         return found(db, store.end(), key, matchKeySize);
+      return found(db, --pos, key, matchKeySize);
+   }
+   uint32_t kvMax(KvHandle db, const char* key, uint32_t keyLen)
+   {
+      // The last key that starts with `key`: the one before the first key
+      // beyond every key with that prefix
+      auto bound = storeKey(db, key, keyLen);
+      while (!bound.empty() && static_cast<unsigned char>(bound.back()) == 0xff)
+         bound.pop_back();
+      auto pos = store.end();
+      if (!bound.empty())
+      {
+         ++bound.back();
+         pos = store.lower_bound(bound);
+      }
+      if (pos == store.begin())
+         return found(db, store.end(), key, keyLen);
+      return found(db, --pos, key, keyLen);
    }
    void kvPut(KvHandle db, const char* key, uint32_t keyLen, const char* value, uint32_t valueLen)
    {
@@ -311,10 +372,12 @@ TEST_CASE("tables: the bytes of a primary and of a composite secondary key", "[t
 
 TEST_CASE("tables: GraphQL connection and edge names", "[tables]")
 {
-   using Conn = psibase::Connection<Row, psio::reflect<Row>::fixed_name + "Connection",
-                                    psio::reflect<Row>::fixed_name + "Edge">;
-   CHECK(std::string_view{get_type_name((const Conn*)nullptr)} == "RowConnection");
-   CHECK(std::string_view{get_type_name((const Conn::Edge*)nullptr)} == "RowEdge");
-   CHECK(std::string_view{get_type_name((const psibase::WithBlockContext<Row>*)nullptr)} ==
-         "RowWithBlockContext");
+   namespace gql = psio::graphql;
+   CHECK(gql::type_name<gql::connection<psio::shared_pssz<Row>>>::value == "RowConnection");
+   CHECK(gql::type_name<gql::edge<psio::shared_pssz<Row>>>::value == "RowEdge");
+   CHECK(gql::type_name<psibase::WithBlockContext<Row>>::value == "RowWithBlockContext");
+   // An event query's connection is named after the event, not after its node
+   CHECK(gql::type_name<gql::connection<psibase::WithBlockContext<Row>>>::value ==
+         "RowConnection");
+   CHECK(gql::type_name<gql::edge<psibase::WithBlockContext<Row>>>::value == "RowEdge");
 }

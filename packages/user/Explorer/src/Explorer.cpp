@@ -225,11 +225,15 @@ struct Query
    TransactionAuthChecker transactionCensor;
    /// A page may hold fewer blocks than requested, but never none if any match;
    /// use `pageInfo` to continue.
-   auto blocks() const
+   auto blocks(psio::graphql::key_range<std::uint32_t> range, psio::graphql::page_args page) const
    {
-      return psibase::TransformedConnectionView{
-          blockLog(), [this](SharedBlock&& block)
-          { return BlockQuery{std::move(block), &transactionCensor}; }, blocksPageBytes};
+      return psio::graphql::paginate(
+          psio::graphql::transform(IndexView{blockLog()},
+                                   [this](SharedBlock&& block)
+                                   { return BlockQuery{std::move(block), &transactionCensor}; }),
+          range, page,
+          psio::graphql::page_budget{.max_bytes     = blocksPageBytes,
+                                     .max_page_size = allRows.max_page_size});
    }
 
    std::optional<BlockQuery> block(std::uint32_t blockNum) const
@@ -285,7 +289,8 @@ struct Query
 };
 PSIO_REFLECT(  //
     Query,
-    method(blocks),
+    attr(transactionCensor, psio::graphql::hidden),
+    method(blocks, range, page),
     method(block, blockNum),
     method(head),
     method(transaction, id, maxBlocks))

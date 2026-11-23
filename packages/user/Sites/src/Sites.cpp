@@ -855,19 +855,24 @@ namespace SystemService
          }
 
          /// Gets all file properties for a given site
-         auto getContent(AccountNumber account) const
+         auto getContent(AccountNumber                         account,
+                         psio::graphql::key_range<std::string> range,
+                         psio::graphql::page_args              page) const
          {
             auto tables = Sites::Tables{service, KvMode::read};
 
             auto idx =
                 tables.open<SitesContentTable>().getIndex<0>().subindex<std::string>(account);
 
-            return TransformedConnection(std::move(idx),
-                                         [](auto&& row)
+            return psio::graphql::paginate(
+                psio::graphql::transform(IndexView{std::move(idx)},
+                                         [](psio::shared_pssz<SitesContentRow> packed)
                                          {
-                                            row.csp = row.csp.value_or("");
+                                            auto row = packed.unpack();
+                                            row.csp  = row.csp.value_or("");
                                             return row;
-                                         });
+                                         }),
+                range, page, allRows);
          }
 
          /// Gets the file properties for a given site and path
@@ -884,9 +889,10 @@ namespace SystemService
             return result;
          }
       };
-      PSIO_REFLECT(Query,                                //
-                   method(getConfig, account),           //
-                   method(getContent, account),          //
+      PSIO_REFLECT(Query,                                  //
+                   attr(service, psio::graphql::hidden),   //
+                   method(getConfig, account),             //
+                   method(getContent, account, range, page),  //
                    method(getContentAt, account, path),  //
                    method(getDefaultCsp)                 //
       );

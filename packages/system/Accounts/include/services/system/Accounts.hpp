@@ -3,7 +3,7 @@
 #include <psibase/Table.hpp>
 #include <psibase/name.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psio1/chrono.hpp>
+#include <chrono>
 
 #include <optional>
 #include <string>

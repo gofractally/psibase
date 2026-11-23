@@ -527,23 +527,32 @@ namespace
 
    struct Query
    {
-      auto peers() const
+      auto peers(psio::graphql::key_range<std::int32_t> range, psio::graphql::page_args page) const
       {
-         return TransformedConnection{
-             XPeers{}.open<PeerConnectionTable>().getIndex<0>(), [](PeerConnection&& row)
-             {
-                return GQLPeerConnection{std::move(row.socket), std::move(row.urls),
-                                         std::move(row.hosts)};
-             }};
+         return psio::graphql::paginate(
+             psio::graphql::transform(
+                 IndexView{XPeers{}.open<PeerConnectionTable>().getIndex<0>()},
+                 [](psio::shared_pssz<PeerConnection> packed)
+                 {
+                    auto row = packed.unpack();
+                    return GQLPeerConnection{std::move(row.socket), std::move(row.urls),
+                                             std::move(row.hosts)};
+                 }),
+             range, page, allRows);
       }
-      auto urls() const
+      auto urls(psio::graphql::key_range<std::string> range, psio::graphql::page_args page) const
       {
-         return TransformedConnection{
-             XPeers{}.open<UrlTable>().getIndex<0>(),
-             [](UrlRow&& row) { return GQLUrl{std::move(row.url), std::move(row.refcount)}; }};
+         return psio::graphql::paginate(
+             psio::graphql::transform(IndexView{XPeers{}.open<UrlTable>().getIndex<0>()},
+                                      [](psio::shared_pssz<UrlRow> packed)
+                                      {
+                                         auto row = packed.unpack();
+                                         return GQLUrl{std::move(row.url), std::move(row.refcount)};
+                                      }),
+             range, page, allRows);
       }
       auto users() const { return XPeers{}.open<PeerUsernameTable>().getIndex<0>(); }
-      PSIO_REFLECT(Query, method(peers), method(urls), method(users))
+      PSIO_REFLECT(Query, method(peers, range, page), method(urls, range, page), method(users))
    };
 
 }  // namespace

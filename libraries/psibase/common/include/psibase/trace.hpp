@@ -2,7 +2,7 @@
 
 #include <psibase/block.hpp>
 
-#include <psio1/chrono.hpp>
+#include <chrono>
 
 namespace psibase
 {

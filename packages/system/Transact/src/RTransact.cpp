@@ -1376,6 +1376,7 @@ struct TransactQuery
    }
 };
 PSIO_REFLECT(TransactQuery, method(snapshotInfo));
+PSIO_TYPE_ATTRS(TransactQuery, psio::graphql::name_as{"Query"})
 
 std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  request,
                                              std::optional<std::int32_t>  socket,

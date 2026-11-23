@@ -64,38 +64,31 @@ namespace SystemService
          return result;
       }
 
-      auto accountsByPre(std::string                prefix,
-                         std::optional<uint32_t>    first,
-                         std::optional<uint32_t>    last,
-                         std::optional<std::string> before,
-                         std::optional<std::string> after) const
+      auto accountsByPre(std::string prefix, psio::graphql::page_args page) const
       {
-         using AccountConnection = Connection<Account, "AccountConnection", "AccountEdge">;
-         auto bounds             = accountPrefixBounds(prefix);
+         auto                                   bounds = accountPrefixBounds(prefix);
+         psio::graphql::key_range<AccountNumber> range{.ge = bounds.ge, .lt = bounds.lt};
+         // No account matches: an empty range
          if (bounds.matchNone)
-            return AccountConnection{};
-         auto index = Accounts::Tables{Accounts::service}.open<AccountTable>().getIndex<0>();
-         return makeConnection<AccountConnection>(index, {}, bounds.ge, bounds.lt, {}, first, last,
-                                                  before, after);
+            range = {.ge = AccountNumber{}, .lt = AccountNumber{}};
+         return psio::graphql::paginate(
+             IndexView{Accounts::Tables{Accounts::service}.open<AccountTable>().getIndex<0>()},
+             range, page, allRows);
       }
 
-      auto frozenAccounts(std::optional<uint32_t>    first,
-                          std::optional<uint32_t>    last,
-                          std::optional<std::string> before,
-                          std::optional<std::string> after) const
+      auto frozenAccounts(psio::graphql::page_args page) const
       {
-         using FrozenConnection =
-             Connection<FrozenAccount, "FrozenAccountConnection", "FrozenAccountEdge">;
-         auto index = Accounts::Tables{Accounts::service}.open<FrozenTable>().getIndex<0>();
-         return makeConnection<FrozenConnection>(index, {}, {}, {}, {}, first, last, before,
-                                                 after);
+         return psio::graphql::paginate(
+             IndexView{Accounts::Tables{Accounts::service}.open<FrozenTable>().getIndex<0>()}, page,
+             allRows);
       }
    };
    PSIO_REFLECT(AccountsQuery,
                 method(getAccount, accountName),
                 method(getAccounts, accountNames),
-                method(accountsByPre, prefix, first, last, before, after),
-                method(frozenAccounts, first, last, before, after))
+                method(accountsByPre, prefix, page),
+                method(frozenAccounts, page))
+   PSIO_TYPE_ATTRS(AccountsQuery, psio::graphql::name_as{"Query"})
 
    std::optional<HttpReply> RAccounts::serveSys(HttpRequest request)
    {

@@ -27,6 +27,7 @@ namespace
       }
    };
    PSIO_REFLECT(QueryRoot, method(sockets))
+   PSIO_TYPE_ATTRS(QueryRoot, psio::graphql::name_as{"Query"})
 
 }  // namespace
 

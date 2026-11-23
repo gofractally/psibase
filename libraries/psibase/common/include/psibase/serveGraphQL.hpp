@@ -1,23 +1,97 @@
 #pragma once
 
-#include <rapidjson/document.h>
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
 #include <psibase/Table.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio/fixed_string.hpp>
+#include <psio/graphql.hpp>
 #include <psio/json.hpp>
+#include <psio/json_value.hpp>
+#include <psio/key.hpp>
 #include <psio/reflect.hpp>
-#include <psio/to_hex.hpp>
-#include <psio1/graphql.hpp>
+
+#include <charconv>
+#include <format>
+#include <limits>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace psibase
 {
+   /// The body of `POST /graphql` with `Content-Type: application/json`
    struct GraphQLQuery
    {
-      std::string query;
-      PSIO_REFLECT(GraphQLQuery, query);
+      std::string                     query;
+      std::optional<psio::json_value> variables;
+      std::optional<std::string>      operationName;
+      PSIO_REFLECT(GraphQLQuery, query, variables, operationName);
    };
+
+   namespace detail
+   {
+      // What a request to `/graphql` asks for
+      struct GraphQLRequest
+      {
+         enum Kind
+         {
+            none,       // not a GraphQL request
+            getSchema,  // the schema, in SDL
+            runQuery,
+         };
+         Kind        kind = none;
+         std::string query;
+         std::string variables;      // the text of a JSON object, or empty
+         std::string operationName;  // empty: the document's only operation
+      };
+
+      inline GraphQLRequest parseGraphQLRequest(const HttpRequest& request)
+      {
+         GraphQLRequest result;
+         auto target = ((std::string_view)request.target).substr(0, request.target.find('?'));
+         if (target != "/graphql")
+            return result;
+
+         if (auto pos = request.target.find("?query="); pos < request.target.size())
+         {
+            result.kind  = GraphQLRequest::runQuery;
+            result.query = request.target.substr(pos + 7);
+         }
+         else if (request.method == "GET")
+         {
+            result.kind = GraphQLRequest::getSchema;
+         }
+         else if (request.method == "POST")
+         {
+            if (request.contentType == "application/graphql")
+            {
+               result.kind = GraphQLRequest::runQuery;
+               result.query.assign(request.body.data(), request.body.size());
+            }
+            else if (request.contentType == "application/json")
+            {
+               auto q       = psio::from_ijson<GraphQLQuery>(request.body);
+               result.kind  = GraphQLRequest::runQuery;
+               result.query = std::move(q.query);
+               // `"variables": null` is the same as no variables
+               if (q.variables && !std::holds_alternative<std::monostate>(q.variables->value))
+                  result.variables = psio::to_ijson(*q.variables);
+               if (q.operationName)
+                  result.operationName = std::move(*q.operationName);
+            }
+         }
+         return result;
+      }
+
+      inline HttpReply graphQLReply(std::string_view contentType, const std::string& body)
+      {
+         return HttpReply{
+             .contentType = std::string{contentType},
+             .body        = {body.data(), body.data() + body.size()},
+             .headers     = allowCors(),
+         };
+      }
+   }  // namespace detail
 
    /// Handle `/graphql` request
    ///
@@ -27,109 +101,40 @@ namespace psibase
    /// * `GET /graphql?query=...`: Run query in URL and return JSON result.
    /// * `POST /graphql?query=...`: Run query in URL and return JSON result.
    /// * `POST /graphql` with `Content-Type = application/graphql`: Run query that's in body and return JSON result.
-   /// * `POST /graphql` with `Content-Type = application/json`: Body contains a JSON object of the form `{"query"="..."}`. Run query and return JSON result.
+   /// * `POST /graphql` with `Content-Type = application/json`: Body contains a JSON object of the form
+   ///   `{"query": "...", "variables": {...}, "operationName": "..."}`; `variables` and `operationName`
+   ///   are optional. Run query and return JSON result.
    ///
-   /// `queryRoot` should be a reflected object; this shows up in GraphQL as the root
-   /// `Query` type. GraphQL exposes both fields and **const** methods. Fields may be
-   /// any reflected struct. Const methods may return any reflected struct. They should
-   /// return objects by value.
+   /// The result is `{"data": ...}`, followed by
+   /// `"errors": [{"message": ..., "locations": [...], "path": [...]}]`
+   /// when the query or one of its fields failed.
    ///
-   /// See [makeConnection example](#makeconnection-example).
+   /// `queryRoot` should be a reflected object; it is the root type of the schema
+   /// (`psio::graphql::schema<QueryRoot>`). Name it `Query`, or annotate it with
+   /// `PSIO_TYPE_ATTRS(QueryRoot, psio::graphql::name_as{"Query"})`. GraphQL exposes
+   /// both fields and **const** methods; a member that is state, not a field, is
+   /// annotated `attr(member, psio::graphql::hidden)` or left unreflected. A method
+   /// reports an error by returning `psio::graphql::result<T>`
+   /// (`return psio::graphql::fail("message")`).
+   ///
+   /// See PSIO's `docs/graphql.md` and the [connection example](#connection-example).
    template <typename QueryRoot>
    std::optional<HttpReply> serveGraphQL(const HttpRequest& request, const QueryRoot& queryRoot)
    {
-      auto doit = [&](std::string_view query, std::string_view variables)
-      {
-         auto result = psio1::gql_query(queryRoot, query, {});
-         return HttpReply{
-             .contentType = "application/json",
-             .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
-             .headers     = allowCors(),
-         };
-      };
-
-      auto target = ((std::string_view)request.target).substr(0, request.target.find('?'));
-      if (target != "/graphql")
+      using Schema = psio::graphql::schema<std::remove_cvref_t<QueryRoot>>;
+      auto req     = detail::parseGraphQLRequest(request);
+      if (req.kind == detail::GraphQLRequest::getSchema)
+         return detail::graphQLReply("text/plain", Schema::sdl());
+      if (req.kind != detail::GraphQLRequest::runQuery)
          return std::nullopt;
 
-      if (auto pos = request.target.find("?query="); pos < request.target.size())
-         return doit(request.target.substr(pos + 7), {});
-      else if (request.method == "GET")
-      {
-         auto result = psio1::get_gql_schema<std::remove_cvref_t<QueryRoot>>();
-         return HttpReply{
-             .contentType = "text/plain",
-             .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy,
-             .headers     = allowCors(),
-         };
-      }
-      else if (request.method == "POST")
-      {
-         if (request.contentType == "application/graphql")
-         {
-            return doit({request.body.data(), request.body.size()}, {});
-         }
-         else if (request.contentType == "application/json")
-         {
-            auto q = psio::from_ijson<GraphQLQuery>(request.body);
-            return doit(q.query, {});
-         }
-      }
-
-      return std::nullopt;
+      psio::graphql::request gqlRequest;
+      gqlRequest.operation_name = req.operationName;
+      gqlRequest.variables      = req.variables;
+      std::string out;
+      Schema::run(queryRoot, req.query, out, gqlRequest);
+      return detail::graphQLReply("application/json", out);
    }  // serveGraphQL
-
-   /// GraphQL support for paging
-   ///
-   /// This lets the query clients know when more data is available and
-   /// what cursor values can be used to fetch that data.
-   struct PageInfo
-   {
-      bool        hasPreviousPage = false;
-      bool        hasNextPage     = false;
-      std::string startCursor;
-      std::string endCursor;
-      PSIO_REFLECT(PageInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
-   };
-
-   /// GraphQL support for paging
-   ///
-   /// `node` contains the row data. `cursor` identifies where in the
-   /// table the node is located.
-   template <typename Node, psio::fixed_string EdgeName>
-   struct Edge
-   {
-      Node        node;
-      std::string cursor;
-      PSIO_REFLECT(Edge, node, cursor)
-   };
-
-   template <typename Node, psio::fixed_string EdgeName>
-   constexpr const char* get_type_name(const Edge<Node, EdgeName>*)
-   {
-      return EdgeName.c_str();
-   }
-
-   /// GraphQL support for paging
-   ///
-   /// `edges` contain the matching rows. `pageInfo` gives clients information
-   /// needed to resume paging.
-   template <typename Node, psio::fixed_string ConnectionName, psio::fixed_string EdgeName>
-   struct Connection
-   {
-      using NodeType = Node;
-      using Edge     = psibase::Edge<Node, EdgeName>;
-
-      std::vector<Edge> edges;
-      PageInfo          pageInfo;
-      PSIO_REFLECT(Connection, edges, pageInfo)
-   };
-
-   template <typename Node, psio::fixed_string ConnectionName, psio::fixed_string EdgeName>
-   constexpr const char* get_type_name(const Connection<Node, ConnectionName, EdgeName>*)
-   {
-      return ConnectionName.c_str();
-   }
 
    /// Block context for an event row.
    struct EventBlockInfo
@@ -149,6 +154,9 @@ namespace psibase
    }  // namespace detail
 
    /// Wraps a node type with block context for event queries.
+   ///
+   /// In GraphQL the type is named `<T>WithBlockContext` and has the field
+   /// `block` followed by the fields of `T`.
    template <typename T>
    struct WithBlockContext
    {
@@ -156,558 +164,202 @@ namespace psibase
                     "WithBlockContext<T>: T already has a 'block' field");
       EventBlockInfo block;
       T              data;
-      PSIO_REFLECT(WithBlockContext, block, data)
+      PSIO_REFLECT(WithBlockContext, block, attr(data, psio::graphql::flatten))
    };
 
-   template <typename T>
-   const char* get_type_name(const WithBlockContext<T>*)
-   {
-      static constexpr auto name = psio::reflect<T>::fixed_name + "WithBlockContext";
-      return name.c_str();
-   }
-
-   // Flatten T's fields alongside `block` in the schema for WithBlockContext<T>.
-   template <typename T, typename S>
-   void fill_gql_schema_members(const WithBlockContext<T>*, S& stream, bool is_input)
-   {
-      psio1::write_str("    block: ", stream);
-      psio1::write_str(psio1::generate_gql_whole_name((EventBlockInfo*)nullptr, is_input), stream);
-      psio1::write_str("\n", stream);
-      psio1::fill_gql_schema_members((T*)nullptr, stream, is_input);
-   }
-
-   // Resolve `block` from value.block, T's fields from value.data.
-   template <typename T, typename OS, typename E>
-   auto gql_query_inline(WithBlockContext<T>*,
-                         const WithBlockContext<T>& value,
-                         psio1::gql_stream&          input_stream,
-                         OS&                        output_stream,
-                         const E&                   error,
-                         bool                       allow_unknown_members,
-                         bool&                      first)
-   {
-      auto resolve_data =
-          psio1::make_field_resolver(value.data, input_stream, output_stream, error, first);
-      return psio1::gql_query_inline(
-          psio1::generate_gql_partial_name((const WithBlockContext<T>*)nullptr, false),
-          [&](std::string_view field_name, std::string_view alias) -> bool
-          {
-             if (field_name == "block")
-             {
-                psio1::detail::write_field_name(alias, first, output_stream);
-                return gql_query(value.block, input_stream, output_stream, error, false);
-             }
-             return resolve_data(field_name, alias);
-          },
-          input_stream, output_stream, error, first);
-   }
-
-   /// GraphQL Pagination through TableIndex
+   /// A [TableIndex] as PSIO's GraphQL engine pages through it
+   /// (`psio::graphql::ordered_index`)
    ///
-   /// You rarely need to call this directly; see [the example](#makeconnection-example).
+   /// The keys, and so the cursors, are the keys of the index without its prefix.
+   /// The rows are the packed rows: a query reads the fields it selects in place.
    ///
-   /// Template arguments:
-   /// - `Connection`: [Connection]
-   /// - `T`: Type stored in index
-   /// - `Key`: Key in index
-   ///
-   /// Arguments:
-   /// - `index`: [TableIndex] to paginate through
-   /// - `gt`: Restrict range to keys greater than this
-   /// - `ge`: Restrict range to keys greater than or equal to this
-   /// - `lt`: Restrict range to keys less than to this
-   /// - `le`: Restrict range to keys less than or equal to this
-   /// - `first`: Stop after including this many items at the beginning of the range
-   /// - `last`: Stop after including this many items at the end of the range
-   /// - `before`: Opaque cursor value. Resume paging; include keys before this point
-   /// - `after`: Opaque cursor value. Resume paging; include keys after this point
-   /// - `maxBytes`: Stop before the serialized rows included would total more than
-   ///   this many bytes. At least one row is always included, even if it alone is larger.
-   ///
-   /// By default, `makeConnection` pages through the entire index's range.
-   /// `gt`, `ge`, `lt`, and `le` restrict the range. They can be used in any
-   /// combination (set intersection).
-   ///
-   /// `first`, `last`, `before`, `after`, [PageInfo], [Connection], and
-   /// [Edge] match the GraphQL Cursor Connections Specification
-   /// (aka GraphQL Pagination). `first` and `after` page through the
-   /// range defined above in the forward direction. `last` and `before`
-   /// page through the range defined above in the reverse direction.
-   /// Combining `first` with `last` isn't recommended, but matches the
-   /// behavior in the specification.
-   ///
-   /// #### makeConnection example
-   ///
-   /// This demonstrates exposing a table's contents via GraphQL. This example
-   /// doesn't include a way to fill the table; that's left as an exercise to the
-   /// reader. Hint: service-based RPC and GraphQL only support read-only
-   /// operations; you must use actions to write to a table.
-   ///
-   /// ```c++
-   /// #include <psibase/Service.hpp>
-   /// #include <psibase/dispatch.hpp>
-   /// #include <psibase/serveGraphQL.hpp>
-   /// #include <psibase/serveSimpleUI.hpp>
-   ///
-   /// struct MyType
-   /// {
-   ///    uint32_t    primaryKey;
-   ///    std::string secondaryKey;
-   ///    std::string moreData;
-   ///
-   ///    std::string someFn(std::string arg1, std::string arg2) const
-   ///    {
-   ///       return arg1 + secondaryKey + arg2 + moreData;
-   ///    }
-   /// };
-   /// PSIO_REFLECT(MyType,
-   ///    primaryKey, secondaryKey, moreData,
-   ///    method(someFn, arg1, arg2))
-   ///
-   /// using MyTable  = psibase::Table<
-   ///    MyType, &MyType::primaryKey, &MyType::secondaryKey>;
-   /// using MyTables = psibase::ServiceTables<MyTable>;
-   ///
-   /// struct Query
-   /// {
-   ///    psibase::AccountNumber service;
-   ///
-   ///    auto rowsByPrimary() const {
-   ///       return MyTables{service}.open<MyTable>().getIndex<0>();
-   ///    }
-   ///    auto rowsBySecondary() const {
-   ///       return MyTables{service}.open<MyTable>().getIndex<1>();
-   ///    }
-   /// };
-   /// PSIO_REFLECT(Query, method(rowsByPrimary), method(rowsBySecondary))
-   ///
-   /// struct ExampleService : psibase::Service
-   /// {
-   ///    std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
-   ///    {
-   ///       if (auto result = psibase::serveSimpleUI<ExampleService, true>(request))
-   ///          return result;
-   ///       if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))
-   ///          return result;
-   ///       return std::nullopt;
-   ///    }
-   /// };
-   /// PSIO_REFLECT(ExampleService, method(serveSys, request))
-   ///
-   /// PSIBASE_DISPATCH(ExampleService)
-   /// ```
-   ///
-   /// This example doesn't call `makeConnection` directly; it's automatic.
-   /// If a member function on a query object:
-   ///
-   /// - is `const`, and
-   /// - is reflected, and
-   /// - has no arguments, and
-   /// - returns a [TableIndex]
-   ///
-   /// then the system exposes that function to GraphQL as a function which
-   /// takes `gt`, `ge`, `lt`, `le`, `first`, `last`, `before`, and `after`.
-   /// The system calls `makeConnection` automatically.
-   ///
-   /// [serveGraphQL] generates this GraphQL schema and processes queries which
-   /// conform to it:
-   ///
-   /// ```
-   /// type MyType {
-   ///     primaryKey: Float!
-   ///     secondaryKey: String!
-   ///     moreData: String!
-   ///     someFn(arg1: String! arg2: String!): String!
-   /// }
-   /// type PageInfo {
-   ///     hasPreviousPage: Boolean!
-   ///     hasNextPage: Boolean!
-   ///     startCursor: String!
-   ///     endCursor: String!
-   /// }
-   /// type MyTypeEdge {
-   ///     node: MyType!
-   ///     cursor: String!
-   /// }
-   /// type MyTypeConnection {
-   ///     edges: [MyTypeEdge!]!
-   ///     pageInfo: PageInfo!
-   /// }
-   /// type Query {
-   ///     rowsByPrimary(
-   ///          gt: Float ge: Float lt: Float le: Float
-   ///          first: Float last: Float
-   ///          before: String after: String): MyTypeConnection!
-   ///     rowsBySecondary(
-   ///          gt: String ge: String lt: String le: String
-   ///          first: Float last: Float
-   ///          before: String after: String): MyTypeConnection!
-   /// }
-   /// ```
-   ///
-   /// Things of note:
-   /// - `rowsByPrimary` and `rowsBySecondary` automatically have `makeConnection`'s arguments.
-   /// - `MyTypeEdge` and `MyTypeConnection` are automatically generated from `MyType`.
-   /// - Returned rows (`MyType`) include MyType's fields and the `someFn` method. Only `const` methods are exposed.
-   /// - [serveGraphQL] automatically chooses GraphQL types which cover the range of numeric types. When no suitable match is found (e.g. no GraphQL type covers the range of `int64_t`), it falls back to `String`.
-   template <typename Connection, typename T, typename Key, typename Proj = std::identity>
-   Connection makeConnectionIter(const TableIndex<T, Key>&         index,
-                                 const std::optional<Key>&         gt,
-                                 const std::optional<Key>&         ge,
-                                 const std::optional<Key>&         lt,
-                                 const std::optional<Key>&         le,
-                                 std::optional<uint32_t>           first,
-                                 std::optional<uint32_t>           last,
-                                 const std::optional<std::string>& before,
-                                 const std::optional<std::string>& after,
-                                 Proj&&                            proj     = {},
-                                 std::optional<uint32_t>           maxBytes = std::nullopt)
-   {
-      auto keyFromHex = [&](const std::optional<std::string>& s) -> std::vector<char>
-      {
-         std::vector<char> bytes;
-         if (!s || s->empty())
-            return bytes;
-         bytes.reserve(s->size() / 2);
-         if (!psio::from_hex(*s, bytes))
-            bytes.clear();
-         return bytes;
-      };
-
-      auto rangeBegin = index.begin();
-      auto rangeEnd   = index.end();
-      if (ge)
-         rangeBegin = std::max(rangeBegin, index.lower_bound(*ge));
-      if (gt)
-         rangeBegin = std::max(rangeBegin, index.upper_bound(*gt));
-      if (le)
-         rangeEnd = std::min(rangeEnd, index.upper_bound(*le));
-      if (lt)
-         rangeEnd = std::min(rangeEnd, index.lower_bound(*lt));
-      rangeEnd = std::max(rangeBegin, rangeEnd);
-
-      auto it  = rangeBegin;
-      auto end = rangeEnd;
-      if (auto key = keyFromHex(after); !key.empty())
-         it = std::clamp(index.upper_bound(KeyView{key}), rangeBegin, rangeEnd);
-      if (auto key = keyFromHex(before); !key.empty())
-         end = std::clamp(index.lower_bound(KeyView{key}), rangeBegin, rangeEnd);
-      end = std::max(it, end);
-
-      Connection result;
-      auto       add_edge = [&](const auto& it)
-      {
-         auto cursor = psio::to_hex(it.keyWithoutPrefix());
-         result.edges.push_back(typename Connection::Edge{proj(it), std::move(cursor)});
-      };
-      // Rows are sized before they're read, so a page only exceeds the budget
-      // when its first row alone does.
-      std::uint64_t totalBytes = 0;
-      auto          fits       = [&](const auto& it)
-      {
-         if (!maxBytes)
-            return true;
-         totalBytes += it.valueSize();
-         return result.edges.empty() || totalBytes <= *maxBytes;
-      };
-
-      if (last && !first)
-      {
-         result.pageInfo.hasNextPage = end != rangeEnd;
-         while (it != end && (*last)-- > 0)
-         {
-            if (!fits(--end))
-            {
-               ++end;
-               break;
-            }
-            add_edge(end);
-         }
-         result.pageInfo.hasPreviousPage = end != rangeBegin;
-         std::reverse(result.edges.begin(), result.edges.end());
-      }
-      else
-      {
-         result.pageInfo.hasPreviousPage = it != rangeBegin;
-         for (; it != end && (!first || (*first)-- > 0) && fits(it); ++it)
-            add_edge(it);
-         result.pageInfo.hasNextPage = it != rangeEnd;
-         if (last && *last < result.edges.size())
-         {
-            result.pageInfo.hasPreviousPage = true;
-            result.edges.erase(result.edges.begin(),
-                               result.edges.begin() + (result.edges.size() - *last));
-         }
-      }
-
-      if (!result.edges.empty())
-      {
-         result.pageInfo.startCursor = result.edges.front().cursor;
-         result.pageInfo.endCursor   = result.edges.back().cursor;
-      }
-      return result;
-   }  // makeConnection
-
-   template <typename Connection, typename T, typename Key, typename Proj = std::identity>
-   Connection makeConnection(const TableIndex<T, Key>&         index,
-                             const std::optional<Key>&         gt,
-                             const std::optional<Key>&         ge,
-                             const std::optional<Key>&         lt,
-                             const std::optional<Key>&         le,
-                             std::optional<uint32_t>           first,
-                             std::optional<uint32_t>           last,
-                             const std::optional<std::string>& before,
-                             const std::optional<std::string>& after,
-                             Proj&&                            proj     = {},
-                             std::optional<uint32_t>           maxBytes = std::nullopt)
-   {
-      return makeConnectionIter<Connection>(
-          index, gt, ge, lt, le, first, last, before, after,
-          [&](const auto& iter) { return proj(*iter); }, maxBytes);
-   }
-
-   template <typename Connection, typename T, typename Key, typename Proj = std::identity>
-   Connection makeConnectionView(const TableIndex<T, Key>&         index,
-                                 const std::optional<Key>&         gt,
-                                 const std::optional<Key>&         ge,
-                                 const std::optional<Key>&         lt,
-                                 const std::optional<Key>&         le,
-                                 std::optional<uint32_t>           first,
-                                 std::optional<uint32_t>           last,
-                                 const std::optional<std::string>& before,
-                                 const std::optional<std::string>& after,
-                                 Proj&&                            proj     = {},
-                                 std::optional<uint32_t>           maxBytes = std::nullopt)
-   {
-      return makeConnectionIter<Connection>(
-          index, gt, ge, lt, le, first, last, before, after,
-          [&](const auto& iter) { return proj(iter.view()); }, maxBytes);
-   }
-
-   /// Similar to makeConnection, except that it allows pagination through a virtual table index.
-   ///
-   /// A virtual table index is a dynamically constructed vector of objects.
-   ///
-   /// Allows for a user-provided projection function that transforms elements from type T to Key
-   /// before isolating a range within the container.
-   template <typename Connection, typename T, typename Key>
-   Connection makeVirtualConnection(const std::vector<T>&             elements,
-                                    const std::optional<Key>&         gt,
-                                    const std::optional<Key>&         ge,
-                                    const std::optional<Key>&         lt,
-                                    const std::optional<Key>&         le,
-                                    std::optional<uint32_t>           first,
-                                    std::optional<uint32_t>           last,
-                                    const std::optional<std::string>& before,
-                                    const std::optional<std::string>& after,
-                                    std::function<Key(T)>             projection = {})
-   {
-      auto indexFromString = [&](const std::string& str, size_t& index) -> bool
-      {
-         char*         end;
-         unsigned long result = std::strtoul(str.c_str(), &end, 10);
-         if (end == str.c_str() || *end != '\0' || result == std::numeric_limits<size_t>::max())
-         {
-            return false;
-         }
-         index = static_cast<size_t>(result);
-         return true;
-      };
-
-      auto lower_bound = [&](const Key& key)
-      { return std::ranges::lower_bound(elements, key, {}, projection); };
-
-      auto upper_bound = [&](const Key& key)
-      { return std::ranges::upper_bound(elements, key, {}, projection); };
-
-      auto rangeBegin = elements.begin();
-      auto rangeEnd   = elements.end();
-      if (ge || gt || le || lt)
-      {
-         if (!projection)
-         {
-            psibase::check(false, "makeVirtualConnection: missing projection function");
-         }
-      }
-      if (ge)
-         rangeBegin = std::max(rangeBegin, lower_bound(*ge));
-      if (gt)
-         rangeBegin = std::max(rangeBegin, upper_bound(*gt));
-      if (le)
-         rangeEnd = std::min(rangeEnd, upper_bound(*le));
-      if (lt)
-         rangeEnd = std::min(rangeEnd, lower_bound(*lt));
-      rangeEnd = std::max(rangeBegin, rangeEnd);
-
-      auto it  = rangeBegin;
-      auto end = rangeEnd;
-      if (after)
-      {
-         size_t index = 0;
-         if (indexFromString(*after, index))
-            it = std::clamp(elements.begin() + index + 1, rangeBegin, rangeEnd);
-      }
-      if (before)
-      {
-         size_t index = 0;
-         if (indexFromString(*before, index))
-            end = std::clamp(elements.begin() + index, rangeBegin, rangeEnd);
-      }
-
-      end = std::max(it, end);
-
-      Connection result;
-      auto       add_edge = [&](const auto& it)
-      {
-         size_t index  = std::distance(elements.begin(), it);
-         auto   cursor = std::to_string(index);
-         result.edges.push_back(typename Connection::Edge{*it, std::move(cursor)});
-      };
-
-      if (last && !first)
-      {
-         result.pageInfo.hasNextPage = end != rangeEnd;
-         while (it != end && (*last)-- > 0)
-            add_edge(--end);
-         result.pageInfo.hasPreviousPage = end != rangeBegin;
-         std::reverse(result.edges.begin(), result.edges.end());
-      }
-      else
-      {
-         result.pageInfo.hasPreviousPage = it != rangeBegin;
-         for (; it != end && (!first || (*first)-- > 0); ++it)
-            add_edge(it);
-         result.pageInfo.hasNextPage = it != rangeEnd;
-         if (last && *last < result.edges.size())
-         {
-            result.pageInfo.hasPreviousPage = true;
-            result.edges.erase(result.edges.begin(),
-                               result.edges.begin() + (result.edges.size() - *last));
-         }
-      }
-
-      if (!result.edges.empty())
-      {
-         result.pageInfo.startCursor = result.edges.front().cursor;
-         result.pageInfo.endCursor   = result.edges.back().cursor;
-      }
-      return result;
-   }  // makeConnection
-
-   template <typename Index, typename F>
-   struct TransformedConnection
-   {
-      Index index;
-      F     f;
-      /// Limits the size of a page, which may then hold fewer rows than requested;
-      /// see [makeConnectionIter]
-      std::optional<uint32_t> maxBytes = std::nullopt;
-   };
-
-   template <typename Index, typename F>
-   struct TransformedConnectionView
-   {
-      Index index;
-      F     f;
-      /// Limits the size of a page, which may then hold fewer rows than requested;
-      /// see [makeConnectionIter]
-      std::optional<uint32_t> maxBytes = std::nullopt;
-   };
-
-   namespace detail
-   {
-      template <typename Connection, typename T, typename Key>
-      Connection makeConnectionFn(const TableIndex<T, Key>&         index,
-                                  const std::optional<Key>&         gt,
-                                  const std::optional<Key>&         ge,
-                                  const std::optional<Key>&         lt,
-                                  const std::optional<Key>&         le,
-                                  std::optional<uint32_t>           first,
-                                  std::optional<uint32_t>           last,
-                                  const std::optional<std::string>& before,
-                                  const std::optional<std::string>& after)
-      {
-         return makeConnection<Connection>(index, gt, ge, lt, le, first, last, before, after);
-      }
-
-      template <typename Connection, typename Index, typename F, typename Key>
-      Connection makeTransformedConnection(const TransformedConnection<Index, F>& index,
-                                           const std::optional<Key>&              gt,
-                                           const std::optional<Key>&              ge,
-                                           const std::optional<Key>&              lt,
-                                           const std::optional<Key>&              le,
-                                           std::optional<uint32_t>                first,
-                                           std::optional<uint32_t>                last,
-                                           const std::optional<std::string>&      before,
-                                           const std::optional<std::string>&      after)
-      {
-         return makeConnection<Connection>(index.index, gt, ge, lt, le, first, last, before, after,
-                                           index.f, index.maxBytes);
-      }
-
-      template <typename Connection, typename Index, typename F, typename Key>
-      Connection makeTransformedConnectionView(const TransformedConnectionView<Index, F>& index,
-                                               const std::optional<Key>&                  gt,
-                                               const std::optional<Key>&                  ge,
-                                               const std::optional<Key>&                  lt,
-                                               const std::optional<Key>&                  le,
-                                               std::optional<uint32_t>                    first,
-                                               std::optional<uint32_t>                    last,
-                                               const std::optional<std::string>&          before,
-                                               const std::optional<std::string>&          after)
-      {
-         return makeConnectionView<Connection>(index.index, gt, ge, lt, le, first, last, before,
-                                               after, index.f, index.maxBytes);
-      }
-   }  // namespace detail
-
+   /// - `psio::graphql::paginate(IndexView{index}, range, page, allRows)`: a page of the index
+   /// - `psio::graphql::transform(IndexView{index}, fn)`: the rows shown as another
+   ///   record; `fn` takes a `psio::shared_pssz<T>`
    template <typename T, typename K>
-   constexpr std::optional<std::array<const char*, 8>> gql_callable_args(TableIndex<T, K>*)
+   struct IndexView
    {
-      return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after"};
-   }
+      using iterator = KvIterator<T>;
+      TableIndex<T, K> index;
 
+      iterator begin() const { return index.begin(); }
+      iterator end() const { return index.end(); }
+      /// The first row with a key >= `key`
+      iterator lower_bound(std::span<const char> key) const
+      {
+         return index.lower_bound(KeyView{key});
+      }
+      /// The first row with a key > `key`
+      iterator upper_bound(std::span<const char> key) const
+      {
+         // The smallest byte string above `key`
+         std::vector<char> next(key.begin(), key.end());
+         next.push_back(0);
+         return index.lower_bound(KeyView{next});
+      }
+      std::span<const char> key(const iterator& it) const { return it.keyWithoutPrefix(); }
+      psio::shared_pssz<T>  row(const iterator& it) const { return it.view(); }
+      std::size_t           row_bytes(const iterator& it) const { return it.valueSize(); }
+   };
    template <typename T, typename K>
-   constexpr auto gql_callable_fn(const TableIndex<T, K>*)
-   {
-      using Connection = psibase::Connection<  //
-          T, psio::reflect<T>::fixed_name + "Connection", psio::reflect<T>::fixed_name + "Edge">;
-      return &detail::makeConnectionFn<Connection, T, K>;
-   }  // gql_callable_fn
+   IndexView(TableIndex<T, K>) -> IndexView<T, K>;
 
-   template <typename Index, typename F>
-   constexpr std::optional<std::array<const char*, 8>> gql_callable_args(
-       TransformedConnection<Index, F>*)
+   /// The page size limit of a connection that has none
+   ///
+   /// A query without `first` or `last` gets every row of the range, and `first`
+   /// and `last` are not capped. (PSIO's own default is 100 rows.) The limits of
+   /// the engine still apply: the complexity of the query, counted with `first`
+   /// or `last` as the page size, and the size of the response.
+   inline constexpr psio::graphql::page_limits allRows{std::numeric_limits<std::size_t>::max()};
+
+   /// The arguments of a field that returns a [TableIndex]: `gt`, `ge`, `lt`, `le`
+   /// (of the index's key type), `first`, `last`, `before`, `after`
+   template <typename K>
+   struct IndexArgs
    {
-      return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after"};
+      psio::graphql::key_range<K> range;
+      psio::graphql::page_args    page;
+      PSIO_REFLECT(IndexArgs, range, page)
+   };
+}  // namespace psibase
+
+template <typename K>
+inline constexpr bool psio::graphql::argument_group<psibase::IndexArgs<K>> = true;
+
+/// A const method of a query object that returns a [TableIndex] is a connection
+/// field: it takes `gt`, `ge`, `lt`, `le`, `first`, `last`, `before`, and `after`
+/// and yields `<T>Connection`.
+///
+/// #### connection example
+///
+/// ```c++
+/// #include <psibase/Service.hpp>
+/// #include <psibase/dispatch.hpp>
+/// #include <psibase/serveGraphQL.hpp>
+/// #include <psibase/serveSimpleUI.hpp>
+///
+/// struct MyType
+/// {
+///    uint32_t    primaryKey;
+///    std::string secondaryKey;
+///    std::string moreData;
+///
+///    std::string someFn(std::string arg1, std::string arg2) const
+///    {
+///       return arg1 + secondaryKey + arg2 + moreData;
+///    }
+/// };
+/// PSIO_REFLECT(MyType,
+///    primaryKey, secondaryKey, moreData,
+///    method(someFn, arg1, arg2))
+///
+/// using MyTable  = psibase::Table<
+///    MyType, &MyType::primaryKey, &MyType::secondaryKey>;
+/// using MyTables = psibase::ServiceTables<MyTable>;
+///
+/// struct Query
+/// {
+///    psibase::AccountNumber service;
+///
+///    auto rowsByPrimary() const {
+///       return MyTables{service}.open<MyTable>().getIndex<0>();
+///    }
+///    // The same, spelled out: a range and a page of an index
+///    auto rowsBySecondary(psio::graphql::key_range<std::string> range,
+///                         psio::graphql::page_args              page) const {
+///       return psio::graphql::paginate(
+///          psibase::IndexView{MyTables{service}.open<MyTable>().getIndex<1>()},
+///          range, page, psibase::allRows);
+///    }
+/// };
+/// PSIO_REFLECT(Query, attr(service, psio::graphql::hidden),
+///              method(rowsByPrimary), method(rowsBySecondary, range, page))
+///
+/// struct ExampleService : psibase::Service
+/// {
+///    std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
+///    {
+///       if (auto result = psibase::serveSimpleUI<ExampleService, true>(request))
+///          return result;
+///       if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))
+///          return result;
+///       return std::nullopt;
+///    }
+/// };
+/// PSIO_REFLECT(ExampleService, method(serveSys, request))
+///
+/// PSIBASE_DISPATCH(ExampleService)
+/// ```
+///
+/// [serveGraphQL] generates this GraphQL schema and processes queries which
+/// conform to it:
+///
+/// ```
+/// type Query {
+///   rowsByPrimary(gt: Int, ge: Int, lt: Int, le: Int, first: Int, last: Int, before: String, after: String): MyTypeConnection
+///   rowsBySecondary(gt: String, ge: String, lt: String, le: String, first: Int, last: Int, before: String, after: String): MyTypeConnection
+/// }
+/// type MyTypeConnection {
+///   edges: [MyTypeEdge!]!
+///   pageInfo: PageInfo!
+/// }
+/// type MyTypeEdge {
+///   node: MyType!
+///   cursor: String!
+/// }
+/// type PageInfo {
+///   hasNextPage: Boolean!
+///   hasPreviousPage: Boolean!
+///   startCursor: String
+///   endCursor: String
+/// }
+/// type MyType {
+///   primaryKey: Int!
+///   secondaryKey: String!
+///   moreData: String!
+///   someFn(arg1: String!, arg2: String!): String!
+/// }
+/// ```
+///
+/// - `gt`, `ge`, `lt`, and `le` restrict the range. They can be used in any
+///   combination (set intersection).
+/// - `first` and `after` page forward, `last` and `before` backward; `first`
+///   together with `last` is an error. A cursor is the hex of a row's key.
+/// - `psio::graphql::transform(IndexView{index}, fn)` shows the rows as another
+///   record, and `psio::graphql::page_budget{.max_bytes = n, .max_page_size = m}`
+///   in place of `allRows` limits the stored size of a page.
+template <typename T, typename K>
+struct psio::graphql::resolver<psibase::TableIndex<T, K>>
+{
+   using arguments = psibase::IndexArgs<K>;
+   static auto resolve(psibase::TableIndex<T, K>&& index, const arguments& args)
+   {
+      return psio::graphql::paginate(psibase::IndexView<T, K>{std::move(index)}, args.range,
+                                     args.page, psibase::allRows);
    }
+};
 
-   template <typename T, typename Key, typename F>
-   constexpr auto gql_callable_fn(const TransformedConnection<TableIndex<T, Key>, F>*)
-   {
-      using R          = decltype(std::declval<F>()(std::declval<T>()));
-      using Connection = psibase::Connection<  //
-          R, psio::reflect<R>::fixed_name + "Connection", psio::reflect<R>::fixed_name + "Edge">;
-      return &detail::makeTransformedConnection<Connection, TableIndex<T, Key>, F, Key>;
-   }  // gql_callable_fn
+// The names of the types of an event query: `<T>WithBlockContext`,
+// `<T>Connection`, `<T>Edge`
+template <typename T>
+struct psio::graphql::type_name<psibase::WithBlockContext<T>>
+{
+   static constexpr std::string_view value =
+       psio::graphql::affixed_name<"", T, "WithBlockContext">;
+};
+template <typename T>
+struct psio::graphql::type_name<psio::graphql::connection<psibase::WithBlockContext<T>>>
+{
+   static constexpr std::string_view value = psio::graphql::affixed_name<"", T, "Connection">;
+};
+template <typename T>
+struct psio::graphql::type_name<psio::graphql::edge<psibase::WithBlockContext<T>>>
+{
+   static constexpr std::string_view value = psio::graphql::affixed_name<"", T, "Edge">;
+};
 
-   template <typename Index, typename F>
-   constexpr std::optional<std::array<const char*, 8>> gql_callable_args(
-       TransformedConnectionView<Index, F>*)
-   {
-      return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after"};
-   }
-
-   template <typename T, typename Key, typename F>
-   constexpr auto gql_callable_fn(const TransformedConnectionView<TableIndex<T, Key>, F>*)
-   {
-      // The transform is given the packed row
-      using R = decltype(std::declval<F>()(std::declval<psio::shared_pssz<T>>()));
-      using Connection = psibase::Connection<  //
-          R, psio::reflect<R>::fixed_name + "Connection", psio::reflect<R>::fixed_name + "Edge">;
-      return &detail::makeTransformedConnectionView<Connection, TableIndex<T, Key>, F, Key>;
-   }  // gql_callable_fn
-
+namespace psibase
+{
    struct EventQueryInterface
    {
       std::string sqlQuery(const std::string& query, const std::vector<std::string>& params);
@@ -848,14 +500,19 @@ namespace psibase
    /// [GraphQL Pagination Spec](https://relay.dev/graphql/connections.htm).
    ///
    /// `condition` defines a SQL WHERE clause filter.
-   /// `first`, `last`, `before`, and `after` page through the results.
+   /// `page` (`first`, `last`, `before`, and `after`) pages through the results.
    ///
    /// They conform to the Pagination Spec, except that simultaneous `first`
    /// and `last` arguments are forbidden, rather than simply discouraged.
+   ///
+   /// A cursor is the hex of the row id as a key (16 digits).
    template <typename T>
    class EventQuery
    {
      public:
+      using Node       = WithBlockContext<T>;
+      using Connection = psio::graphql::connection<Node>;
+
       /// Create a new query for the given table
       explicit EventQuery(std::string table_name) : _table_name(std::move(table_name)) {}
 
@@ -882,82 +539,39 @@ namespace psibase
          return *this;
       }
 
-      /// Limit the result to the first `n` matching records.
+      /// The page to return
       ///
-      /// This replaces the current value. Returns error if n is negative.
-      EventQuery& first(std::optional<int32_t> n)
-      {
-         if (n.has_value())
-         {
-            if (n.value() < 0 || n.value() == std::numeric_limits<int32_t>::max())
-            {
-               check(false, "'first' value out of range");
-            }
-            if (_last.has_value())
-            {
-               check(false, "Cannot specify both 'first' and 'last'");
-            }
-         }
-
-         _first = n;
-         return *this;
-      }
-
-      /// Limit the result to the last `n` matching records.
-      ///
-      /// This replaces the current value. Returns error if n is negative.
-      EventQuery& last(std::optional<int32_t> n)
-      {
-         if (n.has_value())
-         {
-            if (n.value() < 0 || n.value() == std::numeric_limits<int32_t>::max())
-            {
-               check(false, "'last' value out of range");
-            }
-            if (_first.has_value())
-            {
-               check(false, "Cannot specify both 'first' and 'last'");
-            }
-         }
-
-         _last = n;
-         return *this;
-      }
-
-      /// Resume paging. Limits the result to records before `cursor`.
-      /// `cursor` is opaque; get it from a previously-returned Connection.
+      /// - `first`: limit the result to the first `n` matching records
+      /// - `last`: limit the result to the last `n` matching records
+      /// - `before`, `after`: resume paging; limit the result to records before
+      ///   (after) a cursor of a previously-returned connection
       ///
       /// This replaces the current value.
-      EventQuery& before(std::optional<std::string> cursor)
+      EventQuery& page(psio::graphql::page_args page)
       {
-         _before = std::move(cursor);
+         _page = std::move(page);
          return *this;
       }
 
-      /// Resume paging. Limits the result to records after `cursor`.
-      /// `cursor` is opaque; get it from a previously-returned Connection.
-      ///
-      /// This replaces the current value.
-      EventQuery& after(std::optional<std::string> cursor)
-      {
-         _after = std::move(cursor);
-         return *this;
-      }
-
-      /// Execute the query and return a Connection containing the results.
+      /// Execute the query and return a connection containing the results.
       ///
       /// Each node is wrapped in WithBlockContext<T> carrying block metadata.
-      /// Returns error if both first and last are specified.
-      Connection<WithBlockContext<T>,
-                 psio::reflect<T>::fixed_name + "Connection",
-                 psio::reflect<T>::fixed_name + "Edge">
-      query() const
+      /// The result is a field error if both first and last are specified, if
+      /// one of them is out of range or if a cursor is malformed.
+      psio::graphql::result<Connection> query() const
       {
-         auto [rows, has_next_page, has_prev_page] = all_edges();
+         if (_page.first && _page.last)
+            return psio::graphql::fail("Arguments \"first\" and \"last\" cannot both be given.");
+         for (const auto& n : {_page.first, _page.last})
+            if (n && (*n < 0 || *n == std::numeric_limits<int32_t>::max()))
+               return psio::graphql::fail("Arguments \"first\" and \"last\" are out of range.");
+         std::optional<uint64_t> before, after;
+         if (_page.before && !(before = extract_cursor(*_page.before)))
+            return psio::graphql::fail("Argument \"before\" is not a cursor.");
+         if (_page.after && !(after = extract_cursor(*_page.after)))
+            return psio::graphql::fail("Argument \"after\" is not a cursor.");
 
-         using ConnType = Connection<WithBlockContext<T>, psio::reflect<T>::fixed_name + "Connection",
-                                     psio::reflect<T>::fixed_name + "Edge">;
-         using EdgeType = typename ConnType::Edge;
+         auto [rows, has_next_page, has_prev_page] = all_edges(before, after);
 
          std::vector<uint64_t> rowids;
          rowids.reserve(rows.size());
@@ -972,42 +586,35 @@ namespace psibase
             blockInfos[bs.rowIndex] = EventBlockInfo{bs.blockNum, bs.blockTime};
          }
 
-         ConnType connection;
-         connection.pageInfo.hasNextPage     = has_next_page;
-         connection.pageInfo.hasPreviousPage = has_prev_page;
+         psio::graphql::connection_builder<Node> connection;
+         connection.reserve(rows.size());
          for (size_t i = 0; i < rows.size(); ++i)
          {
-            EdgeType edge;
-            edge.node   = WithBlockContext<T>{blockInfos[i], std::move(rows[i].data)};
-            edge.cursor = std::to_string(rows[i].rowid);
-            connection.edges.push_back(std::move(edge));
+            auto cursor = psio::to_key(rows[i].rowid);
+            connection.add(Node{blockInfos[i], std::move(rows[i].data)},
+                           std::span<const char>{cursor.data(), cursor.size()});
          }
-         if (!connection.edges.empty())
-         {
-            connection.pageInfo.startCursor = connection.edges.front().cursor;
-            connection.pageInfo.endCursor   = connection.edges.back().cursor;
-         }
-
-         return connection;
+         return std::move(connection).finish(has_prev_page, has_next_page);
       }
 
      private:
-      std::tuple<std::vector<SqlRow<T>>, bool, bool> all_edges() const
+      std::tuple<std::vector<SqlRow<T>>, bool, bool> all_edges(std::optional<uint64_t> before,
+                                                               std::optional<uint64_t> after) const
       {
          std::optional<int32_t> limit_plus_one;
          bool                   descending = false;
 
-         if (_first.has_value())
+         if (_page.first.has_value())
          {
-            limit_plus_one = _first.value() + 1;
+            limit_plus_one = _page.first.value() + 1;
          }
-         else if (_last.has_value())
+         else if (_page.last.has_value())
          {
-            limit_plus_one = _last.value() + 1;
+            limit_plus_one = _page.last.value() + 1;
             descending     = true;
          }
 
-         auto query_str = generate_sql_query(limit_plus_one, descending, _before, _after);
+         auto query_str = generate_sql_query(limit_plus_one, descending, before, after);
          auto json_str  = detail::sql_query(query_str, _params, _debug);
          auto rows      = detail::read_sql_rows<T>(json_str);
 
@@ -1020,15 +627,15 @@ namespace psibase
          bool                   has_prev_page = false;
          std::optional<int32_t> user_limit;
 
-         if (_first.has_value())
+         if (_page.first.has_value())
          {
-            has_next_page = rows.size() > static_cast<size_t>(_first.value());
-            user_limit    = _first;
+            has_next_page = rows.size() > static_cast<size_t>(_page.first.value());
+            user_limit    = _page.first;
          }
-         else if (_last.has_value())
+         else if (_page.last.has_value())
          {
-            has_prev_page = rows.size() > static_cast<size_t>(_last.value());
-            user_limit    = _last;
+            has_prev_page = rows.size() > static_cast<size_t>(_page.last.value());
+            user_limit    = _page.last;
          }
 
          if (user_limit.has_value())
@@ -1040,7 +647,7 @@ namespace psibase
             }
          }
 
-         if (_last.has_value())
+         if (_page.last.has_value())
          {
             std::reverse(rows.begin(), rows.end());
          }
@@ -1048,19 +655,22 @@ namespace psibase
          return {rows, has_next_page, has_prev_page};
       }
 
-      uint64_t extract_cursor(std::string_view c) const
+      // The row id of a cursor: 16 hex digits, the key of the row id
+      static std::optional<uint64_t> extract_cursor(std::string_view c)
       {
          uint64_t b{};
-         auto [ptr, ec] = std::from_chars(c.data(), c.data() + c.size(), b);
-         check(ec == std::errc{}, "Invalid cursor");
-         check(ptr == c.data() + c.size(), "Invalid cursor: not all characters consumed");
+         if (c.size() != 16)
+            return std::nullopt;
+         auto [ptr, ec] = std::from_chars(c.data(), c.data() + c.size(), b, 16);
+         if (ec != std::errc{} || ptr != c.data() + c.size())
+            return std::nullopt;
          return b;
       }
 
-      std::string generate_sql_query(std::optional<int32_t>     limit,
-                                     bool                       descending,
-                                     std::optional<std::string> before,
-                                     std::optional<std::string> after) const
+      std::string generate_sql_query(std::optional<int32_t>  limit,
+                                     bool                    descending,
+                                     std::optional<uint64_t> before,
+                                     std::optional<uint64_t> after) const
       {
          std::vector<std::string> filters;
 
@@ -1071,12 +681,12 @@ namespace psibase
 
          if (before.has_value())
          {
-            filters.push_back(std::format("ROWID < {}", extract_cursor(*before)));
+            filters.push_back(std::format("ROWID < {}", *before));
          }
 
          if (after.has_value())
          {
-            filters.push_back(std::format("ROWID > {}", extract_cursor(*after)));
+            filters.push_back(std::format("ROWID > {}", *after));
          }
 
          auto order = descending ? "DESC" : "ASC";
@@ -1108,10 +718,7 @@ namespace psibase
       std::string                _table_name;
       std::optional<std::string> _condition;
       std::vector<std::string>   _params;
-      std::optional<int32_t>     _first;
-      std::optional<int32_t>     _last;
-      std::optional<std::string> _before;
-      std::optional<std::string> _after;
+      psio::graphql::page_args   _page;
       bool                       _debug = false;
 
    };  // EventQuery

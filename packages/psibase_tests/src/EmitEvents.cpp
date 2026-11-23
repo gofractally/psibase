@@ -57,35 +57,19 @@ PSIO_REFLECT(FooEventRecord, s, i);
 
 struct Query
 {
-   auto foo2Events(std::optional<int32_t>     first,
-                   std::optional<int32_t>     last,
-                   std::optional<std::string> before,
-                   std::optional<std::string> after) const
+   auto foo2Events(psio::graphql::page_args page) const
    {
-      return EventQuery<FooEventRecord>("history.event-svc.e")
-          .first(first)
-          .last(last)
-          .before(before)
-          .after(after)
-          .query();
+      return EventQuery<FooEventRecord>("history.event-svc.e").page(std::move(page)).query();
    }
 
-   auto exampleRecords(std::optional<int32_t>     first,
-                       std::optional<int32_t>     last,
-                       std::optional<std::string> before,
-                       std::optional<std::string> after) const
+   auto exampleRecords(psio::graphql::page_args page) const
    {
-      return EventQuery<ExampleRecordQuery>("history.event-svc.e2")
-          .first(first)
-          .last(last)
-          .before(before)
-          .after(after)
-          .query();
+      return EventQuery<ExampleRecordQuery>("history.event-svc.e2").page(std::move(page)).query();
    }
 };
 PSIO_REFLECT(Query,  //
-             method(foo2Events, first, last, before, after),
-             method(exampleRecords, first, last, before, after))
+             method(foo2Events, page),
+             method(exampleRecords, page))
 
 std::optional<psibase::HttpReply> EmitEvents::serveSys(psibase::HttpRequest request)
 {

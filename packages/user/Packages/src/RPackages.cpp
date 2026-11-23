@@ -74,28 +74,23 @@ namespace UserService
          return Packages{}.open<PublishedPackageTable>().get(std::tuple(owner, name, version));
       }
 
-      auto packages(psibase::AccountNumber            owner,
-                    std::optional<std::string>        name,
-                    std::optional<uint32_t>           first,
-                    std::optional<uint32_t>           last,
-                    const std::optional<std::string>& before,
-                    const std::optional<std::string>& after) const
+      auto packages(psibase::AccountNumber     owner,
+                    std::optional<std::string> name,
+                    psio::graphql::page_args   page) const
       {
          requireAccount(owner);
 
-         using Conn =
-             psibase::Connection<PublishedPackage, psio::fixed_string{"PublishedPackageConnection"},
-                                 psio::fixed_string{"PublishedPackageEdge"}>;
          auto published = Packages{}.open<PublishedPackageTable>().getIndex<0>();
          if (name)
          {
-            auto index = published.subindex(std::tuple(owner, *name));
-            return makeConnection<Conn>(index, {}, {}, {}, {}, first, last, before, after);
+            return psio::graphql::paginate(
+                psibase::IndexView{published.subindex(std::tuple(owner, *name))}, page,
+                psibase::allRows);
          }
          else
          {
-            auto index = published.subindex(owner);
-            return makeConnection<Conn>(index, {}, {}, {}, {}, first, last, before, after);
+            return psio::graphql::paginate(psibase::IndexView{published.subindex(owner)}, page,
+                                           psibase::allRows);
          }
       }
 
@@ -116,7 +111,7 @@ namespace UserService
        method(installed),
        method(newAccounts, accounts, owner),
        method(package, owner, name, version),
-       method(packages, owner, name, first, last, before, after),
+       method(packages, owner, name, page),
        method(sources, account))
 
    struct ManifestQuery
