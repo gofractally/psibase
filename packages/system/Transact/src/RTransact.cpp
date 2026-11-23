@@ -1212,15 +1212,17 @@ namespace
       {
          std::vector<char> body;
          body.reserve(request.body.size() + 1);
-         body.insert(request.body.end(), request.body.begin(), request.body.end());
+         body.insert(body.end(), request.body.begin(), request.body.end());
          body.push_back('\0');
          psio1::json_token_stream stream(body.data());
          from_json(result, stream);
       }
       else if (request.contentType == "application/octet-stream")
       {
-         psio1::input_stream stream{request.body};
-         from_frac(result, stream);
+         // The body comes from a client: it is used only if it is a valid
+         // packed T.
+         if (!psio1::from_frac(result, std::span<const char>{request.body}))
+            abortMessage("The body is not a valid fracpack value");
       }
       else
       {
@@ -1433,6 +1435,11 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
    else if (request.method == "POST" && target == "/login")
    {
       auto trx = parseBody<SignedTransaction>(request);
+      // A JSON body gives the packed transaction as hex, which the JSON
+      // reader copies without looking at it; the views below read it.
+      if (!psio1::fracpack_validate<Transaction>(
+              std::span<const char>{trx.transaction.data(), trx.transaction.size()}))
+         return make400("Invalid transaction");
       if (trx.transaction->actions().size() != 1 ||
           trx.transaction->actions()[0].method() != MethodNumber{"loginSys"})
          return make400("Expected a login transaction");

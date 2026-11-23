@@ -83,6 +83,18 @@ struct LoginInterface
 };
 PSIO_REFLECT(LoginInterface, method(loginSys, rootHost))
 
+namespace
+{
+   // A request body given as its bytes
+   struct RawBody
+   {
+      std::string       type;
+      std::vector<char> bytes;
+      std::string       contentType() const { return type; }
+      std::vector<char> body() const { return bytes; }
+   };
+}  // namespace
+
 TEST_CASE("Test login")
 {
    DefaultTestChain t;
@@ -107,6 +119,43 @@ TEST_CASE("Test login")
       auto client = t.http(getUser).auth_bearer(token);
       auto user   = client.get<std::optional<AccountNumber>>("/");
       CHECK(user == std::optional{alice});
+   }
+
+   // The same as JSON
+   {
+      SignedTransaction strx{trx};
+
+      auto token = t.post<LoginReply>(Transact::service, "/login", JsonBody{std::move(strx)})
+                       .access_token;
+      auto client = t.http(getUser).auth_bearer(token);
+      auto user   = client.get<std::optional<AccountNumber>>("/");
+      CHECK(user == std::optional{alice});
+   }
+   // A body that is not a packed SignedTransaction, and a JSON body whose
+   // transaction is not a packed Transaction, are refused
+   {
+      auto refused = [&](const auto& body)
+      {
+         try
+         {
+            auto reply = t.post(Transact::service, "/login", body);
+            return static_cast<int>(reply.status) >= 400;
+         }
+         catch (std::exception&)
+         {
+            return true;
+         }
+      };
+      auto packed = psio1::to_frac(SignedTransaction{trx});
+      CHECK(refused(RawBody{"application/octet-stream", {}}));
+      CHECK(refused(RawBody{"application/octet-stream", {'\x01', '\x02', '\x03'}}));
+      CHECK(refused(RawBody{"application/octet-stream",
+                            std::vector<char>(packed.begin(), packed.begin() + packed.size() / 2)}));
+      for (std::string_view hex : {"", "00", "FFFFFFFF", "0800FFFFFFFFFFFFFFFF"})
+      {
+         auto json = "{\"transaction\":\"" + std::string{hex} + "\",\"proofs\":[]}";
+         CHECK(refused(RawBody{"application/json", {json.begin(), json.end()}}));
+      }
    }
 
    t.setAuth<AuthSig::AuthSig>(alice, aliceKeys.first);
