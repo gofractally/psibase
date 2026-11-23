@@ -1,0 +1,80 @@
+== lean-m31
+(no input)               wasm instantiate + start only            9.7      13.0      14.2
+secp256r1_valid          wasm (wasmtime, fresh instance)        451.8     473.8     785.1  accepted
+secp256r1_valid          wasm (wasmtime, reused instance)       433.5     436.4     752.9  accepted
+secp256r1_valid          wasm (reused + restore 64 KB)          434.7     450.0     826.7  accepted
+secp256r1_valid          native liblean-m31.dylib               338.8     339.8     554.8  accepted
+secp256r1_invalid        wasm (wasmtime, fresh instance)        454.2     472.9     717.4  rejected: signature invalid
+secp256r1_invalid        native liblean-m31.dylib               343.5     347.0     482.0  rejected: signature invalid
+secp256k1_valid          wasm (wasmtime, fresh instance)         57.2      63.4     105.8  accepted
+secp256k1_valid          wasm (wasmtime, reused instance)        43.9      46.0      67.4  accepted
+secp256k1_valid          wasm (reused + restore 64 KB)           44.8      47.3      58.6  accepted
+secp256k1_valid          native liblean-m31.dylib                19.1      21.2      22.3  accepted
+secp256k1_invalid        wasm (wasmtime, fresh instance)         57.7      65.0      96.0  rejected: signature invalid
+secp256k1_invalid        native liblean-m31.dylib                24.5      26.1      35.4  rejected: signature invalid
+== lean-m15
+(no input)               wasm instantiate + start only            8.8      12.9      33.0
+secp256r1_valid          wasm (wasmtime, fresh instance)       1202.5    1271.5    1717.8  accepted
+secp256r1_valid          wasm (wasmtime, reused instance)      1178.2    1229.9    1473.0  accepted
+secp256r1_valid          wasm (reused + restore 64 KB)         1179.8    1236.7    1430.9  accepted
+secp256r1_valid          native liblean-m15.dylib               907.0     933.2    1232.2  accepted
+secp256r1_invalid        wasm (wasmtime, fresh instance)       1205.8    1279.2    1654.1  rejected: signature invalid
+secp256r1_invalid        native liblean-m15.dylib               912.5     948.6    1052.3  rejected: signature invalid
+secp256k1_valid          wasm (wasmtime, fresh instance)         56.5      65.8      81.5  accepted
+secp256k1_valid          wasm (wasmtime, reused instance)        43.9      46.4      54.5  accepted
+secp256k1_valid          wasm (reused + restore 64 KB)           44.8      45.7      56.2  accepted
+secp256k1_valid          native liblean-m15.dylib                19.1      21.3      23.6  accepted
+secp256k1_invalid        wasm (wasmtime, fresh instance)         58.3      65.7      76.6  rejected: signature invalid
+secp256k1_invalid        native liblean-m15.dylib                24.5      26.0      30.4  rejected: signature invalid
+== lean-p256m
+(no input)               wasm instantiate + start only            8.9      12.3      14.3
+secp256r1_valid          wasm (wasmtime, fresh instance)       2126.0    2496.4    2628.9  accepted
+secp256r1_valid          wasm (wasmtime, reused instance)      2100.5    2382.2    2455.4  accepted
+secp256r1_valid          wasm (reused + restore 64 KB)         2103.8    2390.0    2508.3  accepted
+secp256r1_invalid        wasm (wasmtime, fresh instance)       2127.7    2501.8    2672.1  rejected: signature invalid
+secp256k1_valid          wasm (wasmtime, fresh instance)         56.6      65.6      81.5  accepted
+secp256k1_valid          wasm (wasmtime, reused instance)        43.7      45.8      50.6  accepted
+secp256k1_valid          wasm (reused + restore 64 KB)           44.9      49.2      52.3  accepted
+secp256k1_invalid        wasm (wasmtime, fresh instance)         58.0      65.9      75.7  rejected: signature invalid
+== lean-m64-wide
+(no input)               wasm instantiate + start only            9.2      13.4      17.4
+secp256r1_valid          wasm (wasmtime, fresh instance)        218.0     239.1     276.9  accepted
+secp256r1_valid          wasm (wasmtime, reused instance)       198.5     208.8     233.7  accepted
+secp256r1_valid          wasm (reused + restore 64 KB)          200.5     210.6     242.7  accepted
+secp256r1_valid          native liblean-m64-wide.dylib          155.9     166.4     188.2  accepted
+secp256r1_invalid        wasm (wasmtime, fresh instance)        222.0     243.4     278.4  rejected: signature invalid
+secp256r1_invalid        native liblean-m64-wide.dylib          160.7     168.6     214.2  rejected: signature invalid
+secp256k1_valid          wasm (wasmtime, fresh instance)         35.0      42.5      65.9  accepted
+secp256k1_valid          wasm (wasmtime, reused instance)        22.8      25.0      25.5  accepted
+secp256k1_valid          wasm (reused + restore 64 KB)           23.8      25.2      32.7  accepted
+secp256k1_valid          native liblean-m64-wide.dylib           19.2      22.0      22.2  accepted
+secp256k1_invalid        wasm (wasmtime, fresh instance)         37.3      44.6      52.3  rejected: signature invalid
+secp256k1_invalid        native liblean-m64-wide.dylib           24.7      27.1      28.6  rejected: signature invalid
+== lean-m62-wide
+(no input)               wasm instantiate + start only            9.9      13.5      18.7
+secp256r1_valid          wasm (wasmtime, fresh instance)        341.9     366.2     411.7  accepted
+secp256r1_valid          wasm (wasmtime, reused instance)       321.2     338.6     379.3  accepted
+secp256r1_valid          wasm (reused + restore 64 KB)          323.1     338.8     367.2  accepted
+secp256r1_valid          native liblean-m62-wide.dylib          258.5     304.0     304.5  accepted
+secp256r1_invalid        wasm (wasmtime, fresh instance)        318.3     364.8     383.9  rejected: signature invalid
+secp256r1_invalid        native liblean-m62-wide.dylib          261.1     309.2     311.7  rejected: signature invalid
+secp256k1_valid          wasm (wasmtime, fresh instance)         32.3      39.9      46.2  accepted
+secp256k1_valid          wasm (wasmtime, reused instance)        20.6      22.7      24.8  accepted
+secp256k1_valid          wasm (reused + restore 64 KB)           21.6      24.0      26.6  accepted
+secp256k1_valid          native liblean-m62-wide.dylib           19.1      19.4      21.5  accepted
+secp256k1_invalid        wasm (wasmtime, fresh instance)         34.1      41.0      48.9  rejected: signature invalid
+secp256k1_invalid        native liblean-m62-wide.dylib           24.1      24.7      27.6  rejected: signature invalid
+== lean-m31-wide
+(no input)               wasm instantiate + start only            8.2      12.4      14.8
+secp256r1_valid          wasm (wasmtime, fresh instance)        430.8     485.2     515.5  accepted
+secp256r1_valid          wasm (wasmtime, reused instance)       410.4     441.5     463.0  accepted
+secp256r1_valid          wasm (reused + restore 64 KB)          412.0     447.8     467.8  accepted
+secp256r1_valid          native liblean-m31-wide.dylib          316.8     360.4     372.6  accepted
+secp256r1_invalid        wasm (wasmtime, fresh instance)        425.0     492.1     521.2  rejected: signature invalid
+secp256r1_invalid        native liblean-m31-wide.dylib          322.0     365.7     378.6  rejected: signature invalid
+secp256k1_valid          wasm (wasmtime, fresh instance)         35.0      41.0      47.1  accepted
+secp256k1_valid          wasm (wasmtime, reused instance)        22.1      23.2      25.3  accepted
+secp256k1_valid          wasm (reused + restore 64 KB)           23.7      24.4      27.7  accepted
+secp256k1_valid          native liblean-m31-wide.dylib           19.1      19.6      22.0  accepted
+secp256k1_invalid        wasm (wasmtime, fresh instance)         36.6      43.0      52.2  rejected: signature invalid
+secp256k1_invalid        native liblean-m31-wide.dylib           24.6      25.4      29.0  rejected: signature invalid

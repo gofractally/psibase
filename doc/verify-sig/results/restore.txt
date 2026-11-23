@@ -1,0 +1,18 @@
+== k1-w8-wide.wasm
+(no input)               wasm instantiate + start only           10.5      14.4      25.8
+secp256k1_valid          wasm (wasmtime, fresh instance)         36.8      42.9      65.8  accepted
+secp256k1_valid          wasm (wasmtime, reused instance)        22.8      24.9      29.0  accepted
+secp256k1_valid          wasm (reused + restore 64 KB)           23.7      25.4      31.6  accepted
+secp256k1_valid          native libk1-w8-wide.dylib              19.2      21.2      28.5  accepted
+== k1-w15-wide.wasm
+(no input)               wasm instantiate + start only           73.3      97.1     170.4
+secp256k1_valid          wasm (wasmtime, fresh instance)        102.6     126.0     196.3  accepted
+secp256k1_valid          wasm (wasmtime, reused instance)        20.9      21.2      31.0  accepted
+secp256k1_valid          wasm (reused + restore 1088 KB)         37.7      41.2      55.8  accepted
+secp256k1_valid          native libk1-w15-wide.dylib             17.6      19.5      22.3  accepted
+== VerifySig.wasm
+(no input)               wasm instantiate + start only           56.3      69.7      86.7
+secp256r1_valid          wasm (wasmtime, fresh instance)        689.0     786.1    1058.3  accepted
+secp256r1_valid          wasm (wasmtime, reused instance)       608.4     651.3     858.5  accepted
+secp256r1_valid          wasm (reused + restore 768 KB)         624.2     673.9     857.5  accepted
+secp256r1_valid          native libVerifySig-llvm20.dylib       165.3     174.5     228.2  accepted
