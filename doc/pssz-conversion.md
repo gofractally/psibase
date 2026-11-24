@@ -5812,3 +5812,206 @@ constant-evaluated code; the LLVM AOT backend; front ends and plugins
 in a chain (the macro's writer and the callers' reader are tested
 natively through the same `Method` functions; no Rust service declares
 one).
+
+### 7.11 Pin moved to PSIO `2c64a245`: a call is packed into one buffer
+
+The pin is `2c64a245bda231d427357d502e3d6bfb82364cbb` (PSIO `main`, twelve
+commits after `66abb1b5`). What psibase takes from it (gofractally/psibase#2233):
+a member that is the packed bytes of a value can be written from the value,
+straight into the enclosing buffer (`psio::packed`, `psio::nested_of`,
+`psio::method_args_packed<T, I>`, `psio::method_args_nested<T, I>`; Rust
+`psio::pssz::PackedRef`, `NestedRef`), which closes PSIO gap 2 of 7.9;
+`psio::packs_as` compares recursive records (gap 1 of 7.9);
+`validate_method_result` runs the `sorted` / `unique` checks of
+`returns(...)` (the last remark of 7.10: `callPacked<T, I>` now accepts
+exactly what `callUnpacked<T, I>` does, with no change here). The rest of
+the range is FlatBuffers and Cap'n Proto, which psibase does not use: no
+Rust workspace names `flatbuf`, `FbView` or `capnp` (`grep` over `rust/` and
+`packages/`). **No byte of a value, no JSON text and no schema changed**;
+nothing stopped compiling with the pin alone.
+
+**What changed in psibase.**
+
+| # | Where | Was | Now |
+|---|---|---|---|
+| 1 | `Actor.hpp` `ActionViewProxy::call` (what `Actor<T>`, `to<T>()`, `ActionViewBuilder<T>` pack a call with) | `psio::to_pssz(Action{…, psio::method_args_to_pssz<T, I>(args...)})`: the arguments, then the action around their bytes | `psio::to_pssz(LazyAction{…, psio::method_args_packed<T, I>(args...)})`: one buffer |
+| 2 | `Actor.hpp`, new: `LazyAction<Args>`, `LazyActionProxy`, `LazyActionBuilder<T>` | — | `LazyAction<Args>` is psibase's record of an action whose `rawData` is a source of the packed arguments; it `psio::packs_as` `Action`, so it is an argument wherever a method takes an `Action`, and the call around it is still one buffer. `LazyActionBuilder<T>{sender, service}.method(args...)` returns one (the lazy form of `transactor<T>`). An lvalue argument is referred to and must outlive the packing; an rvalue is held. It declares no `schemaId`: it is a source for the PSSZ encoder only, a method's argument list is declared with `Action` (whose `schemaId("Action")` is unchanged) and no schema or JSON ever sees it. `transactor<T>` still returns an owning `Action` |
+| 3 | `Actor.hpp` `EventEmitterProxy` | the payload, then the arguments of `events::event` around it, then the action: three buffers | `pack<I, MemberPtr>(args...)`: `LazyAction{…, psio::packed(std::tuple{db, type, psio::method_args_packed<T, I>(args...)})}`, one buffer; `call` sends it |
+| 4 | `RTransact.cpp` `scheduleSpeculative` | `transactor<Transact>…execTrx(trx, true)` as the argument of `x-run::post` | `LazyActionBuilder<Transact>`: `execTrx` is written into the call of `post` |
+| 5 | `RTransact.cpp` `forwardTransaction`, `forwardStoredTransaction` (`recvAction` is gone) | an owning `recv` action, then `sendProds` around it; the stored row was released before the call | `sendProds(LazyActionBuilder<RTransact>….recv(trx))`; the stored row is held (as it is stored) while the call is packed from it |
+| 6 | `RTransact.cpp` `sendReply`, binary | `HttpReply{.body = psio::to_pssz(pruned)}` | `BasicHttpReply<…>{.body = psio::packed(pruned)}`: the trace is written from its views into the action |
+| 7 | `HttpServer.cpp` `sendProds` | `x-http::send(…, psio::to_pssz(action), …)` | `psio::packed(action)` |
+| 8 | Rust `service.rs` `ServiceCaller` | `to_pssz(&Action{…, rawData: to_pssz(args)})` | a private `ActionRef` whose `rawData` is a `psio::pssz::PackedRef` of the arguments: one buffer |
+
+Not changed: the JSON reply still makes its text first (PSIO has no
+in-place text member, as its `docs/helpers.md` says); every trace row is
+already put from a view (`TxSuccessView`, `TxFailedView`) or is the small
+outcome record, so `packs_as` on the recursive trace removes no copy today
+(it would allow storing a trace without its arguments in place of the
+outcome: a change of what a client sees, not made); Rust's `RunAsCaller`
+and `ActionPacker` hold an owning `Action` (the generated argument record
+of `runAs` has an `Action` member; a second record per action would be
+needed), and no Rust service nests a large call.
+
+**Bytes.** Identical, asserted: `methods.cpp` "a call packed in place has
+the bytes of the two-step encoding" (a lazy action against
+`Action{…, method_args_to_pssz}` for value, lvalue, view and no arguments
+and a hashed method name; a call inside a call inside a call, from owning
+and from lazy actions, through `ActionViewBuilder` and `transactor`; a 1 MiB
+argument; the action of a history and of a Merkle event; a reply whose body
+is packed in place against `HttpReply`), natively and in a guest; the
+existing `ActionViewBuilder` and `transactor` cases are unchanged. Rust:
+`service::tests::a_call_packed_in_place_has_the_bytes_of_the_action`.
+
+**Allocations**, measured natively (`in_place_alloc.cpp`, new, native
+only; a 1 MiB payload; "buffers" are allocations of 64 KiB or more):
+
+| Call | Two-step (what `Actor` did): peak, buffers | In place: peak, buffers |
+|---|---|---|
+| one call (`recv(trx)`) | 2 097 232 bytes, 2 | 1 048 636, 1 |
+| a call inside a call (`post(execTrx(trx))`) | 3 145 937, 3 | 1 048 690, 1 |
+| handing on (`sendProds(recv(trx))`) | 3 145 908, 3 | 1 048 676, 1 |
+| a reply with a packed body (`sendReply(socket, reply)`) | 3 146 036, 3 | 1 048 784, 1 |
+| an event (`events::event(db, type, payload)`) | 3 145 850, 3 | 1 048 649, 1 |
+
+The test asserts one buffer and a peak within 1 KiB of the result for the
+right column, and the bytes equal.
+
+**The copy table of 7.9, now.** S is the transaction, T = 2 S its trace.
+"By count" is by reading the code; "measured" is the hidden case
+(`psitest Transact-test.wasm "[.measure]"`, macOS/arm64, wasmtime), with
+the two limits lifted in a temporary build where a ceiling is given.
+
+| Step | `66abb1b5` (7.9 "now") | `2c64a245` |
+|---|---|---|
+| `r-transact::serveSys` up to `x-run::post` | 4: action bytes, the `execTrx` action, the arguments of `post`, the `post` action | **2**: action bytes, the call of `post` |
+| handing on (`onSpecTrx` → `sendProds(recv(trx))`) | 5 (6 in the tester): the trace (2), [the run token], the `recv` action, the arguments of `sendProds`, the action. Measured: 5 MiB − 1 KiB handed on, 5.5 MiB not | **4** (5 in the tester): the trace (2), [the run token], the stored row, the call. Measured: **6 MiB handed on, 6.5 MiB not** |
+| the JSON reply (`onTrx`) | by count T + text 2 T + arguments 2 T + action 2 T = 7 T, 9 T measured. A trace of 3.46 MiB answered, 3.56 MiB not | by count T + text 2 T + action 2 T = 5 T; **measured 7.5 T**, all of it while the text is written (below); the action then fits in what the text freed. **A trace of 4.41 MiB answered, 4.62 MiB not** |
+| the binary reply | T + body T + arguments T + action T = 4 T | 2 T: the trace, the call (by count and by the native row above; not measured over HTTP) |
+| `http-server::serve` (every request) | 4: action bytes, the dispatcher's owning `HttpRequest`, the arguments of the next call (`getUser`, `serveSys`), its action. Trapped from 8 MiB | **3**. 8, 9, 10 and 10.5 MiB reach `r-transact`; traps from 11 MiB |
+| `http-server::sendProds` | 5: action bytes, the owning `Action`, the message, the arguments of `x-http::send`, its action | 3: action bytes, the owning `Action`, the call (by count) |
+| `x-http` `serve` (every request) | 3: action bytes (the request is read with a borrowed body), the arguments of `http-server::serve`, its action | **2**. 15.5 MiB is passed on; traps from 16 MiB |
+
+Why the JSON reply is 7.5 T and not 5 T — **PSIO, not worked around**.
+Measured in a temporary build that recorded `memory.size` in `onTrx`
+(S = 1 MiB, T = 2.0 MiB = 32 pages): 36 pages at entry, 68 after the row
+is put (the row's buffer, released), 104 after `reply.body.reserve(…)`,
+**241** after `psio::encode_json_checked`, 241 after the action is packed.
+PSIO's JSON writer grows its sink by doubling the sink's *size* and does
+not use capacity the caller reserved (`json.hpp`, `json_impl::writer`:
+`size_ = sink.size()`, `grow`: `max(n + k, 2 * size_, 128)`, then
+`resize`). The text of a trace is two large hex strings and a tail: after
+the second one the next byte asks for twice the size, which is past the
+reservation, and the vector moves to a buffer of four times the trace
+beside the one it leaves. Reproduction, against the pin:
+`~/psibase-pssz-scratch-inplace/psio_json_reserved_sink.cpp` (a record of
+two 1 MiB byte lists and a number into a vector reserved for 4.5 MiB: text
+4 194 336 bytes, capacity afterwards 9 437 184, peak 14 155 776 in two
+allocations; expected one allocation of the reservation). Wanted: a writer
+that fills the reserved capacity before it grows, or a `json_size`. With
+either, the reply is 5 T. `reply.body.reserve` is left as it is.
+
+**The HTTP table** (`/push_transaction?wait_for=applied`, the same case as
+7.9; limits as shipped):
+
+| Arguments | Accepted | Applied by Transact | Reply to the client |
+|---|---|---|---|
+| 1 MiB | yes | ok | 200, the trace as JSON (4.2 MB), 41 ms |
+| 1.5 MiB | yes | ok | 200 (6.3 MB), 60 ms |
+| 1.6 MiB | yes | ok | 200 (6.7 MB), 65 ms |
+| 1.75 MiB, 2 MiB | yes | ok | 200, the outcome (354 bytes) |
+| 4 MiB − 200 bytes, 4.5 MiB | yes | ok | 200, the outcome, 138 and 157 ms |
+| 5 MiB − 1 KiB | yes | ok | 200, the outcome, 175 ms |
+| 5, 6, 6.5, 7, 7.5 MiB | **no**: 413, `The transaction is … bytes. push_transaction accepts at most 5242880 bytes.` | | |
+| 8, 9, 10, 10.5 MiB | **no**: 413, the same text (was 500 from 8 MiB) | | |
+| 11, 12, 14, 15, 15.5 MiB | **no**: 500, `wasm trap: unreachable` in **`http-server`** (`serve`) | | |
+| 16, 20 MiB | **no**: 500, `wasm trap: unreachable` in **`x-http`** (`serve`) | | |
+
+With both limits lifted (temporary build): the whole trace is answered up
+to 2.1 MiB of arguments (a trace of 4.41 MiB, 8.8 MB of JSON) and traps in
+`r-transact` at 2.2 MiB; a transaction is accepted, handed on, applied and
+answered (by its outcome) up to 6 MiB, and the continuation of its
+speculative run fails at 6.5 MiB.
+
+**What trapped from 8 MiB, and what traps now.** Identified by the
+backtrace: the trap at 8 MiB (at `66abb1b5`) has four frames with function
+indexes below 315, the number of functions of `HttpServer.wasm`, and
+enters through the dispatcher; the trap at 20 MiB has three frames, enters
+at function 78 of `XHttp.wasm`, which `wasm-objdump -x` names as its export
+`serve` (417 functions; index 388 does not exist in `HttpServer.wasm`).
+
+- 8 MiB was **`http-server`**: `serve(sock, HttpRequest req)` held the
+  request four times in its 32 MiB (table above). It was the double
+  buffer of a call, and item 1 removes it: 8 to 10.5 MiB now get the 413.
+- From 11 MiB it is still `http-server`, at three: the third is the owning
+  `HttpRequest` the dispatcher builds for `serve`. Removing it means
+  `serve` taking `psio::pssz_view<HttpRequest>` and reading everything but
+  the body from it, as `r-transact::serveSys` does since 7.9
+  (`stripAuthenticationHeaders`, `getTargetService`, `getSiblingUrl` and
+  the two calls take an owning request today). Not done: it is the request
+  path of every service and not a call's double buffer.
+- From 16 MiB it is `x-http` (`serve`, an export of its own): the action
+  it is handed and the call of
+  `http-server::serve`, 2 × 16 MiB. No packing can remove either; psinode
+  accepts a body of 20 MiB (`max_request_size`), so between 16 and 20 MiB a
+  request cannot be passed on by a service with 32 MiB. That needs a limit
+  with a name in `x-http` (or a smaller `max_request_size`): a decision
+  for the team, not made here.
+
+So gofractally/psibase#2233 is referenced, not closed: a client gets a
+correct reply or the named limit up to 10.5 MiB (was 7.5 MiB), and a trap
+as a 500 from 11 MiB to the node's 20 MiB.
+
+**The two limits are not raised.**
+
+- `maxPushedTransactionSize` stays 5 MiB. Handing on now succeeds at 6 MiB
+  and fails at 6.5 MiB (tester: five copies; psinode holds one fewer), where
+  it succeeded at 5 MiB − 1 KiB and failed at 5.5 MiB: the limit was
+  chosen with under 10 % to the failure and now has 20 % to the last size
+  that works. Raising it to 6 MiB would spend that again.
+- `maxFullTraceSize` stays 3.25 MiB. A whole trace is now answered at
+  4.41 MiB and not at 4.62 MiB (was 3.46 / 3.56): 36 % above the limit
+  where it was 6.5 %. It is not raised because the ceiling is the JSON
+  writer's growth, which is a step and not a slope: the buffer the text
+  ends in is the next doubling above twice the trace, and a trace whose
+  text is more than twice its bytes (many small actions: member names
+  outweigh the hex) reaches the next step earlier. The margin is what
+  covers that until the writer is fixed.
+
+Their comments in `RTransact.cpp` say what is held now. "Test transaction
+size" asserts what it did, and 413 at 8 and 10 MiB as well (46
+assertions).
+
+**Schemas and fixtures.** `rust-twins.json` was regenerated
+(`PSIBASE_WRITE_RUST_TWINS=1`) and is byte for byte what it was: vectors,
+calls, transactions and `schema_ir`. No checked-in schema file changed
+(`git status` after the full build). The schema of every installed service
+was read from a chain booted with this build and from the chain of 7.10
+(`~/psibase-pssz-e2e-repin`, booted at the `66abb1b5` commit; no service
+source has changed since, `git diff dd6e64b88 -- packages libraries rust`
+touches tests and CMake only) with `GET packages…/schema?service=…`: 70 services have
+a schema on both chains and the 70 texts are identical. The C++ test services that are in no package were not
+compared with a build of the old pin (none was kept); the PSIO range
+touches no schema code (`schema_ir.hpp`, the builder and the comparison are
+not in `git diff --stat 66abb1b..2c64a24`).
+
+| Step | Result |
+|---|---|
+| baseline, `f7b38e831` with `66abb1b5` | build exit 0 (`build-base-f7b38e831.log`); `ctest -j4` **89 / 89**: 87 in the run (`ctest-base-f7b38e831.log`) and `rs-tests`, `plugin-web-crypto-tests` in a second run (`ctest-base-f7b38e831-rerun2.log`), because the first compiled them over an edit of `service.rs` made too early for this section (`PackedRef` does not exist at the old pin); the 89th test is the head's new `PsizamFixtureTests` |
+| full build | exit 0 (`build-inplace3.log`, after `inplace1`, `inplace2`); `index.json`: 91 entries |
+| twin fixture | regenerated, unchanged; `psio_twins` 4 / 4, `psio_json` 13 / 13, `service_schema` 5 / 5, `psio_leaf_types` 13 / 13, `psio_wrappers` 7 / 7 |
+| native unit tests | C++ `psibase-psio-tests` 1470 assertions in 71 cases (was 1421 in 69), 1382 in 67 in a guest; Rust lib 106 / 106 with `PSIBASE_DATADIR` set (43 `verify_schema` under `contract` against the rebuilt packages) |
+| `ctest -j4` | **89 / 89** (`ctest-inplace3.log`); "Test transaction size" 46 assertions |
+| every Rust workspace | `check_all.sh inplace`: all exit 0 except `packages/user --tests` (`tokens-plugin` 5 errors, Favor's tests 2: the known seven) |
+| end to end (7.5's commands, state `~/psibase-pssz-e2e-inplace`) | boot exit 0; `create alice`, `bob`, `carol` exit 0 **on the second attempt**: run in the same second as `boot` returned, each failed with `service 'transact' aborted with message: transaction references non-existing block` (three warning lines in `node1.log`), and the queries then showed no installed package yet; a few seconds later all three succeeded and the seven queries answer as in 7.5. Whether `boot` returned that early before this pin was not checked. `kill -TERM` at block 0x29, restart, the same answers, `create dave` exit 0, `getAccounts` returns all four; no `[error]` line in either log |
+
+Not verified: Linux (clang + libstdc++) — the new C++ is one reflected
+aggregate template with a deduction guide, two proxies and calls of PSIO
+function templates; no new constant-evaluated code of psibase's own, but
+`psio::method_args_packed` is `constexpr` machinery of PSIO's that only
+the Mac's libc++ has compiled here; the LLVM AOT backend; front ends and
+plugins; the binary reply and `sendProds` over a real second producer; the
+`66abb1b5` copy counts of this section's table other than through the
+thresholds 7.9 recorded (no instrumented build of the old pin was made);
+a Rust service making a large call in a chain.
+
