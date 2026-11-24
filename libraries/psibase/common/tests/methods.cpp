@@ -14,10 +14,12 @@
 #include <psibase/schema.hpp>
 #include <psibase/serveActionTemplates.hpp>
 #include <psibase/servePackAction.hpp>
+#include <psibase/trace.hpp>
 
 #include <psio/to_hex.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -361,6 +363,42 @@ TEST_CASE("methods: a call packed in place has the bytes of the two-step encodin
                             .body        = psio::to_pssz(point),
                             .headers     = {{"Vary", "Origin"}}};
       CHECK(psio::to_pssz(source) == psio::to_pssz(reply));
+   }
+
+   SECTION("a reply whose body is JSON text written in place")
+   {
+      // r-transact sendReply: the text of the trace is written into the
+      // reply, the reply into the action.
+      TransactionTrace trace;
+      auto&            at  = trace.actionTraces.emplace_back();
+      at.action            = Action{alice, bob, MethodNumber{"move"}, {'\x01', '\xfe', '\x00'}};
+      at.rawRetval         = {'\x7f'};
+      at.totalTime         = std::chrono::nanoseconds{1234567};
+      at.innerTraces.push_back({ConsoleTrace{"line \"one\"\n"}});
+      at.innerTraces.push_back({ActionTrace{.action = Action{bob, alice, MethodNumber{"look"}, {}}}});
+      trace.error = "failed: \\ \u00e9";
+
+      const auto text = psio::to_ijson(trace);
+      auto       body = psio::ijson_of(trace);
+      REQUIRE(body.check().ok());
+      CHECK(body.size() == text.size());
+      CHECK(psio::ijson_size(trace) == text.size());
+      const BasicHttpReply<decltype(body)> source{.contentType = "application/json",
+                                                  .body        = std::move(body),
+                                                  .headers     = {{"Vary", "Origin"}}};
+      static_assert(psio::packs_as<decltype(source), HttpReply>);
+      const HttpReply reply{.contentType = "application/json",
+                            .body        = std::vector<char>(text.begin(), text.end()),
+                            .headers     = {{"Vary", "Origin"}}};
+      CHECK(psio::to_pssz(source) == psio::to_pssz(reply));
+      // and as the argument of a call
+      CHECK(psio::to_pssz(std::tuple<std::int32_t, const decltype(source)&>(7, source)) ==
+            psio::to_pssz(std::tuple<std::int32_t, const HttpReply&>(7, reply)));
+
+      // A trace with a string that is not UTF-8 has no text: the source
+      // says so before anything is packed.
+      trace.error = "\xff";
+      CHECK(!psio::ijson_of(trace).check().ok());
    }
 }
 

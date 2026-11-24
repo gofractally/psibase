@@ -236,6 +236,30 @@ TEST_CASE("in place: a call is one buffer of its size", "[methods][alloc]")
            }),
        3);
 
+   // r-transact sendReply, JSON: the body is the text of the value (two
+   // megabytes of hex here). Two-step: the text, exactly sized, then the
+   // reply, the arguments and the action around it.
+   const Payload value{7, std::vector<char>(size, 't')};
+   check(
+       "a reply with a JSON body",
+       measure(
+           [&]
+           {
+              HttpReply reply{.contentType = "application/json", .headers = {{"Vary", "Origin"}}};
+              psio::to_ijson(value, reply.body, psio::json_sizing::exact);
+              return psio::to_pssz(twoStep<Runner, 2>(me, Runner::service, 0, reply));
+           }),
+       measure(
+           [&]
+           {
+              auto body = psio::ijson_of(value);
+              return runner.sendReply(
+                  0, BasicHttpReply<decltype(body)>{.contentType = "application/json",
+                                                    .body        = std::move(body),
+                                                    .headers     = {{"Vary", "Origin"}}});
+           }),
+       3);
+
    // An event: the payload inside the arguments of events::event inside the action
    const std::vector<char> data(size, 'e');
    check(

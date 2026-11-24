@@ -266,12 +266,14 @@ namespace
    // large transaction is larger than the transaction. A trace above this
    // size, packed, is neither kept nor sent: reducedTrace stands for it.
    // The size leaves room for the row (ConfigRow's maxValueSize, 8 MiB)
-   // and for the reply. Its JSON text is twice the bytes; the writer grows
-   // the buffer it is written to by doubling, so the text is held in up to
-   // twice its size beside the buffer it outgrew, and then once more in the
-   // action that sends it (one buffer: the reply is written into the call).
-   // Measured, a trace of 4.41 MiB is answered within the service's 32 MiB
-   // and one of 4.62 MiB is not (doc/pssz-conversion.md 7.11).
+   // and for the reply. The JSON text of a trace is 2 to 2.3 times its
+   // bytes (hex for large arguments; member names for many small actions).
+   // This service writes the text into the action that sends it and holds
+   // 3 to 4.2 times the trace; what bounds a reply now is http-server and
+   // x-http, which each hold the text three times in their 32 MiB.
+   // Measured, a trace of 4.55 MiB of many small actions is answered and
+   // one of 4.65 MiB is not; with one large argument, 5.21 and 5.31 MiB
+   // (doc/pssz-conversion.md 7.12).
    constexpr std::size_t maxFullTraceSize = 13 * 1024 * 1024 / 4;
 
    bool isFullSize(psio::pssz_view<TransactionTrace> trace)
@@ -539,22 +541,27 @@ namespace
 
       if (!jsonClients.empty())
       {
-         HttpReply reply{.contentType = "application/json", .headers = allowCors()};
-         // The text is written once, into a buffer of about its size: it
-         // is mostly the hex of the trace's bytes.
-         auto packedSize = psio::bytes(trace).size();
-         reply.body.reserve(2 * packedSize + packedSize / 8 + 4096);
+         // The body is the JSON text of the trace, written into the action:
+         // the text is measured (check) and never has a buffer of its own.
          // A trace may hold a string with no JSON text (an abort message that
          // is not UTF-8): the clients are told so rather than left waiting.
-         if (!psio::encode_json_checked(psio::ijson{}, pruned, reply.body).ok())
+         auto body = psio::ijson_of(pruned);
+         if (body.check().ok())
+         {
+            send(BasicHttpReply<decltype(body)>{.contentType = "application/json",
+                                                .body        = std::move(body),
+                                                .headers     = allowCors()},
+                 jsonClients);
+         }
+         else
          {
             std::string_view msg = "The transaction trace has no JSON text";
-            reply                = HttpReply{.status      = HttpStatus::internalServerError,
-                                             .contentType = "text/plain",
-                                             .body        = std::vector(msg.begin(), msg.end()),
-                                             .headers     = allowCors()};
+            send(HttpReply{.status      = HttpStatus::internalServerError,
+                           .contentType = "text/plain",
+                           .body        = std::vector(msg.begin(), msg.end()),
+                           .headers     = allowCors()},
+                 jsonClients);
          }
-         send(reply, jsonClients);
       }
 
       if (!binClients.empty())

@@ -6015,3 +6015,269 @@ plugins; the binary reply and `sendProds` over a real second producer; the
 thresholds 7.9 recorded (no instrumented build of the old pin was made);
 a Rust service making a large call in a chain.
 
+### 7.12 Pin moved to PSIO `842a538b`: the JSON text of a reply is written into the call
+
+The pin is `842a538b936ca8b64a4c37cc5e8d9eba47fd416a` (PSIO `main`, two
+commits after `2c64a245`: `056740b` "JSON: the writer uses the sink's
+capacity; exact sizing; a text member written in place" and `842a538`, a
+budget for the FlatBuffers verifier, which psibase does not use). What
+psibase takes from it (gofractally/psibase#2233): `psio::ijson_of(value)`, a
+source of a byte list whose content is the JSON text of the value, written
+by the PSSZ encoder straight into the buffer around it (the counterpart of
+`psio::packed`); the writer fills capacity the caller reserved before it
+grows; `psio::json_size` / `ijson_size`; `psio::json_sizing` as a last
+argument of `to_json` / `to_ijson` / `encode_json_checked`, whose default
+`automatic` is `exact` in every wasm guest (the value is walked twice, the
+text allocated once) and `growth` natively. This closes the PSIO point of
+7.11 (the reply at 7.5 T). **No byte of a value, no JSON text and no schema
+changed; nothing stopped compiling with the pin alone** (full build exit 0,
+`build-json-pin.log`, before any source was touched).
+
+**The pin moved by itself.** `external/psio` was not touched by hand: the
+three pin sites were changed (`cmake/PsibaseDependencies.cmake`,
+`tests/cmake/dependencies/CMakeLists.txt` and its `README.md`) and
+`cmake ~/psibase-pssz-build` was run (exit 0, `configure-json.log`). What
+it printed for the dependencies, in full:
+
+```
+-- psibase: reusing psizam at 2e93ecd1561ed7d4808a1a83af1d0137bac17b41 without Git clone/update
+-- psibase: reusing ucc at d79166da0290fdf9d1f9d5880d4dfb45b2822cf3 without Git clone/update
+-- psibase: fetching psio 842a538b936ca8b64a4c37cc5e8d9eba47fd416a from https://github.com/gofractally/psio.git
+-- psibase: advanced psio from 2c64a245bda231d427357d502e3d6bfb82364cbb to 842a538b936ca8b64a4c37cc5e8d9eba47fd416a (fetched from https://github.com/gofractally/psio.git; git checkout --detach, previous commit still reachable)
+-- psibase: reusing psio at 842a538b936ca8b64a4c37cc5e8d9eba47fd416a without Git clone/update
+-- psibase: reusing psitri at d3bba0e6a5f59e37c3eea08a1a720ae553cafb2c without Git clone/update
+```
+
+Afterwards `git -C external/psio rev-parse HEAD` is the new pin, detached,
+and `git -C external/psio status --short` is empty. It did not refuse and
+printed no command to run.
+
+**What changed in psibase.** One place, `RTransact.cpp` `sendReply`, the
+JSON branch:
+
+| Was | Now |
+|---|---|
+| `HttpReply reply{…}`; `reply.body.reserve(2 * packedSize + packedSize / 8 + 4096)`; `psio::encode_json_checked(psio::ijson{}, pruned, reply.body)`; on failure the reply replaced by the 500; `send(reply, jsonClients)` | `auto body = psio::ijson_of(pruned)`; if `body.check().ok()`: `send(BasicHttpReply<decltype(body)>{.contentType = "application/json", .body = std::move(body), .headers = allowCors()}, jsonClients)`; otherwise the same 500 (`The transaction trace has no JSON text`) |
+
+`BasicHttpReply<T>` is psibase's own record (`Rpc.hpp`; `HttpReply` is
+`BasicHttpReply<std::vector<char>>`), the one the binary reply uses since
+7.11; with a `psio::json_ref` body it `psio::packs_as` `HttpReply`
+(asserted). No psibase name was added for a PSIO facility. `check()`
+measures the text (the first walk; every check the writer makes runs), the
+length is kept, and the PSSZ encoder writes the text into the action (the
+second walk): the trace is not changed in between, the source is made
+where it is packed.
+
+**Bytes.** Identical, asserted: `methods.cpp` "a reply whose body is JSON
+text written in place" (a `TransactionTrace` with a nested action trace,
+console output with escapes, raw bytes and an error: the reply packed from
+`psio::ijson_of(trace)` against `HttpReply{.body = <the bytes of
+psio::to_ijson(trace)>}`, alone and as the argument of a call;
+`body.size()` and `psio::ijson_size(trace)` against the text's length; a
+trace whose error is not UTF-8 fails `check()`), natively and in a guest.
+Over HTTP the two builds give the same reply for the same request up to the
+digits of `totalTime` (4 216 829, 4 216 828 and 4 216 827 bytes for the
+1 MiB transaction in three runs).
+
+**Allocations**, natively (`in_place_alloc.cpp`, a new row; a 1 MiB
+payload, whose text is 2 MiB of hex):
+
+| Call | Two-step: peak, buffers | In place: peak, buffers |
+|---|---|---|
+| a reply with a JSON body (`sendReply(socket, reply)`) | 6 291 758 bytes, 3 (the text exactly sized, the arguments, the action) | 2 097 334, 1 |
+
+**The reply in `r-transact`, measured.** `memory.size` in pages (64 KiB),
+recorded in a temporary build (marks in `onTrx` and `sendReply`, carried
+out in the reply's content type; not committed), the hidden case
+`psitest Transact-test.wasm "[.measure]"`, macOS/arm64, wasmtime. T is the
+packed trace. Two shapes: one action with a large argument (the text is
+2.00 T, hex), and many actions for `nop` with 8 bytes of arguments each
+(a new section of the hidden case; the trace is 415 bytes per action
+packed, nine times the transaction, and its text is 2.30 T: member names,
+not hex).
+
+| Trace | Build | At entry | Row put | Text made | Action packed (peak) | Peak / T |
+|---|---|---|---|---|---|---|
+| one argument of 1 MiB, T = 2 106 993 (32.2 pages), text 4.22 MB | `2c64a245` (7.11) | 36 | 68 | 241 | 241 | **7.5** |
+| | `842a538b`, the code as it was (the reservation is used) | 36 | 68 | 104 | 169 | 5.3 |
+| | `842a538b`, in place | 36 | 68 | — | **100** | **3.1** |
+| 8000 actions of 8 bytes, T = 3 321 443 (50.7 pages), text 7.65 MB | `842a538b`, the code as it was | 54 | 105 | 323 | 440 | 8.7 |
+| | `842a538b`, in place | 54 | 105 | — | **215** | **4.2** |
+
+By count the reply is now T (the action `onTrx` was given) + the text
+(the one buffer of the call): 3 T for hex, as it was before the migration
+(7.9). The many-actions shape holds more, in both builds: the pruned trace
+(`TransactionTraceRef`, a record per action trace) is about 0.9 T of small
+allocations and takes the place the row's buffer left. The old code was
+worse for that shape than 7.11 knew: its reservation (2.125 T) is below
+the text (2.30 T), so the text outgrew it and doubled — 440 of the
+service's 512 pages for a trace just under the limit. That shape was not
+measured at `2c64a245`.
+
+**The largest trace answered whole**, with both limits lifted (temporary
+build):
+
+| Shape | Answered | Not answered | What stops it |
+|---|---|---|---|
+| one large argument (text 2.00 T) | T = 5 462 435 (5.21 MiB), text 10.93 MB, `r-transact` at 254 pages | 5 567 293 (5.31 MiB) | `http-server` |
+| actions with no arguments (text 2.32 T) | 4 685 943 (4.47 MiB), text 10.86 MB, 305 pages | not bracketed (the next size run was the next row's) | |
+| actions of 8 bytes (text 2.30 T) | 4 770 443 (4.55 MiB), text 10.99 MB, 307 pages | 4 873 943 (4.65 MiB) | `http-server` |
+| actions of 64 bytes (text 2.24 T) | 4 874 943 (4.65 MiB), text 10.92 MB, 295 pages | 5 006 443 (4.77 MiB) | `http-server` |
+
+(7.11: 4.41 MiB answered and 4.62 MiB not, one large argument, stopped in
+`r-transact`.) **`r-transact` is no longer what stops a reply**: it is at
+60 % of its memory when the reply fails. The client gets HTTP 500 with a
+wasm backtrace whose allocator frames (functions 281 and 292) are those
+7.11 identified as `HttpServer.wasm`'s; the frame above them is function
+42, and function 90 for a text above 16 MiB. The ceiling is a text of about
+11 MB whatever the shape, a third of 32 MiB: `http-server::sendReply(socket,
+HttpReply)` holds the reply three times (the action it is given, the
+dispatcher's owning `HttpReply`, the call of `x-http::sendReply`), and by
+reading `x-http::sendReply(socket, const HttpReply&)` holds it three times
+as well (the action, the owning `HttpReply`, `psio::to_pssz(result)` for
+`socketSend`). Removing the owning copy means both taking
+`psio::pssz_view<HttpReply>` (checking the headers through the view,
+passing the bytes on), as `r-transact::serveSys` does for the request
+since 7.9: then two and one, and the stored row (`maxValueSize`, 8 MiB)
+would be the next limit. Not done here: it is the reply path of every
+service and not the JSON of a value.
+
+**The two limits are not raised.**
+
+- `maxFullTraceSize` stays 3.25 MiB. The lowest measured ceiling is the
+  many-actions shape: 4.55 MiB answered, 4.65 MiB not (4.47 MiB answered
+  for actions with no arguments). A quarter below 4.55 MiB is 3.41 MiB:
+  0.16 MiB above the limit, less than the spread between the shapes
+  measured. The limit as it is admits a text of up to 3.2 times the trace
+  under the 11 MB ceiling. What moved is where the margin is spent:
+  `r-transact` itself is at 215 pages of 512 for a many-actions trace at
+  the limit, where the code it replaces was at 440. The limit can go to
+  about 6 MiB (the row) once `http-server` and `x-http` pass a reply on
+  through a view.
+- `maxPushedTransactionSize` stays 5 MiB. Handing on is not touched by
+  this change and measures as in 7.11: 6.25 MiB is handed on, applied and
+  answered (by its outcome), and the continuation of the speculative run
+  fails at 6.5 MiB (five copies in the tester).
+
+The comment of `maxFullTraceSize` in `RTransact.cpp` says what is held
+now. "Test transaction size" asserts what it did, and two cases more: a
+transaction of 8000 small actions is answered with its whole trace (8000
+`nop` action traces, more than 3 MiB packed, 7.7 MB of JSON), one of 12000
+(4.75 MiB packed) with the outcome (53 assertions, was 46).
+
+**The HTTP table** (`/push_transaction?wait_for=applied`, the same case
+as 7.9 and 7.11; limits as shipped; `measure-json-final.log`):
+
+| Arguments | Accepted | Applied by Transact | Reply to the client |
+|---|---|---|---|
+| 1 MiB | yes | ok | 200, the trace as JSON (4.2 MB; trace 2.01 MiB packed), 40 ms |
+| 1.5 MiB | yes | ok | 200 (6.3 MB), 61 ms |
+| 1.6 MiB | yes | ok | 200 (6.7 MB), 63 ms |
+| 1.75 MiB, 2 MiB | yes | ok | 200, the outcome (354 bytes), 62 and 70 ms |
+| 4 MiB − 200 bytes, 4.5 MiB | yes | ok | 200, the outcome, 137 and 155 ms |
+| 5 MiB − 1 KiB | yes | ok | 200, the outcome, 170 ms |
+| 5, 6, 6.5, 7, 7.5, 8, 9, 10, 10.5 MiB | **no**: 413, `The transaction is … bytes. push_transaction accepts at most 5242880 bytes.` | | |
+| 11, 12, 14, 15, 15.5 MiB | **no**: 500, `wasm trap: unreachable` in `http-server` (`serve`) | | |
+| 16, 20 MiB | **no**: 500, `wasm trap: unreachable` in `x-http` (`serve`) | | |
+
+Many small actions (`measure-json-final-small.log`):
+
+| Transaction | Trace, packed | Reply to the client |
+|---|---|---|
+| 1000 actions of 8 bytes (44 039 bytes) | 423 443 | 200, the trace (975 616 bytes), 18 ms |
+| 4000 (176 039) | 1 665 443 | 200, the trace (3.84 MB), 65 ms |
+| 8000 (352 039) | 3 321 443 | 200, the trace (7.65 MB), 129 ms |
+| 12000 to 32000 (up to 1 408 039) | 4 977 443 to 13 257 443 | 200, the outcome, 160 to 408 ms |
+| 1000 actions of 64 bytes (100 039) | 535 443 | 200, the trace (1.20 MB), 20 ms |
+| 4000 (400 039) | 2 113 443 | 200, the trace (4.73 MB), 75 ms |
+| 8000 to 32000 (up to 3 200 039) | 4 217 443 to 16 841 443 | 200, the outcome, 122 to 458 ms |
+
+The first table is 7.11's row for row; the times are within 5 ms of it.
+
+**The cost of `exact` sizing in guests** (two walks of every value whose
+JSON a service makes). Not changed; measured where there was a measure:
+
+- the hidden case, same machine: 1 MiB / 1.5 MiB / 1.6 MiB posted and
+  answered in 41 / 60 / 65 ms at `2c64a245`, 42 / 61 / 64 ms with the pin
+  alone (the reply still made by `encode_json_checked`, now sized
+  exactly), 40 / 61 / 63 ms in place; 8000 small actions 131 ms with the
+  code as it was and 129 ms in place. The text of a trace is hex, which
+  PSIO measures without reading;
+- the suite, `ctest -j4`, the baseline log (`verify-pinguard.log.ctest`,
+  `498cc1eb9`, 89 / 89) against the final one, test by test for tests of
+  one second or more: `t-Transact-test` 9.02 → 7.83 s, `t-Explorer-test`
+  4.08 → 3.46 s, `t-Events-test` 3.15 → 2.61 s; every C++ and psinode test
+  within 10 % but `t-Symbol-test` (2.93 → 3.34 s in the run; 2.84, 2.86,
+  2.82 s alone afterwards: load). The 29 `rs-*` tests compiled in the
+  final run because the pin moved (up to 78 s); run again warm
+  (`ctest-json-final-rs-warm.log`) they are within 10 % of the baseline
+  each (the largest `rs-test-BrotliSvc`, 3.75 → 4.11 s), 167.9 → 166.3 s
+  together.
+
+No test is notably slower. Where the default could matter and was only
+read: `REvents.cpp` `column_to_json` and `serveActionTemplates.hpp` append
+many small values to one sink, each now measured and then written, and an
+`exact` append that lacks capacity reserves exactly what it needs (PSIO's
+`docs/json.md`: "for many appends to one sink reserve once, or use
+`growth`"); the punctuation between the values is `push_back` /
+`insert`, which grows the vector geometrically, so the sink is not
+reallocated per value. Neither was timed on a large result.
+
+**Other places a guest makes a JSON body** (looked at; none changed):
+
+| Where | What | Why left |
+|---|---|---|
+| `XPeers.cpp` `sendReply` after a connect (`psio::to_ijson(*replyBody, reply.body)`, then `x-http::sendReply`) | the same shape, a call with a reply | a few hundred bytes |
+| `RPackages.cpp` `/schema` (`psio::to_ijson(row->schema)`, then `reply.body.assign`) | the largest: a service's schema, text made and then copied | the reply is the *return value* of `serveSys`, packed by the dispatcher from an `HttpReply`: an in-place body needs a method result that is a source (the dispatcher and `HttpServer`'s handling of a result), not this pattern. `psio::to_ijson(row->schema, reply.body)` would save the copy; not made here |
+| `serveGraphQL.hpp` (every GraphQL reply, Explorer included) | PSIO's GraphQL executor writes into a `std::string`, copied into the body | not the JSON of a value; bounded by `psio::graphql::limits` (`max_response_bytes`); a return value |
+| `REvents.cpp` SQL results | rows appended column by column to the body | a return value; many appends (above) |
+| `XAdmin.cpp`, `XPeers.cpp` `/peers` `/urls`, `RTransact.cpp` `/login` and stats, `CommonApi.cpp`, `serveActionTemplates.hpp`, the test services | `psio::to_ijson(value, reply.body)` | small; return values. In a guest each is now one exact allocation |
+| `HttpServer.cpp`, `XHttp.cpp` | make no JSON; pass a reply on | hold it three times each (above): the next ceiling of a reply |
+
+Rust services use PSIO's Rust writer, which in this range only learned to
+append in place (`rust/psio/src/json.rs`); no Rust source changed.
+
+**Schemas and fixtures.** `rust-twins.json` was regenerated
+(`PSIBASE_WRITE_RUST_TWINS=1`) and is byte for byte what it was; no
+checked-in file changed but those of this commit (`git status` after
+the full build). The schema of every installed service was read with
+`GET packages…/schema?service=…` for every account from a chain booted with
+this build (`~/psibase-pssz-e2e-json`) and from the chain of 7.11 (a copy
+of `~/psibase-pssz-e2e-inplace/db`, booted at `2c64a245`, served by this
+build's psinode and that chain's own services): 70 services have a schema
+on both and the 70 texts are identical.
+
+| Step | Result |
+|---|---|
+| merge of `bytemaster/head` | already up to date (`498cc1eb9` is in the tip `9be46495a`): no code came in, so the baseline is the coordinator's at `498cc1eb9`: build exit 0, `ctest -j4` **89 / 89** (`verify-pinguard.log.ctest`, 630.5 s) |
+| configure | exit 0, the pin advanced by itself (above) |
+| full build, the pin alone | exit 0 (`build-json-pin.log`) |
+| full build | exit 0 (`build-json-final.log`, after `json-t1` … `json-t4` for the temporary builds and `json1`); once more after a last edit of the comment of `maxFullTraceSize` (`build-json-final2.log`, exit 0; `t-Transact-test` run again, the suite not) |
+| twin fixture | regenerated, unchanged; `psio_twins` 4 / 4, `psio_json` 13 / 13, `service_schema` 5 / 5, `psio_leaf_types` 13 / 13, `psio_wrappers` 7 / 7 |
+| native unit tests | C++ `psibase-psio-tests` 1482 assertions in 71 cases (was 1470), 1388 in 67 in a guest (was 1382); Rust `cargo test -r` of the five host crates with `PSIBASE_DATADIR` set: 167 passed, 0 failed (`rust-unit-json.log`) |
+| `ctest -j4` | **89 / 89** (`ctest-json-final.log`, 903 s with the Rust tests compiling); "Test transaction size" 53 assertions |
+| every Rust workspace | `check_all.sh json`: all exit 0 except `packages/user --tests` (`tokens-plugin` 5 errors, Favor's tests 2: the known seven) |
+| end to end (7.5's commands, state `~/psibase-pssz-e2e-json`) | boot exit 0; `create alice`, `bob`, `carol` exit 0 at the first attempt, 8 s after `boot` returned; the seven queries answer as in 7.5 (accounts and packages in C++, tokens in Rust, Explorer's 720 blocks, the schema endpoint, the SDL); `create frank` through a logging relay: the CLI asks for `application/octet-stream` and gets the binary trace (12 879 bytes); `create grace` with the relay rewriting `accept` to `application/json`: the JSON reply below; `kill -TERM`, restart, the same answers, `create dave` exit 0, `getAccounts` returns all of them; no `[error]` line in either log |
+
+The JSON reply to a pushed transaction (`create grace`; HTTP 200,
+`Content-Type: application/json`, `Content-Length: 29593`, parses as JSON,
+`error` null, one action trace; `~/psibase-pssz-e2e-json/push-reply.json`):
+
+```
+{"actionTraces":[{"action":{"sender":"","service":"transact","method":"","rawData":"0400000004000000170000005F1F056B000000008A832211000052170000007A00000008000000310000001C000000006C9B91D490C204006C9B91D490C204A2AD49B6D30480401C0000000800DCA4566AC0B3071C0000000078A7603C2FB90C006C9B91D490C2044AAD3A8E26C000001C0000001100DCA4566AC0B307005C7DA67944FD0400"},"rawRetval":"","innerTraces":[{"inner":{"ActionTrace":{"action":{"sender":"transact","service":"db","method":"open","rawData":"090000000000000009000000030DACBC26AC958C000003"},"rawRetval":"00000000","innerTraces":[],"totalTime":8125,"error":null}}},…
+…,"innerTraces":[],"totalTime":417,"error":null}}}],"totalTime":1958,"error":null}}}],"totalTime":463834,"error":null}],"error":null}
+```
+
+Not verified: Linux (clang + libstdc++) — the new C++ of psibase is one
+call of `psio::ijson_of`, `check()` and a `BasicHttpReply` with a deduced
+body type, no constant-evaluated code of its own; `psio::json_ref` and the
+PSSZ encoder's in-place text are PSIO's and only the Mac's libc++ has
+compiled them here; the LLVM AOT backend; front ends and plugins; the
+many-actions shape at `2c64a245` (no build of the old pin was made); the
+ceiling of actions with no arguments (answered at 4.47 MiB, the failing
+size not run); `x-http::sendReply`'s three copies (read, not measured: the
+reply fails in `http-server` first); the JSON reply over a second
+producer; the 500 for a trace without JSON text in a chain (the source's
+`check()` is asserted in `methods.cpp`, the branch is the one that was
+there); the Rust lib tests were counted as a total, not against 7.11's
+106.

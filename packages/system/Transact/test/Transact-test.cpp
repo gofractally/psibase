@@ -716,6 +716,30 @@ namespace
                                                          .method  = MethodNumber{"nop"},
                                                          .rawData = std::move(data)}}));
    }
+
+   // A transaction of `count` actions for `nop`, each with `argSize` bytes
+   // of arguments: the shape whose trace is mostly member names as JSON.
+   SignedTransaction makeManyActionsTransaction(DefaultTestChain& t,
+                                                AccountNumber     sender,
+                                                std::size_t       count,
+                                                std::size_t       argSize,
+                                                std::uint32_t     salt = 0)
+   {
+      std::vector<Action> actions;
+      actions.reserve(count);
+      for (std::size_t i = 0; i < count; ++i)
+      {
+         std::vector<char> data(argSize, 'x');
+         auto              n = static_cast<std::uint32_t>(i) ^ (salt << 24);
+         for (std::size_t b = 0; b < sizeof(n) && b < argSize; ++b)
+            data[b] = static_cast<char>(n >> (8 * b));
+         actions.push_back(Action{.sender  = sender,
+                                  .service = Nop::service,
+                                  .method  = MethodNumber{"nop"},
+                                  .rawData = std::move(data)});
+      }
+      return t.signTransaction(t.makeTransaction(std::move(actions)));
+   }
 }  // namespace
 
 // Transact checks a transaction where it lies (psio::validate_strict walks
@@ -796,6 +820,40 @@ TEST_CASE("Test transaction size")
          auto trace = post(size).get<TransactionTrace>();
          CHECK(!isReduced(trace));
          CHECK(argumentBytes(trace) >= 2 * size);
+         CHECK(Result<void>(std::move(trace)).succeeded());
+      }
+      SECTION("8000 small actions: the client gets the trace")
+      {
+         // A trace of 3.2 MiB whose JSON text is 2.3 times its bytes
+         // (7.7 MB): member names, not hex.
+         std::size_t count = 8000;
+         auto        trace = t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
+                                         PsszBody{makeManyActionsTransaction(t, alice, count, 8)})
+                                 .get<TransactionTrace>();
+         CHECK(!isReduced(trace));
+         std::size_t called = 0;
+         auto        visit  = [&](this auto&& self, const ActionTrace& at) -> void
+         {
+            if (at.action.service == Nop::service)
+               ++called;
+            for (const auto& inner : at.innerTraces)
+               if (auto* nested = std::get_if<ActionTrace>(&inner.inner))
+                  self(*nested);
+         };
+         for (const auto& at : trace.actionTraces)
+            visit(at);
+         CHECK(called == count);
+         CHECK(psio::to_pssz(trace).size() > 3 * MiB);
+         CHECK(Result<void>(std::move(trace)).succeeded());
+      }
+      SECTION("12000 small actions: the client gets the outcome")
+      {
+         auto reply = t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
+                                  PsszBody{makeManyActionsTransaction(t, alice, 12000, 8)})
+                          .get();
+         CHECK(reply.status == HttpStatus::ok);
+         auto trace = unpackReply<TransactionTrace>(std::move(reply));
+         CHECK(isReduced(trace));
          CHECK(Result<void>(std::move(trace)).succeeded());
       }
       SECTION("2 MiB: the client gets the outcome")
@@ -880,7 +938,7 @@ TEST_CASE("Test transaction size")
    }
 }
 
-// Measurements behind doc/pssz-conversion.md 7.9 and 7.11. Not part of the suite:
+// Measurements behind doc/pssz-conversion.md 7.9, 7.11 and 7.12. Not part of the suite:
 // psitest Transact-test.wasm "[.measure]"
 TEST_CASE("Measure transaction size", "[.measure]")
 {
@@ -927,6 +985,33 @@ TEST_CASE("Measure transaction size", "[.measure]")
       }
    }
 
+   // The rest of a post that was accepted: the queue, the block, the reply.
+   // Prints the outcome, the packed size of the trace, the reply and the time.
+   auto finish = [&](auto& reply, std::chrono::steady_clock::time_point start)
+   {
+      std::fflush(stdout);
+      while (t.runQueueItem())
+      {
+      }
+      auto trace = t.pushNextTransaction();
+      auto time  = std::chrono::steady_clock::now() - start;
+      std::printf("%s, ", !trace ? "not pushed" : trace->error ? trace->error->c_str() : "ok");
+      if (trace)
+         std::printf("trace %zu bytes packed, ", psio::to_pssz(*trace).size());
+      if (auto answer = reply.poll())
+      {
+         std::printf("reply HTTP %d %s (%zu bytes)", static_cast<int>(answer->status),
+                     answer->contentType.c_str(), answer->body.size());
+         if (answer->status != HttpStatus::ok)
+            std::printf(" %.*s", static_cast<int>(std::min<std::size_t>(answer->body.size(), 200)),
+                        answer->body.data());
+      }
+      else
+         std::printf("no reply");
+      std::printf(", %lld ms\n", static_cast<long long>(ms(time)));
+      t.startBlock();
+   };
+
    SECTION("posted to push_transaction")
    {
       // Step by step, as psinode does: the request (r-transact), the
@@ -952,26 +1037,33 @@ TEST_CASE("Measure transaction size", "[.measure]")
             t.startBlock();
             continue;
          }
-         std::fflush(stdout);
-         while (t.runQueueItem())
-         {
-         }
-         auto trace = t.pushNextTransaction();
-         auto time  = std::chrono::steady_clock::now() - start;
-         std::printf("%s, ", !trace ? "not pushed" : trace->error ? trace->error->c_str() : "ok");
-         if (auto answer = reply.poll())
-         {
-            std::printf("reply HTTP %d (%zu bytes)", static_cast<int>(answer->status),
-                        answer->body.size());
-            if (answer->status != HttpStatus::ok)
-               std::printf(" %.*s",
-                           static_cast<int>(std::min<std::size_t>(answer->body.size(), 200)),
-                           answer->body.data());
-         }
-         else
-            std::printf("no reply");
-         std::printf(", %lld ms\n", static_cast<long long>(ms(time)));
-         t.startBlock();
+         finish(reply, start);
       }
+   }
+
+   SECTION("posted to push_transaction: many small actions")
+   {
+      // The trace of an action with few arguments is mostly member names
+      // as JSON: the text is several times the packed bytes.
+      t.setAutoRun(false);
+      for (std::size_t argSize : {std::size_t{8}, std::size_t{64}})
+         for (std::size_t count : {1000, 4000, 8000, 12000, 16000, 20000, 24000, 32000})
+         {
+            auto trx   = makeManyActionsTransaction(t, alice, count, argSize, salt++);
+            auto start = std::chrono::steady_clock::now();
+            std::printf("post %zu actions of %zu bytes (%zu bytes): ", count, argSize,
+                        psio::to_pssz(trx).size());
+            auto reply = t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
+                                     PsszBody{std::move(trx)});
+            if (auto refused = reply.poll())
+            {
+               std::printf("refused, HTTP %d %.*s\n", static_cast<int>(refused->status),
+                           static_cast<int>(std::min<std::size_t>(refused->body.size(), 700)),
+                           refused->body.data());
+               t.startBlock();
+               continue;
+            }
+            finish(reply, start);
+         }
    }
 }
