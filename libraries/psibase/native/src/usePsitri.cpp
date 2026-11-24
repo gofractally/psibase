@@ -516,6 +516,17 @@ namespace psibase
          // Only the irreversible effects are accepted/uncancellable. Large
          // comparisons and COW splice construction above remain cancellable.
          publication.emplace();
+         // Applying socket changes can start delivery on a socket (the recv
+         // flag), and the action that handles the first message runs on
+         // another thread and takes the current subjective roots. It must
+         // see the rows this commit writes for that socket, so when there
+         // are socket changes readers of the roots are held from the moment
+         // the changes apply until the new roots are in place. A proxy lost
+         // the first message of a connection through that window. Commits
+         // without socket changes, the common case, do not hold readers.
+         std::unique_lock snapshot{impl->subjectiveSnapshotMutex, std::defer_lock};
+         if (!socketChanges.empty())
+            snapshot.lock();
          if (!sockets.applyChanges(std::move(socketChanges), &closing, impl->callbacks))
          {
             original = impl->subjective;
@@ -523,7 +534,10 @@ namespace psibase
             return false;
          }
          impl->publishSubjective(writer, proposedSubjective);
-         impl->setSubjective(std::move(proposedSubjective));
+         if (snapshot.owns_lock())
+            impl->subjective = std::move(proposedSubjective);
+         else
+            impl->setSubjective(std::move(proposedSubjective));
       }
       else
          publication.emplace();
