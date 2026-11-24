@@ -1727,7 +1727,7 @@ namespace psibase
          if (auto bytes =
                  systemContext->sharedDatabase.kvGetSubjective(*writer, SnapshotRow::db, key))
          {
-            psio::from_frac(row, *bytes);
+            check(psio::from_frac(row, *bytes), "Invalid snapshot row");
          }
          // Check whether there are existing signatures for the same state
          if (row.state)
@@ -1825,7 +1825,7 @@ namespace psibase
          if (auto bytes =
                  systemContext->sharedDatabase.kvGetSubjective(*writer, SnapshotRow::db, key))
          {
-            psio::from_frac(row, *bytes);
+            check(psio::from_frac(row, *bytes), "Invalid snapshot row");
          }
          if (row.state && row.state->state == checksum)
          {

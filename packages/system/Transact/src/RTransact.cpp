@@ -1220,7 +1220,7 @@ namespace
       else if (request.contentType == "application/octet-stream")
       {
          psio::input_stream stream{request.body};
-         from_frac(result, stream);
+         check(from_frac(result, stream), "Invalid fracpack data");
       }
       else
       {
