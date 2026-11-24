@@ -28,18 +28,31 @@ file(WRITE ${CMAKE_BINARY_DIR}/CTestTestfile.cmake)
 
 option(BUILD_STATIC "Build static binaries" OFF)
 option(ENABLE_SSL "Build psinode with TLS support" ON)
+option(PSIBASE_BUILD_NATIVE_ONLY "Build host binaries only" OFF)
+option(PSIBASE_NIX_PACKAGE_ONLY "Package prebuilt artifacts" OFF)
 
-set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
-set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
+if(NOT USER_WORKSPACE_TARGET)
+    set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
+endif()
+if(NOT SYSTEM_WORKSPACE_TARGET)
+    set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
+endif()
 
-add_subdirectory(native)
-add_subdirectory(rust)
+if(NOT PSIBASE_NIX_PACKAGE_ONLY)
+    add_subdirectory(native)
+    add_subdirectory(rust)
+endif()
+
+if(PSIBASE_BUILD_NATIVE_ONLY)
+    return()
+endif()
 file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\" \"rust\")\n")
 
 option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 
 include(GNUInstallDirs)
 
+if(NOT PSIBASE_NIX_PACKAGE_ONLY)
 if(DEFINED WASI_SDK_PREFIX)
     install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI EXCLUDE_FROM_ALL)
 elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
@@ -252,7 +265,9 @@ add_manpage(psinode)
 add_manpage(psibase)
 add_manpage(psibase-create-snapshot)
 add_manpage(psibase-load-snapshot)
+endif() # NOT PSIBASE_NIX_PACKAGE_ONLY
 
+if(NOT PSIBASE_NIX_PACKAGE_ONLY)
 # Cargo psibase
 ExternalProject_Add(
     cargo-psibase
@@ -312,6 +327,9 @@ add_rs_component_workspace(packages/:Plugins
     homepage-explorer
     producers
 )
+else()
+    include(${CMAKE_CURRENT_SOURCE_DIR}/nix/package-only.cmake)
+endif()
 
 include(GNUInstallDirs)
 
@@ -1665,6 +1683,7 @@ psibase_package(
 
 write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages 0 PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XSocketList WSEcho XDelay XWithServer)
 
+if(NOT PSIBASE_NIX_PACKAGE_ONLY)
 ExternalProject_Add(
     reserved-names
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
@@ -1674,7 +1693,9 @@ ExternalProject_Add(
     BUILD_ALWAYS 1
     INSTALL_COMMAND ""
 )
+endif()
 
+if(NOT PSIBASE_NIX_PACKAGE_ONLY)
 ExternalProject_Add(
     rust
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
@@ -1684,6 +1705,7 @@ ExternalProject_Add(
     BUILD_ALWAYS 1
     INSTALL_COMMAND ""
 )
+endif()
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase TYPE BIN COMPONENT Client)
 
 option(BUILD_EXAMPLES "Build examples" ON)

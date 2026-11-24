@@ -252,6 +252,13 @@
           gdb
         ];
 
+        release = import ./nix/release.nix {
+          inherit pkgs rustToolchain wasiSdk cargoComponent nodejs24 yarnBerry
+            mdbook mdbookMermaid mdbookPagetoc mdbookPlugins mdbookLinkcheck
+            llvmPackages boostForCMake;
+          src = self;
+        };
+
       in
       {
         devShells.default = pkgs.mkShell {
@@ -391,7 +398,7 @@
           '';
         };
 
-        packages.wasi-sdk = wasiSdk;
+        packages = { wasi-sdk = wasiSdk; } // release.packages;
       }
     );
 }

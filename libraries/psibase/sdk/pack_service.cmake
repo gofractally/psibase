@@ -411,6 +411,21 @@ function(cargo_psibase_package)
         message(FATAL_ERROR "Both PATH and OUTPUT must be specified for cargo_psibase_package")
     endif()
 
+    if(PSIBASE_NIX_PACKAGE_ONLY)
+        get_filename_component(PACKAGE_NAME ${ARG_OUTPUT} NAME)
+        get_filename_component(TARGET_NAME ${ARG_OUTPUT} NAME_WE)
+        set(PREBUILT ${PSIBASE_CARGO_PACKAGES}/${PACKAGE_NAME})
+        add_custom_command(
+            OUTPUT ${ARG_OUTPUT}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${SERVICE_DIR}
+            COMMAND ${CMAKE_COMMAND} -E copy ${PREBUILT} ${ARG_OUTPUT}
+            DEPENDS ${PREBUILT}
+            VERBATIM
+        )
+        add_custom_target(${TARGET_NAME} ALL DEPENDS ${ARG_OUTPUT})
+        return()
+    endif()
+
     # Set variables
     get_filename_component(PACKAGE_NAME ${ARG_OUTPUT} NAME)
     get_filename_component(TARGET_NAME ${ARG_OUTPUT} NAME_WE)
