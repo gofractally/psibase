@@ -1,6 +1,0 @@
-/target
-**/*.rs.bk
-node_modules/
-dist/
-.yarn/
-.pnp.*

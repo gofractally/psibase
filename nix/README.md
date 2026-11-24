@@ -109,7 +109,6 @@ nix develop
 
 - `flake.nix` / `flake.lock` — Nix flake at repo root
 - `nix/rust-toolchain.toml` — Rust version and targets
-- `nix/sdk/template/packages/` — out-of-tree workspace skeleton (crates.io pins)
 
 # Relationship to Docker
 

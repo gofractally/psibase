@@ -1,12 +1,13 @@
 # App templates
 
-This directory contains app templates that can be used with cargo-generate to quickly scaffold entire apps, including:
+This directory contains app templates for `cargo-generate`. Each generated
+package is a **stand-alone Cargo workspace** (service, query-service, plugin,
+UI). It is not added to any parent workspace.
 
-- Service
-- Service unit tests
-- HTTP/RPC Service
-- Plugin
-- UI
+Plugin WIT for Host / Transact / Permissions is **vendored** under
+`basic-01/.../plugin/wit/deps/`. When the template gains a new WIT dependency,
+copy the corresponding `world.wit` into that tree and point
+`plugin/Cargo.toml.liquid` at it.
 
 # Install
 
@@ -16,16 +17,27 @@ This directory contains app templates that can be used with cargo-generate to qu
 
 ## Instantiating the template
 
-From the root of the workspace, run:
-`cargo generate -p ./package-templates/ --destination ./packages/user/ --init -v --allow-commands`
+From the monorepo root (prompts for destination and name when omitted):
 
-This will run a CLI wizard to set up the new app in the `./packages/user/` directory.
+```bash
+./package-templates/new.sh
+# or:
+./package-templates/new.sh --destination ./packages/user --name my-app
+```
+
+`new.sh` pins `psibase` crates to this repo’s `rust/` via a relative path.
+To use crates.io pins instead, pass an empty root through cargo-generate:
+
+```bash
+cargo generate -p ./package-templates --destination /path/to/parent --init \
+  -v --allow-commands --name my-app --define psibase_rust_root= basic-01
+```
 
 ## Building the app
 
-1. From the app's `ui/` subdirectory, run `yarn` and `yarn build` to generate the UI.
-2. From the app's root directory, run `cargo-psibase package` to create a package file for the new app (`./target/wasm32-wasip1/release/packages/AppName.psi`).
-3. Use `cargo-psibase install` to install the new app package to a network.
+1. From the app’s `ui/` subdirectory, run `yarn` and `yarn build`.
+2. From the app’s root directory, run `cargo-psibase package`.
+3. Use `cargo-psibase install` to install the package on a network.
 
 # Additional resources
 
