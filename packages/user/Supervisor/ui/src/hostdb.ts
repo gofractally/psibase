@@ -187,9 +187,12 @@ export class HostDb {
     }
 
     // Sends queued writes, then a check for each read that was not written.
-    // A rejected POST is retried with increasing delay; throws after those
-    // attempts, or on a non-OK response.
+    // Sends nothing when no writes are queued. A rejected POST is retried with
+    // increasing delay; throws after those attempts, or on a non-OK response.
     async flush(): Promise<void> {
+        if (this.queue.size === 0) {
+            return;
+        }
         const written = new Set(this.queue.keys());
         const queued = [...this.queue.values()];
         this.queue.clear();
@@ -209,9 +212,6 @@ export class HostDb {
                 }),
         );
         const ops = [...writes, ...checks];
-        if (ops.length === 0) {
-            return;
-        }
         await postBatch(JSON.stringify({ ops }));
     }
 
