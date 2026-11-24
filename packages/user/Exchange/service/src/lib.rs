@@ -102,8 +102,6 @@ pub mod service {
         if n == 0 {
             return;
         }
-        // Creation deposits before the market row exists. An existing book
-        // refuses new money in either token when one reserve was recalled.
         if let Some(m) = MarketTable::read().get_index_pk().get(&market) {
             require_book(&m);
         }
@@ -369,9 +367,6 @@ pub mod service {
         pool.shares -= pos.shares;
         pool.dust = (pool.dust.get() + earned % Q).into();
         table.erase(&key);
-        // One share balance covers the refund and the proceeds. Paying only
-        // one of them would let a later cancel take another maker's outgoing,
-        // so a paused proceeds token reverts the refund too.
         give(user, m.id, if bid { m.quote } else { m.base }, refund);
         give(user, m.id, if bid { m.base } else { m.quote }, paid);
         if pool.shares == 0 {
@@ -464,7 +459,6 @@ pub mod service {
                     events += 1;
                     continue;
                 }
-                // Below one lot this level cannot fill. Do not relay through it.
                 if u >= h {
                     break;
                 }
@@ -490,8 +484,6 @@ pub mod service {
             } else {
                 relay(m.k.get(), m.y, m.x, step)
             };
-            // A zero-output step donates the input. Smaller steps are also
-            // zero, so leave this input unspent.
             if received == 0 {
                 break;
             }
@@ -1132,8 +1124,6 @@ pub mod service {
         );
         let base_ok = token_solvent(m.id, m.base);
         let quote_ok = token_solvent(m.id, m.quote);
-        // Margin reserves are unrecallable. A spot LP may exit the one reserve
-        // that is still solvent; the missing reserve stays paused and unreduced.
         let spot_exit = m.margin_enabled != Some(true) && base_ok != quote_ok;
         assert!(
             (base_ok && quote_ok) || spot_exit,

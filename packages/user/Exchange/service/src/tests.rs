@@ -1094,8 +1094,8 @@ fn recalled_old_spot_book_cannot_drain_new_guaranteed_market(chain: Chain) -> Re
         .unwrap(),
         safe_record
     );
-    // New spot funding still cannot recapitalize the underfunded historical row.
-    // Incoming tokens pause while either native reserve is short.
+    // Even new spot funding cannot recapitalize an underfunded historical row
+    // silently; both native assets are checked before moving incoming tokens.
     let before = state(&chain);
     assert!(Wrapper::push_from(&chain, account!("bob"))
         .trade(f.market, false, 1000, 0, 16)
