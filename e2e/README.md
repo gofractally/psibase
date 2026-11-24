@@ -1,8 +1,8 @@
 # @psibase/e2e
 
-Playwright end-to-end harness for psibase. This base provides the Playwright
+Playwright end-to-end harness for psibase. It provides the Playwright
 setup only (config, browser projects, CTest and CI wiring, binary and package
-resolution). Fixtures and specs are added by branches stacked on top of it.
+resolution). Fixtures and specs are added separately.
 
 ## Prerequisites
 

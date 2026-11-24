@@ -72,9 +72,9 @@ Other notes:
 - Set the `WASI_SDK_PREFIX` environment variable before building to the root of your llvm installation (e.g. `/usr/lib/llvm-16`). Alternatively, set this variable during the build using the CMake flag `-DWASI_SDK_PREFIX=....`.
 - Add the following targets to rust: `wasm32-wasip1`, `wasm32-unknown-unknown`
 
-> 🔍 You can reference the [Ubuntu 22.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2204-builder.Dockerfile), [Ubuntu 24.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2404-builder.Dockerfile), or [Ubuntu 26.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2604-builder.Dockerfile) for an example on how an environment could be set up.
+> 🔍 You can reference the [Ubuntu 22.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2204-builder.Dockerfile), [Ubuntu 24.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2404-builder.Dockerfile), or [Ubuntu 26.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2604-builder.Dockerfile) for an example on how an environment could be set up. Alternatively, the [Nix development shell](nix/README.md) provides a complete environment.
 
-> 🌐 An optional browser-based E2E suite lives in [`e2e/`](e2e/). Playwright Chromium/WebKit ship in the [Ubuntu builder images](https://github.com/gofractally/image-builders) and via Nix; see [`e2e/README.md`](e2e/README.md). You do not need them to build psibase: without a browser, `ctest` reports the suite as **skipped**, not failed.
+> 🌐 An optional browser-based E2E suite lives in [`e2e/`](e2e/). Running it requires Playwright Chromium and WebKit; see [`e2e/README.md`](e2e/README.md). You do not need them to build psibase: without a browser, `ctest` reports the suite as **skipped**, not failed.
 
 ### Build
 

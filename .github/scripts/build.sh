@@ -2,6 +2,7 @@
 WORKSPACE_ROOT=$1
 BUILDER_IMAGE=$2
 UBUNTU_BUILD_VER=$3
+RUN_E2E=${4:-false}
 
 set -e
 
@@ -64,6 +65,10 @@ echo =====
 ${DOCKER} bash -c "cd rust && cargo build --target-dir ../build/rust --release"
 echo =====
 ${DOCKER} bash -c "cd build && ctest --output-on-failure -j $(nproc) --timeout 600 -LE e2e"
+if [ "$RUN_E2E" = "true" ]; then
+  echo "===== e2e ====="
+  ${DOCKER} bash -c "cd build && ctest --output-on-failure --timeout 600 -L e2e"
+fi
 echo =====
 ls -la ${WORKSPACE_ROOT}
 ls -la ${WORKSPACE_ROOT}/build/doc
