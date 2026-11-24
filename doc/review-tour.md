@@ -4,7 +4,7 @@
 
 `bytemaster/head` is 335 commits ahead of `main` (merge base db601e572, 18 November). The raw diff is about 1,600 files, 237,000 added lines and 56,000 removed. A large share of that is documentation, demos and application work, the serialization change touches most services mechanically, and a large part of the execution engine is not in this repository at all. This tour says where to look.
 
-Status when this was last updated: head at 1d7210e7a, pinning PSIO 66abb1b, psitri d3bba0e and psizam 2e93ecd.
+Status when this was last updated: head at 5468fb08f, pinning PSIO 66abb1b, psitri d3bba0e and psizam 2e93ecd.
 
 ## Why this is worth your time
 
@@ -82,7 +82,7 @@ Visible in traces but not consensus: action trace time, the transaction limit an
 - The status of each engine and the known problems of the experimental ones are in psizam's [KNOWN_ISSUES.md](https://github.com/gofractally/psizam/blob/main/KNOWN_ISSUES.md). #2228 stays open for LLVM AOT on macOS and for the experimental engines.
 - `psitest` still runs every test module on JIT2 while the services it drives run on wasmtime: the one place an experimental engine is on the path of the suites (#2231).
 - psizam tests a reviewer will see fail, all predating this work: the `memory_grow_2` spec cases on every engine, `psizam_host_tail_reentry_tests` (intentionally red), and on x86 "Test call depth dynamic - jit_llvm".
-- Rust services use wide arithmetic only when built with rustc 1.100 or newer; rustc calls the target feature unstable and warns that using it will become an error (#2230). A test in the Rust suite checks 128-bit arithmetic in a service against a 32-bit-limb reference, so a compiler that gets it wrong fails the suite.
+- Rust services use wide arithmetic only when built with rustc 1.100 or newer; rustc calls the target feature unstable and warns that using it will become an error (#2230). A test in the Rust suite checks 128-bit arithmetic in a service against a 32-bit-limb reference. It is intended to fail the suite if a compiler gets it wrong; it passes on rustc 1.100 and has not been run against rustc 1.98 with the feature forced on, so it is not shown to catch that miscompile.
 
 ### 2. Storage: psitri replaces triedent
 
