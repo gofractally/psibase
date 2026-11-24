@@ -241,6 +241,8 @@ pub fn allow_cors_with_origin(origin: &str) -> Vec<HttpHeader> {
     vec![
         HttpHeader::new("Access-Control-Allow-Origin", origin),
         HttpHeader::new("Access-Control-Allow-Methods", "POST, GET, OPTIONS, HEAD"),
-        HttpHeader::new("Access-Control-Allow-Headers", "*"),
+        // "*" alone doesn't cover Authorization
+        HttpHeader::new("Access-Control-Allow-Headers", "*, Authorization"),
+        HttpHeader::new("Access-Control-Max-Age", "86400"),
     ]
 }
