@@ -289,7 +289,9 @@ namespace psibase
       return {
           {"Access-Control-Allow-Origin", std::string(origin)},
           {"Access-Control-Allow-Methods", "POST, GET, OPTIONS, HEAD, PUT, DELETE"},
-          {"Access-Control-Allow-Headers", "*"},
+          // "*" alone doesn't cover Authorization
+          {"Access-Control-Allow-Headers", "*, Authorization"},
+          {"Access-Control-Max-Age", "300"},
       };
    }
 
