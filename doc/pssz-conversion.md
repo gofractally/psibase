@@ -6281,3 +6281,163 @@ producer; the 500 for a trace without JSON text in a chain (the source's
 `check()` is asserted in `methods.cpp`, the branch is the one that was
 there); the Rust lib tests were counted as a total, not against 7.11's
 106.
+
+### 7.13 Pin moved to PSIO `e11fd099`: member defaults in the schema
+
+The pin is `e11fd099f5a584d259357dad0764502c91b992db` (PSIO `main`, twenty
+commits after `842a538b`). What reaches psibase from the range: the schema
+builder writes the member attributes `field`, `deprecated` and `default`
+(a scalar member initialiser that is not zero); `std::monostate` is
+`Tuple{}` in the IR; `long`, `long long` and `std::size_t` are named by
+width on every platform (`f8049a2`); a GraphQL map entry is read as the
+`std::pair` it is (`2ef3911`); view comparisons are constrained; `bin.hpp`
+and `wit.hpp` compile without exceptions. The rest is FlatBuffers, Cap'n
+Proto and protobuf (codecs, schema emitters and parsers, the Rust
+`psio::protobuf` feature), which psibase does not use. **No byte of a
+value, no JSON text of a value, no GraphQL name and no variant label
+changed; serialized *schemas* did, by added `default` attributes only.**
+Nothing stopped compiling with the pin alone (full build exit 0,
+`build-e11-pin.log`, before any source was touched).
+
+**The pin moved by itself.** The three pin sites were changed and
+`cmake ~/psibase-pssz-build` run (exit 0, `configure-e11.log`). What it
+printed for the dependencies, in full:
+
+```
+-- psibase: reusing psizam at 2e93ecd1561ed7d4808a1a83af1d0137bac17b41 without Git clone/update
+-- psibase: reusing ucc at d79166da0290fdf9d1f9d5880d4dfb45b2822cf3 without Git clone/update
+-- psibase: fetching psio e11fd099f5a584d259357dad0764502c91b992db from https://github.com/gofractally/psio.git
+-- psibase: advanced psio from 842a538b936ca8b64a4c37cc5e8d9eba47fd416a to e11fd099f5a584d259357dad0764502c91b992db (fetched from https://github.com/gofractally/psio.git; git checkout --detach, previous commit still reachable)
+-- psibase: reusing psio at e11fd099f5a584d259357dad0764502c91b992db without Git clone/update
+-- psibase: reusing psitri at d3bba0e6a5f59e37c3eea08a1a720ae553cafb2c without Git clone/update
+```
+
+Afterwards `git -C external/psio rev-parse HEAD` is the new pin, detached,
+with an empty `status --short`. It did not refuse and printed no command.
+
+**Changed schemas.** Read with `GET packages…/schema?service=…` for every
+service account of the packages from a chain booted at the old pin
+(`~/psibase-pssz-e2e-e11-old`, the baseline build of this section) and one
+booted with this build (`~/psibase-pssz-e2e-e11`): 70 services have a
+schema on both, **38 differ**. The `service/<acct>.json` members of the
+packages were compared as well (all 91, the 21 that `Dev`/`Prod` do not
+install included): **47 differ**. Every difference, in both comparisons, is
+`"attributes": []` of a record member becoming
+`[{"name":"default","value":…}]`; no `field`, no `deprecated`, no
+`Tuple{}` in place of a monostate (psibase reflects no `std::monostate`:
+its two uses are in `serveGraphQL.hpp` and `trace.cpp`, on PSIO's
+`json_value`), no label and no type name.
+
+| Member (C++ initialiser) | `default` | Services |
+|---|---|---|
+| `BasicHttpReply::status` (`HttpStatus::ok`), C++ services | `"200"` | `accounts+1`, `auth-delg+1`, `auth-sig+1`, `common-api`, `dyn-ld+1`, `events+1`, `explorer`, `http`, `http+1`, `invite+1`, `packages+1`, `producers+1`, `setcode+1`, `sites`, `transact+1`; not installed by `Prod`: `x-admin`, `x-common`, `x-http`, `x-packages`, `x-peers`, `x-proxy`, `x-sites` |
+| `HttpReply::status`, Rust services (through the Rust twin, below) | `"200"` | `auth-dyn+1`, `branding`, `chainmail`, `diff-adj+1`, `evaluation+1`, `fractals+1`, `guilds+1`, `identity`, `namemarket+1`, `nft+1`, `profiles+1`, `registry+1`, `staged-tx+1`, `symbol+1`, `tok-stream+1`, `token-swap+1`, `tokens+1`, `vserver`, `wsauth`; not installed: `auth-rcovr+1`, `favor+1` |
+| `VMOptions::max_mutable_global_bytes`, `max_pages`, `max_table_elements`, `max_stack_bytes` | `"1024"`, `"512"`, `"8192"`, `"1048576"` | `transact` |
+| `TransactStatus::enforceAuth` | `"true"` | `transact` |
+| `TraceClientInfo::json` | `"true"` | `transact+1` |
+| `DefaultVmVersionRow::vmVersion` | `"1"` | `setcode` |
+| `SiteConfigRow::cache` | `"true"` | `sites` |
+| `SecondaryIndexInfo::indexNum` | `"255"` | `events`, `events+2` |
+
+The `<Target>-schema.json` files of the build directory (68, the C++ test
+services included): 39 differ, by the same members and nothing else.
+With the pin alone 26 packaged schemas differed (the C++ services); the 21
+Rust ones followed from the twin of `HttpReply`.
+
+**C++ and Rust twins.** C++ takes the attribute from the member
+initialiser; the Rust derive writes it only where the member says
+`#[psio(default = value)]`. With the pin alone `psio_twins`
+`rust_and_cpp_declare_the_same_types` failed at `VMOptions` (node for node:
+`attributes: []` against `default = "1024"`); the comparison under
+`contract` does not compare the attribute, so `verify_schema` (43 views)
+did not notice. The fixture's Schema IR has ten such members in five
+records, all implemented in C++, so the Rust declarations were completed:
+
+| Rust twin | Added |
+|---|---|
+| `http.rs` `HttpReply::status` | `#[psio(default = 200)]` |
+| `native_tables.rs` `ConfigRow` | `maxKeySize` 128, `maxValueSize` 8388608, `maxBlockSize` 4194304 |
+| `native_tables.rs` `VMOptions` | 1024, 512, 8192, 1048576 |
+| `native_tables.rs` `WasmConfigRow::numExecutionMemories` | 32 |
+| `native_tables.rs` `LogMessage::severity` | 1 |
+| `services/sites.rs` `SiteConfigRow::cache` (not in the fixture; found from the table above) | `true` |
+
+In the Rust derive the attribute is read by the schema and by the
+FlatBuffers codec only (`pssz_macro.rs`, `fb_macro.rs`): no PSSZ byte, key
+or JSON text of these types depends on it. Left as it is and noted for the
+team (13.20): Rust's derived `Default` of `HttpReply` gives status 0, where
+C++ and now the schema say 200. Of the other C++ service records of the
+table above only `SiteConfigRow` has a Rust declaration (completed, last
+row); no test compares it node for node. `TransactStatus`,
+`TraceClientInfo`, `DefaultVmVersionRow` and `SecondaryIndexInfo` have
+none (`git grep`).
+
+**Integer names (rule of `f8049a2`).** psibase has no variant alternative
+and no named type of `std::size_t`, `long` or `long long`: the only
+integer alternative in any schema is `RTransact::VerifyStatus`
+(`std::variant<std::uint64_t, RunToken>`), labelled `uint64` before and
+after and on either platform, and no schema, fixture or JSON text has an
+alternative labelled by its position (searched in the 91 package schemas
+and the 68 build schemas, old and new). So nothing changed on macOS, and
+Mac-built and Linux-built packages did not disagree on a label before this
+pin.
+
+**GraphQL and maps (`2ef3911`).** No psibase query returns map-typed data:
+the 14 service sources that call `serveGraphQL` and the reflected headers
+were searched for map types; `DynDepGroups::groups`, the one reflected `std::map` of a service table,
+is not reachable from `RDynLd`'s `Query` (`depsFor` returns `DynDeps`),
+`ServiceSchema`'s maps are served as JSON by `/schema`, and Explorer's
+maps are private. A test was added so that the Linux build exercises the
+path: `graphql.cpp` `Query::groups` (`std::map<std::string,
+std::vector<Shown>>`, with a key and a text long enough to be on the heap)
+and `Query::counts` (`std::map<AccountNumber, std::uint64_t>`): the SDL
+(`[Tuple_String_ShownList!]!`, `_0` / `_1`), the entries in key order with
+both members, in either selection order, natively and in a guest
+(`psibase-psio-tests` 1485 assertions, was 1482).
+
+**Rust: the foreign formats.** No Rust source or manifest in `rust/`,
+`packages/` or `programs/` names `flatbuf`, `FbView`, `capnp` or
+`protobuf` (`git grep`). PSIO's two manifests changed by one feature
+(`protobuf`, no dependency); no `Cargo.lock` of the tree changed;
+`cargo tree -p tokens --target wasm32-wasip1 -e features` shows `psio`
+with `default`, `async-graphql` and `chrono` only. Sizes: of 369 `.wasm`
+files in the build directory 103 changed size, none by more than 1 % (the
+largest: `Transact-schema-gen.wasm` +0.47 %, `psibase-psio-tests.wasm`
++0.38 %; installed services at most +0.06 %, `identity`); `Transact.wasm`,
+`Accounts.wasm` and the Rust `tokens` service are byte for byte what they
+were.
+
+**Regenerated, and why.**
+
+| File | What changed |
+|---|---|
+| `libraries/psibase/common/tests/rust-twins.json` | `schema_ir` (48 520 → 49 082 characters: the ten `default` attributes), and the one sample whose *value is a schema*: `ServiceSchema` of `setcode` (`vectors[139]`, its `pssz` and `ijson`, and `calls[22]`, which carries it) now holds `DefaultVmVersionRow::vmVersion` `default = "1"`. Every other vector, call, transaction and name is identical, compared key by key |
+| `doc/src/specifications/data-formats/schema-schema.json` | regenerated, byte for byte what it was (the IR's own records have no non-zero scalar initialiser) |
+| every `<Target>-schema.json`, `service/<acct>.json` and package | generated; above. 50 of 92 packages are member for member what they were (none of them holds a changed schema); the Rust services were recompiled (`Compiling tokens` in the log) and are identical but for the schema |
+
+Not changed and still passing: the schema text pinned in
+`common/tests/schema.cpp` and `test_psibase_types.py`,
+`rust/psibase/tests/service-schema-sample.json`, `Nop-schema.json`.
+
+| Step | Result |
+|---|---|
+| merge of `bytemaster/head` | fast-forward `5ee1089a0` → `7954dff6d` (binaryen 133 in `flake.nix`, the alt-context timeout probe) |
+| baseline, `7954dff6d` with `842a538b` | build exit 0 (`build-e11-base.log`); `ctest -j4` **89 / 89** (`ctest-e11-base.log`, 620 s) |
+| configure | exit 0, the pin advanced by itself (above) |
+| full build, the pin alone | exit 0 (`build-e11-pin.log`) |
+| full build | exit 0 (`build-e11-1.log`, and `build-e11-2.log` after the `SiteConfigRow` line); `share/psibase/packages/index.json`: 91 entries |
+| twin fixture | regenerated (above); `psio_twins` 4 / 4, `psio_json` 13 / 13, `service_schema` 5 / 5, `psio_leaf_types` 13 / 13, `psio_wrappers` 7 / 7 |
+| native unit tests | C++ `psibase-psio-tests` 1485 assertions in 71 cases, 1391 in 67 in a guest; Rust `cargo test -r` of the five host crates with `PSIBASE_DATADIR` set: 167 passed, 0 failed (`rust-unit-e11.log`; lib 106 / 106) |
+| `ctest -j4` | **89 / 89** (`ctest-e11-final.log`, 891 s with the Rust tests compiling; again on the final tree after the `SiteConfigRow` line, `ctest-e11-final2.log`, 89 / 89, 876 s) |
+| every Rust workspace | `check_all.sh e11`: all exit 0 except `packages/user --tests` (`tokens-plugin` 5 errors, Favor's tests 2: the known seven) |
+| end to end (7.5's commands, state `~/psibase-pssz-e2e-e11`) | boot exit 0; `create alice`, `bob`, `carol` exit 0 at the first attempt, 8 s after `boot` returned; the seven queries answer as in 7.5 and, but for block ids, as on the old-pin chain (accounts and packages in C++, tokens in Rust, Explorer's 720 blocks, the schema endpoint; the SDL of `accounts` is identical); `GET packages…/schema?service=transact`: `{"name":"enforceAuth",…,"attributes":[{"name":"default","value":"true"}]}`; `kill -TERM`, restart, the same answers, `create dave` exit 0 (a pushed transaction), `getAccounts` returns all four; no `[error]` line in either log |
+
+Not verified: Linux (clang + libstdc++) — the C++ added here is two
+`std::map` results in a test and nothing constant-evaluated; the `2ef3911`
+fault itself does not show on the Mac's libc++ (PSIO: "worked with libc++
+by layout coincidence"), so the new test is evidence only on Linux, and it
+was not run here against the old pin; that a
+schema-driven reader built before this pin refuses the `default` attribute
+(stated by PSIO, not tried); the JSON reply to a pushed transaction (7.12's
+relay was not run again: the CLI's binary reply was); the LLVM AOT
+backend; front ends and plugins.

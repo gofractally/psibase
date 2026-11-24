@@ -16,13 +16,20 @@ schemas flipped in its section 1.21 (stage S2); JSON in its section 1.22
 (stage S4); GraphQL in its section 1.24 (stage S5): a C++ GraphQL answer
 is written by PSIO's engine. The legacy library is deleted (section 1.25).
 
-PSIO pin for both languages: `2c64a245bda231d427357d502e3d6bfb82364cbb`
+PSIO pin for both languages: `e11fd099f5a584d259357dad0764502c91b992db`
 (`cmake/PsibaseDependencies.cmake`; PSIO `main`). No byte of a value and no
 JSON text of a value changed since `f811c6f9`, on which the two halves were
 merged; at `66abb1b5` the *schemas* changed (variant alternative labels,
 section 0.1; method results, section 1 "Return values"):
 `doc/pssz-conversion.md` section 7.10. Nothing changed at `2c64a245`: a
-call is packed into one buffer, with the same bytes (its section 7.11).
+call is packed into one buffer, with the same bytes (its section 7.11), nor
+at `842a538b` (its section 7.12). At `e11fd099` the *schemas* changed again:
+a record member whose C++ initialiser is a scalar that is not zero carries
+the member attribute `default` (`HttpReply::status` = `"200"`, so every
+service that serves HTTP); a Rust twin states it with
+`#[psio(default = …)]`. No reader of bytes or text reads the attribute and
+the comparison under `contract` does not compare it; a schema-driven reader
+must be at the same pin (its section 7.13).
 
 ## 0. Already in force with the pin (before any flip commit)
 

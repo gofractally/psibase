@@ -60,9 +60,12 @@ impl StatusRow {
 
 #[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct ConfigRow {
+    #[psio(default = 128)]
     pub maxKeySize: u32,
+    #[psio(default = 8388608)]
     pub maxValueSize: u32,
     /// The most bytes of transactions a block may hold.
+    #[psio(default = 4194304)]
     pub maxBlockSize: u32,
 }
 
@@ -85,9 +88,13 @@ impl ConfigRow {
     psio::Serde,
 )]
 pub struct VMOptions {
+    #[psio(default = 1024)]
     max_mutable_global_bytes: u32,
+    #[psio(default = 512)]
     max_pages: u32,
+    #[psio(default = 8192)]
     max_table_elements: u32,
+    #[psio(default = 1048576)]
     max_stack_bytes: u32,
 }
 
@@ -102,6 +109,7 @@ pub struct VMOptions {
     psio::Serde,
 )]
 pub struct WasmConfigRow {
+    #[psio(default = 32)]
     numExecutionMemories: u32,
     vmOptions: VMOptions,
 }
@@ -510,6 +518,7 @@ pub enum SocketInfo {
 
 #[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct LogMessage {
+    #[psio(default = 1)]
     pub severity: u32,
     pub message: String,
     pub service: Option<AccountNumber>,

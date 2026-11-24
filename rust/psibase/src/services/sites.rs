@@ -86,6 +86,7 @@ pub mod service {
         #[primary_key]
         pub account: AccountNumber,
         pub spa: bool,
+        #[psio(default = true)]
         pub cache: bool,
         pub globalCsp: Option<String>,
         pub proxyAccount: Option<AccountNumber>,

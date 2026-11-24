@@ -161,6 +161,7 @@ impl HttpBody {
     psio::Serde,
 )]
 pub struct HttpReply {
+    #[psio(default = 200)]
     pub status: u16,
 
     /// "application/json", "text/html", ...

@@ -20,7 +20,7 @@ The defaults are immutable Git revisions:
 
 | Name | Revision | Acquisition boundary |
 | --- | --- | --- |
-| psio | `842a538b936ca8b64a4c37cc5e8d9eba47fd416a` | Sources by FetchContent; the maintained upstream CMake project is added by `psibase_acquire_dependency` |
+| psio | `e11fd099f5a584d259357dad0764502c91b992db` | Sources by FetchContent; the maintained upstream CMake project is added by `psibase_acquire_dependency` |
 | psitri | `d3bba0e6a5f59e37c3eea08a1a720ae553cafb2c` | Sources only |
 | ucc | `d79166da0290fdf9d1f9d5880d4dfb45b2822cf3` | Sources only |
 | psizam | `2e93ecd1561ed7d4808a1a83af1d0137bac17b41` | Sources only |

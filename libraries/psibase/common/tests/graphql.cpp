@@ -10,6 +10,7 @@
 #include <psibase/tester.hpp>
 #endif
 
+#include <map>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -178,6 +179,19 @@ namespace graphql_test
          }
          return std::move(out).finish(false, true);
       }
+      // A map is the list of its entries; an entry is a std::pair, and is
+      // read as one (not as the tuple it is presented as: libstdc++ lays the
+      // two out differently)
+      std::map<std::string, std::vector<Shown>> groups() const
+      {
+         return {{"first", {Shown{1, "one"}, Shown{2, "a text long enough to be on the heap"}}},
+                 {"second", {}},
+                 {"a key long enough to be on the heap", {Shown{3, "three"}}}};
+      }
+      std::map<AccountNumber, std::uint64_t> counts() const
+      {
+         return {{AccountNumber{"bob"}, 2}, {AccountNumber{"alice"}, ~0ull}};
+      }
       gql::result<std::uint32_t> checked(std::uint32_t x) const
       {
          if (x > 3)
@@ -201,6 +215,8 @@ namespace graphql_test
                 method(socket, kind),
                 method(event),
                 method(events, page),
+                method(groups),
+                method(counts),
                 method(checked, x))
 
    // A root that is not called Query
@@ -266,6 +282,8 @@ TEST_CASE("graphql: the schema of a query root", "[graphql]")
   socket(kind: Int!): SocketInfo!
   event: EvWithBlockContext!
   events(first: Int, last: Int, before: String, after: String): EvConnection
+  groups: [Tuple_String_ShownList!]!
+  counts: [Tuple_AccountNumber_UInt64!]!
   checked(x: Int!): Int
 }
 
@@ -308,6 +326,16 @@ type EvWithBlockContext {
 type EvConnection {
   edges: [EvEdge!]!
   pageInfo: PageInfo!
+}
+
+type Tuple_String_ShownList {
+  _0: String!
+  _1: [Shown!]!
+}
+
+type Tuple_AccountNumber_UInt64 {
+  _0: AccountNumber!
+  _1: UInt64!
 }
 
 scalar UInt64
@@ -427,6 +455,13 @@ TEST_CASE("graphql: fields, methods and their results", "[graphql]")
          R"({"data":{"socket":{"endpoint":"/tmp/sock","tls":{"_":true}}}})");
    CHECK(run("{ socket(kind: 1) { ... on WebSocketInfo { tls { __typename } } } }") ==
          R"({"data":{"socket":{"tls":null}}})");
+   // A map: its entries in key order, each with its key and its value
+   CHECK(run("{ groups { _0 _1 { id text } } }") ==
+         R"({"data":{"groups":[{"_0":"a key long enough to be on the heap","_1":[{"id":3,"text":"three"}]},{"_0":"first","_1":[{"id":1,"text":"one"},{"id":2,"text":"a text long enough to be on the heap"}]},{"_0":"second","_1":[]}]}})");
+   CHECK(run("{ groups { _1 { text } key: _0 } }") ==
+         R"({"data":{"groups":[{"_1":[{"text":"three"}],"key":"a key long enough to be on the heap"},{"_1":[{"text":"one"},{"text":"a text long enough to be on the heap"}],"key":"first"},{"_1":[],"key":"second"}]}})");
+   CHECK(run("{ counts { _0 _1 } }") ==
+         R"({"data":{"counts":[{"_0":"alice","_1":"18446744073709551615"},{"_0":"bob","_1":2}]}})");
    // The event's members are beside its block
    CHECK(run("{ event { block { blockNum blockTime } n what } }") ==
          R"({"data":{"event":{"block":{"blockNum":9,"blockTime":null},"n":4,"what":"stored"}}})");
