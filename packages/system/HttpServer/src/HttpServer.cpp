@@ -100,7 +100,6 @@ namespace SystemService
                                                      "Access-Control-Allow-Headers",
                                                      "Access-Control-Allow-Methods",
                                                      "Access-Control-Allow-Origin",
-                                                     "Access-Control-Max-Age",
                                                      "Allow",
                                                      "Cache-Control",
                                                      "Content-Encoding",
