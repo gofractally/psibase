@@ -17,12 +17,13 @@ copy the corresponding `world.wit` into that tree and point
 
 ## Instantiating the template
 
-From the monorepo root (prompts for destination and name when omitted):
+From the monorepo root (prompts for destination, name, and version when omitted;
+version defaults to `rust/Cargo.toml` `[workspace.package]`):
 
 ```bash
 ./package-templates/new.sh
 # or:
-./package-templates/new.sh --destination ./packages/user --name my-app
+./package-templates/new.sh --destination ./packages/user --name my-app --version 0.29.0
 ```
 
 `new.sh` pins `psibase` crates to this repo’s `rust/` via a relative path.
