@@ -4,7 +4,7 @@
 
 `bytemaster/head` is 335 commits ahead of `main` (merge base db601e572, 18 November). The raw diff is about 1,600 files, 237,000 added lines and 56,000 removed. A large share of that is documentation, demos and application work, the serialization change touches most services mechanically, and a large part of the execution engine is not in this repository at all. This tour says where to look.
 
-Status when this was last updated: head at 3085ec56a, pinning PSIO 66abb1b, psitri d3bba0e and psizam 2e93ecd.
+Status when this was last updated: head at 1d7210e7a, pinning PSIO 66abb1b, psitri d3bba0e and psizam 2e93ecd.
 
 ## Why this is worth your time
 
@@ -82,7 +82,7 @@ Visible in traces but not consensus: action trace time, the transaction limit an
 - The status of each engine and the known problems of the experimental ones are in psizam's [KNOWN_ISSUES.md](https://github.com/gofractally/psizam/blob/main/KNOWN_ISSUES.md). #2228 stays open for LLVM AOT on macOS and for the experimental engines.
 - `psitest` still runs every test module on JIT2 while the services it drives run on wasmtime: the one place an experimental engine is on the path of the suites (#2231).
 - psizam tests a reviewer will see fail, all predating this work: the `memory_grow_2` spec cases on every engine, `psizam_host_tail_reentry_tests` (intentionally red), and on x86 "Test call depth dynamic - jit_llvm".
-- Rust services use wide arithmetic only when built with rustc 1.100 or newer; rustc calls the target feature unstable and warns that using it will become an error (#2230).
+- Rust services use wide arithmetic only when built with rustc 1.100 or newer; rustc calls the target feature unstable and warns that using it will become an error (#2230). A test in the Rust suite checks 128-bit arithmetic in a service against a 32-bit-limb reference, so a compiler that gets it wrong fails the suite.
 
 ### 2. Storage: psitri replaces triedent
 
@@ -148,7 +148,7 @@ The first commits (a4e5c0a0e through 0a93ef490) add Exchange, Favor, Signing and
 
 ### 8. Build and toolchain
 
-- **The team's Ubuntu 22.04 CI check fails on this pull request at configure**, before any code is built: the head requires CMake 3.28 or newer and the builder image has an older one (#2238). The other checks pass. Until the image is updated, that check says nothing about the code.
+- **The team's Ubuntu 22.04 CI check fails on this pull request at configure**, before any code is built: the head requires CMake 3.28 or newer and the builder image has an older one (#2238). The other checks pass. A change that removes the CMake 3.28 requirement is being prepared; binaryen 133 and rustc 1.100 will still be needed on the image.
 - CMake 3.28 or newer.
 - binaryen 133 or newer must be first on `PATH`; older versions cannot read wide-arithmetic code and the configure step now says so.
 - Rust services get wide arithmetic only with rustc 1.100 or newer. rustc 1.98 miscompiles 128-bit arithmetic when the feature is on, giving wrong multiply and add/subtract results on every engine, so `cargo-psibase` adds the flag only for 1.100 and later and builds without it otherwise, with a message.
@@ -190,12 +190,20 @@ This section was written by the author of the migration.
 4. Members that exist in a struct but are absent from reflection, listed as questions of intent.
 5. JSON and GraphQL behaviour that clients will notice (`doc/team-review.md` sections 8 and 12).
 
-**Known gaps.** `doc/team-review.md` is the current list. These were open when the migration merged, and some have been addressed since by a later PSIO pin and follow-up commits:
-- The maximum transaction size fell to about 3.5 to 4.4 MB because the guest's strict check re-encoded the transaction; an in-place check was the fix.
-- Method results declared with `returns(...)` did not reach service schemas, and C++ and Rust derived variant labels by different rules. Both are named in the commit that pins PSIO 66abb1b.
-- Identifiers still named after fracpack, and five user documentation pages that describe the old format.
-- Front ends and plugins have not been run in a browser. The snapshot tools and `demo/` have not been run.
-- `psibase boot` returns before the boot transactions are applied.
+**Closed since the migration merged.**
+- Transaction size: the guest's strict check now walks the transaction in place, and Transact accepts one up to its 32 MiB of memory (31.6 MiB measured). A test pins 1, 4.5, 8 and 16 MiB and passes on both machines and both engines.
+- Method results: schemas carry the declared result type, and callers in C++ and Rust decode through it (#2235).
+- Variant labels follow one rule in every language, so C++ and Rust service schemas compare with no special case.
+- The fracpack-named calls and helpers are renamed or deleted.
+
+**Known gaps.** The living list is `doc/team-review.md`, sections 12 and 13.
+1. Large transactions over HTTP (#2233, partly fixed). Up to 1.6 MiB the client gets the whole trace; above that, a 200 with the outcome only; above 5 MiB, a 413 naming the limit; from 8 MiB a service ahead of `r-transact` traps and the client gets a 500. The two limits are new constants chosen by measurement and need the team's confirmation. Receiving from a peer has no size limit of its own.
+2. Names and pages still describing the old format (#2234): a `block.frac` file name in the consensus replay test, and the documentation pages `fracpack.md`, `schema.md`, `js-libraries.md` and the end of `rust-service/tables.md`. `demo/` has not been built.
+3. Not exercised by anyone (#2236): front ends and plugins in a browser, the snapshot tools at run time and validation on snapshot import, `demo/`, and a service that reads a multi-megabyte argument. `psibase boot` returns before the boot transactions are applied, which needs confirming as intended.
+4. Size caps and trust, as in the questions above, and the token-transfer `data` argument is not implemented.
+5. In the PSIO library: strict validation and trusted views in Rust, JavaScript and Python lag C++; the schema format has no canonical byte form; and several smaller items are open there (psio issues 3 to 9).
+6. For Rust code outside the tree: `Caller::call` gained a bound tying arguments to the declared result. Serialized service schemas changed at the current PSIO pin, so packages built before it must be rebuilt.
+7. Throughput has not been remeasured since the serialization change.
 
 ## Throughput
 
@@ -254,7 +262,7 @@ Open items are tracked as issues and closed as they are fixed.
 - The verifier's differential and Wycheproof checks are not an in-tree test: #2225.
 - The team's CI image cannot configure the head (CMake 3.28, binaryen 133): #2238.
 - psitri, ucc and psio have no license file.
-- Serialization: the open questions and gaps in section 9 and `doc/team-review.md`. Front ends and plugins have not been run in a browser since the format change.
+- Serialization: large transactions over HTTP (#2233), names and pages still describing the old format (#2234), and what nobody has exercised yet, including front ends and plugins in a browser (#2236). The rest is in section 9 and `doc/team-review.md`.
 - Throughput has not been remeasured since the serialization change.
 - `doc/verify-sig/` records measurements taken before the serialization change; its harness and case generator use the old library's calls and will not build against this head as written.
 - psitri: the legacy engine's compatibility leg ([psitri#2](https://github.com/gofractally/psitri/issues/2)); freed space that can stay uncompacted ([psitri#7](https://github.com/gofractally/psitri/issues/7)); a debug mode that aborts on a partly filled segment ([psitri#6](https://github.com/gofractally/psitri/issues/6)).
