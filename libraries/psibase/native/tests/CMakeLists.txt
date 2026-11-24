@@ -44,16 +44,25 @@ add_test(NAME StorageTimeoutTests COMMAND StorageTimeoutTests)
 set_tests_properties(StorageTimeoutTests PROPERTIES TIMEOUT 30 PROCESSORS 2)
 
 # The fixture exercises the actual registered-host ABI and native code writer.
-find_program(PSIZAM_WAT2WASM NAMES wat2wasm REQUIRED)
-set(PSIZAM_POLICY_WASM "${CMAKE_CURRENT_BINARY_DIR}/psizam-policy.wasm")
-set(PSIZAM_SERVICE_WASM "${CMAKE_CURRENT_BINARY_DIR}/psizam-service.wasm")
-foreach(fixture policy service)
-    add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/psizam-${fixture}.wasm"
-        COMMAND "${PSIZAM_WAT2WASM}" "${CMAKE_CURRENT_SOURCE_DIR}/psizam-${fixture}.wat"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/psizam-${fixture}.wasm"
-        DEPENDS "psizam-${fixture}.wat" VERBATIM)
-endforeach()
-add_executable(PsizamTests PsizamTests.cpp "${PSIZAM_POLICY_WASM}" "${PSIZAM_SERVICE_WASM}")
+# The assembled modules are checked in next to their .wat sources so the build
+# does not need wabt. Where wat2wasm is installed, PsizamFixtureTests
+# reassembles the sources and fails if a checked-in module is out of date:
+#   wat2wasm psizam-<name>.wat -o psizam-<name>.wasm
+set(PSIZAM_POLICY_WASM "${CMAKE_CURRENT_SOURCE_DIR}/psizam-policy.wasm")
+set(PSIZAM_SERVICE_WASM "${CMAKE_CURRENT_SOURCE_DIR}/psizam-service.wasm")
+find_program(PSIZAM_WAT2WASM NAMES wat2wasm)
+if(PSIZAM_WAT2WASM)
+    add_test(NAME PsizamFixtureTests
+        COMMAND "${CMAKE_COMMAND}"
+            "-DWAT2WASM=${PSIZAM_WAT2WASM}"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/psizam-fixture-check"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/check_psizam_fixtures.cmake")
+else()
+    message(STATUS "wat2wasm not found: using the checked-in psizam test modules; "
+                   "PsizamFixtureTests is not registered")
+endif()
+add_executable(PsizamTests PsizamTests.cpp)
 target_compile_definitions(PsizamTests PRIVATE
     PSIBASE_PSIZAM_POLICY_WASM="${PSIZAM_POLICY_WASM}"
     PSIBASE_PSIZAM_SERVICE_WASM="${PSIZAM_SERVICE_WASM}")
