@@ -10,7 +10,10 @@ import tempfile
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('executable')
-    parser.add_argument('--timeout', type=float, default=5.0)
+    # The bound only has to catch a loop that never traps. The probe takes about
+    # a second on an idle machine and several times that when a parallel test
+    # run has every core busy, so the bound is far from both.
+    parser.add_argument('--timeout', type=float, default=60.0)
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='psizam-alt-timeout-') as state:
         env = dict(os.environ, TMPDIR=state)

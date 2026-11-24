@@ -75,7 +75,7 @@ find_package(Python3 COMPONENTS Interpreter REQUIRED)
 add_test(NAME PsizamAltTimeout
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/run_psizam_alt_timeout.py"
         "$<TARGET_FILE:PsizamTests>")
-set_tests_properties(PsizamAltTimeout PROPERTIES TIMEOUT 15 PROCESSORS 2)
+set_tests_properties(PsizamAltTimeout PROPERTIES TIMEOUT 90 PROCESSORS 2)
 
 set(vm_consensus_wasms)
 set(vm_consensus_definitions)
