@@ -60,11 +60,15 @@ creation; eligibility is sticky and cannot be enabled later for an old book:
 3. Token settings and the absence of the administration NFT are verified from
    native services, not supplied as caller assertions.
 
-Each market/token has an `EscrowTable` expected-cash record. Incoming and
-outgoing transfers compare that expected cash with the actual native
-subaccount balance before proceeding. If an issuer recalls cash from an
-old mutable spot market, its escrow check fails and operations cannot silently
-refinance its missing backing with later deposits. Sealing that token later
+Each market/token has an `EscrowTable` expected-cash record. A withdrawal
+compares that token with its native subaccount. A deposit compares both of
+the book's tokens, so recalling one asset also pauses new commitments of the
+other. Later deposits cannot refinance the missing backing. A solvent token
+can still be withdrawn: an unfilled order cancels, a one-token claim settles,
+and a spot LP can redeem only the solvent reserve. The missing reserve stays
+paused. Swaps, loans, and new orders stay paused until both tokens match. A
+partly filled order cancels only when both its refund and its proceeds token
+match, because those claims share one share balance. Sealing that token later
 does not make the old book margin-eligible. A newly funded immutable book uses
 a different native subaccount, so an old phantom withdrawal cannot draw from
 the new book's relay, lending cash or collateral. This isolation is required

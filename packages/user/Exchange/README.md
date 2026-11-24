@@ -158,8 +158,13 @@ deposited guaranteed funds. A new immutable book receives its own funded
 subaccount. A cached native-escrow total per book/token is compared with the
 actual subaccount before every input/output transfer; external balance changes
 pause that asset's commitments and withdrawals instead of recapitalizing stale
-claims with unsuspecting new deposits. Legacy books without this isolation
-marker are disabled pending explicit migration.
+claims with unsuspecting new deposits. A deposit also pauses when the book's
+other token is short. A solvent token can still be cancelled, claimed, or, for
+a spot book, redeemed by its LPs; that redemption pays only the solvent reserve
+and leaves the missing reserve unchanged. Swaps, loans, and new orders stay
+paused until both tokens match. A partly filled order cancels only when both
+its refund and its proceeds token match, because one share balance covers both.
+Legacy books without this isolation marker are disabled pending explicit migration.
 
 Lending LP NAV in its repayment token is `free_cash + active_face`. A redemption
 can spend only free cash. An active loan cannot be extended by changing its

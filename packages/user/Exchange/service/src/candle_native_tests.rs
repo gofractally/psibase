@@ -150,10 +150,10 @@ fn native_candles_count_seed_stop_and_liquidation_once_and_skip_zero_output(
     let result = Wrapper::push_from(&chain, account!("trader"))
         .trade(tiny, true, 1, 0, 64)
         .get()?;
-    assert_eq!(result.1, 0);
+    assert_eq!((result.0, result.1), (0, 0));
     assert!(
         candles(&chain).iter().all(|c| c.market != tiny),
-        "a donation has no price candle"
+        "refunded zero output has no price candle"
     );
     audit(&chain);
     Ok(())

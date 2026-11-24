@@ -55,10 +55,6 @@ pub mod service {
             m.margin_enabled.is_some(),
             "legacy market requires explicit escrow migration"
         );
-        // Quarantine the whole book after any issuer-side reserve mutation;
-        // never invite new deposits into its otherwise unaffected asset.
-        escrow(m.id, m.base);
-        escrow(m.id, m.quote);
         m
     }
     fn save(m: &Market) {
@@ -68,28 +64,48 @@ pub mod service {
     fn subaccount(market: u64) -> String {
         format!("market-{market}")
     }
-    fn escrow(market: u64, token: u32) -> Escrow {
-        let e = EscrowTable::read()
+    fn cached_escrow(market: u64, token: u32) -> Escrow {
+        EscrowTable::read()
             .get_index_pk()
             .get(&(market, token))
             .unwrap_or(Escrow {
                 market,
                 token,
                 balance: 0,
-            });
-        let actual = Tokens::call()
+            })
+    }
+    fn native_sub_balance(market: u64, token: u32) -> u64 {
+        Tokens::call()
             .getSubBal(token, subaccount(market))
             .map(|q| q.value)
-            .unwrap_or(0);
+            .unwrap_or(0)
+    }
+    fn require_token(market: u64, token: u32) {
         assert_eq!(
-            actual, e.balance,
+            native_sub_balance(market, token),
+            cached_escrow(market, token).balance,
             "market escrow changed externally; deposits and withdrawals paused"
         );
-        e
+    }
+    pub(crate) fn require_book(m: &Market) {
+        require_token(m.id, m.base);
+        require_token(m.id, m.quote);
+    }
+    fn token_solvent(market: u64, token: u32) -> bool {
+        native_sub_balance(market, token) == cached_escrow(market, token).balance
+    }
+    fn escrow(market: u64, token: u32) -> Escrow {
+        require_token(market, token);
+        cached_escrow(market, token)
     }
     pub(crate) fn take(user: AccountNumber, market: u64, token: u32, n: u64) {
         if n == 0 {
             return;
+        }
+        // Creation deposits before the market row exists. An existing book
+        // refuses new money in either token when one reserve was recalled.
+        if let Some(m) = MarketTable::read().get_index_pk().get(&market) {
+            require_book(&m);
         }
         let mut e = escrow(market, token);
         e.balance = e.balance.checked_add(n).expect("market escrow overflow");
@@ -353,6 +369,9 @@ pub mod service {
         pool.shares -= pos.shares;
         pool.dust = (pool.dust.get() + earned % Q).into();
         table.erase(&key);
+        // One share balance covers the refund and the proceeds. Paying only
+        // one of them would let a later cancel take another maker's outgoing,
+        // so a paused proceeds token reverts the refund too.
         give(user, m.id, if bid { m.quote } else { m.base }, refund);
         give(user, m.id, if bid { m.base } else { m.quote }, paid);
         if pool.shares == 0 {
@@ -445,9 +464,11 @@ pub mod service {
                     events += 1;
                     continue;
                 }
-                if amount_in - used >= inlot {
-                    barrier = h;
+                // Below one lot this level cannot fill. Do not relay through it.
+                if u >= h {
+                    break;
                 }
+                barrier = h;
             }
             if let Some(g) = head(m.id, sell) {
                 barrier = barrier.min(trigger(m.k.get(), sell, g.price, m.base_lot, m.quote_tick));
@@ -469,6 +490,11 @@ pub mod service {
             } else {
                 relay(m.k.get(), m.y, m.x, step)
             };
+            // A zero-output step donates the input. Smaller steps are also
+            // zero, so leave this input unspent.
+            if received == 0 {
+                break;
+            }
             if let Some(lim) = limit_price {
                 let priced = lim as u128 * m.quote_tick as u128;
                 let good = if sell {
@@ -1040,6 +1066,7 @@ pub mod service {
     fn liquidate(market: u64, max_events: u32) -> u32 {
         assert!(max_events <= 256, "event budget");
         let mut m = self::market(market);
+        require_book(&m);
         if max_events > 0 && crate::stops::armed(market) {
             let before = loan_rows(market, true).len() + loan_rows(market, false).len();
             crate::stops::execute(&mut m, get_sender(), None, true);
@@ -1103,22 +1130,36 @@ pub mod service {
             shares > 0 && shares <= pos.shares && shares < m.lp_supply,
             "keep positive relay supply"
         );
+        let base_ok = token_solvent(m.id, m.base);
+        let quote_ok = token_solvent(m.id, m.quote);
+        // Margin reserves are unrecallable. A spot LP may exit the one reserve
+        // that is still solvent; the missing reserve stays paused and unreduced.
+        let spot_exit = m.margin_enabled != Some(true) && base_ok != quote_ok;
+        assert!(
+            (base_ok && quote_ok) || spot_exit,
+            "market escrow changed externally; deposits and withdrawals paused"
+        );
         let s = m.lp_supply - shares;
         let dx = amount(shares as u128 * m.x as u128 / m.lp_supply as u128);
         let dy = amount(shares as u128 * m.y as u128 / m.lp_supply as u128);
-        m.x -= dx;
-        m.y -= dy;
+        if base_ok {
+            m.x -= dx;
+        }
+        if quote_ok {
+            m.y -= dy;
+        }
         m.k = (m.x as u128 * m.y as u128).into();
         m.lp_supply = s;
         pos.shares -= shares;
         LiquidityTable::read_write().put(&pos).unwrap();
-        if crate::stops::armed(market) {
+        if base_ok && quote_ok && crate::stops::armed(market) {
             crate::stops::execute(&mut m, get_sender(), None, true);
         }
         save(&m);
-        give(get_sender(), m.id, m.base, dx);
-        give(get_sender(), m.id, m.quote, dy);
-        (dx, dy)
+        let (out_x, out_y) = (if base_ok { dx } else { 0 }, if quote_ok { dy } else { 0 });
+        give(get_sender(), m.id, m.base, out_x);
+        give(get_sender(), m.id, m.quote, out_y);
+        (out_x, out_y)
     }
     #[action]
     fn renew(market: u64) {
@@ -1319,6 +1360,7 @@ pub mod service {
     #[action]
     fn process(market: u64) -> u32 {
         let mut m = self::market(market);
+        require_book(&m);
         // Permissionless bounded lifecycle repair also works without stops.
         // It never spends an owner's principal or accrued proceeds.
         let mut repaired = 0;
