@@ -18,6 +18,31 @@ read_rust_workspace_version() {
   sed -n '/^\[workspace.package\]/,/^\[/{s/^version = "\([^"]*\)"/\1/p}' "$cargo_toml" | head -1
 }
 
+# If start (or an ancestor) is a psibase monorepo checkout, print absolute rust/.
+find_monorepo_rust() {
+  local d="$1"
+  while [[ -n "$d" && "$d" != "/" ]]; do
+    if [[ -f "$d/rust/Cargo.toml" && -d "$d/rust/psibase" ]]; then
+      echo "$d/rust"
+      return 0
+    fi
+    d="$(dirname "$d")"
+  done
+  return 1
+}
+
+# Relative path from package root to monorepo rust/, or "" for crates.io.
+default_psibase_rust_root() {
+  local app_dir="$1"
+  local search_from="$2"
+  local rust_abs
+  if rust_abs="$(find_monorepo_rust "$search_from")"; then
+    realpath -m --relative-to="$app_dir" "$rust_abs"
+  else
+    echo ""
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --destination|-d)
@@ -41,15 +66,15 @@ while [[ $# -gt 0 ]]; do
       cat <<EOF
 Usage: $0 [--destination DIR] [--name NAME] [--version VER] [cargo-generate args…]
 
-Scaffolds a stand-alone psibase package (own Cargo workspace) using
+Scaffolds a stand-alone package (own Cargo workspace) using
 package-templates/basic-01. Does not register the package in any parent
 workspace.
 
-Version defaults to rust/Cargo.toml [workspace.package] (canonical crate
-train on main). Prompted when omitted unless --silent.
+Version defaults to rust/Cargo.toml [workspace.package]. Prompted when
+omitted unless --silent.
 
-When run from this monorepo, psibase crates are pinned to rust/ via a
-relative path. Pass --define psibase_rust_root= to force crates.io pins.
+If the destination sits inside a psibase monorepo, psibase crates use a
+relative path to that tree's rust/; otherwise crates.io pins.
 EOF
       exit 0
       ;;
@@ -85,7 +110,7 @@ if [[ -z "$NAME" ]]; then
     echo "error: --name is required with --silent" >&2
     exit 1
   fi
-  read -r -p "Package name (≤8 lowercase kebab-case): " NAME
+  read -r -p "Package name (≤10 lowercase kebab-case): " NAME
 fi
 if [[ -z "$NAME" ]]; then
   echo "error: package name is required" >&2
@@ -103,7 +128,7 @@ fi
 
 CAMEL="$(echo "$NAME" | sed -E 's/(^|-)([a-z])/\U\2/g')"
 APP_DIR="$DEST/$CAMEL"
-RUST_ROOT="$(realpath -m --relative-to="$APP_DIR" "$ROOT/rust")"
+RUST_ROOT="$(default_psibase_rust_root "$APP_DIR" "$DEST")"
 
 # Binary is `cargo-generate` with a `generate` subcommand; cargo subcommand is
 # `cargo generate` (same flags).
@@ -127,7 +152,11 @@ STAGE="$(mktemp -d "${TMPDIR:-/tmp}/psibase-new.XXXXXX")"
 cleanup_stage() { rm -rf "$STAGE"; }
 trap cleanup_stage EXIT
 
-echo "Generating '$NAME' into $APP_DIR (psibase $VERSION from $RUST_ROOT)…"
+if [[ -n "$RUST_ROOT" ]]; then
+  echo "Generating '$NAME' into $APP_DIR (psibase $VERSION, path $RUST_ROOT)…"
+else
+  echo "Generating '$NAME' into $APP_DIR (psibase $VERSION, crates.io)…"
+fi
 "${GENERATE[@]}" \
   --path "$ROOT/package-templates" \
   --destination "$STAGE" \

@@ -1,8 +1,6 @@
 [placeholders]
 description = { prompt = "Enter a description of the package", default = "An example application", type = "string" }
-# Prefer package-templates/new.sh or psiapp new — they default this from
-# rust/Cargo.toml [workspace.package]. No hard-coded train default here.
-version = { prompt = "Psibase crate version", type = "string", regex = "^[0-9]+.[0-9]+.[0-9]+$" }
+version = { prompt = "Enter the current psibase version", default = "0.29.0", type = "string", regex = "^[0-9]+.[0-9]+.[0-9]+$" }
 # Relative path from the generated package root to monorepo rust/ (e.g. ../../../rust).
 # Empty = crates.io pins for psibase / psibase_macros / psibase_service.
 psibase_rust_root = { prompt = "Path to monorepo rust/ from package root (empty = crates.io)", default = "", type = "string" }
