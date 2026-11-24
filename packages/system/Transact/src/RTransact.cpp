@@ -266,11 +266,12 @@ namespace
    // large transaction is larger than the transaction. A trace above this
    // size, packed, is neither kept nor sent: reducedTrace stands for it.
    // The size leaves room for the row (ConfigRow's maxValueSize, 8 MiB)
-   // and for the reply: its JSON text is twice the bytes and is in this
-   // service's memory three times while it is sent (the text, the
-   // arguments of sendReply, the action), beside the trace itself. Measured,
-   // a trace of 3.46 MiB is answered within the service's 32 MiB and one of
-   // 3.56 MiB is not.
+   // and for the reply. Its JSON text is twice the bytes; the writer grows
+   // the buffer it is written to by doubling, so the text is held in up to
+   // twice its size beside the buffer it outgrew, and then once more in the
+   // action that sends it (one buffer: the reply is written into the call).
+   // Measured, a trace of 4.41 MiB is answered within the service's 32 MiB
+   // and one of 4.62 MiB is not (doc/pssz-conversion.md 7.11).
    constexpr std::size_t maxFullTraceSize = 13 * 1024 * 1024 / 4;
 
    bool isFullSize(psio::pssz_view<TransactionTrace> trace)
@@ -524,7 +525,8 @@ namespace
 
       // The action is packed once; the socket, its first argument, is
       // overwritten in place for each client.
-      auto send = [&](const HttpReply& reply, const std::vector<std::int32_t>& sockets)
+      // The reply is an HttpReply or a source of one.
+      auto send = [&](const auto& reply, const std::vector<std::int32_t>& sockets)
       {
          auto action = http.sendReply(0, reply);
          auto args   = *psio::as_mutable_view(action).rawData();
@@ -557,9 +559,12 @@ namespace
 
       if (!binClients.empty())
       {
-         send(HttpReply{.contentType = "application/octet-stream",
-                        .body        = psio::to_pssz(pruned),
-                        .headers     = allowCors()},
+         // The body is the packed trace, written into the action from the
+         // views it is made of.
+         auto body = psio::packed(pruned);
+         send(BasicHttpReply<decltype(body)>{.contentType = "application/octet-stream",
+                                             .body        = std::move(body),
+                                             .headers     = allowCors()},
               binClients);
       }
    }
@@ -1072,16 +1077,18 @@ namespace
    using WriteOnly  = RTransact::WriteOnly;
 
    // The largest body push_transaction accepts. While a transaction is
-   // handed on to the other producers this service holds it five to six
-   // times (the trace of its speculative run, which has it twice, the token
-   // of that run where it carries the action, and three times for the call
-   // of sendProds: the arguments of recv, those of sendProds, the action),
-   // of its 32 MiB.
+   // handed on to the other producers this service holds it four to five
+   // times of its 32 MiB: the trace of its speculative run, which has it
+   // twice, the token of that run where it carries the action (the tester),
+   // the stored row, and the call of sendProds, which is one buffer.
+   // Measured, 6 MiB is handed on and 6.5 MiB is not
+   // (doc/pssz-conversion.md 7.11).
    constexpr std::size_t maxPushedTransactionSize = 5 * 1024 * 1024;
 
    std::uint64_t scheduleSpeculative(const Checksum256& id, psio::pssz_view<SignedTransaction> trx)
    {
-      transactor<Transact> transact{RTransact::service, Transact::service};
+      // The call of execTrx is written into the call of post: one buffer.
+      LazyActionBuilder<Transact> transact{RTransact::service, Transact::service};
       auto runid = to<XRun>().post(RunMode::speculative, transact.execTrx(trx.transaction(), true),
                                    std::chrono::seconds(1), MethodNumber{"onSpecTrx"});
       RTransact{}.open<SpeculativeTransactionTable>().put({id, runid});
@@ -1172,27 +1179,25 @@ namespace
       return result;
    }
 
-   // The action that hands a transaction to another producer
-   Action recvAction(psio::pssz_view<SignedTransaction> trx)
-   {
-      return transactor<RTransact>(HttpServer::service, RTransact::service).recv(trx);
-   }
+   // Hands a transaction to the other producers. The action that does it
+   // (recv) is written from the transaction's bytes into the call of
+   // sendProds: one buffer beside the transaction.
    void forwardTransaction(psio::pssz_view<SignedTransaction> trx)
    {
-      to<HttpServer>().sendProds(recvAction(trx));
+      LazyActionBuilder<RTransact> rtransact{HttpServer::service, RTransact::service};
+      to<HttpServer>().sendProds(rtransact.recv(trx));
    }
-   // The row is read as it is stored, and released before the action is
-   // packed for the call.
+   // The row is read as it is stored and is what the call is packed from.
    void forwardStoredTransaction(const Checksum256& id)
    {
-      std::optional<Action> recv;
+      auto table = RTransact{}.open<TransactionDataTable>();
+      decltype(table.getView(id)) data;
       PSIBASE_SUBJECTIVE_TX
       {
-         if (auto data = RTransact{}.open<TransactionDataTable>().getView(id))
-            recv = recvAction((*data)->trx());
+         data = table.getView(id);
       }
-      if (recv)
-         to<HttpServer>().sendProds(*recv);
+      if (data)
+         forwardTransaction((*data)->trx());
    }
 
    constexpr auto ws = " \t";  // (SP / HTAB)

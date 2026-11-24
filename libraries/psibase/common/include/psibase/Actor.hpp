@@ -16,7 +16,9 @@
 #include <cstddef>
 #include <span>
 #include <string>
+#include <tuple>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace psibase
@@ -37,6 +39,50 @@ namespace psibase
    /// The class whose reflection lists the method `MemberPtr` points to
    template <auto MemberPtr>
    using MethodClass = typename psio::method_traits<decltype(MemberPtr)>::class_type;
+
+   /// An [Action] whose arguments are not packed yet
+   ///
+   /// `rawData` is a source of the packed arguments
+   /// (`psio::method_args_packed<T, I>(args...)`, `psio::packed(value)`)
+   /// in place of the bytes. Packing a `LazyAction` writes the bytes of
+   /// the [Action] it stands for, with the arguments written directly into
+   /// them, and it is accepted wherever a packed [Action] is expected: as
+   /// an argument of a call, so that a call inside a call is packed into
+   /// one buffer.
+   ///
+   /// The arguments that were passed as lvalues are referred to, not
+   /// copied: they must outlive the packing. It is a source for the PSSZ
+   /// encoder only: the type of an action in a schema, and what has a JSON
+   /// form, is [Action].
+   template <typename Args>
+   struct LazyAction
+   {
+      AccountNumber sender;   ///< Account sending the action
+      AccountNumber service;  ///< Service to execute the action
+      MethodNumber  method;   ///< Service method to execute
+      Args          rawData;  ///< Source of the data for the method
+      PSIO_REFLECT(LazyAction, sender, service, method, rawData)
+   };
+   template <typename Args>
+   LazyAction(AccountNumber, AccountNumber, MethodNumber, Args) -> LazyAction<Args>;
+
+   /// Builds an action without packing it: the result is a [LazyAction]
+   /// that holds the arguments.
+   struct LazyActionProxy
+   {
+      LazyActionProxy(AccountNumber s, AccountNumber r) : sender(s), receiver(r) {}
+
+      AccountNumber sender;
+      AccountNumber receiver;
+
+      template <std::size_t I, auto MemberPtr, typename... Args>
+      auto call(Args&&... args) const
+      {
+         return LazyAction{sender, receiver, methodNumber<I, MemberPtr>,
+                           psio::method_args_packed<MethodClass<MemberPtr>, I>(
+                               std::forward<Args>(args)...)};
+      }
+   };
 
    /**
     *  When an action is called it returns
@@ -204,10 +250,11 @@ namespace psibase
       {
          using Class = MethodClass<MemberPtr>;
          using Tuple = typename psio::reflect<Class>::template method_arg_tuple<I>;
+         // One buffer: the arguments are written into the action.
          return psio::pssz_buffer<TypedAction<Tuple>>::unchecked(
-             psio::to_pssz(Action{sender, receiver, methodNumber<I, MemberPtr>,
-                                  psio::method_args_to_pssz<Class, I>(
-                                      std::forward<Args>(args)...)}));
+             psio::to_pssz(LazyAction{sender, receiver, methodNumber<I, MemberPtr>,
+                                      psio::method_args_packed<Class, I>(
+                                          std::forward<Args>(args)...)}));
       }
    };
 
@@ -267,20 +314,24 @@ namespace psibase
       AccountNumber sender;
       EventDb       event_log;
 
-      // The payload of an event is the packed argument tuple of its method
+      // The packed action that emits an event. The payload of an event is
+      // the packed argument tuple of its method; payload, arguments and
+      // action are written into one buffer.
+      template <std::size_t I, auto MemberPtr, typename... Args>
+      std::vector<char> pack(Args&&... args) const
+      {
+         return psio::to_pssz(LazyAction{
+             sender, AccountNumber{"events"}, MethodNumber{"event"},
+             psio::packed(std::tuple{event_log, methodNumber<I, MemberPtr>,
+                                     psio::method_args_packed<MethodClass<MemberPtr>, I>(
+                                         std::forward<Args>(args)...)})});
+      }
+
       template <std::size_t I, auto MemberPtr, typename... Args>
       EventNumber call(Args&&... args) const
       {
-         auto   type = methodNumber<I, MemberPtr>;
-         Action action{
-             .sender  = sender,
-             .service = AccountNumber{"events"},
-             .method  = MethodNumber{"event"},
-             .rawData = psio::to_pssz(std::tuple(
-                 event_log, type,
-                 psio::method_args_to_pssz<MethodClass<MemberPtr>, I>(std::forward<Args>(args)...))),
-         };
-         return callPacked<EventNumber>(action).unpack();
+         auto action = pack<I, MemberPtr, Args...>(std::forward<Args>(args)...);
+         return callPacked<EventNumber>(std::span<const char>{action}).unpack();
       }
    };
 
@@ -593,6 +644,19 @@ namespace psibase
    struct ActionViewBuilder : public psio::reflect<T>::template proxy<ActionViewProxy>
    {
       using base = typename psio::reflect<T>::template proxy<ActionViewProxy>;
+      using base::base;
+   };
+
+   /// Builds actions that are not packed yet
+   ///
+   /// Each method returns a [LazyAction]: the action with its arguments
+   /// held, not packed. Pass it where an [Action] is an argument of a call
+   /// (`to<XRun>().post(mode, lazy.someMethod(args...), ...)`) and the
+   /// whole call is packed into one buffer.
+   template <typename T>
+   struct LazyActionBuilder : public psio::reflect<T>::template proxy<LazyActionProxy>
+   {
+      using base = typename psio::reflect<T>::template proxy<LazyActionProxy>;
       using base::base;
    };
 

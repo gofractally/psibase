@@ -148,14 +148,37 @@ pub struct ServiceCaller {
     pub flags: u64,
 }
 
+/// An [`Action`] that holds its arguments instead of their bytes: it has
+/// the wire of `Action`, and the arguments are written straight into the
+/// buffer of the action (`psio::pssz::PackedRef`).
+#[derive(psio::PsszPack)]
+#[allow(non_snake_case)]
+struct ActionRef<'a, A: psio::pssz::PsszPack<psio::Pssz>> {
+    sender: AccountNumber,
+    service: AccountNumber,
+    method: MethodNumber,
+    rawData: psio::pssz::PackedRef<'a, A>,
+}
+
+/// The packed [`Action`] of a call, in one buffer: the same bytes as
+/// packing the arguments and then an `Action` around them.
+fn pack_action<A: psio::pssz::PsszPack<psio::Pssz>>(
+    sender: AccountNumber,
+    service: AccountNumber,
+    method: MethodNumber,
+    args: &A,
+) -> Vec<u8> {
+    psio::to_pssz(&ActionRef {
+        sender,
+        service,
+        method,
+        rawData: psio::pssz::PackedRef::new(args),
+    })
+}
+
 impl ServiceCaller {
     fn action<Args: Method>(&self, method: MethodNumber, args: &Args) -> Vec<u8> {
-        psio::to_pssz(&Action {
-            sender: self.sender,
-            service: self.service,
-            method,
-            rawData: psio::to_pssz(args).into(),
-        })
+        pack_action(self.sender, self.service, method, args)
     }
 }
 
@@ -405,5 +428,40 @@ impl Caller for RunAsCaller {
                 Args::NAME
             ))
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(psio::PsszPack)]
+    struct Transfer {
+        to: AccountNumber,
+        amount: u64,
+        memo: String,
+    }
+
+    // A call is packed in one buffer; the bytes are those of the two-step
+    // form (the arguments, then the action around them).
+    #[test]
+    fn a_call_packed_in_place_has_the_bytes_of_the_action() {
+        let sender = AccountNumber::from_exact("alice").unwrap();
+        let service = AccountNumber::from_exact("tokens").unwrap();
+        let method = MethodNumber::from("credit");
+        for args in [
+            Transfer { to: AccountNumber::from_exact("bob").unwrap(), amount: 5, memo: "rent".into() },
+            Transfer { to: AccountNumber::from_exact("carol").unwrap(), amount: u64::MAX, memo: "x".repeat(70_000) },
+        ] {
+            let two_step = psio::to_pssz(&Action {
+                sender,
+                service,
+                method,
+                rawData: psio::to_pssz(&args).into(),
+            });
+            assert!(pack_action(sender, service, method, &args) == two_step);
+        }
+        let none = psio::to_pssz(&Action { sender, service, method, rawData: psio::to_pssz(&()).into() });
+        assert!(pack_action(sender, service, method, &()) == none);
     }
 }

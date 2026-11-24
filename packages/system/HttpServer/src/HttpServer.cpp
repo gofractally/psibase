@@ -93,7 +93,8 @@ namespace SystemService
       if (getSender() != action.service)
          psibase::abortMessage(getSender().str() + " cannot send messages to " + action.service.str());
       checkRecvAuth(action);
-      to<XHttp>().send(producer_multicast, psio::to_pssz(action), 0);
+      // The message is the packed action, written into the call.
+      to<XHttp>().send(producer_multicast, psio::packed(action), 0);
    }
 
    namespace

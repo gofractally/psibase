@@ -857,7 +857,9 @@ TEST_CASE("Test transaction size")
       }
       SECTION("above 5 MiB: refused, with the limit")
       {
-         for (std::size_t size : {5 * MiB, 6 * MiB, 15 * MiB / 2})
+         // (8 and 10 MiB reach r-transact since a call is packed into
+         // one buffer: http-server held 8 MiB four times before.)
+         for (std::size_t size : {5 * MiB, 6 * MiB, 15 * MiB / 2, 8 * MiB, 10 * MiB})
          {
             INFO("size: " << size);
             auto reply = post(size).poll();
@@ -878,7 +880,7 @@ TEST_CASE("Test transaction size")
    }
 }
 
-// Measurements behind doc/pssz-conversion.md 7.9. Not part of the suite:
+// Measurements behind doc/pssz-conversion.md 7.9 and 7.11. Not part of the suite:
 // psitest Transact-test.wasm "[.measure]"
 TEST_CASE("Measure transaction size", "[.measure]")
 {
@@ -934,7 +936,8 @@ TEST_CASE("Measure transaction size", "[.measure]")
       t.setAutoRun(false);
       for (std::size_t size : {MiB, 3 * MiB / 2, 16 * MiB / 10, 7 * MiB / 4, 2 * MiB, 4 * MiB - 200,
                                9 * MiB / 2, 5 * MiB - 1024, 5 * MiB, 6 * MiB, 13 * MiB / 2, 7 * MiB,
-                               15 * MiB / 2, 8 * MiB, 20 * MiB})
+                               15 * MiB / 2, 8 * MiB, 9 * MiB, 10 * MiB, 21 * MiB / 2, 11 * MiB,
+                               12 * MiB, 14 * MiB, 15 * MiB, 31 * MiB / 2, 16 * MiB, 20 * MiB})
       {
          auto trx   = makeLargeTransaction(t, alice, size, salt++);
          auto start = std::chrono::steady_clock::now();

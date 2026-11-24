@@ -17,6 +17,7 @@
 
 #include <psio/to_hex.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -217,6 +218,150 @@ TEST_CASE("methods: ActionViewBuilder packs a whole action", "[methods]")
    const psio::pssz_view<Point> pointView{point};
    CHECK(transactor<Ledger>{alice, Ledger::service}.locate(pointView, 3).rawData ==
          psio::to_pssz(std::tuple{Point{4, "here"}, std::int32_t{3}}));
+}
+
+namespace methods_test
+{
+   // A service that is handed actions: a call inside a call.
+   struct Runner
+   {
+      static constexpr auto service = AccountNumber{"runner"};
+
+      std::uint64_t post(std::uint8_t mode, Action action, std::uint32_t maxTime, MethodNumber callback)
+      {
+         return mode;
+      }
+      void relay(const Action& action) {}
+      void store(psio::pssz_view<Point> at, std::vector<char> data) {}
+   };
+   PSIO_REFLECT(Runner,
+                method(post, mode, action, maxTime, callback),
+                method(relay, action),
+                method(store, at, data))
+
+   // What a call wrote before its arguments were packed in place: the
+   // arguments, then the action around them.
+   template <typename T, std::size_t I, typename... Args>
+   Action twoStep(AccountNumber sender, AccountNumber service, Args&&... args)
+   {
+      return Action{sender, service, MethodNumber{psio::reflect<T>::template method_name<I>},
+                    psio::method_args_to_pssz<T, I>(std::forward<Args>(args)...)};
+   }
+}  // namespace methods_test
+
+// A call is packed into one buffer (psio::method_args_packed). The bytes
+// are those of the two-step encoding, for every proxy that packs a call.
+TEST_CASE("methods: a call packed in place has the bytes of the two-step encoding", "[methods]")
+{
+   const AccountNumber alice{"alice"};
+   const AccountNumber bob{"bob"};
+   std::string         memo = "rent";
+
+   const LazyActionBuilder<Ledger> lazyLedger{alice, Ledger::service};
+   const LazyActionBuilder<Runner> lazyRunner{alice, Runner::service};
+   const ActionViewBuilder<Runner> runner{alice, Runner::service};
+   auto equal = [](const auto& packed, const Action& expected)
+   { return std::ranges::equal(packed.bytes(), psio::to_pssz(expected)); };
+
+   SECTION("an action that is not packed yet")
+   {
+      auto lazy = lazyLedger.transfer(bob, memo, 5);
+      static_assert(psio::packs_as<decltype(lazy), Action>);
+      const auto expected = twoStep<Ledger, 1>(alice, Ledger::service, bob, memo, 5);
+      CHECK(psio::to_pssz(lazy) == psio::to_pssz(expected));
+      CHECK(psio::pssz_size(lazy) == psio::to_pssz(expected).size());
+      CHECK(psio::validate_strict<Action>(psio::pssz{}, psio::to_pssz(lazy)).ok());
+      // An lvalue argument is referred to: the action is what it is when packed.
+      memo = "food";
+      CHECK(psio::to_pssz(lazy) ==
+            psio::to_pssz(twoStep<Ledger, 1>(alice, Ledger::service, bob, "food", 5)));
+      CHECK(psio::to_pssz(lazyLedger.init()) ==
+            psio::to_pssz(twoStep<Ledger, 0>(alice, Ledger::service)));
+      // A view argument, a hashed method name
+      const auto                   point = psio::to_pssz(Point{4, "here"});
+      const psio::pssz_view<Point> pointView{point};
+      CHECK(psio::to_pssz(lazyLedger.locate(pointView, 3)) ==
+            psio::to_pssz(twoStep<Ledger, 3>(alice, Ledger::service, Point{4, "here"}, 3)));
+      CHECK(psio::to_pssz(lazyLedger.get_staged_tx(7)) ==
+            psio::to_pssz(twoStep<Ledger, 5>(alice, Ledger::service, 7)));
+      // To a method it is the Action it stands for: the argument list of
+      // a method that takes an action is declared with Action.
+      static_assert(std::is_same_v<psio::reflect<Runner>::method_arg_tuple<1>::tuple_type,
+                                   std::tuple<Action>>);
+      static_assert(psio::method_arguments<Runner, 1, decltype(lazy)>);
+   }
+
+   SECTION("a call inside a call inside a call")
+   {
+      const MethodNumber callback{"onDone"};
+      const Action       transfer = twoStep<Ledger, 1>(alice, Ledger::service, bob, memo, 5);
+      const Action       post =
+          twoStep<Runner, 0>(alice, Runner::service, std::uint8_t{2}, transfer, 1000, callback);
+      const Action relay = twoStep<Runner, 1>(alice, Runner::service, post);
+
+      // An owning action as the argument, as before
+      CHECK(equal(runner.post(std::uint8_t{2}, transfer, 1000, callback), post));
+      CHECK(equal(runner.relay(post), relay));
+      // The same calls from actions that are not packed
+      CHECK(equal(runner.post(std::uint8_t{2}, lazyLedger.transfer(bob, memo, 5), 1000, callback),
+                  post));
+      CHECK(equal(runner.relay(lazyRunner.post(std::uint8_t{2}, lazyLedger.transfer(bob, memo, 5),
+                                               1000, callback)),
+                  relay));
+      // transactor takes them too
+      CHECK(transactor<Runner>{alice, Runner::service}
+                .relay(lazyRunner.post(std::uint8_t{2}, lazyLedger.transfer(bob, memo, 5), 1000,
+                                       callback))
+                .rawData == relay.rawData);
+   }
+
+   SECTION("a large argument")
+   {
+      const std::vector<char>      data(1 << 20, 'x');
+      const auto                   point = psio::to_pssz(Point{4, "here"});
+      const psio::pssz_view<Point> at{point};
+      const Action  store = twoStep<Runner, 2>(alice, Runner::service, at, data);
+      const Action  relay = twoStep<Runner, 1>(alice, Runner::service, store);
+      auto          direct = runner.relay(lazyRunner.store(at, data));
+      CHECK(direct.size() == psio::to_pssz(relay).size());
+      CHECK(equal(direct, relay));
+      CHECK(equal(runner.store(at, data), store));
+   }
+
+   SECTION("the action that emits an event")
+   {
+      const EventEmitterProxy emitter{alice, EventDb::historyEvent};
+      const Action            expected{
+          alice, AccountNumber{"events"}, MethodNumber{"event"},
+          psio::to_pssz(std::tuple(
+              EventDb::historyEvent, MethodNumber{"noted"},
+              psio::method_args_to_pssz<Ledger::Events::History, 0>(bob, memo)))};
+      CHECK(emitter.pack<0, &Ledger::Events::History::noted>(bob, memo) == psio::to_pssz(expected));
+      CHECK(emitter.pack<0, &Ledger::Events::History::noted>(AccountNumber{"bob"},
+                                                             std::string{"rent"}) ==
+            psio::to_pssz(expected));
+      const EventEmitterProxy merkle{bob, EventDb::merkleEvent};
+      CHECK(merkle.pack<0, &Ledger::Events::Merkle::sealed>(7) ==
+            psio::to_pssz(Action{
+                bob, AccountNumber{"events"}, MethodNumber{"event"},
+                psio::to_pssz(std::tuple(
+                    EventDb::merkleEvent, MethodNumber{"sealed"},
+                    psio::method_args_to_pssz<Ledger::Events::Merkle, 0>(std::uint64_t{7})))}));
+   }
+
+   SECTION("a reply whose body is packed in place")
+   {
+      const Point point{4, "here"};
+      auto        body = psio::packed(point);
+      const BasicHttpReply<decltype(body)> source{.contentType = "application/octet-stream",
+                                                  .body        = std::move(body),
+                                                  .headers     = {{"Vary", "Origin"}}};
+      static_assert(psio::packs_as<decltype(source), HttpReply>);
+      const HttpReply reply{.contentType = "application/octet-stream",
+                            .body        = psio::to_pssz(point),
+                            .headers     = {{"Vary", "Origin"}}};
+      CHECK(psio::to_pssz(source) == psio::to_pssz(reply));
+   }
 }
 
 namespace methods_test
