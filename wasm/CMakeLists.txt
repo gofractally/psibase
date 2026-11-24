@@ -25,21 +25,27 @@ endif()
 option(BUILD_RELEASE_WASM "Build release wasms" ON)
 option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 
-# Services are compiled with wide arithmetic. The binaryen tools that post-process
-# them (wasm-ctor-eval always, wasm-opt when present) read it from version 133.
-find_program(PSIBASE_WASM_CTOR_EVAL wasm-ctor-eval)
-if(NOT PSIBASE_WASM_CTOR_EVAL)
-    message(FATAL_ERROR "wasm-ctor-eval (binaryen 133 or newer) is required to build the services")
+# Services are compiled with wide arithmetic, which binaryen reads from version
+# 133. The tool that post-processes them is wasm-opt, and it is run by name:
+# by clang when it links, and by sdk/psibase-wasm-opt. So the copy to check is
+# the first one on PATH and nothing else. A plain find_program looks in
+# CMAKE_PREFIX_PATH and the system directories first, and would report a copy
+# the build never runs (or miss an old one that it does).
+unset(PSIBASE_WASM_OPT CACHE)
+find_program(PSIBASE_WASM_OPT wasm-opt PATHS ENV PATH NO_DEFAULT_PATH)
+if(NOT PSIBASE_WASM_OPT)
+    message(FATAL_ERROR "wasm-opt (binaryen 133 or newer) must be on PATH to build the services")
 endif()
-execute_process(COMMAND ${PSIBASE_WASM_CTOR_EVAL} --version
+execute_process(COMMAND ${PSIBASE_WASM_OPT} --version
     OUTPUT_VARIABLE binaryen_version_text OUTPUT_STRIP_TRAILING_WHITESPACE)
 string(REGEX MATCH "version ([0-9]+)" binaryen_version_match "${binaryen_version_text}")
 if(NOT CMAKE_MATCH_1 OR CMAKE_MATCH_1 LESS 133)
     message(FATAL_ERROR
-        "${PSIBASE_WASM_CTOR_EVAL} is '${binaryen_version_text}'. binaryen 133 or newer is "
+        "${PSIBASE_WASM_OPT} is '${binaryen_version_text}'. binaryen 133 or newer is "
         "required: older versions cannot read the wide-arithmetic instructions services are "
         "compiled with. Put a newer binaryen first on PATH.")
 endif()
+message(STATUS "binaryen: ${PSIBASE_WASM_OPT} (${binaryen_version_text})")
 
 # Point to psidk-config.cmake to allow documentation examples to build
 set(psidk_DIR ${CMAKE_SOURCE_DIR})
