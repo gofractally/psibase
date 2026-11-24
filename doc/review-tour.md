@@ -1,10 +1,10 @@
 # Review tour: `bytemaster/head` against `main`
 
-**This is a review vehicle, not a merge request.** It exists so the team has one place to read what changed, see the evidence, and comment. Please do not merge it. It will keep moving as work lands; the list at the end says what is still coming, including the migration to the new PSIO library.
+**This is a review vehicle, not a merge request.** It exists so the team has one place to read what changed, see the evidence, and comment. Please do not merge it. It will keep moving as work lands. The serialization migration to the new PSIO library, promised here earlier, is now in the head and has its own section (9).
 
-`bytemaster/head` is 188 commits ahead of `main` (merge base db601e572, 18 November). The raw diff is about 980 files and 207,000 added lines, but most of that is documentation, demos and application work. The platform changes are much smaller, and a large part of the execution engine is not in this repository at all. This tour says where to look.
+`bytemaster/head` is 335 commits ahead of `main` (merge base db601e572, 18 November). The raw diff is about 1,600 files, 237,000 added lines and 56,000 removed. A large share of that is documentation, demos and application work, the serialization change touches most services mechanically, and a large part of the execution engine is not in this repository at all. This tour says where to look.
 
-Status when this was last updated: head at 04efaefe4.
+Status when this was last updated: head at 3085ec56a, pinning PSIO 66abb1b, psitri d3bba0e and psizam 2e93ecd.
 
 ## Why this is worth your time
 
@@ -25,11 +25,11 @@ Why that matters:
 - **Per-transaction cost is what limits psibase today, not block size.** On `main` a transfer costs about 6.4 ms of execution; on this head it costs about 1.1 ms. A token transfer is the reference case other chains are compared on, so this is the number that decides how psibase compares.
 - **The gain is spread across the stack, so it applies to every service, not just Tokens.** It comes from a new storage engine, a new execution engine with pooled instances, a signature check that went from about 900 µs to about 135 µs, and indexing events once per block. A transaction that does nothing at all now runs at about 1,790 per second, which is the platform's own overhead and the floor for everything built on it.
 - **Signatures are no longer a tax.** With secp256k1 keys a signed transfer costs close to an unsigned one.
-- **It is measured, repeatable and still moving.** The benchmark and a per-service call profile are in the tree, suite results are recorded for every commit on two machines, and each step in the table is a specific commit you can check out. More is queued: the serialization change, the single clock, and a faster P-256 verifier.
+- **It is measured and repeatable.** The benchmark and a per-service call profile are in the tree, suite results are recorded for every commit on two machines, and each step in the table is a specific commit you can check out. Still queued: a faster P-256 verifier and secp256k1 keys by default in the browser.
 
 What it asks of the team is real, which is why it needs review and not just a merge: the state format changes, the consensus engine becomes a pinned fork of wasmtime, and several validity rules change. The table below lists every such change. The tour after it says where to look and what we would most like challenged.
 
-These are tester figures, one block on one thread. Submitted over TCP to a single running node, unsigned transfers went from 108 per second on `main` to 485 on this head (4.5×); the network table and the caveats are in the Throughput section.
+These are tester figures, one block on one thread, measured before the serialization change landed and not yet remeasured. Submitted over TCP to a single running node, unsigned transfers went from 108 per second on `main` to 485 on this head (4.5×); the network table and the caveats are in the Throughput section.
 
 ## Read this first: what changes consensus or formats
 
@@ -38,6 +38,7 @@ These are the changes the team has to agree to, as opposed to review for quality
 | Change | Where | Effect |
 |---|---|---|
 | Storage engine | psitri replaces triedent (fae80b3b8 deletes triedent) | On-disk state format; no migration path from a triedent database |
+| Serialization | fracpack replaced by PSSZ on the [gofractally/psio](https://github.com/gofractally/psio) library; the in-tree library is deleted | Every wire and stored format changes: actions, results, table rows and keys, events, blocks, transactions, service schemas, JSON and GraphQL. Earlier chains and databases are not readable. Ten method numbers changed |
 | Execution engine | psizam and wasmtime replace eos-vm; wasmtime is the default (d3aec135e) | Every node must produce identical results on the new engines. The wasmtime every node runs is a **fork** ([gofractally/wasmtime](https://github.com/gofractally/wasmtime): upstream 51.0.0 plus changes), pinned by revision; that revision is part of the identity of compiled code |
 | Stack depth | psizam's validator, and the wasmtime shim | A byte budget (`max_stack_bytes`) charged per call frame from costs the validator computes, so every engine overflows at the same call |
 | Float policy per code version | 09e1f9075, 3a0ae5d56 | A service runs under the float profile its `vmVersion` names: 0 is the strict WebAssembly deterministic profile, 1 is "deterministic performance" (fused multiply-add, as wasmtime behaves). SetCode stamps the chain default, 1, on new code. NaNs are canonical in both |
@@ -47,7 +48,7 @@ These are the changes the team has to agree to, as opposed to review for quality
 | Default key curve | cb87219ff | New software-held keys are secp256k1; P-256 remains for hardware keys. Both verify as before |
 | Canonical signatures | `packages/system/VerifySig`, and every signer | Only low-S signatures (`s <= n/2`) verify, on both curves. A signer that does not normalize has about half its signatures rejected |
 
-Visible in traces but not consensus: `ActionTrace.totalTime` is now elapsed time from the monotonic clock, not thread CPU time (c3397f9c7). Billing still reads the CPU clock.
+Visible in traces but not consensus: action trace time, the transaction limit and billing all read one monotonic clock that measures elapsed time (e272625fc). Thread CPU time is no longer used for any of them.
 
 ## Tour by area
 
@@ -57,8 +58,8 @@ Visible in traces but not consensus: `ActionTrace.totalTime` is now elapsed time
 
 - **Compilation.** With wasmtime a service is compiled at first use, in tens of milliseconds, and the result is kept in a per-user cache on disk. Compiling stored services in the background ahead of first use applies to the LLVM AOT engine only.
 - **Instance pool** (ff905f61a, bc22a3953). wasmtime's pooling allocator with 256 slots per engine; a slot stays warm for the module that last used it. An instance the pool cannot serve (no free slot, a memory16 module, an oversized table) is created by a second engine without a pool running the same compiled code, and if the pool's address space cannot be reserved the node runs without one. `PSIBASE_WASMTIME_POOL=0` turns it off; the test `t-Tokens-test-one-pool-slot` forces the fallback. Resetting a slot is wasmtime's own mechanism: a copy-on-write image and in-place zeroing on Linux, a fresh mapping on macOS, where it gains almost nothing.
-- **CPU budget** (c3397f9c7). The executing thread no longer evaluates its own budget; only the watchdog thread cancels. The budget is paused only while a service is actually being loaded or compiled. The trace, the limit and billing are to share one monotonic clock; that change is still to come (#2227).
-- **A budget raised mid-run** (#2217). Funding resources just in time has to work. On the native side, changing the limit and the watchdog's decision to cancel happen under one lock, and the watchdog re-reads the limit whenever it wakes, so a raise that completes before the old deadline is honoured and nothing cancels on a stale limit; a raise after the budget ran out is too late and the cancellation stands. On the service side, the billing service used to set the limit only when a transaction starts and when billing moves to a sub-account; `buy_res`, `buy_res_for`, `buy_res_sub` and `del_res_sub` now recompute it when the balance they change is the one the running transaction is billed to (branch `claude/buy-res-raises-cpu-limit`, 69322f19e, not in the head). A chain test starts an account with a small balance, buys resources in its first action and then does forty transfers; its x86 run with and without the fix is in progress.
+- **CPU budget** (c3397f9c7, e272625fc). The executing thread no longer evaluates its own budget; only the watchdog thread cancels. The budget is paused only while a service is actually being loaded or compiled. Trace time, the limit and billing share one monotonic clock; the thread-CPU-clock path and the cross-thread sampling it needed on macOS are gone.
+- **A budget raised mid-run** (34fced88e). Funding resources just in time has to work. On the native side, changing the limit and the watchdog's decision to cancel happen under one lock, and the watchdog re-reads the limit whenever it wakes, so a raise that completes before the old deadline is honoured and nothing cancels on a stale limit; a raise after the budget ran out is too late and the cancellation stands. On the service side, `buy_res`, `buy_res_for`, `buy_res_sub` and `del_res_sub` recompute the limit when the balance they change is the one the running transaction is billed to. Tests cover a limit raised mid-run.
 - **Wide arithmetic** (8b09a8776). Accepted unconditionally by every engine, with no feature gate and no per-contract opt-in. C++ services use it; Rust services use it when built with rustc 1.100 or newer.
 - **memory16.** An optional one-page execution profile a module opts into with a custom section. No psibase service uses it. Tag `stable-20261122-memory16` on psibase, psizam and the wasmtime fork marks that checkpoint.
 
@@ -76,7 +77,9 @@ Visible in traces but not consensus: `ActionTrace.totalTime` is now elapsed time
 - Wide arithmetic is lowered in JIT2 and LLVM as 64-bit operations plus a carry compare, with two new high-multiply operations, and is tested against a 128-bit oracle on every engine. Is unconditional acceptance what the team wants?
 
 **Known limits.**
-- wasmtime is the engine. psizam's interpreter, JIT1 and JIT2 are kept only as a cross-check for wasmtime and for LLVM AOT, and are to be marked experimental with their failures documented. They are largely compatible, with only minor known issues, and could be revived later for something wasmtime lacks, such as debugging. LLVM AOT is the second engine: robust, but slow to compile, and faster than wasmtime at run time for some modules, so engines may later be chosen per application. Work on it is paused for now. The status of each engine and the known problems of the experimental ones are in psizam's [KNOWN_ISSUES.md](https://github.com/gofractally/psizam/blob/main/KNOWN_ISSUES.md). c45c060cd marks the psizam-engine execution context as unverified after the CPU budget change, and the suites are qualified on wasmtime only (#2228).
+- wasmtime is the engine, and every landing is qualified on it on x86. psizam's interpreter, JIT1 and JIT2 are kept only as a cross-check for wasmtime and for LLVM AOT, and are experimental with their known problems documented. They are largely compatible, with only minor known issues, and could be revived later for something wasmtime lacks, such as debugging.
+- LLVM AOT is the second engine: robust, but slow to compile, and faster than wasmtime at run time for some modules, so engines may later be chosen per application. It is re-verified on x86-64 Linux, most recently with the serialization change in (e93c2e64d): native 20/20, including the consensus test that compares LLVM AOT and saved AOT artifacts with JIT1 bit for bit, and end-to-end 39/39. The Rust suite has not been run under it and macOS has not been run. Getting there needed two fixes: the LLVM AOT build had never linked on Linux, and the consensus test leaves JIT2 out on x86-64, where JIT2 keeps NaN payloads through SIMD float operations.
+- The status of each engine and the known problems of the experimental ones are in psizam's [KNOWN_ISSUES.md](https://github.com/gofractally/psizam/blob/main/KNOWN_ISSUES.md). #2228 stays open for LLVM AOT on macOS and for the experimental engines.
 - `psitest` still runs every test module on JIT2 while the services it drives run on wasmtime: the one place an experimental engine is on the path of the suites (#2231).
 - psizam tests a reviewer will see fail, all predating this work: the `memory_grow_2` spec cases on every engine, `psizam_host_tail_reentry_tests` (intentionally red), and on x86 "Test call depth dynamic - jit_llvm".
 - Rust services use wide arithmetic only when built with rustc 1.100 or newer; rustc calls the target feature unstable and warns that using it will become an error (#2230).
@@ -95,11 +98,11 @@ Visible in traces but not consensus: `ActionTrace.totalTime` is now elapsed time
 - Speculative execution never takes the store's writer gate. A database's pending changes are folded early once they pass 256 MiB.
 - After an unclean shutdown the default open does not rebuild reference counts: counts may be stale and leaked space remains until a full scan. Stronger recovery modes exist but are not what the node selects.
 - Durability is chosen by sync level, and the suites run with `database-sync=none`. Performance by default with persistence opt-in is a deliberate policy.
-- The pinned psitri is b7b8647 on its `main`.
+- The pinned psitri is d3bba0e on its `main`. Beyond the test fixes it carries a fix for a race in the block allocator: part of its address-space reservation could be left unmapped.
 
 **Known limits.**
 - On 22 November `psinode_test_crash` failed intermittently: a node aborted with "reference count exceeded limits" when reopening its database. It has not been reproduced in 21 loaded runs on the current line. The diagnosis is an earlier double release: in release builds psitri wrapped a reference count that was already zero, and the next retain threw. The root cause has not been found. The pinned psitri now aborts at the faulty release with a message instead of wrapping, so a recurrence will name the caller.
-- psitri's own suite: every test passes on its `main` (94fa328) except `kv-compat-test`, where the legacy engine's leg fails two checks that deliberately mark features it does not implement ([psitri#2](https://github.com/gofractally/psitri/issues/2)); psibase does not use that engine. The head still pins the previous psitri commit; the new one differs from it only in tests and in code psibase does not link.
+- psitri's own suite: every test passes on its `main` (94fa328) except `kv-compat-test`, where the legacy engine's leg fails two checks that deliberately mark features it does not implement ([psitri#2](https://github.com/gofractally/psitri/issues/2)); psibase does not use that engine.
 - Pinned and unpinned segments are compacted separately, and each needs a whole segment of freed space before the compactor acts, so up to a segment of freed space per pool can stay uncompacted ([psitri#7](https://github.com/gofractally/psitri/issues/7)).
 
 ### 3. Signature verification (suggested reviewer: Steven, who wrote the Botan-based service)
@@ -145,15 +148,58 @@ The first commits (a4e5c0a0e through 0a93ef490) add Exchange, Favor, Signing and
 
 ### 8. Build and toolchain
 
+- **The team's Ubuntu 22.04 CI check fails on this pull request at configure**, before any code is built: the head requires CMake 3.28 or newer and the builder image has an older one (#2238). The other checks pass. Until the image is updated, that check says nothing about the code.
+- CMake 3.28 or newer.
 - binaryen 133 or newer must be first on `PATH`; older versions cannot read wide-arithmetic code and the configure step now says so.
 - Rust services get wide arithmetic only with rustc 1.100 or newer. rustc 1.98 miscompiles 128-bit arithmetic when the feature is on, giving wrong multiply and add/subtract results on every engine, so `cargo-psibase` adds the flag only for 1.100 and later and builds without it otherwise, with a message.
 - psizam, psitri and ucc are fetched at configure time over HTTPS and pinned; the eos-vm submodule is no longer what the node runs on.
 - Building the web UIs refuses an unsupported Node version and says why (8747dc889).
 - The tree builds and its suites run on macOS (Apple silicon) as well as Linux x86-64.
 
+### 9. Serialization: fracpack to PSSZ on the official PSIO library
+
+This section was written by the author of the migration.
+
+**What changed.** The in-tree `libraries/psio` (the old psio with fracpack), `rust/fracpack` and the Python fracpack codec are deleted. Every C++ and Rust type, action, table row, event, schema, JSON and GraphQL path uses [gofractally/psio](https://github.com/gofractally/psio), pinned. There is one library and no compatibility layer; chains and databases from before are not readable.
+
+**Wire formats.**
+- Actions, results, table values, events, blocks and transactions: PSSZ. The offset width is 1, 2 or 4 bytes, chosen per type from its declared cap or inferred bound; records are extensible by trailing optionals; maps and sets are strictly ordered.
+- Table keys: the PSIO key format.
+- HTTP and JSON: I-JSON. 64-bit integers are bare below 2^53, bytes are upper-case hex.
+- Service schemas: PSIO Schema IR, as I-JSON in files and PSSZ in `setSchema`.
+- Account names keep psibase's own coding; method names use PSIO's coder.
+
+**Where to look.**
+- `doc/team-review.md`: everything the team must decide or confirm. Start with sections 12 and 13.
+- `doc/pssz-conversion.md`: the mapping from each old call to the new one (sections 3 and 6.6), the merge handover and classes of failure (section 7).
+- `doc/flip-interop.md`: the rules that keep C++ and Rust twins of a type identical. `doc/merge-checklist.md`.
+- Code: `libraries/psibase/common/include/psibase/{Table,Rpc,Actor,schema}.hpp`, `libraries/psibase/native/src/{BlockContext,TransactionContext}.cpp`, `rust/psibase`, `rust/psibase_macros`, `packages/system/Transact`.
+- The library itself: start with its `docs/annotations.md`, `docs/tutorial-annotations.md` and `docs/pssz-spec.md`.
+
+**Evidence.**
+- macOS, wasmtime: full ctest 88/88 (the count fell because the old library's own tests were deleted with it).
+- x86-64 Linux at e93c2e64d: wasmtime native 19/19, end-to-end 39/39, Rust 29/29, plugins 1/1; LLVM AOT native 20/20 and end-to-end 39/39.
+- A fixture that C++ and Rust both encode is byte-identical for types, JSON, service schemas, leaf types and wrappers, and every Rust workspace type-checks.
+- End to end by hand: boot, account creation, GraphQL on a C++ and on a Rust service, the schema endpoint, pushing a transaction, and stopping and restarting a node that continues. Commands and output are in `doc/pssz-conversion.md` section 7.
+- PSIO's own suites: C++ 424/424 in both JSON-parser configurations, Rust 1,141, JavaScript 252, Python 90.
+
+**Questions for reviewers.**
+1. Size caps. Only `Memo` (UTF-8, 80 bytes) and two callbacks are capped. Proposed caps for everything else are estimates awaiting review, and a cap is permanent for a type.
+2. Trust. Rows a service reads from its own tables are decoded with validation today. The intended rule is trusted reads of own rows and validated action and cross-service data.
+3. Naming. The implementing language is the authority for a name; a blanket camelCase rename is held for team discussion.
+4. Members that exist in a struct but are absent from reflection, listed as questions of intent.
+5. JSON and GraphQL behaviour that clients will notice (`doc/team-review.md` sections 8 and 12).
+
+**Known gaps.** `doc/team-review.md` is the current list. These were open when the migration merged, and some have been addressed since by a later PSIO pin and follow-up commits:
+- The maximum transaction size fell to about 3.5 to 4.4 MB because the guest's strict check re-encoded the transaction; an in-place check was the fix.
+- Method results declared with `returns(...)` did not reach service schemas, and C++ and Rust derived variant labels by different rules. Both are named in the commit that pins PSIO 66abb1b.
+- Identifiers still named after fracpack, and five user documentation pages that describe the old format.
+- Front ends and plugins have not been run in a browser. The snapshot tools and `demo/` have not been run.
+- `psibase boot` returns before the boot transactions are applied.
+
 ## Throughput
 
-The table is at the top of this document. The three head commits in it were measured in one session on an idle server.
+The table is at the top of this document. The three head commits in it were measured in one session on an idle server. **All of these figures predate the serialization change** (they stop at 054a0c386); throughput has not been remeasured since.
 
 So the head today against `main` is about 5.7 times faster unsigned and about 5.8 times faster signed with P-256. A transaction that does nothing runs at about 1,790 per second unsigned and 1,490 signed with secp256k1 at 054a0c386.
 
@@ -180,51 +226,46 @@ The full report, with raw output, is in `doc/benchmarks/transfer-throughput/`.
 
 ## Test results
 
-Suite results are recorded per commit under `tests/timing/runs/`. On wasmtime:
+Suite results are recorded per commit under `tests/timing/runs/`. On wasmtime unless a row says otherwise:
 
 | Commit | Mac | x86 |
 |---|---|---|
 | c45c060cd | native 24/24, end-to-end 39/39, Rust 29/29 | native 20/20, end-to-end 39/39, Rust 29/29 |
 | 054a0c386 | full ctest 92/92 | native 20/20, end-to-end 39/39, Rust 29/29 |
-| 04efaefe4 (head) | not run at this commit | native 20/20, end-to-end 39/39, Rust 29/29, browser-plugin signing test 1/1 |
+| 04efaefe4 | not run at this commit | native 20/20, end-to-end 39/39, Rust 29/29, browser-plugin signing test 1/1 |
+| 733be8cde (psitri 94fa328) | not run at this commit | native 20/20, end-to-end 39/39, Rust 29/29, browser-plugin signing test 1/1 |
+| e272625fc (one clock) | not run | native 20/20, end-to-end 39/39, Rust 29/29, plugins 1/1 |
+| 34fced88e (budget raised mid-run) | not run | native 20/20, end-to-end 39/39, Rust 29/29, plugins 1/1 |
+| 7fe3cda05, built for LLVM AOT | not run | native 21/21, end-to-end 39/39; Rust suite not run |
+| a217d99bb (serialization migration) | full ctest 88/88 | not run at this commit |
+| e93c2e64d (PSIO 66abb1b, psitri d3bba0e) | not reported | wasmtime: native 19/19, end-to-end 39/39, Rust 29/29, plugins 1/1. LLVM AOT: native 20/20, end-to-end 39/39 |
 
 ## Known gaps, in one place
 
 Open items are tracked as issues and closed as they are fixed.
 
-- wasmtime (a pinned fork) is the only qualified engine. The interpreter, JIT1 and JIT2 are experimental cross-checks, and LLVM AOT is paused; none is verified on this head: #2228. `psitest` still runs test modules on JIT2: #2231. Engine tests red on psizam main: [psizam#1](https://github.com/gofractally/psizam/issues/1), [psizam#2](https://github.com/gofractally/psizam/issues/2).
-- One monotonic clock for trace time, the limit and billing: #2227.
+- LLVM AOT is re-verified on x86 only (native and end-to-end); not on macOS, and not the Rust suite. The interpreter, JIT1 and JIT2 are experimental and unverified on this head: #2228. `psitest` still runs test modules on JIT2: #2231.
 - Deterministic stack check on wasmtime costs memory traffic on every call: #2221.
-- Buying resources during a transaction does not raise that transaction's CPU limit: #2217 (fix on a branch).
 - Events: one billing event per transaction and the per-block pipeline: #2218. Objective pricing for events, by size and index count: #2223.
 - Network throughput drops with more connections, and signed lags unsigned: #2220.
 - secp256k1 by default in the Rust library and the browser plugins: #2216.
 - P-256 verification is about eight times slower than secp256k1: #2222.
 - Crypto library sources are fetched from their upstream sites, not mirrored: #2224.
 - The verifier's differential and Wycheproof checks are not an in-tree test: #2225.
+- The team's CI image cannot configure the head (CMake 3.28, binaryen 133): #2238.
 - psitri, ucc and psio have no license file.
+- Serialization: the open questions and gaps in section 9 and `doc/team-review.md`. Front ends and plugins have not been run in a browser since the format change.
+- Throughput has not been remeasured since the serialization change.
+- `doc/verify-sig/` records measurements taken before the serialization change; its harness and case generator use the old library's calls and will not build against this head as written.
 - psitri: the legacy engine's compatibility leg ([psitri#2](https://github.com/gofractally/psitri/issues/2)); freed space that can stay uncompacted ([psitri#7](https://github.com/gofractally/psitri/issues/7)); a debug mode that aborts on a partly filled segment ([psitri#6](https://github.com/gofractally/psitri/issues/6)).
 - The reference-count abort seen in `psinode_test_crash`: not reproduced on the current line, root cause not found: #2229.
 - rustc treats the wide-arithmetic target feature as unstable: #2230.
 
 ## Still to come in this pull request
 
-### Migration to gofractally/psio and PSSZ (in progress, not in this head)
-
-Serialization is being moved from the in-tree fracpack library to the canonical [gofractally/psio](https://github.com/gofractally/psio) library. The work is on topic branch `claude/pssz` (pushed up to bc71f6bb0, with newer commits still being verified) and a parallel C++ branch that is not pushed yet. When it lands, this pull request will be updated with its own tour section so the new PSIO library and the format change can be reviewed. Status as reported by its author on 23 November:
-
-- **Done on the branch, wire format still unchanged.** Every C++ type and service is declared with psio's `PSIO_REFLECT`; dispatch, call proxies, tables and schema generation read `psio::reflect`; every packed Rust type carries the PSIO derives beside the old ones; C++, Rust and the Python test harness share one method-name coder, which changed ten method numbers. Rust mirrors of C++ types and C++ mirrors of Rust services were cross-checked with a shared fixture (51 types; parameter names of 28 services and 265 methods) and corrected where they disagreed. The full suite passed 93/93 at each verified step.
-- **In progress: the switch itself.** C++ and Rust are being converted in parallel and will be merged together. In one step it changes the binary format (fracpack to PSSZ), service schemas (to PSIO's Schema IR), JSON (to I-JSON: 64-bit integers above 2^53-1 as decimal strings, bytes as hex, variants as `{"Name": value}`, action arguments as an object keyed by parameter name), and the GraphQL engine. It then deletes `libraries/psio1` and `rust/fracpack`. Front ends and plugins are not covered by the test suite and may need updating.
-- **Left for the team after the switch.** Per-type size caps (a proposal exists: 161 member bounds and 84 type caps, almost all new rules); tightening validation to "own table rows trusted, everything else validated" (an audit of 584 decode sites exists); the token-transfer `data` argument.
-- **gofractally/psio changed substantially for this.** PSSZ evolution, pruning and width rules; annotations for bounds on ordinary types; method reflection with argument caps; views; keys; I-JSON; Schema IR with runtime compatibility checks; a GraphQL engine; Rust, TypeScript and Python implementations held to shared conformance fixtures. Reviewers should start with its `docs/annotations.md`, `docs/tutorial-annotations.md` and `docs/pssz-spec.md`.
-- **Fixes found along the way, independent of the format** (on `claude/pssz`): a request-body decode whose result was not checked in `RTransact`; code reference counts in `SetCode`/`XAdmin` that were never persisted, so unreferenced code was never erased; a missing field in the C++ mirror of a staged-transaction response; `Decimal`/`Quantity` parsing that wrapped on overflow; several Rust mirrors that were wrong on the wire.
-- A running list of questions and decisions for reviewers will be committed as `doc/team-review.md` with the migration.
-
-### Also to come
-
-- Moving the pin to psitri 94fa328, the re-verification of LLVM AOT, and the single monotonic clock (#2227).
-- Throughput figures for the current head; the table at the top stops at 054a0c386.
+- LLVM AOT on macOS and under the Rust suite (#2228).
+- Throughput figures for the current head. The table at the top stops at 054a0c386, before the serialization change.
 
 ## A note on how this was written
 
-The sections on signature verification, key defaults and canonical signatures describe work done by the author of this document and were checked against the code and test runs. The other sections are summarized from the commit history and from reports by the people who did that work, and may be corrected by them.
+The sections on signature verification, key defaults and canonical signatures describe work done by the author of this document and were checked against the code and test runs. The serialization section was written by the author of that migration. The other sections are summarized from the commit history and from reports by the people who did that work, and may be corrected by them.
