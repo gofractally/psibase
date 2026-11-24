@@ -16,23 +16,15 @@ function(psibase_declare_dependencies)
     # FetchContent's first declaration wins, including a containing project's
     # declarations. Local development uses FETCHCONTENT_SOURCE_DIR_<NAME>.
     # Exact commits, rather than moving branches, are the release/CI defaults.
-    # A consumer that only links PSIO (the psibase build) sets
-    # PSIBASE_PSIO_EXCLUDE_FROM_ALL so that PSIO's own install rules (its
-    # native archive, package config and the simdjson it fetched) stay out of
-    # the consumer's install tree and packages.
-    set(psio_scope)
-    if(PSIBASE_PSIO_EXCLUDE_FROM_ALL)
-        if(CMAKE_VERSION VERSION_LESS 3.28)
-            message(FATAL_ERROR "PSIBASE_PSIO_EXCLUDE_FROM_ALL requires CMake 3.28 or newer")
-        endif()
-        set(psio_scope EXCLUDE_FROM_ALL)
-    endif()
+    # Every declaration is source-only (SOURCE_SUBDIR names a directory that
+    # does not exist, so FetchContent populates without adding the project).
+    # psibase_acquire_dependency(psio) adds PSIO's project itself; see there.
     FetchContent_Declare(psio
         GIT_REPOSITORY https://github.com/gofractally/psio.git
         GIT_TAG 66abb1b50a96d1eeef33c61504ae67d509b868e1
         GIT_SHALLOW FALSE
         SOURCE_DIR "${psibase_root}/external/psio"
-        ${psio_scope})
+        SOURCE_SUBDIR .psibase-no-top-level-cmake)
     FetchContent_Declare(psitri
         GIT_REPOSITORY https://github.com/gofractally/psitri.git
         GIT_TAG d3bba0e6a5f59e37c3eea08a1a720ae553cafb2c
@@ -53,6 +45,29 @@ function(psibase_declare_dependencies)
         GIT_SUBMODULES ""
         SOURCE_DIR "${psibase_root}/external/psizam"
         SOURCE_SUBDIR .psibase-no-top-level-cmake)
+endfunction()
+
+# Sets <result> to TRUE when the directory that defines the psio target, or a
+# directory above it, was added with EXCLUDE_FROM_ALL: its install rules are
+# then not part of the top-level install.
+function(psibase_psio_install_excluded result)
+    set(${result} FALSE PARENT_SCOPE)
+    if(NOT TARGET psio)
+        return()
+    endif()
+    get_target_property(real psio ALIASED_TARGET)
+    if(NOT real)
+        set(real psio)
+    endif()
+    get_target_property(dir ${real} SOURCE_DIR)
+    while(dir)
+        get_property(excluded DIRECTORY "${dir}" PROPERTY EXCLUDE_FROM_ALL)
+        if(excluded)
+            set(${result} TRUE PARENT_SCOPE)
+            return()
+        endif()
+        get_property(dir DIRECTORY "${dir}" PROPERTY PARENT_DIRECTORY)
+    endwhile()
 endfunction()
 
 function(psibase_acquire_dependency name)
@@ -156,13 +171,47 @@ function(psibase_acquire_dependency name)
             message(STATUS "psibase: reusing ${name} at ${existing_head} without Git clone/update")
         endif()
     endif()
-    # psitri/ucc/psizam only populate sources. Their adapters explicitly add
-    # the validated, codec-free engine subset; never evaluate upstream roots.
+    # FetchContent only populates sources here. The psitri/ucc/psizam adapters
+    # explicitly add the validated, codec-free engine subset; never evaluate
+    # those upstream roots.
     FetchContent_MakeAvailable(${name})
-    if(name STREQUAL "psio" AND NOT TARGET psio::psio)
-        message(FATAL_ERROR "The selected PSIO source did not provide psio::psio")
-    endif()
     FetchContent_GetProperties(${name})
+    if(name STREQUAL "psio")
+        # PSIO's maintained project is added here rather than by FetchContent,
+        # so that the consumer chooses its scope on every supported CMake
+        # (FetchContent_Declare(... EXCLUDE_FROM_ALL) needs CMake 3.28).
+        # A consumer that only links PSIO (the psibase build) sets
+        # PSIBASE_PSIO_EXCLUDE_FROM_ALL: the directory's install rules (PSIO's
+        # native archive, headers and package config, and those of the
+        # simdjson it fetches in a subdirectory) then stay out of the
+        # consumer's install tree and packages, and its targets are built
+        # only as dependencies of the consumer's targets.
+        # A containing project's earlier declaration without SOURCE_SUBDIR has
+        # already added the project in FetchContent_MakeAvailable.
+        if(NOT TARGET psio::psio)
+            if(NOT EXISTS "${psio_SOURCE_DIR}/CMakeLists.txt")
+                message(FATAL_ERROR "The selected PSIO source has no CMake project: ${psio_SOURCE_DIR}")
+            endif()
+            if(PSIBASE_PSIO_EXCLUDE_FROM_ALL)
+                add_subdirectory("${psio_SOURCE_DIR}" "${psio_BINARY_DIR}" EXCLUDE_FROM_ALL)
+            else()
+                add_subdirectory("${psio_SOURCE_DIR}" "${psio_BINARY_DIR}")
+            endif()
+        endif()
+        if(NOT TARGET psio::psio)
+            message(FATAL_ERROR "The selected PSIO source did not provide psio::psio")
+        endif()
+        if(PSIBASE_PSIO_EXCLUDE_FROM_ALL)
+            # Also covers PSIO added earlier: by another declaration, or by an
+            # acquisition that did not ask for exclusion.
+            psibase_psio_install_excluded(psio_excluded)
+            if(NOT psio_excluded)
+                message(FATAL_ERROR
+                    "PSIBASE_PSIO_EXCLUDE_FROM_ALL is set, but PSIO was already added "
+                    "without EXCLUDE_FROM_ALL; its install rules would be added to the consumer's")
+            endif()
+        endif()
+    endif()
     find_package(Git REQUIRED)
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env GIT_OPTIONAL_LOCKS=0
         "${GIT_EXECUTABLE}" -C "${${name}_SOURCE_DIR}" rev-parse HEAD

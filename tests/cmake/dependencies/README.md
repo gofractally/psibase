@@ -20,7 +20,7 @@ The defaults are immutable Git revisions:
 
 | Name | Revision | Acquisition boundary |
 | --- | --- | --- |
-| psio | `66abb1b50a96d1eeef33c61504ae67d509b868e1` | Maintained upstream CMake target |
+| psio | `66abb1b50a96d1eeef33c61504ae67d509b868e1` | Sources by FetchContent; the maintained upstream CMake project is added by `psibase_acquire_dependency` |
 | psitri | `d3bba0e6a5f59e37c3eea08a1a720ae553cafb2c` | Sources only |
 | ucc | `d79166da0290fdf9d1f9d5880d4dfb45b2822cf3` | Sources only |
 | psizam | `2e93ecd1561ed7d4808a1a83af1d0137bac17b41` | Sources only |
@@ -36,6 +36,24 @@ its checkpoint covers the existing container tests and header consumer, not
 the complete database engine.
 All four repositories are public and are fetched over HTTPS; no GitHub
 credentials are needed to configure.
+
+All four module declarations are source-only: `SOURCE_SUBDIR` names a
+directory that does not exist, so `FetchContent_MakeAvailable` populates the
+source and adds nothing. For PSIO, `psibase_acquire_dependency(psio)` then
+adds the maintained upstream project itself, with
+`add_subdirectory(<source> <binary>)`, or with `EXCLUDE_FROM_ALL` when the
+consumer set `PSIBASE_PSIO_EXCLUDE_FROM_ALL` before the first acquisition.
+This is one code path for every supported CMake (3.20 or newer);
+`FetchContent_Declare(... EXCLUDE_FROM_ALL)` would need CMake 3.28. In an
+excluded directory the install rules of PSIO and of the simdjson it fetches in
+a subdirectory are not part of the consumer's install, and their targets are
+built only because consumer targets link them. If PSIO was already added
+without exclusion (a containing project's declaration without `SOURCE_SUBDIR`
+lets FetchContent add it, as in the parent-declaration check below), a
+consumer that asks for exclusion fails at configure; nothing is excluded
+silently or left installed silently. A transitive consumer that calls raw
+`FetchContent_MakeAvailable(psio)` shares the target only after
+`psibase_acquire_dependency(psio)` has run.
 
 For psitri, UCC, and psizam, the first declaration MUST retain
 `SOURCE_SUBDIR .psibase-no-top-level-cmake`. `psibase_acquire_dependency(name)`
@@ -158,5 +176,6 @@ ctest --test-dir build/deps-installed --output-on-failure
 This establishes native standalone package behavior. In the psibase build the
 SDK (`COMPONENT libpsibase`) ships PSIO's headers for guests from the WASM
 project; PSIO's own native install rules are excluded from psibase's install
-tree (`PSIBASE_PSIO_EXCLUDE_FROM_ALL`). Rust manifest paths/pins and the wire
+tree (`PSIBASE_PSIO_EXCLUDE_FROM_ALL`, checked by `libraries/CMakeLists.txt`
+with `psibase_psio_install_excluded`). Rust manifest paths/pins and the wire
 and API cutover are tracked in `doc/pssz-conversion.md`.

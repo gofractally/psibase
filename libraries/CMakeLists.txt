@@ -14,10 +14,11 @@ if(DEFINED IS_NATIVE)
     endif()
     psibase_acquire_dependency(psio)
     # psibase links PSIO; it does not install PSIO's native package
-    # (native/CMakeLists.txt sets PSIBASE_PSIO_EXCLUDE_FROM_ALL).
-    get_property(psio_declaration GLOBAL PROPERTY _FetchContent_psio_savedDetails)
-    if(NOT "EXCLUDE_FROM_ALL" IN_LIST psio_declaration)
-        message(FATAL_ERROR "PSIO was declared without EXCLUDE_FROM_ALL; its install rules would "
+    # (native/CMakeLists.txt sets PSIBASE_PSIO_EXCLUDE_FROM_ALL, so the
+    # acquisition adds PSIO's directory with EXCLUDE_FROM_ALL).
+    psibase_psio_install_excluded(psio_excluded)
+    if(NOT psio_excluded)
+        message(FATAL_ERROR "PSIO was added without EXCLUDE_FROM_ALL; its install rules would "
             "be added to psibase's")
     endif()
     FetchContent_GetProperties(simdjson)
