@@ -291,6 +291,7 @@ namespace psibase
           {"Access-Control-Allow-Methods", "POST, GET, OPTIONS, HEAD, PUT, DELETE"},
           // "*" alone doesn't cover Authorization
           {"Access-Control-Allow-Headers", "*, Authorization"},
+          {"Access-Control-Max-Age", "300"},
       };
    }
 
