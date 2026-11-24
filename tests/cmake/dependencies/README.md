@@ -91,10 +91,44 @@ path and never runs that clone/update operation on a pre-existing directory:
 - A clean Git checkout at the exact winning declaration's commit is reused
   without Git mutation. Extra local branches, tags, reflogs and index bytes are
   preserved. This covers normal reconfiguration and a second build directory.
-- A dirty checkout, different HEAD (including a clean unpushed commit), hidden
-  index flags, non-Git data or an unverifiable declaration fails without changing
-  the source. Select a separate qualified checkout or explicitly opt into the
-  source with `FETCHCONTENT_SOURCE_DIR_<NAME>`; acquisition never resets it.
+- A clean Git checkout at another commit (the pin moved since it was fetched)
+  is advanced to the declared commit when nothing can be lost, and only then:
+  - the status is empty, untracked files and submodules included, and no index
+    flag (assume-unchanged, skip-worktree) hides an edit;
+  - HEAD is detached. FetchContent leaves its clones detached, so a checkout
+    on a local branch was put there by a person and is not moved, although the
+    branch would keep its commits: their next commit would otherwise land on a
+    detached HEAD without their knowing;
+  - the current HEAD commit stays reachable: a branch, tag or remote-tracking
+    ref contains it, or it is an ancestor of the declared commit. A commit made
+    on the detached HEAD and held by no ref is refused;
+  - the declared commit is already in the checkout, or `git fetch
+    <GIT_REPOSITORY> <commit>` obtains it. If the server refuses a commit that
+    is not a ref tip, the advertised branches and tags are fetched by name and
+    the commit must then exist. With `FETCHCONTENT_FULLY_DISCONNECTED`,
+    `FETCHCONTENT_UPDATES_DISCONNECTED` or
+    `FETCHCONTENT_UPDATES_DISCONNECTED_<NAME>` nothing is fetched, and the
+    checkout is advanced only if the commit is already local.
+
+  The move is `git checkout --no-overwrite-ignore --detach <commit>`, under the
+  same lock as a first population. The fetch adds objects and creates, moves
+  or deletes no ref (Git before 2.29 also rewrites `FETCH_HEAD`). Nothing is
+  reset, cleaned or deleted; Git itself refuses to overwrite a modified,
+  untracked or ignored file. HEAD and cleanliness are verified afterwards.
+  The configure log says `psibase: advanced <name> from <old> to <new>` and the
+  provenance file records `mode=advanced-existing`.
+- Everything else fails without changing the working tree, HEAD or refs, and
+  the message names the one reason found, with the real path, URL and commit
+  in the commands that resolve it: uncommitted or untracked files (the status
+  lines; `git stash push --include-untracked`), hidden index flags (the files;
+  `git update-index --no-assume-unchanged`/`--no-skip-worktree`), a checkout
+  on a local branch or a commit that would become unreachable (`git branch
+  keep-<commit> <commit>`, or the `git fetch` and `git checkout --detach`
+  pair), a commit that is absent while disconnected or cannot be fetched
+  (Git's own error, and the same pair), an ignored file in the way, non-Git
+  data (`mv` it aside) or a declaration that is not an exact commit. Each
+  message also gives the `-DFETCHCONTENT_SOURCE_DIR_<NAME>=<path>` override,
+  which builds the source as it is; acquisition never resets it.
 - Explicit source overrides remain developer input. The storage adapter's
   strict source hashes still apply, and the standalone consumer records actual
   source/HEAD/status rather than assuming the configured pin was consumed.
@@ -109,7 +143,17 @@ is unavailable. It does not guess a source path and risk deleting another one.
 
 The disposable fixture checks working-file and complete `.git` metadata bytes
 before/after each protected operation, including dirty edits, an unpushed commit
-and annotated local tag:
+and annotated local tag. Its moved-pin cases use local bare repositories as
+remotes (no network): a FetchContent clone advanced in its own build tree and
+reused by a second one; a commit that only ancestry keeps reachable; a server
+that refuses a commit below a branch tip; a commit already local while
+disconnected, with an unreachable repository. Refused and byte-identical: a
+local branch, a modified file, an untracked file, a skip-worktree edit, an
+unreachable repository, and each disconnected setting with the commit absent.
+Refused after a successful fetch, so with new objects but the same HEAD, refs
+and working files: a local commit that no ref contains (then advanced once
+the printed `git branch` command has named it) and an ignored file that the
+new commit tracks:
 
 ```sh
 python3 tests/cmake/dependencies/preservation.py build/dependency-preservation
