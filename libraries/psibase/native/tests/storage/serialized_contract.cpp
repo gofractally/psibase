@@ -67,18 +67,26 @@ int main(int argc, char** argv)
                    condition.wait(lock, [&] { return release; });
                 }
                 return true;
-             });
+             },
+             // Nothing watches this request, so it evaluates its budget at
+             // every check; the callback is how the test sees the gate held.
+             std::chrono::microseconds{0});
          std::thread holder(
              [&]
              {
                 try
                 {
-                   // Only mutating work enters the writer's gate; reads no longer do.
+                   // Only mutating work enters the writer's gate; reads no longer
+                   // do, and splice finds its differences before entering it.
+                   // A single-key write checks its request when the scope
+                   // opens, before the gate, and again once inside it: the
+                   // third check is the first one made holding the gate.
                    accounting::Scope scope(holderRequest);
-                   shared_root       copy;
-                   writer->splice(copy, first, {}, {});
-                   require(reader->is_equal_weak(first, copy, {}, {}),
-                           "equal immutable roots differed");
+                   shared_root       copy = first;
+                   put(*writer, copy, "holder", "value");
+                   require(get(*reader, copy, "holder") == "value" &&
+                               get(*reader, first, "holder") == "<missing>",
+                           "write under the gate did not produce a private root");
                 }
                 catch (...)
                 {
@@ -152,7 +160,11 @@ int main(int argc, char** argv)
          if (waiterError)
             std::rethrow_exception(waiterError);
          require(didEnter && cancelled, "cancelled waiter entered mutable work");
-         require(!expiredWhileWaiting && billed < 30ms, "serialization wait was charged as CPU");
+         // Time is one monotonic clock for the limit and for billing, so a
+         // wait for the writer's gate counts like any other elapsed time: the
+         // 30 ms limit expires during the 80 ms wait and the wait is billed.
+         require(expiredWhileWaiting && billed >= 30ms,
+                 "wait for the writer's gate was not counted as elapsed time");
          require(second == before && get(*reader, second, "cancelled") == "<missing>",
                  "cancelled waiter changed immutable root");
       }
@@ -277,7 +289,7 @@ int main(int argc, char** argv)
          require(get(*reader, proxy->get_top_root(), "clone") == "<missing>",
                  "concurrent clone published private root");
       }
-      std::cout << "{\"passed\":true,\"groups\":3,\"wait_not_cpu\":true,\"cancel_before_mutation\":"
+      std::cout << "{\"passed\":true,\"groups\":3,\"wait_counts_as_elapsed\":true,\"cancel_before_mutation\":"
                    "true,\"native_lifetime\":true,\"concurrent_publish\":true}\n";
    }
    catch (const std::exception& e)
