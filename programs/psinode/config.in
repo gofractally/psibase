@@ -7,7 +7,8 @@ host     = psibase.localhost
 listen   = 8080
 # peer     = http://localhost:8080/
 mount    = $PSIBASE_DATADIR/packages
-database-cache-size = 256MiB
+database-cache-policy = disabled
+database-sync = none
 service-threads = 4
 
 http-timeout = 4s

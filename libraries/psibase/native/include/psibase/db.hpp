@@ -3,20 +3,14 @@
 #include_next <psibase/db.hpp>
 
 #include <psibase/blob.hpp>
-#include <psio/fracpack.hpp>
-#include <psio/to_key.hpp>
-#include <triedent/cow_ptr.hpp>
-#include <triedent/file_fwd.hpp>
+#include <psibase/storage.hpp>
+#include <psio/key.hpp>
+#include <psio/shapes.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 
 #include <array>
 #include <filesystem>
-
-namespace triedent
-{
-   class write_session;
-   class root;
-   struct database_config;
-}  // namespace triedent
 
 namespace psibase::net
 {
@@ -34,10 +28,10 @@ namespace psibase
    struct Revision;
    using ConstRevisionPtr = std::shared_ptr<const Revision>;
 
-   using Writer    = triedent::write_session;
+   using Writer    = storage::write_session;
    using WriterPtr = std::shared_ptr<Writer>;
 
-   using DbPtr = triedent::cow_ptr<triedent::root>;
+   using DbPtr = storage::shared_root;
 
    struct DbChangeSet
    {
@@ -114,9 +108,9 @@ namespace psibase
       std::shared_ptr<SharedDatabaseImpl> impl;
 
       SharedDatabase() = default;
-      SharedDatabase(const std::filesystem::path&     dir,
-                     const triedent::database_config& config,
-                     triedent::open_mode              mode = triedent::open_mode::create);
+      SharedDatabase(const std::filesystem::path&    dir,
+                     const storage::database_config& config,
+                     storage::open_mode              mode = storage::open_mode::create);
       SharedDatabase(const SharedDatabase&) = default;
       SharedDatabase(SharedDatabase&&)      = default;
 
@@ -151,10 +145,11 @@ namespace psibase
                                            IndependentChangeSet&& changes,
                                            SocketChangeSet&&      socketChanges,
                                            Sockets&               sockets,
-                                           SocketAutoCloseSet&    closing);
+                                           SocketAutoCloseSet&    closing,
+                                           const std::function<void()>& afterPublish = {});
 
-      bool                               isSlow() const;
-      std::vector<std::span<const char>> span() const;
+      std::optional<bool>                isSlow() const;
+      std::filesystem::path             directory() const;
 
       void               setCallbacks(DatabaseCallbacks*);
       DatabaseCallbacks* getCallbacks() const;
@@ -167,8 +162,8 @@ namespace psibase
 
       struct KVResult
       {
-         psio::input_stream key;
-         psio::input_stream value;
+         std::span<const char> key;
+         std::span<const char> value;
       };
 
       struct Session
@@ -256,35 +251,38 @@ namespace psibase
       // TODO: kvPutRaw, kvRemoveRaw: return deltas
       // TODO: getters: pass in input buffers instead of returning KVResult
 
-      void kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value);
-      void kvRemoveRaw(DbId db, psio::input_stream key);
-      std::optional<psio::input_stream> kvGetRaw(DbId db, psio::input_stream key);
+      void kvPutRaw(DbId db, std::span<const char> key, std::span<const char> value);
+      void kvRemoveRaw(DbId db, std::span<const char> key);
+      std::optional<std::span<const char>> kvGetRaw(DbId db, std::span<const char> key);
+      /// Whether the key exists. Recorded as a read like kvGetRaw, without
+      /// copying the value.
+      bool kvContains(DbId db, std::span<const char> key);
       std::optional<KVResult>           kvGreaterEqualRaw(DbId               db,
-                                                          psio::input_stream key,
+                                                          std::span<const char> key,
                                                           size_t             matchKeySize);
-      std::optional<KVResult> kvLessThanRaw(DbId db, psio::input_stream key, size_t matchKeySize);
-      std::optional<KVResult> kvMaxRaw(DbId db, psio::input_stream key);
+      std::optional<KVResult> kvLessThanRaw(DbId db, std::span<const char> key, size_t matchKeySize);
+      std::optional<KVResult> kvMaxRaw(DbId db, std::span<const char> key);
 
       template <typename K, typename V>
       auto kvPut(DbId db, const K& key, const V& value)
-          -> std::enable_if_t<!psio::is_std_optional<V>(), void>
+          -> std::enable_if_t<!psio::is_optional<V>::value, void>
       {
-         kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
+         kvPutRaw(db, psio::encode(psio::key{}, key), psio::to_pssz(value));
       }
 
       template <typename K>
       void kvRemove(DbId db, const K& key)
       {
-         kvRemoveRaw(db, psio::convert_to_key(key));
+         kvRemoveRaw(db, psio::encode(psio::key{}, key));
       }
 
       template <typename V, typename K>
       std::optional<V> kvGet(DbId db, const K& key)
       {
-         auto s = kvGetRaw(db, psio::convert_to_key(key));
+         auto s = kvGetRaw(db, psio::encode(psio::key{}, key));
          if (!s)
             return std::nullopt;
-         return psio::from_frac<V>(psio::prevalidated{s->pos, s->end});
+         return psio::from_pssz<V>(psio::trusted{std::span<const char>{*s}});
       }
 
       template <typename V, typename K>

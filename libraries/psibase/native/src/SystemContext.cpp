@@ -38,9 +38,9 @@ namespace psibase
 
    SharedState::~SharedState() {}
 
-   std::vector<std::span<const char>> SharedState::dbSpan() const
+   std::filesystem::path SharedState::databaseDirectory() const
    {
-      return impl->db.span();
+      return impl->db.directory();
    }
 
    std::vector<std::span<const char>> SharedState::codeSpan() const

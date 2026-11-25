@@ -6,6 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 import { useConfig } from "../hooks/use-config";
 import { usePeers } from "../hooks/use-peers";
 import { useStatuses } from "../hooks/use-statuses";
+import { pressureUnavailableMessage } from "../lib/storage-diagnostics";
 
 export const StatusBanner = () => {
     const { error: peersError } = usePeers();
@@ -22,6 +23,8 @@ export const StatusBanner = () => {
         switch (s) {
             case "startup":
                 return <>Initializing</>;
+            case "storage-pressure-unavailable":
+                return <>{pressureUnavailableMessage}</>;
             case "slow":
                 return (
                     <>
@@ -60,10 +63,12 @@ export const StatusBanner = () => {
     }
 
     const disconnected = Boolean(peersError && configError && statusError);
-    const statusTitle = disconnected ? "Node connection error" : "Warning";
+    const informationOnly = status?.length === 1 && status[0] === "storage-pressure-unavailable"
+        && !peersError && !configError && !statusError;
+    const statusTitle = disconnected ? "Node connection error" : informationOnly ? "Storage information" : "Warning";
 
     return (
-        <Alert variant={disconnected ? "destructive" : "warning"}>
+        <Alert variant={disconnected ? "destructive" : informationOnly ? "default" : "warning"}>
             {disconnected ? <Unplug /> : <TriangleAlert />}
             <AlertTitle>{statusTitle}</AlertTitle>
             {serverStatus.map((status, idx) => (

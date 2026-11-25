@@ -66,13 +66,14 @@ export const UIPeer = z
 const schem = z.object({
     timestamp: z.string(),
     memory: z.object({
-        database: z.coerce.number(),
+        database: z.coerce.number().nullable(),
+        databaseAttribution: z.enum(["file-backed", "unavailable"]).default("unavailable"),
         code: z.coerce.number(),
         data: z.coerce.number(),
         wasmMemory: z.coerce.number(),
         wasmCode: z.coerce.number(),
         unclassified: z.coerce.number(),
-    }),
+    }).nullable(),
     tasks: z
         .object({
             id: z.number(),
@@ -83,7 +84,8 @@ const schem = z.object({
             read: z.string(),
             written: z.string(),
         })
-        .array(),
+        .array()
+        .nullable(),
 });
 
 const TransactStats = z.object({
