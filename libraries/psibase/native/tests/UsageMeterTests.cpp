@@ -1,7 +1,12 @@
 #include <psibase/UsageMeter.hpp>
 
 #include <catch2/catch_test_macros.hpp>
+#include <psibase/Socket.hpp>
 #include <psio/key.hpp>
+
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 
 #include <atomic>
 #include <map>
@@ -598,4 +603,298 @@ TEST_CASE("usage meter: flush, restart, reload")
       CHECK(!shared.kvGetSubjective(*writer, UsageRow::db, key));
       CHECK(sum(again.rows()).requests == before.requests + 4);
    }
+}
+
+namespace
+{
+   std::span<const char> bytes(std::string_view s)
+   {
+      return {s.data(), s.size()};
+   }
+   std::string letters(unsigned n)
+   {
+      std::string result;
+      for (int i = 0; i < 4; ++i, n /= 26)
+         result += static_cast<char>('a' + n % 26);
+      return result;
+   }
+   // The identities of a node whose every kind that can fill is full
+   std::vector<UsageIdentity> manyIdentities(std::size_t perKind)
+   {
+      std::vector<UsageIdentity> result;
+      for (unsigned n = 0; n < perKind; ++n)
+      {
+         IPV4Address addr{{10, static_cast<std::uint8_t>(n >> 16), static_cast<std::uint8_t>(n >> 8),
+                           static_cast<std::uint8_t>(n)}};
+         result.push_back(UsageIdentity::address(addr));
+         result.push_back(UsageIdentity::account(AccountNumber{"acct" + letters(n)}));
+         result.push_back(UsageIdentity::peer(SocketEndpoint{IPV4Endpoint{addr, 8080}}));
+      }
+      return result;
+   }
+   double ms(std::chrono::nanoseconds t)
+   {
+      return t.count() / 1e6;
+   }
+   std::uint64_t sumRequests(SharedDatabase& shared, Writer& writer)
+   {
+      std::uint64_t total = 0;
+      shared.kvScanSubjective(writer, UsageRow::db, psio::to_key(usagePrefix()),
+                              [&](std::span<const char>, std::span<const char> value)
+                              { total += psio::from_pssz<UsageRow>(value).total.requests; });
+      return total;
+   }
+}  // namespace
+
+// The flush runs on the chain thread and writes through the subjective root
+// under the subjective write lock, while run-queue and HTTP threads commit
+// subjective transactions and socket rows through the same root. Neither
+// side may lose anything: every count charged must be in the usage table,
+// and every row the other threads committed must be there.
+//
+// USAGE_RACE_ROUNDS repeats it (default 1).
+TEST_CASE("usage meter: a flush racing subjective commits loses nothing on either side")
+{
+   unsigned rounds = 1;
+   if (auto env = std::getenv("USAGE_RACE_ROUNDS"))
+      rounds = static_cast<unsigned>(std::atoi(env));
+   for (unsigned round = 0; round < rounds; ++round)
+   {
+      TempDirectory  dir;
+      SharedDatabase shared(dir.path / "db", dbConfig, psibase::storage::open_mode::create_new);
+      UsageMeter     meter;
+      auto           identities = manyIdentities(100);
+      constexpr unsigned writers = 3, commits = 120, chargers = 2, charges = 4000;
+      std::atomic<bool>          failed{false};
+      std::atomic<unsigned>      running{writers + chargers + 1};
+      std::atomic<std::uint64_t> conflicts{0};
+      std::vector<std::thread>   threads;
+
+      // Services on run-queue threads: subjective transactions (optimistic,
+      // retried on conflict) that write a service row and a native row, the
+      // way x-run posts a run.
+      for (unsigned t = 0; t < writers; ++t)
+         threads.emplace_back(
+             [&, t]
+             {
+                auto               writer = shared.createWriter();
+                Sockets            sockets(shared);
+                SocketAutoCloseSet closing;
+                Database           db(shared, shared.emptyRevision());
+                auto               session = db.startWrite(writer);
+                for (unsigned i = 0; i < commits; ++i)
+                {
+                   auto key   = "svc-" + std::to_string(t) + "-" + std::to_string(i);
+                   auto run   = "\x7f run-" + std::to_string(t) + "-" + std::to_string(i);
+                   auto value = std::to_string(i);
+                   db.checkoutSubjective();
+                   do
+                   {
+                      // Every transaction also rewrites one shared row, so
+                      // transactions really conflict. A refused commit
+                      // leaves the transaction open on the current state.
+                      db.kvPutRaw(DbId::subjective, bytes("shared"), bytes(key));
+                      db.kvPutRaw(DbId::subjective, bytes(key), bytes(value));
+                      db.kvPutRaw(DbId::nativeSubjective, bytes(run), bytes(value));
+                   } while (!db.commitSubjective(sockets, closing) && ++conflicts);
+                }
+                --running;
+             });
+      // The HTTP layer: socket rows written and removed directly
+      threads.emplace_back(
+          [&]
+          {
+             auto writer = shared.createWriter();
+             for (unsigned i = 0; i < 400; ++i)
+             {
+                auto key = "\x7f sock-" + std::to_string(i);
+                shared.kvPutSubjective(*writer, DbId::nativeSession, bytes(key), bytes("s"));
+                if (i % 2)
+                   shared.kvRemoveSubjective(*writer, DbId::nativeSession, bytes(key));
+             }
+             --running;
+          });
+      // Requests being counted
+      for (unsigned t = 0; t < chargers; ++t)
+         threads.emplace_back(
+             [&, t]
+             {
+                for (unsigned i = 0; i < charges; ++i)
+                   meter.find(identities[(i * 7 + t) % identities.size()])
+                       ->add(UsageField::requests, 1);
+                --running;
+             });
+      // The chain thread: flush after flush, in slices as psinode does
+      {
+         auto writer = shared.createWriter();
+         while (running)
+         {
+            meter.prepareFlush();
+            meter.writeFlush(shared, *writer, UsageMeter::batchRows);
+         }
+         for (auto& thread : threads)
+            thread.join();
+         meter.writeFlush(shared, *writer);
+         meter.flush(shared, *writer);
+
+         CHECK(sumRequests(shared, *writer) == std::uint64_t{chargers} * charges);
+         for (unsigned t = 0; t < writers; ++t)
+            for (unsigned i = 0; i < commits; ++i)
+            {
+               auto key = "svc-" + std::to_string(t) + "-" + std::to_string(i);
+               auto run = "\x7f run-" + std::to_string(t) + "-" + std::to_string(i);
+               auto a   = shared.kvGetSubjective(*writer, DbId::subjective, bytes(key));
+               auto b   = shared.kvGetSubjective(*writer, DbId::nativeSubjective, bytes(run));
+               if (!a || !b || std::string(a->begin(), a->end()) != std::to_string(i))
+                  failed = true;
+            }
+         for (unsigned i = 0; i < 400; ++i)
+         {
+            auto key = "\x7f sock-" + std::to_string(i);
+            auto row = shared.kvGetSubjective(*writer, DbId::nativeSession, bytes(key));
+            if (row.has_value() != (i % 2 == 0))
+               failed = true;
+         }
+         CHECK(!failed);
+         // The rows of other tables are untouched by a reload of the meter
+         UsageMeter again;
+         again.load(shared, *writer);
+         CHECK(sum(again.rows()).requests == std::uint64_t{chargers} * charges);
+         CHECK(shared.kvGetSubjective(*writer, DbId::nativeSubjective, bytes("\x7f run-0-0")));
+      }
+   }
+}
+
+// Not part of the suite: UsageMeterTests "[.bench]". How long a flush is,
+// how long it holds the subjective write lock, and what another subjective
+// writer sees meanwhile.
+TEST_CASE("usage meter: flush cost", "[.bench]")
+{
+   TempDirectory  dir;
+   SharedDatabase shared(dir.path / "db", dbConfig, psibase::storage::open_mode::create_new);
+   auto           writer = shared.createWriter();
+   UsageMeter     meter;  // default bound: 4096 records per kind
+   auto           identities = manyIdentities(meter.settings().maxRecords);
+   std::vector<UsageHandle> handles;
+   for (const auto& identity : identities)
+      handles.push_back(meter.find(identity));
+
+   // Another subjective writer (a run-queue thread committing, a socket
+   // being added): how long its writes take while the flush runs.
+   std::atomic<bool>         stop{false};
+   std::atomic<bool>         measuring{false};
+   std::atomic<std::int64_t> worstPut{0}, worstCommit{0};
+   std::thread               other{
+       [&]
+       {
+          auto               mine = shared.createWriter();
+          Sockets            sockets(shared);
+          SocketAutoCloseSet closing;
+          Database           db(shared, shared.emptyRevision());
+          auto               session = db.startWrite(mine);
+          unsigned           i       = 0;
+          auto               record  = [&](std::atomic<std::int64_t>& worst, auto start)
+          {
+             auto t = (std::chrono::steady_clock::now() - start).count();
+             if (measuring && t > worst)
+                worst = t;
+          };
+          while (!stop)
+          {
+             auto key   = "other-" + std::to_string(i++ % 64);
+             auto start = std::chrono::steady_clock::now();
+             shared.kvPutSubjective(*mine, DbId::nativeSession, bytes(key), bytes("x"));
+             record(worstPut, start);
+             start = std::chrono::steady_clock::now();
+             db.checkoutSubjective();
+             db.kvPutRaw(DbId::subjective, bytes(key), bytes("y"));
+             db.commitSubjective(sockets, closing);
+             record(worstCommit, start);
+          }
+       }};
+
+   auto dirty = [&](std::size_t n)
+   {
+      for (std::size_t i = 0; i < n; ++i)
+         handles[i * (handles.size() / n)]->add(UsageField::requests, 1);
+   };
+   auto baseline = [&]
+   {
+      worstPut = worstCommit = 0;
+      measuring              = true;
+      std::this_thread::sleep_for(std::chrono::milliseconds(300));
+      measuring = false;
+      std::printf("%-44s other writer worst: put %.3f ms, subjective commit %.3f ms\n",
+                  "no flush (300 ms)", worstPut / 1e6, worstCommit / 1e6);
+   };
+   auto whole = [&](const char* label)
+   {
+      worstPut = worstCommit = 0;
+      measuring              = true;
+      auto start             = std::chrono::steady_clock::now();
+      auto r                 = meter.flush(shared, *writer);
+      auto total             = std::chrono::steady_clock::now() - start;
+      measuring              = false;
+      std::printf("%-44s rows %5zu  total %8.3f ms (collect %.3f, write %.3f in %zu batches, "
+                  "longest batch %.3f)  other writer worst: put %.3f ms, commit %.3f ms\n",
+                  label, r.written, ms(total), ms(r.collectTime), ms(r.writeTime), r.batches,
+                  ms(r.maxBatchTime), worstPut / 1e6, worstCommit / 1e6);
+   };
+   // As psinode does it: at most `rows` per task of the chain thread
+   auto sliced = [&](const char* label, std::size_t rows)
+   {
+      worstPut = worstCommit = 0;
+      measuring              = true;
+      std::chrono::nanoseconds worstSlice{0}, all{0};
+      std::size_t              slices = 0, written = 0;
+      std::chrono::nanoseconds prepare{0};
+      meter.prepareFlush(&prepare);  // on the timekeeping thread in psinode
+      for (;;)
+      {
+         auto start = std::chrono::steady_clock::now();
+         auto r     = meter.writeFlush(shared, *writer, rows);
+         auto t     = std::chrono::steady_clock::now() - start;
+         worstSlice = std::max<std::chrono::nanoseconds>(worstSlice, t);
+         all += t;
+         ++slices;
+         written += r.written;
+         if (!r.remaining)
+            break;
+         std::this_thread::yield();
+      }
+      measuring = false;
+      std::printf("%-44s rows %5zu  prepare %.3f ms (off the chain thread), write %8.3f ms in "
+                  "%zu slices, longest slice (chain thread stall) %.3f ms  other writer worst: "
+                  "put %.3f ms, commit %.3f ms\n",
+                  label, written, ms(prepare), ms(all), slices, ms(worstSlice), worstPut / 1e6,
+                  worstCommit / 1e6);
+   };
+
+   baseline();
+   dirty(handles.size());
+   whole("full, first write (insert), one go");
+   for (int i = 0; i < 3; ++i)
+   {
+      dirty(handles.size());
+      whole("full, all dirty (update), one go");
+   }
+   for (int i = 0; i < 3; ++i)
+   {
+      dirty(handles.size());
+      sliced("full, all dirty, 128 rows per slice", 128);
+   }
+   for (int i = 0; i < 3; ++i)
+   {
+      dirty(200);
+      whole("200 dirty, one go");
+   }
+   for (int i = 0; i < 3; ++i)
+   {
+      dirty(200);
+      sliced("200 dirty, 128 rows per slice", 128);
+   }
+   baseline();
+   stop = true;
+   other.join();
+   CHECK(sumRequests(shared, *writer) == handles.size() * 7 + 200 * 6);
 }

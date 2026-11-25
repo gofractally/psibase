@@ -707,34 +707,37 @@ void write_om_usage(const std::vector<psibase::UsageMeter::KindTotal>& totals, a
 //
 // The writing is done on the chain thread, the thread that owns `ctx`,
 // which reads and writes the database already: the storage engine has a
-// fixed number of session slots, one per thread that touches the database,
-// and aborts when they run out (gofractally/psibase#2273), so metering
-// must not bring a thread of its own to the database. The thread here only
-// keeps time; it never touches storage.
+// limited number of session slots and metering must not bring a thread of
+// its own to the database (gofractally/psibase#2273). The chain thread also
+// produces blocks, so it is given as little as possible: the thread here
+// keeps time and prepares the rows (no storage), and the chain thread
+// writes them one batch of 128 per task, with whatever else it has to do in
+// between. Measured (UsageMeterTests "[.bench]"): a batch is well under a
+// millisecond; every record of a full table dirty is about 85 batches.
 struct UsageFlusher
 {
    UsageFlusher(boost::asio::io_context&             ctx,
                 psibase::SharedDatabase              db,
                 std::shared_ptr<psibase::UsageMeter> meter)
-       : db(std::move(db)), meter(std::move(meter))
+       : ctx(ctx), db(std::move(db)), meter(std::move(meter))
    {
       if (!this->meter->enabled())
          return;
       auto interval =
           std::chrono::seconds(std::max<std::uint64_t>(this->meter->settings().flushSeconds, 1));
-      ticker = std::jthread{[this, &ctx, interval]
+      ticker = std::jthread{[this, interval]
                             {
                                std::unique_lock l{mutex};
                                while (!cond.wait_for(l, interval, [this] { return done; }))
                                {
-                                  // One at a time: a busy chain thread is not
-                                  // given a queue of flushes.
-                                  if (!pending.exchange(true))
-                                     boost::asio::post(ctx, [this]
-                                                       {
-                                                          pending = false;
-                                                          flush();
-                                                       });
+                                  // One flush at a time: a busy chain thread
+                                  // is not given a queue of them.
+                                  if (writing.exchange(true))
+                                     continue;
+                                  if (this->meter->prepareFlush())
+                                     boost::asio::post(this->ctx, [this] { writeBatch(); });
+                                  else
+                                     writing = false;
                                }
                             }};
    }
@@ -749,14 +752,13 @@ struct UsageFlusher
       cond.notify_one();
       if (ticker.joinable())
          ticker.join();
-      if (meter->enabled())
-         flush();
-   }
-   void flush()
-   {
+      if (!meter->enabled())
+         return;
       try
       {
          auto writer = db.createWriter();
+         // What was prepared and not written, then what was counted since
+         meter->writeFlush(db, *writer);
          meter->flush(db, *writer);
       }
       catch (std::exception& e)
@@ -765,12 +767,32 @@ struct UsageFlusher
              << "Usage counters not written: " << e.what();
       }
    }
+   // On the chain thread
+   void writeBatch()
+   {
+      try
+      {
+         auto writer = db.createWriter();
+         if (meter->writeFlush(db, *writer, psibase::UsageMeter::batchRows).remaining)
+         {
+            boost::asio::post(ctx, [this] { writeBatch(); });
+            return;
+         }
+      }
+      catch (std::exception& e)
+      {
+         PSIBASE_LOG(psibase::loggers::generic::get(), warning)
+             << "Usage counters not written: " << e.what();
+      }
+      writing = false;
+   }
+   boost::asio::io_context&             ctx;
    psibase::SharedDatabase              db;
    std::shared_ptr<psibase::UsageMeter> meter;
    std::condition_variable              cond;
    std::mutex                           mutex;
    bool                                 done = false;
-   std::atomic<bool>                    pending{false};
+   std::atomic<bool>                    writing{false};
    std::jthread                         ticker;
 };
 

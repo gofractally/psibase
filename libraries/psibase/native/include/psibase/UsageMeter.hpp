@@ -148,7 +148,36 @@ namespace psibase
       //   is harmless and a crash loses at most one interval).
       void load(SharedDatabase& db, Writer& writer);
       void publishSettings(SharedDatabase& db, Writer& writer);
-      void flush(SharedDatabase& db, Writer& writer);
+      //
+      // A flush has two halves, so that the thread that owns the database
+      // session is held as briefly as possible:
+      //
+      // prepareFlush: gathers what changed and serializes it. Uses no
+      //   storage and may run on any one thread. Does nothing while rows
+      //   of an earlier flush are still unwritten. Returns how many rows
+      //   wait to be written.
+      // writeFlush: writes at most maxRows of them, in batches of 128 (one
+      //   acquisition of the subjective write lock each), and says how
+      //   many are left. psinode writes one batch per task of the chain
+      //   thread, so the chain thread is never held for more than a batch.
+      // flush: both, everything.
+      struct FlushResult
+      {
+         std::size_t written   = 0;
+         std::size_t remaining = 0;
+         std::size_t batches   = 0;
+         // prepareFlush (no storage, no subjective lock); set by flush()
+         std::chrono::nanoseconds collectTime{0};
+         // Writing: all batches, and the longest one. A batch holds the
+         // subjective write lock for its whole duration.
+         std::chrono::nanoseconds writeTime{0};
+         std::chrono::nanoseconds maxBatchTime{0};
+      };
+      static constexpr std::size_t allRows   = ~std::size_t{0};
+      static constexpr std::size_t batchRows = 128;
+      std::size_t prepareFlush(std::chrono::nanoseconds* time = nullptr);
+      FlushResult writeFlush(SharedDatabase& db, Writer& writer, std::size_t maxRows = allRows);
+      FlushResult flush(SharedDatabase& db, Writer& writer);
 
       // The same without storage (tests): returns the rows a flush would
       // write and the identities it would remove.
@@ -202,6 +231,9 @@ namespace psibase
       // Guards the flush state of every record and detached_.
       std::mutex               flushMutex_;
       std::vector<UsageHandle> detached_;
+      // Rows prepared and not yet written
+      std::mutex                                   pendingMutex_;
+      std::vector<SharedDatabase::SubjectiveWrite> pending_;
 
       std::mutex                                     runMutex_;
       // Ordered: run ids grow, so the first entry is the oldest.

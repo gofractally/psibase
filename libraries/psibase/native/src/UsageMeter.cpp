@@ -402,29 +402,57 @@ namespace psibase
       db.kvPutSubjective(writer, UsageConfigRow::db, psio::to_key(row.key()), psio::to_pssz(row));
    }
 
-   void UsageMeter::flush(SharedDatabase& db, Writer& writer)
+   std::size_t UsageMeter::prepareFlush(std::chrono::nanoseconds* time)
    {
-      auto changes = collect();
-      std::vector<SharedDatabase::SubjectiveWrite> writes;
-      auto                                         send = [&]
+      using Clock = std::chrono::steady_clock;
+      std::lock_guard l{pendingMutex_};
+      if (pending_.empty())
       {
-         db.kvWriteSubjective(writer, UsageRow::db, writes);
-         writes.clear();
-      };
-      // Removals first: an identity that was dropped and came back within
-      // one flush has both, and its new row must be the one that stays.
-      for (const auto& identity : changes.removed)
-      {
-         writes.push_back({psio::to_key(usageKey(identity)), std::nullopt});
-         if (writes.size() >= flushBatch)
-            send();
+         auto start   = Clock::now();
+         auto changes = collect();
+         // Removals first: an identity that was dropped and came back within
+         // one flush has both, and its new row must be the one that stays.
+         for (const auto& identity : changes.removed)
+            pending_.push_back({psio::to_key(usageKey(identity)), std::nullopt});
+         for (const auto& row : changes.rows)
+            pending_.push_back({psio::to_key(row.key()), psio::to_pssz(row)});
+         if (time)
+            *time = Clock::now() - start;
       }
-      for (const auto& row : changes.rows)
+      return pending_.size();
+   }
+
+   UsageMeter::FlushResult UsageMeter::writeFlush(SharedDatabase& db,
+                                                  Writer&         writer,
+                                                  std::size_t     maxRows)
+   {
+      using Clock = std::chrono::steady_clock;
+      FlushResult     result;
+      std::lock_guard l{pendingMutex_};
+      std::size_t     pos = 0;
+      while (pos < pending_.size() && result.written < maxRows)
       {
-         writes.push_back({psio::to_key(row.key()), psio::to_pssz(row)});
-         if (writes.size() >= flushBatch)
-            send();
+         auto n = std::min({flushBatch, pending_.size() - pos, maxRows - result.written});
+         auto start = Clock::now();
+         db.kvWriteSubjective(writer, UsageRow::db, std::span{pending_}.subspan(pos, n));
+         auto time = Clock::now() - start;
+         result.writeTime += time;
+         result.maxBatchTime = std::max<std::chrono::nanoseconds>(result.maxBatchTime, time);
+         ++result.batches;
+         result.written += n;
+         pos += n;
       }
-      send();
+      pending_.erase(pending_.begin(), pending_.begin() + pos);
+      result.remaining = pending_.size();
+      return result;
+   }
+
+   UsageMeter::FlushResult UsageMeter::flush(SharedDatabase& db, Writer& writer)
+   {
+      std::chrono::nanoseconds collectTime{0};
+      prepareFlush(&collectTime);
+      auto result        = writeFlush(db, writer);
+      result.collectTime = collectTime;
+      return result;
    }
 }  // namespace psibase
