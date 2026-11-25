@@ -82,6 +82,9 @@ namespace psibase::vm
                                               Memory&             memory,
                                               Cache&              cache,
                                               AccountNumber       service);
+      // Whether the engine can run services with debugging support (see
+      // serviceDebugging). Its caches read that setting when they are made.
+      bool serviceDebugging = false;
    };
 
    // The engines in this build. The first is the default.
@@ -95,6 +98,21 @@ namespace psibase::vm
    // Selects an engine by name. Throws if this build does not have it. Affects
    // WasmCaches created afterwards; existing ones keep the engine they have.
    void select(std::string_view name);
+
+   // Whether services run with debugging support: when a service fails, the
+   // node logs where in the service it was, and compiled services are
+   // registered with a debugger attached to the node (gdb, lldb). Off unless
+   // the node's operator turns it on, initially through the
+   // PSIBASE_DEBUG_SERVICES environment variable. Like the engine, this is a
+   // property of the node and never of the chain: a node that debugs computes
+   // exactly what one that does not computes, and nothing it adds reaches a
+   // block, the state or a transaction trace.
+   bool serviceDebugging();
+
+   // Affects WasmCaches created afterwards; existing ones keep what they
+   // have. Creating a WasmCache then throws if the selected engine has no
+   // debugging support.
+   void setServiceDebugging(bool enabled);
 
    // The engine a WasmCache was created with.
    const Engine& engineOf(const WasmCache& cache);

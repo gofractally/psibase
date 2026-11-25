@@ -3,14 +3,16 @@
 // wasmtime (Cranelift) executes; psizam decides what may execute. Every
 // service still passes validateNativeWasm and psizam's parser under
 // NativeVMOptions, so limits and enabled proposals are the chain policy. That
-// parse also yields psizam's per-function stack costs, which are compiled into
-// the module so the stack-overflow point is the same as on psizam's engines.
+// parse also yields psizam's per-function stack costs, which wasmtime's
+// compiler enforces so the stack-overflow point is the same as on psizam's
+// engines. The module itself is compiled as deployed: nothing rewrites it.
 //
 // ExecutionContext.cpp is the psizam counterpart of this file.
 
 #include <psibase/NativeFunctions.hpp>
 
 #include <atomic>
+#include <cstdio>
 #include <list>
 #include <map>
 #include <mutex>
@@ -53,8 +55,9 @@ namespace psibase::vm_wasmtime
    {
       // Native stack for wasm, per executing thread. The byte budget
       // (max_stack_bytes) must run out long before this does: a frame was
-      // measured at up to 1.33 native bytes per budget byte, and each nested
-      // service call adds host frames on top.
+      // measured at up to 1.72 native bytes per budget byte (psizam's
+      // "byte budget ends recursion before the native stack can" test), and
+      // each nested service call adds host frames on top.
       constexpr std::uint64_t nativeStackBytes     = std::uint64_t(256) << 20;
       constexpr std::uint64_t nativeBytesPerBudget = 16;
 
@@ -73,7 +76,16 @@ namespace psibase::vm_wasmtime
          return count;
       }
 
-      wt::engine_options engineOptions(psizam::float_profile profile, bool pooled = false)
+      // The innermost frames kept of a failed call's stack. A stack overflow is
+      // thousands of frames deep and every one kept is looked up and logged.
+      constexpr std::uint32_t backtraceFrames = 128;
+
+      // `debug` is vm::serviceDebugging() as the WasmCache found it. It only
+      // adds what a developer can observe from outside the chain: the code it
+      // compiles differs, what that code computes does not.
+      wt::engine_options engineOptions(psizam::float_profile profile,
+                                       bool                  debug,
+                                       bool                  pooled = false)
       {
          wt::engine_options o;
          // Mirrors NativeVMOptions; psizam's validator has the final word.
@@ -86,6 +98,13 @@ namespace psibase::vm_wasmtime
                                     : wt::float_profile::performance;
          o.native_stack       = nativeStackBytes;
          o.epoch_interruption = true;
+         if (debug)
+         {
+            o.backtrace            = true;
+            o.backtrace_details    = true;
+            o.backtrace_max_frames = backtraceFrames;
+            o.debug_info           = true;
+         }
          if (pooled)
          {
             o.pool_instances      = pooledInstances();
@@ -98,39 +117,46 @@ namespace psibase::vm_wasmtime
       // under comes from the version its code was deployed with.
       // Modules are compiled and instantiated here: instances come from the
       // engine's pool of slots.
-      wt::runtime<ExecutionContextImpl> pooledRuntime(psizam::float_profile profile)
+      wt::runtime<ExecutionContextImpl> pooledRuntime(psizam::float_profile profile, bool debug)
       {
          try
          {
-            return wt::runtime<ExecutionContextImpl>{engineOptions(profile, true)};
+            return wt::runtime<ExecutionContextImpl>{engineOptions(profile, debug, true)};
          }
          catch (const wt::error&)
          {
             // The pool reserves address space for every slot up front. Where
             // the system refuses that, instances are created one at a time.
-            return wt::runtime<ExecutionContextImpl>{engineOptions(profile)};
+            return wt::runtime<ExecutionContextImpl>{engineOptions(profile, debug)};
          }
       }
 
-      wt::runtime<ExecutionContextImpl>& vmRuntime(psizam::float_profile profile)
+      // The engines of one debugging mode. Debugging is a property of an
+      // engine, so services being debugged run on engines of their own.
+      struct Runtimes
       {
-         static wt::runtime<ExecutionContextImpl> strict =
-             pooledRuntime(psizam::float_profile::strict);
-         static wt::runtime<ExecutionContextImpl> performance =
-             pooledRuntime(psizam::float_profile::performance);
-         return profile == psizam::float_profile::strict ? strict : performance;
-      }
+         wt::runtime<ExecutionContextImpl> pooledStrict;
+         wt::runtime<ExecutionContextImpl> pooledPerformance;
+         // The same engines without a pool, for an instance the pool cannot
+         // provide. They run the same compiled code.
+         wt::runtime<ExecutionContextImpl> unpooledStrict;
+         wt::runtime<ExecutionContextImpl> unpooledPerformance;
 
-      // The same engine without a pool, for an instance the pool cannot
-      // provide. It runs the same compiled code.
-      wt::runtime<ExecutionContextImpl>& unpooledRuntime(psizam::float_profile profile)
-      {
-         static wt::runtime<ExecutionContextImpl> strict{
-             engineOptions(psizam::float_profile::strict)};
-         static wt::runtime<ExecutionContextImpl> performance{
-             engineOptions(psizam::float_profile::performance)};
-         return profile == psizam::float_profile::strict ? strict : performance;
-      }
+         // Links the host functions into every engine.
+         explicit Runtimes(bool debug);
+
+         wt::runtime<ExecutionContextImpl>& pooled(psizam::float_profile profile)
+         {
+            return profile == psizam::float_profile::strict ? pooledStrict : pooledPerformance;
+         }
+         wt::runtime<ExecutionContextImpl>& unpooled(psizam::float_profile profile)
+         {
+            return profile == psizam::float_profile::strict ? unpooledStrict : unpooledPerformance;
+         }
+      };
+
+      // Made at first use, so a node that never debugs has no debugging engines.
+      Runtimes& runtimes(bool debug);
    }  // namespace
 
    // Compiled modules, most recently used last. A wasmtime module is shared:
@@ -158,6 +184,9 @@ namespace psibase::vm_wasmtime
       std::shared_ptr<NativeAotCache>              artifacts;
       std::atomic<std::uint64_t>                   compiled{0};
       std::atomic<std::uint64_t>                   loaded{0};
+      // Whether the services of this cache run with debugging support. Fixed
+      // for the cache's lifetime: its modules belong to that mode's engines.
+      const bool                                   debug = vm::serviceDebugging();
 
       WasmCacheImpl(std::uint32_t cacheSize, std::shared_ptr<NativeAotCache> store)
           : cacheSize{cacheSize},
@@ -167,16 +196,21 @@ namespace psibase::vm_wasmtime
 
       // Everything that determines the compiled code: the service, the chain
       // limits it was admitted and metered under, the engine's proposal set
-      // and float profile, and the wasmtime build.
-      static NativeAotCache::Key artifactKey(const Checksum256&    hash,
-                                             const VMOptions&      vmOptions,
-                                             std::uint8_t          vmVersion,
-                                             psizam::float_profile profile)
+      // and float profile, the debugging options that change what is
+      // compiled, and the wasmtime build.
+      NativeAotCache::Key artifactKey(const Checksum256&    hash,
+                                      const VMOptions&      vmOptions,
+                                      std::uint8_t          vmVersion,
+                                      psizam::float_profile profile) const
       {
-         auto options = engineOptions(profile);
+         auto options = engineOptions(profile, debug);
          auto digest  = sha256(std::tuple{
-             std::string("psibase-wasmtime-artifact-v2"), hash, vmOptions, vmVersion,
-             options.features, std::uint32_t(options.fp), std::string(wt::build_identity())});
+             std::string("psibase-wasmtime-artifact-v4"), hash, vmOptions, vmVersion,
+             options.features, std::uint32_t(options.fp),
+             // Service debugging: the two debugging options an artifact is
+             // tied to. A runtime only loads artifacts made with the same.
+             options.backtrace_details, options.debug_info,
+             std::string(wt::build_identity())});
          NativeAotCache::Key key;
          std::copy(digest.begin(), digest.end(), key.begin());
          return key;
@@ -205,7 +239,7 @@ namespace psibase::vm_wasmtime
             if (auto stored = artifacts->load(key))
                try
                {
-                  auto module = vmRuntime(profile).load(std::span(
+                  auto module = runtimes(debug).pooled(profile).load(std::span(
                       reinterpret_cast<const std::uint8_t*>(stored->data()), stored->size()));
                   ++loaded;
                   PSIBASE_LOG(loggers::generic::get(), debug)
@@ -221,7 +255,7 @@ namespace psibase::vm_wasmtime
          // the psizam engines apply before they compile.
          const std::span<const std::uint8_t> wasm  = code();
          const auto                          costs = admitNativeWasm(wasm, vmOptions, vmVersion);
-         auto module = vmRuntime(profile).compile_metered(wasm, costs);
+         auto module = runtimes(debug).pooled(profile).compile_metered(wasm, costs);
          ++compiled;
          std::size_t stored = 0;
          if (artifacts)
@@ -265,7 +299,7 @@ namespace psibase::vm_wasmtime
                return *it->second->unpooled;
          }
          const auto artifact = module.serialize();
-         auto       loaded   = unpooledRuntime(profile).load(artifact);
+         auto       loaded   = runtimes(debug).unpooled(profile).load(artifact);
          std::lock_guard lock{mutex};
          auto            it = index.find(key);
          if (it != index.end() && !it->second->unpooled)
@@ -464,7 +498,7 @@ namespace psibase::vm_wasmtime
          };
          try
          {
-            instance.emplace(vmRuntime(floatProfile), *module, *this, limits);
+            instance.emplace(runtimes(cache.debug).pooled(floatProfile), *module, *this, limits);
          }
          catch (const wt::instantiation_error&)
          {
@@ -474,7 +508,8 @@ namespace psibase::vm_wasmtime
             // reports why none can be created.
             module = cache.unpooled(code.codeHash, vmOptions, code.vmVersion, floatProfile,
                                     *module);
-            instance.emplace(unpooledRuntime(floatProfile), *module, *this, limits);
+            instance.emplace(runtimes(cache.debug).unpooled(floatProfile), *module, *this,
+                             limits);
          }
          {
             std::lock_guard lock{interruptMutex};
@@ -531,16 +566,62 @@ namespace psibase::vm_wasmtime
          }
          catch (const accounting::Cancelled&)
          {
+            logFailureBacktrace();
             // A synchronous storage check can observe expiry before the
             // watchdog thread has delivered asyncTimeout to this VM.
             throw TimeoutException{};
          }
          catch (...)
          {
+            logFailureBacktrace();
             if (timedOut)
                throw TimeoutException{};
             throw;
          }
+      }
+
+      // Tells the developer at this node where in the service the call that
+      // just failed was (psizam keeps no frames of an earlier call). Each service on the call path logs its own frames as
+      // the failure passes through it, the one that failed first. This goes to
+      // the log and nowhere else: traces and state are compared between nodes,
+      // and most of them do not debug.
+      void logFailureBacktrace()
+      {
+         if (!cache.debug || !instance)
+            return;
+         const auto frames = instance->failure_backtrace();
+         if (frames.empty())
+            return;
+         std::string text;
+         for (std::size_t i = 0; i < frames.size(); ++i)
+         {
+            const auto& frame = frames[i];
+            text += "\n  " + std::to_string(i) + ": " +
+                    (frame.function_name.empty() ? "<unnamed>" : frame.function_name) + " (" +
+                    std::to_string(frame.function_index) + ")";
+            if (frame.module_offset)
+            {
+               char offset[32];
+               std::snprintf(offset, sizeof(offset), " +0x%llx",
+                             static_cast<unsigned long long>(*frame.module_offset));
+               text += offset;
+            }
+            if (!frame.file.empty())
+               text += " at " + frame.file + ":" + std::to_string(frame.line);
+            // Runaway recursion is the same frame over and over.
+            std::size_t same = 0;
+            while (i + 1 < frames.size() &&
+                   frames[i + 1].function_index == frame.function_index &&
+                   frames[i + 1].module_offset == frame.module_offset)
+               ++i, ++same;
+            if (same)
+               text += " (and " + std::to_string(same) + " more of the same)";
+         }
+         if (frames.size() == backtraceFrames)
+            text += "\n  (outer frames not shown)";
+         PSIBASE_LOG(loggers::generic::get(), warning)
+             << "service " << code.codeNum.str() << " failed here (wasm frames, innermost first):"
+             << text;
       }
 
       void onTransferControl(std::uint64_t callerFlags)
@@ -558,58 +639,70 @@ namespace psibase::vm_wasmtime
       void          asyncTimeout() override;
    };  // ExecutionContextImpl
 
+   namespace
+   {
+      Runtimes::Runtimes(bool debug)
+          : pooledStrict{pooledRuntime(psizam::float_profile::strict, debug)},
+            pooledPerformance{pooledRuntime(psizam::float_profile::performance, debug)},
+            unpooledStrict{engineOptions(psizam::float_profile::strict, debug)},
+            unpooledPerformance{engineOptions(psizam::float_profile::performance, debug)}
+      {
+         // The list every engine registers and admission checks imports
+         // against (NativeHostFunctions.hpp). The signature wasmtime derives
+         // for each must be the admission table's, or the node does not
+         // start.
+         auto check = [](const wt::abi::PzwtImport& import)
+         {
+            auto encoded = [](const std::uint8_t* types, std::size_t count)
+            {
+               // wasmtime_backend.hpp numbers i32, i64, f32, f64 from 0; a
+               // module encodes them as 0x7f down to 0x7c.
+               std::vector<std::uint8_t> result;
+               for (std::size_t i = 0; i < count; ++i)
+                  result.push_back(static_cast<std::uint8_t>(0x7f - types[i]));
+               return result;
+            };
+            checkNativeHostFunction("wasmtime", {import.name, import.name_len},
+                                    encoded(import.params, import.params_len),
+                                    encoded(import.results, import.results_len));
+         };
+         std::size_t count = 0;
+#define PSIBASE_HOST_FUNCTION(name)                                                  \
+   check(wt::detail::make_import<ExecutionContextImpl, &ExecutionContextImpl::name>( \
+       &ExecutionContextImpl::name, "env", #name));                                  \
+   ++count;
+         PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+#undef PSIBASE_HOST_FUNCTION
+         checkNativeHostFunctionCount("wasmtime", count);
+         // Both engines of a profile import the same host functions.
+         for (auto* runtime :
+              {&pooledStrict, &pooledPerformance, &unpooledStrict, &unpooledPerformance})
+         {
+            auto& rt = *runtime;
+#define PSIBASE_HOST_FUNCTION(name) rt.add<&ExecutionContextImpl::name>("env", #name);
+            PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+#undef PSIBASE_HOST_FUNCTION
+            rt.link();
+         }
+      }
+
+      Runtimes& runtimes(bool debug)
+      {
+         if (debug)
+         {
+            static Runtimes debugging{true};
+            return debugging;
+         }
+         static Runtimes plain{false};
+         return plain;
+      }
+   }  // namespace
+
+   // Makes the engines the node is about to use, so that one it cannot make
+   // stops the node as it starts rather than at its first transaction.
    static void registerHostFunctions()
    {
-      static std::once_flag once;
-      std::call_once(
-          once,
-          []
-          {
-             // Both engines of a profile import the same host functions.
-             const auto profiles = {psizam::float_profile::strict,
-                                    psizam::float_profile::performance};
-             std::vector<wt::runtime<ExecutionContextImpl>*> runtimes;
-             for (auto profile : profiles)
-             {
-                runtimes.push_back(&vmRuntime(profile));
-                runtimes.push_back(&unpooledRuntime(profile));
-             }
-             // The list every engine registers and admission checks imports
-             // against (NativeHostFunctions.hpp). The signature wasmtime
-             // derives for each must be the admission table's, or the node
-             // does not start.
-             auto check = [](const wt::abi::PzwtImport& import)
-             {
-                auto encoded = [](const std::uint8_t* types, std::size_t count)
-                {
-                   // wasmtime_backend.hpp numbers i32, i64, f32, f64 from 0;
-                   // a module encodes them as 0x7f down to 0x7c.
-                   std::vector<std::uint8_t> result;
-                   for (std::size_t i = 0; i < count; ++i)
-                      result.push_back(static_cast<std::uint8_t>(0x7f - types[i]));
-                   return result;
-                };
-                checkNativeHostFunction("wasmtime", {import.name, import.name_len},
-                                        encoded(import.params, import.params_len),
-                                        encoded(import.results, import.results_len));
-             };
-             std::size_t count = 0;
-#define PSIBASE_HOST_FUNCTION(name)                                                          \
-   check(wt::detail::make_import<ExecutionContextImpl, &ExecutionContextImpl::name>(         \
-       &ExecutionContextImpl::name, "env", #name));                                          \
-   ++count;
-             PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
-#undef PSIBASE_HOST_FUNCTION
-             checkNativeHostFunctionCount("wasmtime", count);
-             for (auto* runtime : runtimes)
-             {
-                auto& rt = *runtime;
-#define PSIBASE_HOST_FUNCTION(name) rt.add<&ExecutionContextImpl::name>("env", #name);
-                PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
-#undef PSIBASE_HOST_FUNCTION
-                rt.link();
-             }
-          });
+      runtimes(vm::serviceDebugging());
    }
 
    std::uint32_t ExecutionContextImpl::remainingStack() const
@@ -678,7 +771,8 @@ namespace psibase::vm_wasmtime
           {
              return std::make_unique<ExecutionContextImpl>(
                  transactionContext, vmOptions, static_cast<WasmCacheImpl&>(cache), service);
-          }};
+          },
+          true};
       return result;
    }
 }  // namespace psibase::vm_wasmtime

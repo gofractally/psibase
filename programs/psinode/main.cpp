@@ -2129,6 +2129,20 @@ int main(int argc, char* argv[])
           ("Execution engine for services. This build has: " + engines +
            ". Default: the first, or PSIBASE_VM_ENGINE")
               .c_str());
+      // Also of this node only: a node that debugs computes what the others
+      // compute, so one node of a live network can debug while the rest do not.
+      engine_opts.add_options()(
+          "debug-services",
+          po::bool_switch()->notifier(
+              [](bool enabled)
+              {
+                 // Absent, the option leaves PSIBASE_DEBUG_SERVICES in charge.
+                 if (enabled)
+                    psibase::vm::setServiceDebugging(true);
+              }),
+          "Run services with debugging support: log where in a service a failed call was, and "
+          "register compiled services with an attached debugger (gdb, lldb). Slower. Needs the "
+          "wasmtime engine. Default: off, or PSIBASE_DEBUG_SERVICES");
    }
    desc.add(engine_opts);
 

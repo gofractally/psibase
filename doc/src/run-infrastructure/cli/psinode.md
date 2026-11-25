@@ -62,6 +62,17 @@ psinode - The psibase blockchain server
 
   When creating new database, the package and all its dependencies will be installed. If the database directory already exists, this option will have no effect.
 
+- `--debug-services`
+
+  Runs services with debugging support. When a call to a service fails, the node logs the WebAssembly functions the service was in, innermost first, as a warning. Compiled services are also registered with a debugger attached to `psinode` (`gdb`, or `lldb` after `settings set plugin.jit-loader.gdb.enable on`), by function name. For a service that carries debug information (DWARF), the logged frames also give the source file and line, and a debugger can set breakpoints by file and line.
+
+  Known limits:
+  - The innermost frame of a stack overflow is reported at the first line of its function, because the stack budget is checked at function entry.
+  - An `unreachable` can be reported one line early.
+  - Local variables are not readable in a debugger.
+
+  This is a setting of the node and not of the chain: a node that debugs computes exactly what the other nodes compute, so one node of a network can turn it on. It makes services slower to compile and to fail. It needs the wasmtime execution engine, is only read from the command line, and can also be turned on with the environment variable `PSIBASE_DEBUG_SERVICES=1`.
+
 ### P2P Network Options
 
 - `--p2p`
