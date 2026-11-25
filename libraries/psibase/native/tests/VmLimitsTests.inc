@@ -451,10 +451,7 @@ namespace
               m.calledBody = {0x41, 0, 0x10};
               leb(m.calledBody, probe);
               return m.build();
-           },
-           false, "",
-           "50,000 locals cost 200,000 bytes, above the temporary ceiling of "
-           "max_func_local_bytes (gofractally/psizam#3)"},
+           }},
           {"max_func_local_bytes", &VMOptions::max_func_local_bytes,
            [](std::uint32_t bytes)
            {
@@ -469,7 +466,10 @@ namespace
               m.calledBody = {0x10};
               leb(m.calledBody, probe);
               return m.build();
-           }},
+           },
+           false,
+           "a call takes these bytes plus 16 from the stack budget, and the two ceilings are "
+           "equal (16 MiB): the function is admitted and can never be called"},
           {"max_code_bytes", &VMOptions::max_code_bytes,
            [](std::uint32_t bytes)
            {
@@ -512,8 +512,8 @@ namespace
           {"max_block_params", &VMOptions::max_block_params,
            [](std::uint32_t count)
            {
-              // An if with `count` parameters: the form JIT2 cannot compile
-              // above 16 (gofractally/psizam#5).
+              // An if with `count` parameters: the form LLVM AOT and JIT2
+              // cannot compile above 16 (gofractally/psizam#5).
               ServiceModule m;
               auto          type = m.addType(Bytes(count, 0x7f), {});
               Bytes         body{0};

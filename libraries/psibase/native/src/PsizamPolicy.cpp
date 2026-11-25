@@ -648,6 +648,11 @@ namespace psibase
       // psizam's validating parser with a code writer that emits nothing
       // and checks what the parser has no option for: the parameters of a
       // block, loop or if.
+      //
+      // On the psizam engines max_block_params is checked here only, at
+      // the write of a code row (admitNativeWasm); the adapter's own parse
+      // before it compiles (ExecutionContext.cpp) does not repeat it. That
+      // is intended: the adapter's parse is not the admission.
       struct AdmissionWriter : psizam::detail::null_writer
       {
          using null_writer::null_writer;

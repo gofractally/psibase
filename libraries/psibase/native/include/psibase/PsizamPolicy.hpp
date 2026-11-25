@@ -51,8 +51,8 @@ namespace psibase
       std::string_view          name;
       std::uint32_t VMOptions::*member;
       std::uint32_t             ceiling;
-      /// Set below a defect that is to be fixed; the string names the
-      /// issue, and what the ceiling becomes afterwards. Empty otherwise.
+      /// Set below a limit that is to be lifted; the string names the
+      /// issue. Empty otherwise.
       std::string_view temporary;
       /// The engine and source that set the ceiling.
       std::string_view source;
@@ -64,12 +64,23 @@ namespace psibase
    // or below the stock constant); "WT" the wasmtime fork; "PZ" psizam
    // (external/psizam/include/psizam); "survey" the measurements recorded on
    // gofractally/psibase#2262.
+   //
+   // LLVM AOT is a supported engine: what it refuses is a ceiling, not a
+   // defect to wait for (max_type_section_elements, max_block_params).
+   //
+   // JIT2 is experimental and sets no ceiling by itself. It MUST NOT BE USED
+   // WHERE RESULTS MATTER until gofractally/psizam#3 is fixed: it
+   // miscompiles a function with more than 32,767 spill slots, which no
+   // ceiling here rules out (see max_func_local_bytes). psitest still runs
+   // test modules on it: gofractally/psibase#2231.
    inline constexpr std::array<VMOptionCeiling, vmOptionCount> vmOptionCeilings = {{
        PSIBASE_VM_CEILING(max_mutable_global_bytes, 262'144, "",
            "no engine limit below 2^32; 16 bytes for each of the 16,384 globals allowed"),
        PSIBASE_VM_CEILING(max_pages, 65'536, "",
            "wasm32 itself; PZ detail/parser.hpp:752, WP validator/core.rs:803"),
-       PSIBASE_VM_CEILING(max_table_elements, 65'536, "",
+       PSIBASE_VM_CEILING(max_table_elements, 65'536,
+           "gofractally/psibase#2272: lifted when the wasmtime adapter instantiates a module "
+           "too large for its instance pool without the pool",
            "the wasmtime adapter: a slot of its instance pool holds a table of 65,536 elements "
            "(ExecutionContextWasmtime.cpp pool_table_elements), and wasmtime checks a module "
            "against the pool when it compiles it, so a module with a larger table cannot be "
@@ -80,10 +91,11 @@ namespace psibase
            "ExecutionContextWasmtime.cpp nativeStackBytes / nativeBytesPerBudget"),
        PSIBASE_VM_CEILING(max_module_bytes, 15 * 1024 * 1024, "",
            "storage: the largest value a row may have, verifyConfigRow maxValueSize"),
-       PSIBASE_VM_CEILING(max_type_section_elements, 60'000,
-           "gofractally/psizam#4: JIT2 packs a call_indirect type index in 16 bits (PZ "
-           "detail/ir_writer.hpp:1666); 60,002 types measured good, 70,002 bad. Then 1,000,000 (WP)",
-           "psizam JIT2; otherwise WP MAX_WASM_TYPES 1,000,000, validator.rs:739"),
+       PSIBASE_VM_CEILING(max_type_section_elements, 60'000, "",
+           "psizam LLVM AOT and JIT2 (gofractally/psizam#4): LLVM AOT refuses a module of 70,002 "
+           "types when it compiles it (\"invalid typed guest call\", arm64), and JIT2 packs a "
+           "call_indirect type index in 16 bits (PZ detail/ir_writer.hpp:1666); 60,002 types "
+           "measured good. WP MAX_WASM_TYPES is 1,000,000, validator.rs:739"),
        PSIBASE_VM_CEILING(max_import_section_elements, 10'000, "",
            "WP MAX_WASM_IMPORTS 1,000,000, validator.rs:767; kept low so that max_type_size is "
            "the only bound on the size of imports and exports, and for the 4 MiB instance of the "
@@ -97,7 +109,9 @@ namespace psibase
            "lib.rs:669; the host interface addresses one table"),
        PSIBASE_VM_CEILING(max_memory_section_elements, 1, "",
            "multi-memory is off on wasmtime; the host interface addresses one memory"),
-       PSIBASE_VM_CEILING(max_global_section_elements, 16'384, "",
+       PSIBASE_VM_CEILING(max_global_section_elements, 16'384,
+           "gofractally/psibase#2272: lifted when the wasmtime adapter instantiates a module "
+           "too large for its instance pool without the pool",
            "the wasmtime adapter: a slot of its instance pool holds an instance of 4 MiB (PZ "
            "wasmtime/shim/src/lib.rs max_core_instance_size) and a module that needs more cannot "
            "be compiled there. Measured: 32 bytes per function, 32 more per import, 16 per global; "
@@ -126,12 +140,13 @@ namespace psibase
        PSIBASE_VM_CEILING(max_function_locals, 50'000, "",
            "WP MAX_WASM_FUNCTION_LOCALS 50,000, parameters included, validator/operators.rs:4803; "
            "Cranelift block parameters are 16-bit, WT cranelift/codegen/src/ir/dfg.rs:695"),
-       PSIBASE_VM_CEILING(max_func_local_bytes, 128'000,
-           "gofractally/psizam#3: JIT2 miscompiles a function with more than 32,767 spill slots "
-           "(PZ detail/jit_ir.hpp:455); 32,000 values live at once measured good, 33,000 bad, and "
-           "a value is at least 4 bytes. This bounds values live at once only: see the note on "
-           "the issue. Then the ceiling of max_stack_bytes",
-           "psizam JIT2; otherwise a function costing more than max_stack_bytes cannot be called"),
+       PSIBASE_VM_CEILING(max_func_local_bytes, 16 * 1024 * 1024, "",
+           "the stack budget: a call takes these bytes (plus 16) from max_stack_bytes, whose "
+           "ceiling is 16 MiB, so a function with more could never be called. No ceiling is set "
+           "for gofractally/psizam#3 (JIT2 miscompiles a function with more than 32,767 spill "
+           "slots): JIT2 alone has the defect (LLVM AOT returns correct values on the probe "
+           "modules), JIT2 is experimental, and a ceiling here would not close it: it depends on "
+           "the spilled intervals of the whole function, not on the values live at once"),
        PSIBASE_VM_CEILING(max_code_bytes, 7'654'321, "",
            "WP MAX_WASM_FUNCTION_SIZE 7,654,321, validator.rs:1033"),
        PSIBASE_VM_CEILING(max_br_table_elements, 65'520, "",
@@ -141,10 +156,10 @@ namespace psibase
        PSIBASE_VM_CEILING(max_nested_structures, 100'000, "",
            "no engine limit found; 1,000,000 nested blocks cost 0.3 to 1.25 GB to compile "
            "(survey row 25)"),
-       PSIBASE_VM_CEILING(max_block_params, 16,
-           "gofractally/psizam#5: JIT2 holds 16 block parameters (PZ detail/jit_ir.hpp:491); an "
-           "if with 17 is refused by its compiler. Then 1,000 (WP, as max_function_params)",
-           "psizam JIT2; otherwise WP MAX_WASM_FUNCTION_PARAMS 1,000"),
+       PSIBASE_VM_CEILING(max_block_params, 16, "",
+           "psizam LLVM AOT and JIT2 (gofractally/psizam#5): LLVM AOT refuses an if with 17 "
+           "block parameters when it compiles it (\"IR virtual stack underflow\", arm64), and "
+           "JIT2 holds 16 (PZ detail/jit_ir.hpp:491). WP MAX_WASM_FUNCTION_PARAMS is 1,000"),
    }};
 #undef PSIBASE_VM_CEILING
    // Every member of VMOptions has exactly one entry: the table has one
