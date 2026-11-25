@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16.3)
+cmake_minimum_required(VERSION 3.20)
 cmake_policy(VERSION 3.16.3...3.31.6)
 project(psibase)
 include(ExternalProject)
@@ -28,6 +28,25 @@ file(WRITE ${CMAKE_BINARY_DIR}/CTestTestfile.cmake)
 
 option(BUILD_STATIC "Build static binaries" OFF)
 option(ENABLE_SSL "Build psinode with TLS support" ON)
+
+# Homebrew keeps ICU outside the linker's default search path, and Boost's
+# static libraries name it without one. Find it rather than leave every
+# native link to fail with "library 'icudata' not found".
+if(APPLE AND NOT ICU_LIBRARY_DIR)
+    # `brew --prefix icu4c` names the newest formula even when an older one
+    # is what is installed, so look for the library itself.
+    execute_process(COMMAND brew --prefix
+        OUTPUT_VARIABLE brew_prefix OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    file(GLOB icu_candidates "${brew_prefix}/opt/icu4c/lib" "${brew_prefix}/opt/icu4c@*/lib"
+        "/opt/homebrew/opt/icu4c*/lib" "/usr/local/opt/icu4c*/lib")
+    foreach(candidate IN LISTS icu_candidates)
+        file(GLOB icu_data "${candidate}/libicudata.*")
+        if(icu_data)
+            set(ICU_LIBRARY_DIR "${candidate}" CACHE PATH "Directory holding the ICU libraries")
+            break()
+        endif()
+    endforeach()
+endif()
 
 set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
 set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
@@ -95,6 +114,73 @@ if(DEFINED WASI_SDK_PREFIX)
         COMPONENT libpsibase
     )
 
+    # Signature verification (the VerifySig service) uses two small libraries
+    # instead of Botan: libsecp256k1 for secp256k1 and BearSSL's P-256 for
+    # secp256r1. Each is built by its own build system and only the objects the
+    # service references are linked.
+    #
+    # Both are built for 64-bit arithmetic, whose 64x64->128 multiply is one
+    # wide-arithmetic instruction. (Without -mwide-arithmetic it would be a
+    # library call and several times slower than the 32-bit code.)
+    set(wasm_crypto_c_flags "--target=wasm32-wasip1 --sysroot=${WASI_SDK_PREFIX}/share/wasi-sysroot -O3 -msign-ext -mnontrapping-fptoint -mbulk-memory -mwide-arithmetic")
+
+    # The verification table is 2^(window-1) * 64 bytes. A window of 8 (8 KiB)
+    # is within 10% of the fastest setting and keeps the service in one page.
+    ExternalProject_Add(wasm-secp256k1
+        URL https://github.com/bitcoin-core/secp256k1/archive/refs/tags/v0.6.0.tar.gz
+        URL_HASH SHA256=785bb98e7d6705c51c8dfa8ac3af6aa2ccfa3774714d51c0b9e28fac1146e9f1
+        DOWNLOAD_NAME secp256k1-0.6.0.tar.gz
+        DEPENDS ${wasm-deps}
+        PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm/secp256k1
+        INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps
+        TEST_EXCLUDE_FROM_MAIN 1
+        CMAKE_ARGS
+            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+            -DCMAKE_INSTALL_LIBDIR=lib
+            -DCMAKE_TOOLCHAIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/wasm/toolchain.cmake
+            -DWASI_SDK_PREFIX=${WASI_SDK_PREFIX}
+            -DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}
+            "-DCMAKE_C_FLAGS=${wasm_crypto_c_flags}"
+            -DBUILD_SHARED_LIBS=OFF
+            -DSECP256K1_INSTALL=ON
+            -DSECP256K1_ENABLE_MODULE_ECDH=OFF
+            -DSECP256K1_ENABLE_MODULE_RECOVERY=OFF
+            -DSECP256K1_ENABLE_MODULE_EXTRAKEYS=OFF
+            -DSECP256K1_ENABLE_MODULE_SCHNORRSIG=OFF
+            -DSECP256K1_ENABLE_MODULE_MUSIG=OFF
+            -DSECP256K1_ENABLE_MODULE_ELLSWIFT=OFF
+            -DSECP256K1_ECMULT_WINDOW_SIZE=8
+            -DSECP256K1_ECMULT_GEN_KB=2
+            -DSECP256K1_TEST_OVERRIDE_WIDE_MULTIPLY=int128
+            -DSECP256K1_ASM=OFF
+            -DSECP256K1_VALGRIND=OFF
+            -DSECP256K1_BUILD_BENCHMARK=OFF
+            -DSECP256K1_BUILD_TESTS=OFF
+            -DSECP256K1_BUILD_EXHAUSTIVE_TESTS=OFF
+            -DSECP256K1_BUILD_CTIME_TESTS=OFF
+            -DSECP256K1_BUILD_EXAMPLES=OFF
+    )
+
+    # BearSSL has no release containing the 64-bit P-256 code, so a commit is pinned.
+    ExternalProject_Add(wasm-bearssl
+        GIT_REPOSITORY https://www.bearssl.org/git/BearSSL
+        GIT_TAG 7bea48e5e850ab4cafbe68d3765cdaba13a86d6f
+        DEPENDS ${wasm-deps}
+        PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm/bearssl
+        INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps
+        BUILD_IN_SOURCE 1
+        TEST_EXCLUDE_FROM_MAIN 1
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND make -j${NUM_PROCS} lib
+            CC=${WASI_SDK_PREFIX}/bin/clang
+            AR=${WASI_SDK_PREFIX}/bin/llvm-ar
+            BUILD=build-wasm
+            "CFLAGS=${wasm_crypto_c_flags} -DBR_64=1 -DBR_INT128=1 -DBR_USE_URANDOM=0 -DBR_USE_GETENTROPY=0 -DBR_USE_UNIX_TIME=0"
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/build-wasm/libbearssl.a <INSTALL_DIR>/lib/libbearssl.a
+        COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR>/inc <INSTALL_DIR>/include/bearssl
+    )
+
     ExternalProject_Add(wasm-catch2
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2
         BINARY_DIR catch2
@@ -140,7 +226,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate RDynLd REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode
-        Transact VerifySig XAdmin XBasic XDb XHttp XRun XSites XTimer XTransact
+        Transact VerifySig XAdmin XBasic XDb XHttp XKeys XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
         XPackages XPeers XProxy XSocketListService WSEcho XDelay ServerId)
@@ -151,7 +237,7 @@ if(DEFINED WASI_SDK_PREFIX)
 
     ExternalProject_Add(wasm
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wasm
-        DEPENDS ${wasm-deps} wasm-botan wasm-catch2 psitest
+        DEPENDS ${wasm-deps} wasm-botan wasm-secp256k1 wasm-bearssl wasm-catch2 psitest
         BINARY_DIR wasm
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
@@ -176,6 +262,7 @@ if(DEFINED WASI_SDK_PREFIX)
             -DCMAKE_INSTALL_INCLUDEDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/include
             -DCMAKE_INSTALL_LIBDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
             -DPSITEST_EXECUTABLE=$<TARGET_FILE:psitest>
+            -DPSIBASE_PSIO_SOURCE_DIR=${PSIBASE_PSIO_SOURCE_DIR}
             -DUSER_WORKSPACE_TARGET=${USER_WORKSPACE_TARGET}
             -DSYSTEM_WORKSPACE_TARGET=${SYSTEM_WORKSPACE_TARGET}
         BUILD_BYPRODUCTS ${WASM_BYPRODUCTS}
@@ -1539,6 +1626,21 @@ psibase_package(
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )
+
+# With LLVM a service takes seconds to compile, the largest tens of seconds,
+# and a node compiles it when it is first installed. Compile every packaged
+# service into the native artifact cache here instead, so that the nodes and
+# tests this build runs load artifacts rather than compile during a boot.
+if(PSIBASE_VM_BACKEND STREQUAL "LLVM_AOT")
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/native-aot-cache.stamp
+        DEPENDS ${SERVICE_DIR}/index.json psibase-precompile
+        COMMAND psibase-precompile ${SERVICE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/native-aot-cache.stamp
+        COMMENT "Compiling packaged services into the native artifact cache"
+    )
+    add_custom_target(native-aot-cache ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/native-aot-cache.stamp)
+endif()
 
 psibase_package(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/Counter.psi

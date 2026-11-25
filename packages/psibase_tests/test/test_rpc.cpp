@@ -2,6 +2,7 @@
 #include <psibase/Rpc.hpp>
 
 #include <psibase/tester.hpp>
+#include <services/system/HttpServerRequest.hpp>
 
 #include <catch2/catch_all.hpp>
 
@@ -36,6 +37,40 @@ TEST_CASE("removeCookie")
    CHECK(request.headers.size() == 2);
    CHECK(request.headers[0].value == "foo=10; session=xxx");
    CHECK(request.headers[1].value == "extra=9");
+}
+
+TEST_CASE("HttpServer strips issued session credentials before application RPC")
+{
+   HttpRequest request{.headers = {{"Cookie", "theme=dark; __Host-SESSION=secret; local=1"},
+                                   {"cOoKiE", "__Host-SESSION=duplicate; SESSION=old; session=app"},
+                                   {"COOKIE", "__HOST-SESSION=legacy"},
+                                   {"Authorization", "Bearer sensitive"},
+                                   {"aUtHoRiZaTiOn", "Bearer duplicate"},
+                                   {"X-App", "preserved"}}};
+   SystemService::http_detail::stripAuthenticationHeaders(request);
+   REQUIRE(request.headers.size() == 3);
+   CHECK(request.headers[0].value == "theme=dark; local=1");
+   CHECK(request.headers[1].value == "session=app");
+   CHECK(request.headers[2].name == "X-App");
+   CHECK_FALSE(request.getHeader("authorization"));
+   for (auto name : {"__Host-SESSION", "__HOST-SESSION", "SESSION"})
+      CHECK(request.getCookie(name).empty());
+}
+
+TEST_CASE("HttpServer removes whitespace-obscured credential cookies")
+{
+   HttpRequest request{.headers = {{"cookie", "\t__Host-SESSION \t=secret; app=value=with=equals"}}};
+   SystemService::http_detail::stripAuthenticationHeaders(request);
+   REQUIRE(request.headers.size() == 1);
+   CHECK(request.headers[0].value == "app=value=with=equals");
+}
+
+TEST_CASE("HttpServer default preflight explicitly allows Authorization")
+{
+   auto headers = SystemService::http_detail::defaultPreflightHeaders();
+   CHECK(HttpHeader::get(headers, "Access-Control-Allow-Origin") == "*");
+   CHECK(HttpHeader::get(headers, "Access-Control-Allow-Headers") == "*, Authorization");
+   CHECK_FALSE(HttpHeader::get(headers, "Access-Control-Allow-Credentials"));
 }
 
 TEST_CASE("forwardedFor")

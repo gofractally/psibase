@@ -26,10 +26,10 @@ void TestImport::testCallback()
    testImport(false);
 }
 
-void TestImport::testImport(bool expectHandles)
+void TestImport::testImport(bool expectHandle)
 {
    auto handles = importHandles();
-   if (expectHandles)
+   if (expectHandle)
    {
       check(handles.size() == 1, std::format("Wrong number of handles: {}", handles.size()));
       auto value = kvGet<int>(handles[0], std::tuple{}).value();

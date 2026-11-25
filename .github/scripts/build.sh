@@ -30,6 +30,35 @@ echo log_file = ${WORKSPACE_ROOT}/ccache.log >>${WORKSPACE_ROOT}/ccache.conf
 export SCCACHE_IDLE_TIMEOUT=0
 export SCCACHE_CACHE_SIZE=1G
 export RUSTC_WRAPPER=sccache
+if ! docker image inspect "${BUILDER_IMAGE}" >/dev/null 2>&1; then
+  docker pull "${BUILDER_IMAGE}"
+else
+  echo "Using local image ${BUILDER_IMAGE}"
+fi
+
+# This branch compiles services with WebAssembly wide arithmetic and its
+# native code needs a C++23 standard library. A builder image that carries the
+# newer toolchain keeps it beside its defaults, under /opt, so that branches
+# which do not need it build as before; select it here when it is present.
+#   binaryen 133   wasm-opt that reads wide arithmetic
+#   wasi-sdk 29    clang 21 and a matching sysroot for the services
+#   Rust 1.100.0   128-bit arithmetic is correct with the wide-arithmetic feature
+#   clang 20       host compiler, with a libstdc++ that has <format>
+TOOLCHAIN=""
+if docker run --rm "${BUILDER_IMAGE}" test -x /opt/wasi-sdk-29/bin/clang -a -x /opt/binaryen-133/bin/wasm-opt; then
+  echo "Using the wide-arithmetic toolchain in ${BUILDER_IMAGE}"
+  IMAGE_PATH=$(docker run --rm "${BUILDER_IMAGE}" printenv PATH)
+  TOOLCHAIN="-e WASI_SDK_PREFIX=/opt/wasi-sdk-29 \
+  -e RUSTUP_TOOLCHAIN=1.100.0 \
+  -e CC=clang-20 \
+  -e CXX=clang++-20 \
+  -e PATH=/opt/binaryen-133/bin:/opt/wasi-sdk-29/bin:${IMAGE_PATH}"
+fi
+
+# npm (used by one UI package) keeps its cache in the home directory, which the
+# container's user does not have. Keep it with the other caches.
+export npm_config_cache=${WORKSPACE_ROOT}/.caches/npm
+
 # (Note for cargo-generate to be happy) Ensure there's a $USER environment variable set with username corresponding to the uid of the user running the container
 DOCKER="docker run --rm \
   -v ${WORKSPACE_ROOT}:${WORKSPACE_ROOT} \
@@ -43,14 +72,10 @@ DOCKER="docker run --rm \
   -e WASM_PACK_CACHE=${WORKSPACE_ROOT}/.caches/wasm-pack \
   -e CARGO_COMPONENT_CACHE_DIR=${WORKSPACE_ROOT}/.caches/cargo-component \
   -e USER \
+  -e npm_config_cache \
+  ${TOOLCHAIN} \
   --user $(id -u):$(id -g) \
   ${BUILDER_IMAGE}"
-
-if ! docker image inspect "${BUILDER_IMAGE}" >/dev/null 2>&1; then
-  docker pull "${BUILDER_IMAGE}"
-else
-  echo "Using local image ${BUILDER_IMAGE}"
-fi
 
 echo "===== ccache  ====="
 ${DOCKER} ccache -s

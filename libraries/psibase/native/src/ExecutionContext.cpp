@@ -367,12 +367,14 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
                 // Waiting for a compile in flight, or compiling here, is not
                 // billed to the transaction.
                 //
-                // NOT VERIFIED ON THESE ENGINES: this file serves the psizam
+                // NOT VERIFIED ON JIT1 OR JIT2: this file serves the psizam
                 // engines (JIT2, LLVM AOT, JIT1). The watchdog-only CPU budget
                 // changed the order here (cache first, pause only on a miss)
-                // and the trace timing below, and was qualified on wasmtime
-                // only; work on the other engines is paused. Run their suites
-                // before relying on a build that selects one of them.
+                // and the trace timing below. It was qualified on wasmtime;
+                // LLVM AOT has since passed the native and end-to-end suites
+                // on x86-64 Linux. A node built on JIT1 or JIT2 has not been
+                // run (gofractally/psibase#2228): run their suites before
+                // relying on one.
                 std::optional<TransactionContext::BillingPause> unbilled;
                 if (!backend.backend)
                 {
@@ -450,9 +452,9 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
              });
       }
 
-      // The time an action took, for its trace. This is elapsed time, read
-      // without a system call; the thread's CPU clock is read only where a
-      // value is billed.
+      // The time an action took, for its trace: elapsed time on the monotonic
+      // clock, read without a system call. It is the clock the transaction's
+      // limit and its bill use (RunClock).
       struct RecordActionTime
       {
          explicit RecordActionTime(ActionContext& actionContext) : actionContext(actionContext) {}

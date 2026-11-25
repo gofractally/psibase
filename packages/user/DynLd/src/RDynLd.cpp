@@ -20,9 +20,9 @@ namespace
    };
 }  // namespace
 
-auto RDynLd::serveSys(psibase::HttpRequest req) -> std::optional<psibase::HttpReply>
+auto RDynLd::serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>
 {
-   if (auto result = serveGraphQL(req, Query{}))
+   if (auto result = serveGraphQL(request, Query{}))
       return result;
    return {};
 }

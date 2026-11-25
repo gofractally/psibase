@@ -1,7 +1,6 @@
 use crate::AccountNumber;
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize)]
+/// The body of `POST x-http/register_server`: both members are required.
+#[derive(psio::JsonText, psio::Serde)]
 pub struct RegisterServerRequest {
     pub service: AccountNumber,
     pub server: AccountNumber,
@@ -68,7 +67,7 @@ mod service {
     /// socket must be the sender. If local is false, then the
     /// reply is expected to come through http-server.
     #[action]
-    fn giveSocket(socket: i32, account: AccountNumber, local: bool) {
+    fn giveSocket(socket: i32, service: AccountNumber, local: bool) {
         unimplemented!()
     }
 
@@ -123,12 +122,12 @@ mod service {
 
     /// Returns the root host for a given host
     #[action]
-    fn rootHost(host: String) -> String {
+    fn rootHost(host: String) -> psio::pssz::RawString {
         unimplemented!()
     }
 
     #[action]
-    fn serveSys(req: HttpRequest, socket: Option<i32>) -> Option<HttpReply> {
+    fn serveSys(request: HttpRequest, socket: Option<i32>) -> Option<HttpReply> {
         unimplemented!()
     }
 

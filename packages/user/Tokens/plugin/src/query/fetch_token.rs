@@ -29,7 +29,9 @@ pub struct Token {
     pub nft_id: u32,
     pub current_supply: Decimal,
     pub max_issued_supply: Decimal,
-    pub owner: AccountNumber,
+    // Burning the administration NFT intentionally leaves an immutable token
+    // without an issuer. Its precision and transferability remain valid.
+    pub owner: Option<AccountNumber>,
     pub symbol: Option<AccountNumber>,
     pub settings: TokenSettings,
 }
@@ -66,4 +68,19 @@ pub fn fetch_token(token_number: u32) -> Result<Token, ErrorType> {
                 Err(ErrorType::TokenMismatch(token_number.to_string()))
             }
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn immutable_and_administered_native_tokens_decode() {
+        let immutable = r#"{"data":{"token":{"precision":4,"id":2,"nftId":20,"currentSupply":"1000.0000","maxIssuedSupply":"1000.0000","owner":null,"symbol":"usd","settings":{"untransferable":false}}}}"#;
+        let token: Response = serde_json::from_str(immutable).unwrap();
+        assert!(token.data.token.owner.is_none());
+        assert_eq!(token.data.token.precision.value(), 4);
+        let administered = immutable.replace("\"owner\":null", "\"owner\":\"issuer\"");
+        let token: Response = serde_json::from_str(&administered).unwrap();
+        assert_eq!(token.data.token.owner.unwrap().to_string(), "issuer");
+    }
 }

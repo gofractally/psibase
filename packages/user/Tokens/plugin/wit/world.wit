@@ -183,6 +183,29 @@ interface user-config {
     del-balance-config: func(token-id: u32) -> result<_, error>;
 }
 
+/// Narrow wallet-to-app transfers. Unlike `user`, this interface never grants
+/// issuer/configuration access. The counterparty must be the authenticated
+/// calling app, which must also be the active app. Each untrusted transfer is
+/// reviewed by Tokens with its exact token, amount, memo, user and counterparty.
+interface transfer {
+    use host:types/types.{error};
+    use types.{decimal};
+    /// expected-user guards the account displayed when the user submitted the
+    /// request. It never selects an account or substitutes for native authority.
+    credit: func(token-id: u32, debitor: string, amount: decimal, memo: string, expected-user: string) -> result<_, error>;
+    uncredit: func(token-id: u32, debitor: string, amount: decimal, memo: string, expected-user: string) -> result<_, error>;
+    debit: func(token-id: u32, creditor: string, amount: decimal, memo: string, expected-user: string) -> result<_, error>;
+    /// Client-side, chain/user/calling-app scoped; not an on-chain allowance.
+    trust-status: func() -> bool;
+    /// Removes the calling app's remembered grant and unused one-shot approvals.
+    revoke-trust: func() -> result<_, error>;
+    /// Latest exact intent: none, pending, approved, denied, consumed or expired.
+    approval-status: func() -> string;
+    /// Bounded native token history for the current user and this calling app
+    /// only. Does not accept an account or arbitrary GraphQL query.
+    history: func(token-id: u32, before: option<string>, limit: u32) -> result<string, error>;
+}
+
 interface helpers {
     use host:types/types.{error};
     use types.{decimal, system-token-info, user-balance};
@@ -231,6 +254,7 @@ world imports {
     import types;
     import issuer;
     import user;
+    import transfer;
     import user-config;
     import helpers;
     import authorized;

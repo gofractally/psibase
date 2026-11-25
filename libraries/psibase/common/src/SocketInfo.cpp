@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cstring>
+#include <span>
 
 using namespace psibase;
 
@@ -158,7 +159,8 @@ namespace
          // consumed one ':'.
          if (iter != end && *iter == ':')
          {
-            if (elidedPos < 16)
+            // Only one '::', and it stands for at least one group
+            if (elidedPos < 16 || i >= 16)
                return {};
             elidedPos = i;
             ++iter;
@@ -167,7 +169,8 @@ namespace
                if (iter == end || *iter++ != ':')
                   return {};
             }
-            if (iter != end && (*iter == ']' || *iter == '%'))
+            // The address may end with '::' ("::", "1::", "fe80::%3")
+            if (iter == end || *iter == ']' || *iter == '%')
                break;
          }
          if (i >= 16)
@@ -188,7 +191,8 @@ namespace
                return {};
             i += 4;
 
-            if (iter == end || (*iter != ']' && *iter != '%'))
+            // The IPv4 part is the end of the address
+            if (iter != end && *iter != ']' && *iter != '%')
                return {};
             break;
          }

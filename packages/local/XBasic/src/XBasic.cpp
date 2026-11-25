@@ -44,10 +44,10 @@ void XBasic::startSession()
    }
 }
 
-AuthResult XBasic::checkAuth(const HttpRequest& req, std::optional<std::int32_t> socket)
+AuthResult XBasic::checkAuth(const HttpRequest& request, std::optional<std::int32_t> socket)
 {
    auto passwords = open<PasswordTable>();
-   if (auto header = req.getHeader("authorization"))
+   if (auto header = request.getHeader("authorization"))
    {
       if (auto auth = parseBasicAuth(*header))
       {

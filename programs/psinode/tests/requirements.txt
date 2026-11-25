@@ -1,0 +1,8 @@
+# Third-party modules imported by the psinode tests in this directory.
+#   python3 -m pip install -r programs/psinode/tests/requirements.txt
+# Tests that drive a hardware key additionally need SoftHSM 2 (softhsm2-util and
+# libsofthsm2.so), which is not a Python package.
+requests
+urllib3
+websockets
+cryptography

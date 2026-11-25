@@ -173,9 +173,9 @@ mod service {
             let json = psibase::services::r_events::Wrapper::call().sqlQuery(
                 "SELECT DISTINCT token_id FROM \"history.tokens.balChanged\" WHERE account = ?"
                     .to_string(),
-                vec![user.to_string()],
+                vec![user.to_string().into()],
             );
-            let rows: Vec<Row> = serde_json::from_str(&json).map_err(|e| {
+            let rows: Vec<Row> = serde_json::from_slice(&json).map_err(|e| {
                 async_graphql::Error::new(format!("Failed to read balance history: {e}"))
             })?;
 
@@ -439,9 +439,10 @@ mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    #[allow(unused_variables)]
     fn serveSys(
         request: HttpRequest,
-        _socket: Option<i32>,
+        socket: Option<i32>,
         user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
         assert_eq!(
@@ -449,6 +450,14 @@ mod service {
             http_server::SERVICE,
             "permission denied: tokens::serveSys only callable by 'http-server'",
         );
+
+        // A registered server may be reused by another account. Authentication
+        // from that account's host must not expose private Tokens projections.
+        // Public token metadata remains available through the normal schema.
+        let root = http_server::Wrapper::call().rootHost(request.host.clone());
+        let root = root.to_string_lossy();
+        let user = request.host.eq_ignore_ascii_case(&format!("tokens.{root}"))
+            .then_some(user).flatten();
 
         // Services graphql queries
         None.or_else(|| serve_graphql(&request, Query { user }))

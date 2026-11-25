@@ -1,12 +1,19 @@
 use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
-use psibase::fracpack::{Pack, UnpackOwned};
-use psibase::{Action, Claim, Hex, MethodNumber};
+
+use psibase::{Action, Claim, MethodNumber};
+#[path = "transaction_policy.rs"]
+mod policy;
+use policy::{register_hook, ConnectionPin};
 
 const ACTIONS: &str = "actions";
 const CLAIMS: &str = "claims";
+const EVIDENCE: &str = "evidence";
 const LATCH_SENDER: &str = "latch-sender";
 const LATCH_ACTIONS: &str = "latch-actions";
 const SENDER_HOOK: &str = "sender-hook";
+const PRE_PUBLISH_HOOKS: &str = "pre-publish-hooks";
+const PUBLICATION_STARTED: &str = "publication-started";
+const CONNECTION: &str = "connection";
 
 // The transaction currently being built. Ephemeral, so start-tx's clear-buffers drops it.
 pub(crate) fn open_tx_table() -> Bucket {
@@ -19,20 +26,68 @@ pub(crate) fn open_tx_table() -> Bucket {
     )
 }
 
-fn load<T: UnpackOwned>(key: &str) -> Option<T> {
+fn load<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>>(key: &str) -> Option<T> {
     open_tx_table()
         .get(key)
-        .map(|bytes| T::unpacked(&bytes).unwrap())
+        .map(|bytes| psio::from_pssz::<T>(&bytes).unwrap())
 }
 
-fn store<T: Pack>(key: &str, value: &T) {
-    open_tx_table().set(key, &value.packed());
+fn store<T: psio::pssz::PsszPack<psio::Pssz>>(key: &str, value: &T) {
+    open_tx_table().set(key, &psio::to_pssz(value));
+}
+
+fn connection() -> Option<ConnectionPin> {
+    load::<(bool, Option<String>)>(CONNECTION).map(|(bound, user)| ConnectionPin { bound, user })
+}
+
+fn store_connection(pin: ConnectionPin) {
+    store(CONNECTION, &(pin.bound, pin.user));
 }
 
 pub(crate) struct OpenTx;
 
 #[allow(dead_code)]
 impl OpenTx {
+    pub(crate) fn initialize_connection(user: Option<String>) {
+        store_connection(ConnectionPin::at_start(user));
+    }
+
+    pub(crate) fn check_connection(current: Option<String>) -> Result<(), &'static str> {
+        let mut pin = connection().ok_or("no active transaction connection")?;
+        pin.bind_or_check(current)?;
+        store_connection(pin);
+        Ok(())
+    }
+
+    pub(crate) fn validate_connection(current: Option<String>) -> Result<(), &'static str> {
+        let pin = connection().ok_or("no active transaction connection")?;
+        pin.validate(current.as_deref())
+    }
+
+    pub(crate) fn connection_user() -> Option<String> {
+        connection().and_then(|pin| pin.user)
+    }
+
+    pub(crate) fn publication_started() -> bool {
+        load(PUBLICATION_STARTED).unwrap_or(false)
+    }
+
+    pub(crate) fn register_pre_publish_hook(service: &str) -> Result<(), &'static str> {
+        let mut hooks = load(PRE_PUBLISH_HOOKS).unwrap_or_default();
+        register_hook(&mut hooks, service, Self::publication_started())?;
+        store(PRE_PUBLISH_HOOKS, &hooks);
+        Ok(())
+    }
+
+    pub(crate) fn begin_pre_publish() -> Vec<String> {
+        assert!(
+            !Self::publication_started(),
+            "pre-publication hooks already running"
+        );
+        store(PUBLICATION_STARTED, &true);
+        load(PRE_PUBLISH_HOOKS).unwrap_or_default()
+    }
+
     pub(crate) fn add_action(action: Action) {
         let mut actions: Vec<Action> = load(ACTIONS).unwrap_or_default();
         actions.push(action);
@@ -55,6 +110,24 @@ impl OpenTx {
         let claims = load(CLAIMS).unwrap_or_default();
         open_tx_table().delete(CLAIMS);
         claims
+    }
+
+    pub(crate) fn add_evidence(claim: Claim, proof: Vec<u8>) -> Result<(), &'static str> {
+        if Self::publication_started() { return Err("cannot add evidence during publication"); }
+        let mut entries: Vec<(Claim, Vec<u8>)> = load(EVIDENCE).unwrap_or_default();
+        if entries.len() >= 8 || claim.rawData.len() > 65536 || proof.len() > 262144 {
+            return Err("evidence count or entry size limit");
+        }
+        let bytes: usize = entries.iter().map(|(c,p)|c.rawData.len()+p.len()).sum();
+        if bytes + claim.rawData.len() + proof.len() > 1_048_576 {
+            return Err("total evidence size limit");
+        }
+        entries.push((claim,proof)); store(EVIDENCE,&entries); Ok(())
+    }
+
+    pub(crate) fn take_evidence() -> Vec<(Claim, Vec<u8>)> {
+        let entries=load(EVIDENCE).unwrap_or_default();
+        open_tx_table().delete(EVIDENCE); entries
     }
 
     pub(crate) fn latch_sender() -> Option<String> {
@@ -104,18 +177,17 @@ impl OpenTx {
             return Err(());
         };
 
-        let packed = psibase::services::staged_tx::action_structs::propose {
+        let packed = psio::to_pssz(&psibase::services::staged_tx::action_structs::propose {
             actions,
             auto_exec: true,
-        }
-        .packed();
+        });
         Self::add_action(Action {
             sender: proposer.parse().unwrap(),
             service: psibase::services::staged_tx::SERVICE,
             method: MethodNumber::from(
-                psibase::services::staged_tx::action_structs::propose::ACTION_NAME,
+                <psibase::services::staged_tx::action_structs::propose as psio::interface::Method>::NAME,
             ),
-            rawData: Hex::from(packed),
+            rawData: packed,
         });
         Ok(())
     }

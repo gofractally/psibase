@@ -35,7 +35,8 @@ pub mod service {
     }
 
     #[action]
-    fn is_role_ok(fractal: AccountNumber, _role_id: u8) -> bool {
+    #[allow(unused_variables)]
+    fn is_role_ok(fractal: AccountNumber, role_id: u8) -> bool {
         ::fractals::tables::tables::FractalTable::read()
             .get_index_pk()
             .get(&fractal)
@@ -47,7 +48,8 @@ pub mod service {
     }
 
     #[action]
-    fn role_policy(fractal: AccountNumber, _role_id: u8) -> auth_dyn::policy::DynamicAuthPolicy {
+    #[allow(unused_variables)]
+    fn role_policy(fractal: AccountNumber, role_id: u8) -> auth_dyn::policy::DynamicAuthPolicy {
         let accounts: Vec<(AccountNumber, u8)> =
             ::fractals::tables::tables::FractalMemberTable::read()
                 .get_index_pk()

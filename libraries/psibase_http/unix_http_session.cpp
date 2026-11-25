@@ -4,9 +4,25 @@
 
 namespace psibase::http
 {
+   namespace
+   {
+      // The peer of a socket that was never bound has no name. Linux reports that
+      // as an empty path. Darwin reports a full-length address whose path is all
+      // zero bytes; without this it would be shown (and matched) as a 14-byte name.
+      // A Linux abstract name starts with a zero byte followed by its name, so only
+      // trailing zero bytes are dropped.
+      std::string peerPath(const boost::asio::local::stream_protocol::endpoint& endpoint)
+      {
+         auto path = endpoint.path();
+         while (!path.empty() && path.back() == '\0')
+            path.pop_back();
+         return path;
+      }
+   }  // namespace
+
    SocketEndpoint toSocketEndpoint(const boost::asio::local::stream_protocol::endpoint& endpoint)
    {
-      return LocalEndpoint{endpoint.path()};
+      return LocalEndpoint{peerPath(endpoint)};
    }
 
    unix_http_session::unix_http_session(server_state&                                 server,
@@ -14,7 +30,7 @@ namespace psibase::http
        : http_session<unix_http_session>(server), stream(std::move(socket))
    {
       logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant<std::string>(
-                                                 stream.socket().remote_endpoint().path()));
+                                                 peerPath(stream.socket().remote_endpoint())));
    }
    unix_http_session::~unix_http_session() = default;
 

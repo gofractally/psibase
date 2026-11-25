@@ -131,7 +131,7 @@ mod service {
     fn serve_sys() -> services::transact::ServiceMethod {
         services::transact::ServiceMethod {
             service: crate::Wrapper::SERVICE,
-            method: MethodNumber::from(crate::action_structs::serveSys::ACTION_NAME),
+            method: MethodNumber::from(<crate::action_structs::serveSys as psio::interface::Method>::NAME),
         }
     }
 
@@ -234,9 +234,10 @@ mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    #[allow(unused_variables)]
     fn serveSys(
         request: HttpRequest,
-        _socket: Option<i32>,
+        socket: Option<i32>,
         user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
         assert_eq!(

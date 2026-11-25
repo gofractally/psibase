@@ -1,0 +1,27 @@
+cmake_minimum_required(VERSION 3.20)
+project(psibase_canonical_engine_sources NONE)
+include("${CMAKE_CURRENT_LIST_DIR}/../../../../cmake/PsibaseDependencies.cmake")
+psibase_declare_dependencies()
+find_package(Git REQUIRED)
+set(psitri_expected d3bba0e6a5f59e37c3eea08a1a720ae553cafb2c)
+set(ucc_expected d79166da0290fdf9d1f9d5880d4dfb45b2822cf3)
+set(psizam_expected 8a328b9aef73ef8885460af3c9023cefc0cfb59a)
+foreach(name psitri ucc psizam)
+    psibase_acquire_dependency(${name})
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env GIT_OPTIONAL_LOCKS=0
+        "${GIT_EXECUTABLE}" -C "${${name}_SOURCE_DIR}" rev-parse HEAD
+        RESULT_VARIABLE result OUTPUT_VARIABLE actual OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT result EQUAL 0 OR NOT actual STREQUAL "${${name}_expected}")
+        message(FATAL_ERROR "Unexpected ${name} source HEAD: ${actual}")
+    endif()
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env GIT_OPTIONAL_LOCKS=0
+        "${GIT_EXECUTABLE}" -C "${${name}_SOURCE_DIR}" status --porcelain
+        RESULT_VARIABLE result OUTPUT_VARIABLE source_status OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT result EQUAL 0 OR source_status)
+        message(FATAL_ERROR "Pinned ${name} source is not clean: ${source_status}")
+    endif()
+    message(STATUS "Canonical ${name} source: ${${name}_SOURCE_DIR} at ${actual}")
+endforeach()
+if(TARGET psio OR TARGET psio::psio OR TARGET ucc OR TARGET sal OR TARGET psizam OR TARGET softfloat)
+    message(FATAL_ERROR "A source-only dependency evaluated its upstream root")
+endif()

@@ -28,7 +28,7 @@ namespace UserService
       static constexpr uint8_t unrecallable   = 1;
       static constexpr uint8_t autoDebit      = 0;
 
-      Tokens(psio::shared_view_ptr<psibase::Action> action);
+      Tokens(psio::shared_pssz<psibase::Action> action);
 
       void init();
 
@@ -39,7 +39,7 @@ namespace UserService
       /// * `max_issued_supply` - The permanent max issued supply of the token
       ///
       /// Returns the unique token identifier aka TID (u32)
-      TID create(Precision precision, Quantity maxIssuedSupply);
+      TID create(Precision precision, Quantity max_issued_supply);
 
       /// Mint / Issue new tokens into existence
       ///
@@ -50,7 +50,7 @@ namespace UserService
       /// * `token_id` - Unique token identifier
       /// * `amount`   - Amount of tokens to mint
       /// * `memo`     - Memo
-      void mint(TID tokenId, Quantity amount, Memo memo);
+      void mint(TID token_id, Quantity amount, Memo memo);
 
       /// Burn's the specified amount of the sender's specified tokens
       ///
@@ -58,7 +58,7 @@ namespace UserService
       /// * `token_id` - Unique token identifier
       /// * `amount`   - Amount of tokens to burn
       /// * `memo`     - Memo
-      void burn(TID tokenId, Quantity amount, Memo memo);
+      void burn(TID token_id, Quantity amount, Memo memo);
 
       /// Set user global configuration of sender
       ///
@@ -73,7 +73,7 @@ namespace UserService
       ///                           the receiver.
       /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
       ///                           balance table, and will not need to be recreated on the next deposit.
-      void setUserConf(uint8_t index, bool enable);
+      void setUserConf(uint8_t index, bool enabled);
 
       /// Set user's token-specific balance configuration
       ///
@@ -89,13 +89,13 @@ namespace UserService
       ///                           the receiver.
       /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
       ///                           balance table, and will not need to be recreated on the next deposit.
-      void setBalConf(TID tokenId, uint8_t index, bool enable);
+      void setBalConf(TID token_id, uint8_t index, bool enabled);
 
       /// Delete the user's token-specific balance configuration
       ///
       /// # Arguments
       /// * `token_id` - Unique token identifier.
-      void delBalConf(TID tokenId);
+      void delBalConf(TID token_id);
 
       /// Set token configuration. Only the token owner can set the configuration.
       ///
@@ -109,7 +109,7 @@ namespace UserService
       /// Configurations:
       /// * 0: Untransferrable - If enabled, the token cannot be transferred
       /// * 1: Unrecallable    - If enabled, the token cannot be recalled
-      void setTokenConf(TID tokenId, uint8_t index, bool enable);
+      void setTokenConf(TID token_id, uint8_t index, bool enabled);
 
       /// Sets the icon of a token. Only the token owner can set the icon.
       ///
@@ -119,13 +119,13 @@ namespace UserService
       /// * `tokenId`     - Unique token identifier
       /// * `image`       - Image bytes, at most 32 KiB
       /// * `contentType` - Image type: 0 = PNG, 1 = JPEG, 2 = WebP
-      void setIcon(TID tokenId, std::vector<char> image, uint8_t contentType);
+      void setIcon(TID token_id, std::vector<char> image, uint8_t contentType);
 
       /// Removes the icon of a token. Only the token owner can remove the icon.
       ///
       /// # Arguments
       /// * `tokenId` - Unique token identifier
-      void removeIcon(TID tokenId);
+      void removeIcon(TID token_id);
 
       /// Credit tokens to a debitor (recipient).
       ///
@@ -143,7 +143,7 @@ namespace UserService
       /// * `debitor`  - Debitor / recipient
       /// * `amount`   - Amount to credit
       /// * `memo`     - Memo
-      void credit(TID tokenId, psibase::AccountNumber debitor, Quantity amount, Memo memo);
+      void credit(TID token_id, psibase::AccountNumber debitor, Quantity amount, Memo memo);
 
       /// Uncredit tokens that were credited into a shared balance
       ///
@@ -161,7 +161,7 @@ namespace UserService
       /// * `debitor`  - Debitor / recipient
       /// * `amount`   - Amount to uncredit
       /// * `memo`     - Memo
-      void uncredit(TID tokenId, psibase::AccountNumber debitor, Quantity amount, Memo memo);
+      void uncredit(TID token_id, psibase::AccountNumber debitor, Quantity amount, Memo memo);
 
       /// Rejects the shared balance between a creditor and a debitor
       ///
@@ -178,7 +178,7 @@ namespace UserService
       /// * `token_id` - Unique token identifier
       /// * `creditor`  - User who credited the tokens
       /// * `memo`     - Memo
-      void reject(TID tokenId, psibase::AccountNumber creditor, Memo memo);
+      void reject(TID token_id, psibase::AccountNumber creditor, Memo memo);
 
       /// Debit tokens that were credited into a shared balance
       ///
@@ -196,7 +196,7 @@ namespace UserService
       /// * `creditor` - User who credited the tokens
       /// * `amount`   - Amount to debit
       /// * `memo`     - Memo
-      void debit(TID tokenId, psibase::AccountNumber creditor, Quantity amount, Memo memo);
+      void debit(TID token_id, psibase::AccountNumber creditor, Quantity amount, Memo memo);
 
       /// Recalls an amount of tokens from a user's primary or sub-account balance and burns them
       ///
@@ -208,11 +208,11 @@ namespace UserService
       /// * `amount`      - Amount of tokens to recall
       /// * `memo`        - Memo
       /// * `subAccount`  - If specified, recall from this sub-account of `from`
-      void recall(TID                        tokenId,
+      void recall(TID                        token_id,
                   psibase::AccountNumber     from,
                   Quantity                   amount,
                   Memo                       memo,
-                  std::optional<std::string> subAccount);
+                  std::optional<std::string> sub_account);
 
       /// Recalls an amount of tokens from a shared balance and burns them
       ///
@@ -224,7 +224,7 @@ namespace UserService
       /// * `debitor`  - Account that received the credit
       /// * `amount`   - Amount of tokens to recall
       /// * `memo`     - Memo
-      void recallShared(TID                    tokenId,
+      void recallShared(TID                    token_id,
                         psibase::AccountNumber creditor,
                         psibase::AccountNumber debitor,
                         Quantity               amount,
@@ -242,7 +242,7 @@ namespace UserService
       /// * `token_id` - Unique token identifier
       /// * `sub_account` - Sub-account key
       /// * `amount`   - Amount of tokens to send
-      void toSub(TID tokenId, std::string subAccount, Quantity amount);
+      void toSub(TID token_id, std::string sub_account, Quantity amount);
 
       /// Returns tokens from a "sub-account" balance into the account's primary balance
       ///
@@ -255,7 +255,7 @@ namespace UserService
       /// * `token_id` - Unique token identifier
       /// * `sub_account` - Sub-account key
       /// * `amount`   - Amount of tokens to return
-      void fromSub(TID tokenId, std::string subAccount, Quantity amount);
+      void fromSub(TID token_id, std::string sub_account, Quantity amount);
 
       /// Creates a new "sub-account" with an empty balance
       ///
@@ -268,7 +268,7 @@ namespace UserService
       ///
       /// # Arguments
       /// * `sub_account` - Sub-account key
-      void createSub(std::string subAccount);
+      void createSub(std::string sub_account);
 
       /// Deletes a "sub-account" balance
       ///
@@ -276,7 +276,7 @@ namespace UserService
       ///
       /// # Arguments
       /// * `sub_account` - Sub-account key
-      void deleteSub(std::string subAccount);
+      void deleteSub(std::string sub_account);
 
       // Read-only interface:
 
@@ -286,7 +286,7 @@ namespace UserService
       /// * `token_id` - Unique token identifier
       ///
       /// Returns token information including current, burned supply and precision
-      TokenRecord getToken(TID tokenId);
+      TokenRecord getToken(TID token_id);
 
       /// Get user token balance
       ///
@@ -295,7 +295,7 @@ namespace UserService
       /// * `user` - User account
       ///
       /// Returns quantity of tokens in the user's balance
-      Quantity getBalance(TID tokenId, psibase::AccountNumber account);
+      Quantity getBalance(TID token_id, psibase::AccountNumber user);
 
       /// Get shared balance between a creditor and debitor
       ///
@@ -305,7 +305,7 @@ namespace UserService
       /// * `debitor` - Debitor account
       ///
       /// Returns quantity of tokens in the shared balance
-      Quantity getSharedBal(TID                    tokenId,
+      Quantity getSharedBal(TID                    token_id,
                             psibase::AccountNumber creditor,
                             psibase::AccountNumber debitor);
 
@@ -325,7 +325,7 @@ namespace UserService
       ///                           balance table, and will not need to be recreated on the next deposit.
       ///
       /// Returns a `bool` indicating whether the specified configuration flag is enabled.
-      bool getBalConf(psibase::AccountNumber account, TID tokenId, uint8_t index);
+      bool getBalConf(psibase::AccountNumber account, TID token_id, uint8_t index);
 
       /// Get user's global configuration.
       ///
@@ -359,7 +359,7 @@ namespace UserService
       /// * 1: Unrecallable    - If enabled, the token cannot be recalled
       ///
       /// Returns a `bool` indicating whether the specified configuration flag is enabled
-      bool getTokenConf(TID tokenId, uint8_t index);
+      bool getTokenConf(TID token_id, uint8_t index);
 
       /// Sets the system token
       ///
@@ -382,7 +382,7 @@ namespace UserService
       ///
       /// Returns the token balance of the sender's specified sub-account
       /// or `None` if the sub-account does not exist
-      std::optional<Quantity> getSubBal(TID tokenId, std::string subAccount);
+      std::optional<Quantity> getSubBal(TID token_id, std::string sub_account);
 
      private:
       void checkAccountValid(psibase::AccountNumber account);
@@ -397,9 +397,9 @@ namespace UserService
          // clang-format off
          struct History
          {
-            void configured(TID tokenId, std::string action, Memo memo) {}
-            void supplyChanged(TID tokenId, Account actor, std::string action, std::string amount, Memo memo) {}
-            void balChanged(TID tokenId, Account account, Account counterParty, std::string action, std::string amount, Memo memo) {}
+            void configured(TID token_id, std::string action, Memo memo) {}
+            void supplyChanged(TID token_id, Account actor, std::string action, std::string amount, Memo memo) {}
+            void balChanged(TID token_id, Account account, Account counter_party, std::string action, std::string amount, Memo memo) {}
          };
       };
       // clang-format on
@@ -408,39 +408,39 @@ namespace UserService
    // clang-format off
    PSIO_REFLECT(Tokens,
       method(init),
-      method(create, precision, maxIssuedSupply),
-      method(mint, tokenId, amount, memo),
-      method(burn, tokenId, amount, memo),
-      method(setBalConf, tokenId, index, enable),
-      method(delBalConf, tokenId),
-      method(setUserConf, index, enable),
-      method(setTokenConf, tokenId, index, enable),
-      method(setIcon, tokenId, image, contentType),
-      method(removeIcon, tokenId),
-      method(credit, tokenId, debitor, amount, memo),
-      method(uncredit, tokenId, debitor, amount, memo),
-      method(reject, tokenId, creditor, memo),
-      method(toSub, tokenId, subAccount, amount),
-      method(fromSub, tokenId, subAccount, amount),
-      method(createSub, subAccount),
-      method(deleteSub, subAccount),
-      method(debit, tokenId, creditor, amount, memo),
-      method(recall, tokenId, from, amount, memo, subAccount),
-      method(recallShared, tokenId, creditor, debitor, amount, memo),
-      method(getToken, tokenId),
+      method(create, precision, max_issued_supply),
+      method(mint, token_id, amount, memo),
+      method(burn, token_id, amount, memo),
+      method(setBalConf, token_id, index, enabled),
+      method(delBalConf, token_id),
+      method(setUserConf, index, enabled),
+      method(setTokenConf, token_id, index, enabled),
+      method(setIcon, token_id, image, contentType),
+      method(removeIcon, token_id),
+      method(credit, token_id, debitor, amount, memo),
+      method(uncredit, token_id, debitor, amount, memo),
+      method(reject, token_id, creditor, memo),
+      method(toSub, token_id, attr(sub_account, utf8), amount),
+      method(fromSub, token_id, attr(sub_account, utf8), amount),
+      method(createSub, attr(sub_account, utf8)),
+      method(deleteSub, attr(sub_account, utf8)),
+      method(debit, token_id, creditor, amount, memo),
+      method(recall, token_id, from, amount, memo, attr(sub_account, utf8)),
+      method(recallShared, token_id, creditor, debitor, amount, memo),
+      method(getToken, token_id),
       method(getUserConf, account, index),
       method(setSysToken, tokenId),
       method(getSysToken),
-      method(getSubBal, tokenId, subAccount),
-      method(getBalance, tokenId, account),
-      method(getSharedBal, tokenId, creditor, debitor),
-      method(getBalConf, account, tokenId, index),
-      method(getTokenConf, tokenId, index),
+      method(getSubBal, token_id, attr(sub_account, utf8)),
+      method(getBalance, token_id, user),
+      method(getSharedBal, token_id, creditor, debitor),
+      method(getBalConf, account, token_id, index),
+      method(getTokenConf, token_id, index),
     );
    PSIBASE_REFLECT_HISTORY_EVENTS(Tokens,
-      method(configured, tokenId, action, memo),
-      method(supplyChanged, tokenId, actor, action, amount, memo),
-      method(balChanged, tokenId, account, counterParty, action, amount, memo),
+      method(configured, token_id, attr(action, utf8), memo),
+      method(supplyChanged, token_id, actor, attr(action, utf8), attr(amount, utf8), memo),
+      method(balChanged, token_id, account, counter_party, attr(action, utf8), attr(amount, utf8), memo),
    );
    PSIBASE_REFLECT_TABLES(Tokens, Tokens::Tables)
    // clang-format on
