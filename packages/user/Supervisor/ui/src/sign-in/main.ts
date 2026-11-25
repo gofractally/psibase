@@ -66,6 +66,10 @@ const readDestination = (): Destination => {
 
 const destination = readDestination();
 
+// "step=account": the visitor asked to become a named account.
+const accountStep =
+    new URLSearchParams(window.location.search).get("step") === "account";
+
 // ------------------------------------------------------------------ views
 
 const views = ["welcome", "account", "working", "done", "unsupported"] as const;
@@ -119,7 +123,20 @@ const renderWelcome = () => {
         ? "Use your passkey to pick up where you left off."
         : "One passkey gets you in. New here? It takes a few seconds, and you can explore before you decide on anything else.";
     setButton(knownPasskey ? "Continue with your passkey" : "Sign up or sign in");
-    setBelow();
+    if (accountStep) {
+        // Asked to connect an account without being signed in: the passkey
+        // comes first, and the older account-and-key prompt stays one
+        // click away.
+        setBelow("Already have an account and its key?", {
+            label: "Use it instead",
+            run: () =>
+                window.location.assign(
+                    `/prompt.html?classic=1&returnPath=${encodeURIComponent(destination.path)}`,
+                ),
+        });
+    } else {
+        setBelow();
+    }
 
     if (destination.explicit) {
         $("dest-avatar").textContent = destination.app[0].toUpperCase();
@@ -538,10 +555,6 @@ const loadRememberedCredential = (): Uint8Array | undefined => {
         return undefined;
     }
 };
-
-// "step=account": the visitor asked to become a named account.
-const accountStep =
-    new URLSearchParams(window.location.search).get("step") === "account";
 
 const start = async () => {
     $("network").textContent = rootName;

@@ -21,6 +21,13 @@ interface PromptDetails {
 // NOTE: This expiration also guards page refresh.
 const PROMPT_EXPIRATION_SEC = 300;
 
+// Whether this browser has ever been through the account-and-key prompt.
+// Someone who has keeps getting it; everyone else is offered the passkey
+// path, which links to this prompt for those who want it.
+const CLASSIC_KEY = "psibase.used-classic-prompt.v1";
+const hasImportedAccounts = () =>
+    window.localStorage.getItem(CLASSIC_KEY) !== null;
+
 export const App = () => {
     const [iframeUrl, setIframeUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -54,6 +61,9 @@ export const App = () => {
                 }
 
                 setActiveApp(promptDetails.activeApp);
+                if (urlParams.has("classic")) {
+                    window.localStorage.setItem(CLASSIC_KEY, "1");
+                }
 
                 // A passkey guest who asks to connect an account is offered
                 // the way to create one. "classic" keeps the original
@@ -62,7 +72,7 @@ export const App = () => {
                     promptDetails.promptApp === "host" &&
                     promptDetails.promptName === "connect" &&
                     !urlParams.has("classic") &&
-                    loadGuestSession()
+                    (loadGuestSession() || !hasImportedAccounts())
                 ) {
                     const next = new URLSearchParams({
                         step: "account",

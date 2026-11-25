@@ -11,7 +11,7 @@ import {
     HttpRequest,
     HttpResponse,
 } from "../host-interface";
-import { guestBearerFor } from "../guest-session";
+import { guestBearerFor, isNetworkUrl } from "../guest-session";
 import { Supervisor } from "../supervisor";
 import { chainId, networkName } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
@@ -126,7 +126,10 @@ export class PluginHost implements HostInterface {
                 this.rewriteUriHook(req.uri),
                 false,
             );
-            xhr.withCredentials = withCredentials;
+            // To another host of this network, the visitor's billing cookie
+            // goes along, so the request is attributable even when no token
+            // is attached. The app answering is not told who the visitor is.
+            xhr.withCredentials = withCredentials || isNetworkUrl(req.uri);
 
             // Sync XHR cannot use responseType=arraybuffer. Always read the
             // response as a binary-safe string so every byte survives, then
