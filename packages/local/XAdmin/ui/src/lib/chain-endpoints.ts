@@ -12,6 +12,7 @@ import {
     siblingUrl,
     throwIfError,
     RPCError,
+    verifierForKeyType,
 } from "@psibase/common-lib";
 
 import { adminBearerAuthHeaders } from "./admin-login-jwt";
@@ -330,8 +331,11 @@ class Chain {
         key?: string;
         device?: string;
     }): Promise<ServerKey[]> {
+        // The service names the kind of key. Server keys made here are
+        // P-256: that is what security devices hold and what the browser
+        // can import (see hexDERPublicKeyToCryptoKey).
         const res = await postJson("/native/admin/keys", {
-            service: "verify-sig",
+            service: verifierForKeyType("secp256r1"),
             rawData: key,
             device,
         });

@@ -5,6 +5,7 @@ import {
     publicKeyPairToDER,
     signatureToBin,
 } from "./key-conversions";
+import { requireVerifierFor } from "./verifier";
 
 export class RPCError extends Error {
     trace: any;
@@ -365,10 +366,13 @@ export async function signTransaction(
         if (typeof k === "string") return privateStringToKeyPair(k);
         else return k;
     });
-    const claims = keys.map((k) => ({
-        service: "verify-sig",
-        rawData: uint8ArrayToHex(publicKeyPairToDER(k)),
-    }));
+    const claims = keys.map((k) => {
+        const der = publicKeyPairToDER(k);
+        return {
+            service: requireVerifierFor(der),
+            rawData: uint8ArrayToHex(der),
+        };
+    });
     // The signed transaction holds the transaction object; what is signed
     // is the digest of its packed bytes.
     transaction = {

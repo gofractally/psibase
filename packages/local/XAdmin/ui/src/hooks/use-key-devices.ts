@@ -1,5 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
+import { verifierForKeyType } from "@psibase/common-lib";
+
 import { chain } from "@/lib/chain-endpoints";
 import { hexDERPublicKeyToCryptoKey } from "@/lib/keys";
 import { queryKeys } from "@/lib/query-keys";
@@ -39,7 +41,7 @@ export const useAddServerKey = () =>
             });
 
             const service = result[0].service;
-            if (service !== "verify-sig") {
+            if (service !== verifierForKeyType("secp256r1")) {
                 throw new Error(`Unexpected service: ${service}"`);
             }
 
