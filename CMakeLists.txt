@@ -162,9 +162,13 @@ if(DEFINED WASI_SDK_PREFIX)
             -DSECP256K1_BUILD_EXAMPLES=OFF
     )
 
-    # BearSSL has no release containing the 64-bit P-256 code, so a commit is pinned.
+    # BearSSL has no release containing the 64-bit P-256 code, so a commit is
+    # pinned. It is fetched from the project's own fork, not from the author's
+    # server: the code that verifies signatures is then held where the rest
+    # of the project's code is, and any change to it is a commit there that
+    # can be reviewed. The fork's master is upstream's history, unmodified.
     ExternalProject_Add(wasm-bearssl
-        GIT_REPOSITORY https://www.bearssl.org/git/BearSSL
+        GIT_REPOSITORY https://github.com/gofractally/BearSSL.git
         GIT_TAG 7bea48e5e850ab4cafbe68d3765cdaba13a86d6f
         DEPENDS ${wasm-deps}
         PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm/bearssl
