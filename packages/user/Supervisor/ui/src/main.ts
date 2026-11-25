@@ -15,6 +15,7 @@ import { AppInterface } from "./app-interface";
 import { camelToKebab } from "./case";
 import { loadClientKey } from "./client-key";
 import { createDeviceStorage } from "./device-storage";
+import { loadHostDbCookies } from "./hostdb";
 import { MainPage } from "./main-page";
 import { Supervisor } from "./supervisor";
 import { isEmbedded } from "./utils";
@@ -78,6 +79,7 @@ addCallHandler(callHandlers, isGetJsonRequest, (msg) =>
 async function startup(): Promise<void> {
     try {
         await loadClientKey(createDeviceStorage());
+        await loadHostDbCookies();
         registerCallHandlers(callHandlers, (msg) => shouldHandleMessage(msg));
         window.parent.postMessage(buildMessageSupervisorInitialized(), "*");
     } catch (err) {

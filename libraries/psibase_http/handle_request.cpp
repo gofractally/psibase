@@ -1,4 +1,5 @@
 #include "http_session_base.hpp"
+#include "reply_headers.hpp"
 #include "websocket.hpp"
 #include "websocket_log_session.hpp"
 
@@ -430,8 +431,9 @@ namespace psibase::http
                                std::move(socket)));
                     },
                     websocket::stream_base::decorator(
-                        [reply = std::move(result)](auto& rep)
+                        [reply = std::move(result)](auto& rep) mutable
                         {
+                           dedupeSetCookie(reply.headers);
                            for (const auto& h : reply.headers)
                            {
                               if (h.matches("Sec-WebSocket-Accept") || h.matches("Upgrade") ||
@@ -445,9 +447,7 @@ namespace psibase::http
                                  rep.set(bhttp::field::connection, h.value);
                               }
                               else
-                              {
                                  rep.insert(h.name, h.value);
-                              }
                            }
                         }));
              });
@@ -827,12 +827,18 @@ namespace psibase::http
                 std::move(req), send,
                 [builder](HttpReply&& reply)
                 {
+                   dedupeSetCookie(reply.headers);
                    bhttp::response<bhttp::vector_body<char>> res{
                        bhttp::int_to_status(static_cast<std::uint16_t>(reply.status)),
                        builder.req_version};
                    res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
                    for (auto& h : reply.headers)
-                      res.set(h.name, h.value);
+                   {
+                      if (h.matches("set-cookie"))
+                         res.insert(h.name, h.value);
+                      else
+                         res.set(h.name, h.value);
+                   }
                    res.set(bhttp::field::content_type, reply.contentType);
                    builder.setKeepAlive(res);
                    res.body() = std::move(reply.body);
