@@ -87,6 +87,26 @@ const setNotice = (message?: string) => {
     el.textContent = message ?? "";
 };
 
+const setButton = (label: string) => {
+    $("btn-create-label").textContent = label;
+};
+
+/** The line under the button: a sentence and, optionally, one link. */
+const setBelow = (text?: string, link?: { label: string; run: () => void }) => {
+    const el = $("below");
+    el.textContent = text ?? "";
+    el.hidden = !text;
+    if (text && link) {
+        el.append(" ");
+        const a = document.createElement("button");
+        a.type = "button";
+        a.className = "si-link";
+        a.textContent = link.label;
+        a.addEventListener("click", link.run);
+        el.append(a);
+    }
+};
+
 const shortId = (guest: string) => `${guest.slice(0, 4)}…${guest.slice(-4)}`;
 
 const renderWelcome = () => {
@@ -97,13 +117,9 @@ const renderWelcome = () => {
     $("headline").textContent = knownPasskey ? "Welcome back" : "Welcome";
     $("lede").textContent = knownPasskey
         ? "Use your passkey to pick up where you left off."
-        : "Create a passkey to step inside. It takes a few seconds, and you can explore before you decide on anything else.";
-    $("btn-create-label").textContent = knownPasskey
-        ? "Continue with your passkey"
-        : "Continue with a passkey";
-    $("btn-existing").textContent = knownPasskey
-        ? "Create a new passkey instead"
-        : "I already have a passkey here";
+        : "One passkey gets you in. New here? It takes a few seconds, and you can explore before you decide on anything else.";
+    setButton(knownPasskey ? "Continue with your passkey" : "Sign up or sign in");
+    setBelow();
 
     if (destination.explicit) {
         $("dest-avatar").textContent = destination.app[0].toUpperCase();
@@ -145,9 +161,15 @@ const asCancelled = (e: unknown): never => {
 };
 
 /** Uses a passkey this visitor already has. */
-const usePasskey = async (credentialId?: Uint8Array): Promise<PrfResult> => {
+const usePasskey = async (
+    credentialId?: Uint8Array,
+    immediate = false,
+): Promise<PrfResult> => {
     const credential = (await navigator.credentials
         .get({
+            // "immediate": show the chooser only if this device already has
+            // a passkey for this site; otherwise fail at once, with no dialog.
+            ...(immediate ? { uiMode: "immediate" } : {}),
             publicKey: {
                 challenge: randomBytes(32),
                 userVerification: "required",
@@ -156,7 +178,7 @@ const usePasskey = async (credentialId?: Uint8Array): Promise<PrfResult> => {
                     : [],
                 extensions: prfExtension(),
             } as PublicKeyCredentialRequestOptions,
-        })
+        } as CredentialRequestOptions)
         .catch(asCancelled)) as PublicKeyCredential | null;
     if (!credential) throw new Cancelled();
     const ext = credential.getClientExtensionResults() as PrfExtensionResults;
@@ -313,18 +335,69 @@ const describeFailure = (e: unknown): string | undefined => {
     return "Something went wrong. Try again.";
 };
 
-const signIn = async (mode: "create" | "existing") => {
+type Mode = "auto" | "create" | "existing";
+
+/** Whether the browser can look for a passkey without showing a dialog. */
+const canLookUpSilently = async (): Promise<boolean> => {
+    try {
+        const caps = await (
+            PublicKeyCredential as unknown as {
+                getClientCapabilities?: () => Promise<Record<string, boolean>>;
+            }
+        ).getClientCapabilities?.();
+        return caps?.immediateGet === true;
+    } catch {
+        return false;
+    }
+};
+
+/**
+ * One button signs a visitor up or in.
+ *
+ * - This browser has signed in before: use that passkey.
+ * - The browser can look without a dialog: use a passkey if the device has
+ *   one, otherwise create one.
+ * - Otherwise ask the browser for an existing passkey first, so a returning
+ *   visitor on a new browser is not given a second identity. If none is
+ *   chosen, the button becomes "Create a passkey".
+ */
+const obtainPasskey = async (mode: Mode): Promise<PrfResult> => {
+    if (mode === "create") {
+        working("Creating your passkey", "Follow the prompt from your device.");
+        return createPasskey();
+    }
+    const remembered = loadRememberedCredential();
+    if (remembered || mode === "existing") {
+        working("Checking your passkey", "Follow the prompt from your device.");
+        return usePasskey(remembered);
+    }
+    if (await canLookUpSilently()) {
+        working("Looking for your passkey");
+        try {
+            return await usePasskey(undefined, true);
+        } catch (e) {
+            if (!(e instanceof Cancelled)) throw e;
+        }
+        working("Creating your passkey", "Follow the prompt from your device.");
+        return createPasskey();
+    }
+    working("Checking for a passkey", "Follow the prompt from your device.");
+    try {
+        return await usePasskey();
+    } catch (e) {
+        if (e instanceof Cancelled) throw new NoPasskeyChosen();
+        throw e;
+    }
+};
+
+class NoPasskeyChosen extends Error {}
+
+let nextMode: Mode = "auto";
+
+const signIn = async (mode: Mode) => {
     setNotice();
     try {
-        working(
-            mode === "create" ? "Creating your passkey" : "Checking your passkey",
-            "Follow the prompt from your device.",
-        );
-        const remembered = loadRememberedCredential();
-        const prf =
-            mode === "create"
-                ? await createPasskey()
-                : await usePasskey(remembered);
+        const prf = await obtainPasskey(mode);
         working("Signing you in", "Deriving your key on this device.");
         const session = await guestLogin(prf);
         saveGuestSession(session);
@@ -337,6 +410,28 @@ const signIn = async (mode: "create" | "existing") => {
             return;
         }
         renderWelcome();
+        if (e instanceof NoPasskeyChosen) {
+            // The browser found nothing to use, or the visitor closed its
+            // dialog. The same button now creates a passkey.
+            nextMode = "create";
+            setButton("Create a passkey");
+            setBelow("No passkey was used. New here? Create one.", {
+                label: "Look again",
+                run: () => void signIn("existing"),
+            });
+            return;
+        }
+        if (e instanceof Cancelled && loadRememberedCredential()) {
+            setBelow("Not your passkey?", {
+                label: "Use a different one",
+                run: () => {
+                    window.localStorage.removeItem(HAS_PASSKEY_KEY);
+                    nextMode = "auto";
+                    renderWelcome();
+                },
+            });
+            return;
+        }
         setNotice(describeFailure(e));
     }
 };
@@ -360,13 +455,11 @@ const start = async () => {
         return;
     }
 
-    const knownPasskey = () => !!window.localStorage.getItem(HAS_PASSKEY_KEY);
-    $("btn-create").addEventListener("click", () =>
-        signIn(knownPasskey() ? "existing" : "create"),
-    );
-    $("btn-existing").addEventListener("click", () =>
-        signIn(knownPasskey() ? "create" : "existing"),
-    );
+    $("btn-create").addEventListener("click", () => {
+        const mode = nextMode;
+        nextMode = "auto";
+        void signIn(mode);
+    });
 
     const session = loadGuestSession();
     const forget = $("btn-forget");
@@ -385,7 +478,9 @@ const start = async () => {
             clearGuestSession();
             renderWelcome();
             setNotice(
-                "Your earlier sign-in is no longer valid here. Use your passkey to continue.",
+                window.location.protocol === "http:"
+                    ? "This browser did not keep the sign-in for this app. Safari only keeps it over a secure (https) connection; over http, use Chrome."
+                    : "Your earlier sign-in is no longer valid here. Use your passkey to continue.",
             );
             return;
         }

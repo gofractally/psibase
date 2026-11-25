@@ -306,6 +306,18 @@
                 background: color-mix(in srgb, var(--si-accent) 10%, transparent);
             }
 
+            #signin .si-below {
+                margin: 12px 2px 0;
+                font-size: 13.5px;
+                line-height: 1.5;
+                color: var(--si-muted);
+                text-align: center;
+            }
+
+            #signin .si-below .si-link {
+                font-size: inherit;
+            }
+
             #signin .si-btn:focus-visible,
             #signin .si-link:focus-visible {
                 outline: 2px solid var(--si-accent);
@@ -510,11 +522,9 @@
                                 stroke-linejoin="round"
                             />
                         </svg>
-                        <span id="btn-create-label">Continue with a passkey</span>
+                        <span id="btn-create-label">Sign up or sign in</span>
                     </button>
-                    <button class="si-btn si-ghost" id="btn-existing" type="button">
-                        I already have a passkey here
-                    </button>
+                    <p class="si-below" id="below" hidden></p>
 
                     <ul class="si-points">
                         <li>
