@@ -539,6 +539,7 @@ let
         -e 's|/usr/bin/env WASI_SDK_PREFIX=[^ ]* ||' \
         doc/book.toml.in > $docdir/book.toml
       mdbook build -d $out $docdir
+      find $out \( -name '.*' -o -name '*~' \) -delete
     '';
     dontInstall = true;
   };
