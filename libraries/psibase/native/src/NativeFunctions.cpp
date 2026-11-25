@@ -148,9 +148,12 @@ namespace psibase
                "CodeByHashRow has incorrect key");
       }
 
-      void compileStoredCode(TransactionContext& context,
-                             std::span<const char>  key,
-                             std::span<const char>  value)
+      // A code row is being written: service code must pass the chain's
+      // admission rule now, or the write (and the transaction) fails. See
+      // TransactionContext::admitCode.
+      void admitStoredCode(TransactionContext&   context,
+                           std::span<const char> key,
+                           std::span<const char> value)
       {
          NativeTableNum table;
          if (key.size() < sizeof(table))
@@ -164,9 +167,14 @@ namespace psibase
          if (code.vmType() != 0)
             return;
          std::span<const char> bytes = psio::bytes(code.code());
-         context.blockContext.systemContext.wasmCache.compileAhead(
-             code.codeHash(), {bytes.data(), bytes.size()},
-             context.vmOptions(), code.vmVersion());
+         // The caller counts this write as database time. What admitCode
+         // does unbilled (compiling) is no more database time than it is
+         // billed time.
+         const auto billed = context.getBillableTime();
+         const auto start  = std::chrono::steady_clock::now();
+         context.admitCode(code.codeHash(), {bytes.data(), bytes.size()}, code.vmVersion());
+         context.databaseTime -= (std::chrono::steady_clock::now() - start) -
+                                 (context.getBillableTime() - billed);
       }
 
       void verifyRemoveCodeByHashRow(TransactionContext& ctx,
@@ -791,8 +799,7 @@ namespace psibase
                    {
                       verifyWriteConstrained(transactionContext, fullKey,
                                              {value.data(), value.size()}, existing);
-                      compileStoredCode(transactionContext, fullKey,
-                                        {value.data(), value.size()});
+                      admitStoredCode(transactionContext, fullKey, {value.data(), value.size()});
                    }
                    notifyKvMut(*this, bucketDb, fullKey.size(),
                                existing ? existing->size() : -1, value.size());
@@ -805,7 +812,7 @@ namespace psibase
              else if (bucketDb == DbId::nativeSubjective)
              {
                 verifyWriteSubjective(database, fullKey, {value.data(), value.size()});
-                compileStoredCode(transactionContext, fullKey, {value.data(), value.size()});
+                admitStoredCode(transactionContext, fullKey, {value.data(), value.size()});
              }
              else if (bucketDb == DbId::nativeSession)
              {

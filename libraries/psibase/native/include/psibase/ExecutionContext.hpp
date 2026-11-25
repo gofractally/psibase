@@ -16,6 +16,14 @@ namespace psibase
                 uint8_t            vmVersion,
                 std::span<const char> code);
 
+   /// What a WasmCache has done since it was created.
+   struct WasmCacheStats
+   {
+      std::uint64_t compiled  = 0;  ///< modules compiled from wasm
+      std::uint64_t loaded    = 0;  ///< modules taken from the artifact store
+      std::uint64_t discarded = 0;  ///< stored artifacts that failed verification
+   };
+
    struct WasmCacheImpl;
    struct WasmCache
    {
@@ -28,14 +36,24 @@ namespace psibase
 
       std::vector<std::span<const char>> span() const;
 
-      /// Start compiling newly stored code in the background, so that it is
-      /// ready, or nearly, when a transaction first executes it.
+      /// Newly stored code: make it ready for the transaction that first
+      /// executes it. wasmtime compiles here, before returning (or loads the
+      /// stored artifact); LLVM AOT starts a compile in the background. Never
+      /// throws: code that cannot be compiled is logged and is reported again
+      /// by whatever executes it first.
       void compileAhead(const Checksum256&    hash,
                         std::span<const char> code,
                         const VMOptions&      options,
                         std::uint8_t          vmVersion);
       /// Returns once every compile started by compileAhead has finished.
       void finishCompiles();
+
+      /// Whether the compiled module is in memory, ready to execute. Reported
+      /// by engines that share compiled modules (wasmtime); false otherwise.
+      bool           contains(const Checksum256& hash,
+                              const VMOptions&   options,
+                              std::uint8_t       vmVersion) const;
+      WasmCacheStats stats() const;
    };
 
    struct ExecutionMemoryImpl;

@@ -78,6 +78,16 @@ namespace psibase
          TransactionContext& context;
       };
 
+      // Service code is about to be stored (a CodeByHashRow with vmType 0).
+      // Runs the chain's admission rule (admitNativeWasm) under this
+      // context's VM limits and throws its error if the code is not
+      // admissible, which aborts the transaction. That part is billed: every
+      // node does it at every such write, with or without a compiled module.
+      // Then hands the code to the engine to compile ahead, with billing
+      // paused: a node that already holds the module and one that compiles
+      // it here bill the same and reach the same limit decision.
+      void admitCode(const Checksum256& hash, std::span<const char> code, std::uint8_t vmVersion);
+
       // Set watchdog timer; it will expire at startTime + serviceLoadTime + watchdogLimit.
       // This may be called multiple times with different limits; the most-recent limit applies.
       /// The VM limits this context executes services under.

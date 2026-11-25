@@ -221,6 +221,7 @@ function(add suffix)
             native/src/NativeFunctions.cpp
             native/src/PsizamPolicy.cpp
             native/src/NativeAotCache.cpp
+            native/src/NativeArtifactCache.cpp
             native/src/OpenSSLProver.cpp
             native/src/pkcs11.cpp
             native/src/PKCS11Prover.cpp

@@ -22,6 +22,7 @@
 #include <psibase/crypto.hpp>
 #include <psibase/db.hpp>
 #include <psibase/finally.hpp>
+#include <psibase/log.hpp>
 #include <psizam/wasmtime_admission.hpp>
 #include <psizam/wasmtime_backend.hpp>
 
@@ -129,20 +130,6 @@ namespace psibase::vm_wasmtime
              engineOptions(psizam::float_profile::performance)};
          return profile == psizam::float_profile::strict ? strict : performance;
       }
-
-      // psizam reports the reason separately from the kind of error.
-      template <typename F>
-      decltype(auto) withDetail(F f)
-      {
-         try
-         {
-            return f();
-         }
-         catch (const psizam::exception& e)
-         {
-            throw std::runtime_error(std::string(e.what()) + ": " + e.detail());
-         }
-      }
    }  // namespace
 
    // Compiled modules, most recently used last. A wasmtime module is shared:
@@ -160,13 +147,16 @@ namespace psibase::vm_wasmtime
          // an instance of it could not be taken from the pool.
          std::optional<wt::module> unpooled;
       };
-      std::mutex                                   mutex;
+      mutable std::mutex                           mutex;
       std::uint32_t                                cacheSize;
       std::list<Entry>                             entries;
       std::map<Key, std::list<Entry>::iterator>    index;
-      // Compiled modules kept between runs. The directory is private to the
-      // user: wasmtime executes what it loads from here without checking it.
+      // Compiled modules kept between runs. wasmtime executes what it loads
+      // from here as it is; the cache returns only what it has verified
+      // (NativeAotCache.hpp).
       std::shared_ptr<NativeAotCache>              artifacts;
+      std::atomic<std::uint64_t>                   compiled{0};
+      std::atomic<std::uint64_t>                   loaded{0};
 
       WasmCacheImpl(std::uint32_t cacheSize, const std::filesystem::path& path)
           : cacheSize{cacheSize},
@@ -190,6 +180,53 @@ namespace psibase::vm_wasmtime
          NativeAotCache::Key key;
          std::copy(digest.begin(), digest.end(), key.begin());
          return key;
+      }
+
+      // The module for stored code that is not in memory: from the artifact
+      // store, or compiled now and stored. `code()` is called, for the wasm,
+      // only if it has to be compiled. Throws the admission error, or the
+      // compiler's.
+      //
+      // Called on the thread that needs the module, with no lock held: two
+      // threads that need the same new module both compile it and store the
+      // same artifact, and different modules compile side by side.
+      template <typename Code>
+      wt::module obtain(const Checksum256&    hash,
+                        const VMOptions&      vmOptions,
+                        std::uint8_t          vmVersion,
+                        psizam::float_profile profile,
+                        Code&&                code)
+      {
+         // An artifact stored under this key was admitted and compiled from
+         // this exact service under these exact limits by this build, and
+         // the store returns it only if it is what was stored.
+         const auto key = artifactKey(hash, vmOptions, vmVersion, profile);
+         if (artifacts)
+            if (auto stored = artifacts->load(key))
+               try
+               {
+                  auto module = vmRuntime(profile).load(std::span(
+                      reinterpret_cast<const std::uint8_t*>(stored->data()), stored->size()));
+                  ++loaded;
+                  return module;
+               }
+               catch (const std::exception&)
+               {
+                  // Intact, but this engine will not take it: compile again.
+               }
+         // Admission is psizam's: the same checks, in the same order, as
+         // the psizam engines apply before they compile.
+         const std::span<const std::uint8_t> wasm  = code();
+         const auto                          costs = admitNativeWasm(wasm, vmOptions, vmVersion);
+         auto module = vmRuntime(profile).compile_metered(wasm, costs);
+         ++compiled;
+         if (artifacts)
+         {
+            auto artifact = module.serialize();
+            artifacts->store(
+                key, std::span(reinterpret_cast<const char*>(artifact.data()), artifact.size()));
+         }
+         return module;
       }
 
       std::optional<wt::module> get(const Checksum256& hash,
@@ -230,13 +267,51 @@ namespace psibase::vm_wasmtime
       // wasmtime owns its code and memory mappings.
       std::vector<std::span<const char>> span() const override { return {}; }
 
-      // Nothing to do ahead of time: Cranelift compiles a service in tens of
-      // milliseconds, at its first use, and the result is kept on disk.
-      void compileAhead(const Checksum256&,
-                        std::span<const char>,
-                        const VMOptions&,
-                        std::uint8_t) override
+      // Cranelift compiles a service in tens of milliseconds, so there is no
+      // queue and no second tier: the code is compiled here, on the thread
+      // that stored it, and is in memory and in the artifact store when this
+      // returns. The caller has admitted it (TransactionContext::admitCode).
+      // If the compiler still refuses it, that is this node's fault, not the
+      // transaction's: it is logged, the code stays stored, and whatever
+      // executes it first tries again and reports the error.
+      void compileAhead(const Checksum256&    hash,
+                        std::span<const char> code,
+                        const VMOptions&      vmOptions,
+                        std::uint8_t          vmVersion) override
       {
+         try
+         {
+            auto profile = nativeFloatProfile(vmVersion);
+            if (!profile || contains(hash, vmOptions, vmVersion))
+               return;
+            add(hash, vmOptions, vmVersion,
+                obtain(hash, vmOptions, vmVersion, *profile,
+                       [&]
+                       {
+                          return std::span(reinterpret_cast<const std::uint8_t*>(code.data()),
+                                           code.size());
+                       }));
+         }
+         catch (const std::exception& e)
+         {
+            PSIBASE_LOG(loggers::generic::get(), error)
+                << "Service code " << loggers::to_string(hash) << " (vmVersion "
+                << unsigned(vmVersion) << ") was not compiled when it was stored: " << e.what()
+                << ". It stays stored and is compiled again when it is first executed.";
+         }
+      }
+
+      bool contains(const Checksum256& hash,
+                    const VMOptions&   vmOptions,
+                    std::uint8_t       vmVersion) const override
+      {
+         std::lock_guard lock{mutex};
+         return index.count(Key{hash, vmOptions, vmVersion}) != 0;
+      }
+
+      WasmCacheStats stats() const override
+      {
+         return {compiled.load(), loaded.load(), artifacts ? artifacts->discarded() : 0};
       }
 
       void add(const Checksum256& hash,
@@ -335,43 +410,14 @@ namespace psibase::vm_wasmtime
             unbilled.emplace(transactionContext);
          if (!module)
          {
-            // An artifact stored under this key was admitted and compiled from
-            // this exact service under these exact limits by this build.
-            const auto key = WasmCacheImpl::artifactKey(code.codeHash, vmOptions, code.vmVersion,
-                                                        floatProfile);
-            if (cache.artifacts)
-               if (auto stored = cache.artifacts->load(key))
-                  try
-                  {
-                     module = vmRuntime(floatProfile).load(std::span(
-                         reinterpret_cast<const std::uint8_t*>(stored->data()), stored->size()));
-                  }
-                  catch (const std::exception&)
-                  {
-                     // Unreadable or from an incompatible build: compile again.
-                  }
-         }
-         if (!module)
-         {
-            // Admission is psizam's: the same checks, in the same order, as
-            // the psizam engines apply before they compile.
-            loadCode();
-            NativeVMOptions policy{vmOptions, {}, code.vmVersion};
-            auto            costs = withDetail(
-                [&]
-                {
-                   validateNativeWasm(c->code, policy);
-                   return wt::validate_and_cost(c->code, policy);
-                });
-            module = vmRuntime(floatProfile).compile_metered(c->code, costs);
-            if (cache.artifacts)
-            {
-               auto artifact = module->serialize();
-               cache.artifacts->store(
-                   WasmCacheImpl::artifactKey(code.codeHash, vmOptions, code.vmVersion,
-                                              floatProfile),
-                   std::span(reinterpret_cast<const char*>(artifact.data()), artifact.size()));
-            }
+            // The limits may have changed since the code was stored: it is
+            // admitted again before it is compiled here.
+            module = cache.obtain(code.codeHash, vmOptions, code.vmVersion, floatProfile,
+                                  [&]
+                                  {
+                                     loadCode();
+                                     return std::span<const std::uint8_t>(c->code);
+                                  });
          }
          if (!cache.get(code.codeHash, vmOptions, code.vmVersion))
             cache.add(code.codeHash, vmOptions, code.vmVersion, *module);

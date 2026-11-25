@@ -159,6 +159,18 @@ namespace psibase
       impl->cache->finishCompiles();
    }
 
+   bool WasmCache::contains(const Checksum256& hash,
+                            const VMOptions&   options,
+                            std::uint8_t       vmVersion) const
+   {
+      return impl->cache->contains(hash, options, vmVersion);
+   }
+
+   WasmCacheStats WasmCache::stats() const
+   {
+      return impl->cache->stats();
+   }
+
    const vm::Engine& vm::engineOf(const WasmCache& cache)
    {
       return *cache.impl->engine;

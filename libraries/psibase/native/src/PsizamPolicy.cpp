@@ -11,6 +11,7 @@
 #include <psizam/native_artifact.hpp>
 #include "psibase-native-aot-host.hpp"
 #endif
+#include <psizam/wasmtime_admission.hpp>
 #include <stdexcept>
 
 namespace psibase
@@ -228,6 +229,24 @@ namespace psibase
          {
             throw std::runtime_error("native WASM exception tags are not supported");
          }
+      }
+   }
+   std::vector<std::uint32_t> admitNativeWasm(std::span<const std::uint8_t> code,
+                                              const VMOptions&              options,
+                                              std::uint8_t                  vmVersion)
+   {
+      NativeVMOptions policy{options, {}, vmVersion};
+      validateNativeWasm(code, policy);
+      try
+      {
+         // The parser takes the module by mutable reference.
+         psizam::wasm_code bytes(code.begin(), code.end());
+         return psizam::wasmtime::validate_and_cost(bytes, policy);
+      }
+      catch (const psizam::exception& e)
+      {
+         // psizam reports the reason separately from the kind of error.
+         throw std::runtime_error(std::string(e.what()) + ": " + e.detail());
       }
    }
 

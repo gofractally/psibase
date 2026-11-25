@@ -4,6 +4,7 @@
 #include <mutex>
 #include <optional>
 #include <psibase/ActionContext.hpp>
+#include <psibase/PsizamPolicy.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/finally.hpp>
@@ -264,13 +265,13 @@ namespace psibase
             {
                self.blockContext.modifiedAuthAccounts.insert(service.service);
             }
-            setCode(db, service.service, service.vmType, service.vmVersion,
-                    {service.code.data(), service.code.size()});
             if (service.vmType == 0)
-               self.blockContext.systemContext.wasmCache.compileAhead(
+               self.admitCode(
                    sha256(service.code.data(), service.code.size()),
                    {reinterpret_cast<const char*>(service.code.data()), service.code.size()},
-                   self.vmOptions(), service.vmVersion);
+                   service.vmVersion);
+            setCode(db, service.service, service.vmType, service.vmVersion,
+                    {service.code.data(), service.code.size()});
          }
       }
       catch (const std::exception& e)
@@ -660,6 +661,17 @@ namespace psibase
    TransactionContext::BillingPause::~BillingPause()
    {
       context.impl->watchdog->resume();
+   }
+
+   void TransactionContext::admitCode(const Checksum256&    hash,
+                                      std::span<const char> code,
+                                      std::uint8_t          vmVersion)
+   {
+      admitNativeWasm({reinterpret_cast<const std::uint8_t*>(code.data()), code.size()},
+                      impl->wasmConfig.vmOptions, vmVersion);
+      BillingPause unbilled{*this};
+      blockContext.systemContext.wasmCache.compileAhead(hash, code, impl->wasmConfig.vmOptions,
+                                                        vmVersion);
    }
 
    std::chrono::nanoseconds TransactionContext::getBillableTime()

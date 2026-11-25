@@ -31,6 +31,12 @@ namespace psibase::vm
       // Returns once every compile compileAhead started has finished. An
       // engine that compiles nothing in the background has nothing to wait for.
       virtual void finishCompiles() {}
+      // See WasmCache.
+      virtual bool contains(const Checksum256&, const VMOptions&, std::uint8_t) const
+      {
+         return false;
+      }
+      virtual WasmCacheStats stats() const { return {}; }
    };
 
    // What one running service needs for its linear memory, if the engine

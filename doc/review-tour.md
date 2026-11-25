@@ -42,6 +42,7 @@ These are the changes the team has to agree to, as opposed to review for quality
 | Execution engine | psizam and wasmtime replace eos-vm; wasmtime is the default (d3aec135e) | Every node must produce identical results on the new engines. The wasmtime every node runs is a **fork** ([gofractally/wasmtime](https://github.com/gofractally/wasmtime): upstream 51.0.0 plus changes), pinned by revision; that revision is part of the identity of compiled code |
 | Stack depth | psizam's validator, and the wasmtime shim | A byte budget (`max_stack_bytes`) charged per call frame from costs the validator computes, so every engine overflows at the same call |
 | Float policy per code version | 09e1f9075, 3a0ae5d56 | A service runs under the float profile its `vmVersion` names: 0 is the strict WebAssembly deterministic profile, 1 is "deterministic performance" (fused multiply-add, as wasmtime behaves). SetCode stamps the chain default, 1, on new code. NaNs are canonical in both |
+| Code admission when stored | `admitNativeWasm` (`PsizamPolicy.cpp`), run by the native write of a code row (#2256) | A transaction that stores service code the chain policy does not admit (`setCode`, `stageCode`, genesis) fails with the reason. Before, it succeeded and the service failed when first called |
 | Wide-arithmetic instructions | 8b09a8776 | C++ services are compiled with `-mwide-arithmetic`; every engine must accept `i64.add128`, `i64.sub128`, `i64.mul_wide_s/u` |
 | Block size limit | 01c148342, bf02dd93c | A block stops filling at 4 MiB of transactions; the limit is an on-chain setting |
 | Signature service | b474c3e15 | `verify-sig` is a different implementation and is stricter about key encodings (details below) |
@@ -254,6 +255,7 @@ Open items are tracked as issues and closed as they are fixed.
 
 - LLVM AOT is re-verified on x86 only (native and end-to-end); not on macOS, and not the Rust suite. The interpreter, JIT1 and JIT2 are experimental and unverified on this head: #2228. `psitest` still runs test modules on JIT2: #2231.
 - Deterministic stack check on wasmtime costs memory traffic on every call: #2221.
+- Admission does not cover what only an engine's compiler refuses, nor imports no host function satisfies: such code is stored and fails at its first call. wasmtime refuses modules the chain policy admits (a function with more than 50,000 locals or 1,000 parameters, a name over 100,000 bytes, a function body over 7,654,321 bytes), which a psizam engine would run: #2256.
 - Events: one billing event per transaction and the per-block pipeline: #2218. Objective pricing for events, by size and index count: #2223.
 - Network throughput drops with more connections, and signed lags unsigned: #2220.
 - secp256k1 by default in the Rust library and the browser plugins: #2216.

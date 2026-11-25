@@ -2,8 +2,10 @@
 #include <catch2/catch_all.hpp>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
 #include <functional>
 #include <psibase/PsizamPolicy.hpp>
+#include <psibase/NativeAotCache.hpp>
 #include <psibase/NativeFunctions.hpp>
 #include <psibase/ActionContext.hpp>
 #include <psibase/TransactionContext.hpp>
@@ -445,7 +447,9 @@ namespace
       TempDirectory              directory;
       psibase::SharedDatabase    database{directory.path,
                                           {64ull << 20, 64ull << 20, 64ull << 20, 64ull << 20}};
-      psibase::WasmCache         cache{4};
+      // Compiled modules go to `artifacts`, or to the user's cache if empty.
+      std::filesystem::path      artifacts;
+      psibase::WasmCache         cache{4, artifacts};
       psibase::SystemContext     system{database,
                                         cache,
                                         {},
@@ -457,7 +461,7 @@ namespace
       psibase::SignedTransaction signedTransaction;
       psibase::TransactionTrace  trace;
 
-      NativeService()
+      explicit NativeService(std::filesystem::path artifacts = {}) : artifacts(std::move(artifacts))
       {
          REQUIRE(service.str() == "vm-test");
          REQUIRE(peer.str() == "vm-peer");
@@ -808,4 +812,458 @@ TEST_CASE("A block being produced takes transactions up to the chain's size limi
    // One transaction is allowed whatever its size, and so is the genesis block.
    CHECK_NOTHROW(received(1, 100000, false));
    CHECK_NOTHROW(received(40, 100000, true));
+}
+
+namespace
+{
+   // A privileged service's native writes, without a wasm service to make
+   // them: the same host function, in the same transaction context. A write
+   // to the chain's native database reports to the transaction service
+   // (kvNotify), so the fixture's service is installed as that too.
+   struct CodeWriter
+   {
+      NativeService&              fixture;
+      psibase::DbMode             mode;
+      psibase::TransactionContext transaction{fixture.block, fixture.signedTransaction,
+                                              fixture.trace, mode};
+      psibase::Action             action = fixture.action();
+      psibase::ActionTrace        trace;
+      psibase::ActionContext      context{transaction, action, trace};
+      psibase::NativeFunctions    host{
+          fixture.block.db,
+          transaction,
+          mode,
+          {.codeNum = fixture.service,
+           .flags   = psibase::CodeRow::isPrivileged |
+                      (mode.isSubjective ? psibase::ExecutionContext::isLocal : 0)},
+          &context};
+      // What the cache had done once this writer was ready.
+      psibase::WasmCacheStats before;
+
+      explicit CodeWriter(NativeService&  fixture,
+                          psibase::DbMode mode = psibase::DbMode::transaction())
+          : fixture(fixture), mode(mode)
+      {
+         auto& db = fixture.block.db;
+         auto  transact =
+             db.kvGet<psibase::CodeRow>(psibase::CodeRow::db, psibase::codeKey(fixture.service))
+                 .value();
+         transact.codeNum = psibase::transactionServiceNum;
+         db.kvPut(transact.db, transact.key(), transact);
+         // Running the service gives the transaction its limits and the
+         // host the execution context a write reports through.
+         fixture.run(transaction);
+         host.currentExecContext = &transaction.getExecutionContext(fixture.service);
+         before                  = fixture.cache.stats();
+      }
+      std::uint64_t compiled() const { return fixture.cache.stats().compiled - before.compiled; }
+      std::uint64_t loaded() const { return fixture.cache.stats().loaded - before.loaded; }
+
+      static psibase::CodeByHashRow row(const std::vector<std::uint8_t>& code)
+      {
+         return {.codeHash = psibase::sha256(code.data(), code.size()), .code = code};
+      }
+      void put(psibase::DbId db, const psibase::CodeByHashRow& value)
+      {
+         // Node-local state is written inside a subjective checkout.
+         auto& database = fixture.block.db;
+         bool  open     = mode.isSubjective;
+         if (open)
+            database.checkoutSubjective();
+         auto abort  = psibase::finally{[&]
+                                        {
+                                          if (open)
+                                             database.abortSubjective();
+                                        }};
+         auto handle = host.kvOpen(static_cast<uint32_t>(db), {},
+                                   static_cast<uint32_t>(psibase::KvMode::write));
+         host.kvPut(handle, psio::encode(psio::key{}, value.key()), psio::to_pssz(value));
+         if (open)
+         {
+            open = false;
+            REQUIRE(database.commitSubjective(*fixture.system.sockets, transaction.ownedSockets));
+         }
+      }
+      void put(psibase::DbId db, const std::vector<std::uint8_t>& code) { put(db, row(code)); }
+      bool stored(psibase::DbId db, const std::vector<std::uint8_t>& code)
+      {
+         auto& database = fixture.block.db;
+         if (mode.isSubjective)
+            database.checkoutSubjective();
+         auto abort = psibase::finally{[&]
+                                       {
+                                          if (mode.isSubjective)
+                                             database.abortSubjective();
+                                       }};
+         return database.kvGetRaw(db, psio::encode(psio::key{}, row(code).key())).has_value();
+      }
+      // The first call of a transaction to `account`.
+      static std::uint32_t call(NativeService&               fixture,
+                                psibase::TransactionContext& transaction,
+                                psibase::AccountNumber       account)
+      {
+         auto request    = fixture.action();
+         request.service = account;
+         psibase::ActionTrace result;
+         transaction.execNonTrxAction(0, request, result);
+         return NativeService::value(result);
+      }
+   };
+
+   std::vector<std::uint8_t> wasmModule(std::initializer_list<std::uint8_t> sections)
+   {
+      std::vector<std::uint8_t> code{0, 'a', 's', 'm', 1, 0, 0, 0};
+      code.insert(code.end(), sections);
+      return code;
+   }
+
+   void leb(std::vector<std::uint8_t>& out, std::uint32_t value)
+   {
+      for (; value >= 0x80; value >>= 7)
+         out.push_back(static_cast<std::uint8_t>(value | 0x80));
+      out.push_back(static_cast<std::uint8_t>(value));
+   }
+
+   // A valid module that takes far longer to compile than to admit:
+   // `functions` functions of `steps` arithmetic steps each. `salt` makes
+   // otherwise equal modules different code.
+   std::vector<std::uint8_t> largeModule(std::uint32_t functions,
+                                         std::uint32_t steps,
+                                         std::uint32_t salt)
+   {
+      std::vector<std::uint8_t> body{0, 0x20, 0};  // no locals; local.get 0
+      for (std::uint32_t i = 0; i < steps; ++i)
+      {
+         body.push_back(0x41);  // i32.const
+         leb(body, (salt + i) & 0x3f);
+         body.push_back(i % 3 ? 0x6a : 0x6c);       // i32.add or i32.mul
+         body.insert(body.end(), {0x20, 0, 0x73});  // local.get 0; i32.xor
+      }
+      body.push_back(0x0b);
+      std::vector<std::uint8_t> types, code;
+      leb(types, functions);
+      leb(code, functions);
+      for (std::uint32_t i = 0; i < functions; ++i)
+      {
+         types.push_back(0);
+         leb(code, body.size());
+         code.insert(code.end(), body.begin(), body.end());
+      }
+      auto result = wasmModule({1, 6, 1, 0x60, 1, 0x7f, 1, 0x7f});  // (i32) -> i32
+      result.push_back(3);
+      leb(result, types.size());
+      result.insert(result.end(), types.begin(), types.end());
+      result.push_back(10);
+      leb(result, code.size());
+      result.insert(result.end(), code.begin(), code.end());
+      return result;
+   }
+
+   bool isWasmtime()
+   {
+      return psibase::vm::selected().name == "wasmtime";
+   }
+}  // namespace
+
+TEST_CASE("Service code is admitted when its row is written, in every execution mode")
+{
+   struct Refused
+   {
+      std::vector<std::uint8_t> code;
+      std::string               reason;
+   };
+   const std::vector<Refused> refused = {
+       {{'n', 'o', 't', ' ', 'a', ' ', 'm', 'o', 'd', 'u', 'l', 'e'}, "invalid native WASM header"},
+       // Syntactically valid, against the chain policy: an imported memory,
+       // and a memory larger than max_pages (513 pages against 512).
+       {wasmModule({2, 7, 1, 0, 0, 2, 0, 1, 0}), "native WASM permits function imports only"},
+       {wasmModule({5, 4, 1, 0, 0x81, 0x04}), "native WASM initial resource exceeds chain policy"},
+       // Passes the declaration check and fails psizam's validator: a
+       // function declared to return an i32 that returns nothing.
+       {wasmModule({1, 5, 1, 0x60, 0, 1, 0x7f, 3, 2, 1, 0, 10, 4, 1, 2, 0, 0x0b}), ""},
+   };
+   const auto valid = psizam::read_wasm(PSIBASE_PSIZAM_SERVICE_WASM);
+
+   struct Mode
+   {
+      const char*     name;
+      psibase::DbMode mode;
+      bool            producing;
+      psibase::DbId   db;
+   };
+   for (auto [name, mode, producing, db] :
+        {Mode{"block being produced", psibase::DbMode::transaction(), true, psibase::DbId::native},
+         Mode{"block being applied", psibase::DbMode::transaction(), false, psibase::DbId::native},
+         Mode{"speculative", psibase::DbMode::speculative(), true, psibase::DbId::native},
+         Mode{"node-local", psibase::DbMode::callback(), true, psibase::DbId::nativeSubjective}})
+   {
+      INFO(name);
+      TempDirectory artifacts;
+      NativeService fixture{artifacts.path / "modules"};
+      fixture.block.isProducing = producing;
+      CodeWriter writer{fixture, mode};
+      for (const auto& [code, reason] : refused)
+      {
+         if (reason.empty())
+            CHECK_THROWS(writer.put(db, code));
+         else
+            CHECK_THROWS_WITH(writer.put(db, code), Catch::Matchers::ContainsSubstring(reason));
+         CHECK_FALSE(writer.stored(db, code));
+         CHECK_FALSE(fixture.cache.contains(CodeWriter::row(code).codeHash, {}, 0));
+      }
+      // A version no float profile is defined for is refused, whatever the code.
+      {
+         auto unknown      = CodeWriter::row(valid);
+         unknown.vmVersion = 7;
+         CHECK_THROWS_WITH(writer.put(db, unknown),
+                           Catch::Matchers::ContainsSubstring("vmVersion is not supported"));
+      }
+      CHECK(writer.compiled() == 0);
+
+      CHECK_NOTHROW(writer.put(db, valid));
+      CHECK(writer.stored(db, valid));
+      if (isWasmtime())
+      {
+         // Compiled where it was stored: in memory and in the artifact
+         // store before anything executes it.
+         const auto hash = CodeWriter::row(valid).codeHash;
+         CHECK(fixture.cache.contains(hash, {}, 0));
+         CHECK(writer.compiled() == 1);
+         // Written again (removed and re-added): admitted again, not recompiled.
+         CHECK_NOTHROW(writer.put(db, valid));
+         CHECK(writer.compiled() == 1);
+         CHECK(writer.loaded() == 0);
+      }
+   }
+}
+
+TEST_CASE("The first execution of stored code finds it compiled")
+{
+   if (!isWasmtime())
+      SKIP("only wasmtime compiles where the code is stored");
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   // Other code than the fixture's, deployed to a new account by a write.
+   auto code = psizam::read_wasm(PSIBASE_PSIZAM_SERVICE_WASM);
+   code.insert(code.end(), {0, 5, 4, 't', 'e', 's', 't'});  // a custom section
+   const auto                   hash = CodeWriter::row(code).codeHash;
+   const psibase::AccountNumber account{"vm-stored"};
+   {
+      CodeWriter writer{fixture};
+      CHECK_FALSE(fixture.cache.contains(hash, {}, 0));
+      writer.put(psibase::DbId::native, code);
+      CHECK(writer.compiled() == 1);
+      CHECK(fixture.cache.contains(hash, {}, 0));
+      psibase::CodeRow row{.codeNum = account, .codeHash = hash};
+      fixture.block.db.kvPut(row.db, row.key(), row);
+      // Its first execution, in the transaction that stored it and in the next.
+      CHECK(NativeService::value(fixture.called(writer.transaction, account)) == 8);
+      CHECK(writer.compiled() == 1);
+      CHECK(writer.loaded() == 0);
+   }
+   const auto before = fixture.cache.stats();
+   {
+      psibase::TransactionContext transaction{fixture.block, fixture.signedTransaction,
+                                              fixture.trace, psibase::DbMode::transaction()};
+      CHECK(CodeWriter::call(fixture, transaction, account) == 8);
+   }
+   CHECK(fixture.cache.stats().compiled == before.compiled);
+   CHECK(fixture.cache.stats().loaded == before.loaded);
+
+   // A node that starts later with the same artifact store loads the module
+   // when the code is written (applying the block) and compiles nothing new.
+   NativeService restarted{artifacts.path / "modules"};
+   CodeWriter    writer{restarted};
+   writer.put(psibase::DbId::native, code);
+   CHECK(writer.compiled() == 0);
+   CHECK(writer.loaded() == 1);
+   CHECK(restarted.cache.contains(hash, {}, 0));
+}
+
+TEST_CASE("Code the engine's compiler refuses after admission is stored, not a transaction error")
+{
+   // wasmtime caps a function at 50000 locals; the chain policy bounds
+   // locals by bytes and admits this module (gofractally/psibase#2256). Such
+   // a refusal must not decide the transaction: another engine compiles it.
+   const auto code =
+       wasmModule({1, 4, 1, 0x60, 0, 0, 3, 2, 1, 0, 10, 8, 1, 6, 1, 0xd1, 0x86, 0x03, 0x7f, 0x0b});
+   CHECK_NOTHROW(psibase::admitNativeWasm(code, {}, 0));
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   CodeWriter    writer{fixture};
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK(writer.stored(psibase::DbId::native, code));
+   if (isWasmtime())
+   {
+      CHECK_FALSE(fixture.cache.contains(CodeWriter::row(code).codeHash, {}, 0));
+      CHECK(writer.compiled() == 0);
+      // It fails where it failed before admission moved to the write: at
+      // its first execution on this engine.
+      const psibase::AccountNumber account{"vm-refused"};
+      psibase::CodeRow row{.codeNum = account, .codeHash = CodeWriter::row(code).codeHash};
+      fixture.block.db.kvPut(row.db, row.key(), row);
+      CHECK_THROWS_WITH(fixture.called(writer.transaction, account),
+                        Catch::Matchers::ContainsSubstring("too many locals"));
+   }
+}
+
+TEST_CASE("An import no host function satisfies is not an admission error")
+{
+   // Admission does not know the host functions (gofractally/psibase#2256):
+   // the code is stored, and fails to link when it is first executed.
+   const auto code = wasmModule(
+       {1, 4, 1, 0x60, 0, 0, 2, 14, 1, 3, 'e', 'n', 'v', 6, 'n', 'o', 's', 'u', 'c', 'h', 0, 0});
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   CodeWriter    writer{fixture};
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK(writer.stored(psibase::DbId::native, code));
+   const psibase::AccountNumber account{"vm-import"};
+   psibase::CodeRow             row{.codeNum = account, .codeHash = CodeWriter::row(code).codeHash};
+   fixture.block.db.kvPut(row.db, row.key(), row);
+   CHECK_THROWS(fixture.called(writer.transaction, account));
+}
+
+TEST_CASE("A damaged stored artifact is discarded and the service compiled again")
+{
+   if (!isWasmtime())
+      SKIP("counts compiles, which only the wasmtime engine reports");
+   TempDirectory artifacts;
+   const auto    directory = artifacts.path / "modules";
+   auto          run       = [&]
+   {
+      NativeService               fixture{directory};
+      psibase::TransactionContext transaction{fixture.block, fixture.signedTransaction,
+                                              fixture.trace, psibase::DbMode::transaction()};
+      CHECK(NativeService::value(fixture.run(transaction)) == 8);
+      return fixture.cache.stats();
+   };
+   auto only = [&]
+   {
+      std::vector<std::filesystem::path> files;
+      for (const auto& entry : std::filesystem::directory_iterator(directory))
+         files.push_back(entry.path());
+      REQUIRE(files.size() == 1);
+      return files.front();
+   };
+   auto stats = run();
+   CHECK(stats.compiled == 1);
+   CHECK(stats.loaded == 0);
+   stats = run();
+   CHECK(stats.compiled == 0);
+   CHECK(stats.loaded == 1);
+   CHECK(stats.discarded == 0);
+
+   const auto file   = only();
+   const auto size   = std::filesystem::file_size(file);
+   auto       damage = [&](auto change)
+   {
+      {
+         std::fstream io(file, std::ios::in | std::ios::out | std::ios::binary);
+         REQUIRE(io);
+         change(io);
+      }
+      auto result = run();
+      CHECK(result.discarded == 1);
+      CHECK(result.compiled == 1);
+      CHECK(result.loaded == 0);
+      // What replaced it is good again.
+      CHECK(std::filesystem::file_size(only()) == size);
+      result = run();
+      CHECK(result.discarded == 0);
+      CHECK(result.loaded == 1);
+   };
+   // One bit of native code.
+   damage(
+       [&](std::fstream& io)
+       {
+          io.seekg(size / 2);
+          char byte = io.get();
+          io.seekp(size / 2);
+          io.put(byte ^ 1);
+       });
+   // The digest itself.
+   damage(
+       [&](std::fstream& io)
+       {
+          io.seekp(size - 1);
+          io.put('\x5a');
+          io.seekp(size - 2);
+          io.put('\xa5');
+       });
+   // Cut short.
+   {
+      std::filesystem::resize_file(file, size / 2);
+      auto result = run();
+      CHECK(result.discarded == 1);
+      CHECK(result.compiled == 1);
+   }
+   // An artifact that is intact but stored under another key (a file moved
+   // by hand) is not this module's.
+   {
+      auto moved = file;
+      moved.replace_filename(std::string(64, '0') + ".pzam");
+      std::filesystem::rename(only(), moved);
+      psibase::NativeAotCache      cache{directory};
+      psibase::NativeAotCache::Key zero{};
+      CHECK_FALSE(cache.load(zero).has_value());
+      CHECK(cache.discarded() == 1);
+      CHECK(std::filesystem::is_empty(directory));
+   }
+}
+
+TEST_CASE("Storing code bills the same with and without a compiled module")
+{
+   if (!isWasmtime())
+      SKIP("only wasmtime compiles where the code is stored");
+   using namespace std::chrono;
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   struct Cost
+   {
+      nanoseconds   wall, billed;
+      std::uint64_t compiled;
+   };
+   auto store = [&](const std::vector<std::uint8_t>& code, nanoseconds limit = hours(1))
+   {
+      CodeWriter writer{fixture};
+      writer.transaction.setWatchdog(writer.transaction.getBillableTime() + limit);
+      const auto billedBefore = writer.transaction.getBillableTime();
+      const auto start        = steady_clock::now();
+      writer.put(psibase::DbId::native, code);
+      Cost cost{steady_clock::now() - start, writer.transaction.getBillableTime() - billedBefore,
+                writer.compiled()};
+      // A transaction over its limit can start no service.
+      CHECK_NOTHROW(fixture.called(writer.transaction, fixture.peer));
+      fixture.block.db.kvRemoveRaw(psibase::DbId::native,
+                                   psio::encode(psio::key{}, CodeWriter::row(code).key()));
+      return cost;
+   };
+   const auto code = largeModule(6000, 40, 1);
+   const auto cold = store(code);
+   CHECK(cold.compiled == 1);
+   const auto warm = store(code);
+   CHECK(warm.compiled == 0);
+   INFO("module " << code.size() << " bytes; cold wall " << cold.wall.count() / 1000
+                  << " us, billed " << cold.billed.count() / 1000 << " us; warm wall "
+                  << warm.wall.count() / 1000 << " us, billed " << warm.billed.count() / 1000
+                  << " us");
+   // The compile is most of the cold run and none of its bill: what is
+   // billed is admission, which the warm run does too.
+   CHECK(cold.billed < cold.wall / 2);
+   CHECK(warm.billed <= warm.wall);
+
+   // A CPU limit the write passes with the module cached, it passes when it
+   // has to compile: several times the warm cost, and less than the compile.
+   const auto limit = std::max<nanoseconds>(4 * warm.wall, milliseconds(20));
+   const auto other = largeModule(6000, 40, 2);
+   const auto first = store(other, limit);
+   CHECK(first.compiled == 1);
+   CHECK(first.billed < limit);
+   if (first.wall <= limit)
+      WARN("the compile took " << first.wall.count() / 1000 << " us, within the limit of "
+                               << limit.count() / 1000 << " us: nothing was shown");
+   const auto again = store(other, limit);
+   CHECK(again.compiled == 0);
+   CHECK(again.billed < limit);
 }

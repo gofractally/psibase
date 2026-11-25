@@ -140,6 +140,72 @@ TEST_CASE("SetCode: code is kept while referenced and erased with its last refer
    CHECK(!stored());
 }
 
+// Code is checked when it is stored: a transaction that stores code no node
+// could run fails itself, rather than leaving the failure to whoever calls
+// the service first.
+TEST_CASE("SetCode: code that is not admissible fails the transaction that stores it")
+{
+   DefaultTestChain t;
+   constexpr auto   account = AccountNumber{"admit1"};
+   constexpr auto   stager  = AccountNumber{"admit2"};
+   t.addAccount(account);
+   t.addAccount(stager);
+
+   auto wasm = [](std::initializer_list<unsigned char> sections)
+   {
+      std::vector<char> code{0, 'a', 's', 'm', 1, 0, 0, 0};
+      code.insert(code.end(), sections.begin(), sections.end());
+      return code;
+   };
+   struct Refused
+   {
+      std::vector<char> code;
+      std::string       reason;
+   };
+   const std::vector<Refused> refused = {
+       {{'n', 'o', 't', ' ', 'w', 'a', 's', 'm'}, "invalid native WASM header"},
+       // An imported memory: services import functions only.
+       {wasm({2, 7, 1, 0, 0, 2, 0, 1, 0}), "native WASM permits function imports only"},
+       // 513 pages of memory on a chain that allows 512.
+       {wasm({5, 4, 1, 0, 0x81, 0x04}), "native WASM initial resource exceeds chain policy"},
+   };
+   auto stored = [&](const std::vector<char>& code)
+   {
+      // Under whichever version the chain deploys by default.
+      const auto hash = sha256(code.data(), code.size());
+      for (std::uint8_t version : {0, 1})
+         if (t.kvGet<CodeByHashRow>(CodeByHashRow::db, codeByHashKey(hash, 0, version)))
+            return true;
+      return false;
+   };
+
+   transactor<SetCode> setCode{account, SetCode::service};
+   transactor<SetCode> stage{stager, SetCode::service};
+   std::uint64_t       id = 1;
+   for (const auto& [code, reason] : refused)
+   {
+      t.startBlock();
+      expect(t.pushTransaction(t.makeTransaction({setCode.setCode(account, 0, 0, code)})), reason);
+      CHECK(!stored(code));
+      CHECK(!t.kvGet<CodeRow>(CodeRow::db, codeKey(account)).has_value());
+      // Staged code is stored the same way and refused the same way.
+      expect(t.pushTransaction(t.makeTransaction({stage.stageCode(account, id++, 0, 0, code)})),
+             reason);
+      CHECK(!stored(code));
+   }
+
+   // What is admissible is stored by either route, and the account runs it.
+   const auto valid = readWholeFile("AbortService.wasm");
+   t.startBlock();
+   expect(t.pushTransaction(t.makeTransaction({stage.stageCode(account, id, 0, 0, valid)})));
+   CHECK(stored(valid));
+   expect(t.pushTransaction(t.makeTransaction({setCode.setCode(account, 0, 0, valid)})));
+   CHECK(t.kvGet<CodeRow>(CodeRow::db, codeKey(account)).has_value());
+   expect(t.pushTransaction(t.makeTransaction(
+              {transactor<AbortService>{account, account}.abort("admitted and running")})),
+          "admitted and running");
+}
+
 TEST_CASE("Verify service tracking")
 {
    DefaultTestChain t;

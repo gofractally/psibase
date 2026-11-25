@@ -143,8 +143,12 @@ class TestShutdown(unittest.TestCase):
 
 class TestExceptionExit(TestShutdown):
     def do_shutdown(self, node):
+        # Break the chain: replace transact with code that cannot process a
+        # transaction. Code that is not a module is refused when it is stored,
+        # so this is the smallest thing that is one: an empty module, with
+        # none of the functions the node calls.
         try:
-            node.push_action('transact', 'setcode', 'setcode', {"service":"transact","vmType":0, "vmVersion":0, "code": "DEADBEEF"})
+            node.push_action('transact', 'setcode', 'setcode', {"service":"transact","vmType":0, "vmVersion":0, "code": "0061736D01000000"})
         except ConnectionError:
             pass
 
