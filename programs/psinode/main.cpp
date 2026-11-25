@@ -15,6 +15,7 @@
 #include <psibase/prefix.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/storageDiagnostics.hpp>
+#include <psibase/verifier.hpp>
 #include <psibase/version.hpp>
 #include <psio/json.hpp>
 #include <psio/json_value.hpp>
@@ -310,7 +311,7 @@ namespace psibase
          auto                    key = psio::from_ijson<ClaimKey>(s);
          std::shared_ptr<Prover> result;
 
-         if (key.service.str() == "verify-sig")
+         if (verifiedKeyType(key.service))
          {
             result = std::make_shared<OpenSSLProver>(key.service, key.rawData);
          }
@@ -1743,7 +1744,7 @@ void run(const std::string&              db_path,
          NewKeyRequest key;
          if (auto status = psio::decode_json_checked(psio::ijson{}, json, key); !status.ok())
             return callback(std::string(status.error().what));
-         if (key.service.str() != "verify-sig")
+         if (!verifiedKeyType(key.service))
             return callback("Not implemented for native signing: " + key.service.str());
          boost::asio::post(
              chainContext,
@@ -1772,7 +1773,7 @@ void run(const std::string&              db_path,
                       node.on_key_update();
                       storeConfig = false;
                    }
-                   else if (key.service == AccountNumber{"verify-sig"})
+                   else if (verifiedKeyType(key.service))
                    {
                       if (key.rawData)
                       {

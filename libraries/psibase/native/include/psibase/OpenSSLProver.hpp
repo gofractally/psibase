@@ -9,8 +9,10 @@ namespace psibase
    struct OpenSSLProver : Prover
    {
      public:
-      // Creates a new secp256k1 key
+      // Creates a new key of the type that service verifies
+      // (psibase/verifier.hpp). Throws if service is not a known verifier.
       OpenSSLProver(AccountNumber service);
+      // Loads a private key. Throws unless service is the verifier for it.
       OpenSSLProver(AccountNumber service, std::span<const char> key);
       ~OpenSSLProver();
       std::vector<char> prove(std::span<const char> data, const Claim& claim) const;

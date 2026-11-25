@@ -10,9 +10,12 @@ namespace psibase
    class PKCS11Prover : public Prover
    {
      public:
+      // In each case service must be the verifier for the key
+      // (psibase/verifier.hpp); the constructors throw otherwise.
       PKCS11Prover(std::shared_ptr<pkcs11::session> session,
                    AccountNumber                    service,
                    pkcs11::object_handle            key);
+      // Generates a key of the type that service verifies
       PKCS11Prover(std::shared_ptr<pkcs11::session> session, AccountNumber service);
       PKCS11Prover(std::shared_ptr<pkcs11::session> session,
                    AccountNumber                    service,
@@ -31,8 +34,8 @@ namespace psibase
       pkcs11::mechanism                mechanism;
       bool                             prehash = false;
    };
+   // Each key is loaded for the service that verifies it
    void loadPKCS11Keys(std::shared_ptr<pkcs11::session> session,
-                       AccountNumber                    service,
                        std::string_view                 label,
                        CompoundProver&                  out);
    void loadPKCS11Keys(std::shared_ptr<pkcs11::session> session, CompoundProver& out);

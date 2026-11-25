@@ -10,7 +10,7 @@
 #include <psibase/db.hpp>
 #include <psibase/tester.hpp>
 #include <psibase/testerApi.hpp>
-#include <services/system/VerifySig.hpp>
+#include <psibase/verifier.hpp>
 #include "LightValidator.hpp"
 #include "cli.hpp"
 
@@ -384,7 +384,7 @@ int main(int argc, const char* const* argv)
       auto                  hash = psibase::sha256(preimage.data(), preimage.size());
       for (const auto& key : keys)
       {
-         psibase::Claim         pubkey{.service = SystemService::VerifySig::service,
+         psibase::Claim         pubkey{.service = psibase::requireVerifierFor(key.first.data),
                                        .rawData = {key.first.data.begin(), key.first.data.end()}};
          psibase::AccountNumber account;
          for (const auto& prod :

@@ -13,8 +13,7 @@ using namespace psibase::pkcs11;
 namespace
 {
 
-   constexpr const char key_label[]   = "psibase block signing key";
-   constexpr const char eckey_label[] = "psibase block signing EC key";
+   constexpr const char key_label[] = "psibase block signing key";
 
    std::vector<unsigned char> getPublicKeyData(EVP_PKEY* key)
    {
@@ -264,48 +263,37 @@ namespace
    // to the service-specific form used in a Claim
    std::vector<char> convertPublicKey(AccountNumber service, std::vector<char>&& in)
    {
-      if (service == AccountNumber{"verify-sig"})
-      {
-         return std::move(in);
-      }
-      else
-      {
-         throw std::runtime_error("Unsupported verify service");
-      }
+      // Every verifier takes the SubjectPublicKeyInfo as it is; the service
+      // has to be the one for this key.
+      checkVerifier(service, in);
+      return std::move(in);
    }
 
    pkcs11::object_handle parseAndStoreKey(pkcs11::session&      session,
                                           AccountNumber         service,
                                           std::span<const char> key)
    {
-      if (service == AccountNumber{"verify-sig"})
-      {
-         return storeKey(session, key_label, parsePrivateKey(key).get());
-      }
-      else
-      {
+      if (!verifiedKeyType(service))
          throw std::runtime_error("Unsupported verify service");
-      }
+      auto parsed = parsePrivateKey(key);
+      if (!parsed)
+         handleOpenSSLError();
+      // Checked before the key is stored, so a mismatch leaves nothing behind.
+      checkVerifier(service, psibase::getPublicKey(parsed.get()));
+      return storeKey(session, key_label, parsed.get());
    }
 
    std::vector<char> formatSignature(AccountNumber            service,
                                      const std::vector<char>& pubkey,
                                      std::vector<char>&&      sig)
    {
-      if (service == AccountNumber{"verify-sig"})
-      {
-         // The token returns whichever s it computed.
-         auto p = reinterpret_cast<const unsigned char*>(pubkey.data());
-         std::unique_ptr<EVP_PKEY, OpenSSLDeleter> key(d2i_PUBKEY(nullptr, &p, pubkey.size()));
-         if (!key)
-            handleOpenSSLError();
-         normalizeSignature(key.get(), sig);
-         return std::move(sig);
-      }
-      else
-      {
-         throw std::runtime_error("Unsupported verify service");
-      }
+      // The token returns whichever s it computed.
+      auto p = reinterpret_cast<const unsigned char*>(pubkey.data());
+      std::unique_ptr<EVP_PKEY, OpenSSLDeleter> key(d2i_PUBKEY(nullptr, &p, pubkey.size()));
+      if (!key)
+         handleOpenSSLError();
+      normalizeSignature(key.get(), sig);
+      return std::move(sig);
    }
 
    // Use the CKA_ALLOWED_MECHANISMS attribute if available or the token's mechanism list otherwise.
@@ -325,7 +313,6 @@ namespace
 }  // namespace
 
 void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session,
-                             AccountNumber                    service,
                              std::string_view                 label,
                              CompoundProver&                  out)
 {
@@ -336,7 +323,11 @@ void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session,
    {
       try
       {
-         out.add(std::make_shared<PKCS11Prover>(session, service, key));
+         // The key itself says which service verifies it.
+         auto service = verifierFor(::getPublicKey(*session, key));
+         if (!service)
+            throw std::runtime_error("Unsupported public key");
+         out.add(std::make_shared<PKCS11Prover>(session, *service, key));
       }
       catch (std::runtime_error& e)
       {
@@ -347,7 +338,7 @@ void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session,
 
 void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session, CompoundProver& out)
 {
-   loadPKCS11Keys(session, AccountNumber{"verify-sig"}, key_label, out);
+   loadPKCS11Keys(session, key_label, out);
 }
 
 psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session,
@@ -385,10 +376,7 @@ psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session,
 psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session, AccountNumber service)
     : PKCS11Prover(session,
                    service,
-                   ::generateKey(*session,
-                                 service == AccountNumber{"verify-sig"} ? key_label : eckey_label,
-                                 service == AccountNumber{"verify-sig"} ? NID_X9_62_prime256v1
-                                                                        : NID_secp256k1))
+                   ::generateKey(*session, key_label, curveNidFor(service)))
 {
 }
 

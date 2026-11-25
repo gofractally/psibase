@@ -4,6 +4,12 @@
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
 
+#include <psibase/verifier.hpp>
+
+#include <memory>
+#include <span>
+#include <vector>
+
 // Some C++ wrappers for OpenSSL
 
 namespace psibase
@@ -30,7 +36,15 @@ namespace psibase
    std::vector<char>                         getPublicKey(EVP_PKEY* key);
    std::unique_ptr<EVP_PKEY, OpenSSLDeleter> generateKey(int nid);
    std::unique_ptr<EVP_PKEY, OpenSSLDeleter> parsePrivateKey(std::span<const char> key);
+   // The OpenSSL curve for a key type
+   int curveNid(KeyType type);
+   // The OpenSSL curve for the keys that a verify service verifies. Throws if
+   // the service is not one of the verifiers in psibase/verifier.hpp.
+   int curveNidFor(AccountNumber verifyService);
+   // Throws unless service is the verifier for this public key (a DER
+   // SubjectPublicKeyInfo): a claim naming any other service would not verify.
+   void checkVerifier(AccountNumber service, std::span<const char> publicKey);
    // Rewrites a raw r || s ECDSA signature made with key into the low-S form,
-   // s <= n/2. verify-sig accepts no other form.
+   // s <= n/2. The verifiers accept no other form.
    void normalizeSignature(EVP_PKEY* key, std::span<char> signature);
 }  // namespace psibase

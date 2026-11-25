@@ -113,6 +113,34 @@ std::unique_ptr<EVP_PKEY, OpenSSLDeleter> psibase::generateKey(int nid)
    return result;
 }
 
+int psibase::curveNid(KeyType type)
+{
+   switch (type)
+   {
+      case KeyType::secp256k1:
+         return NID_secp256k1;
+      case KeyType::secp256r1:
+         return NID_X9_62_prime256v1;
+   }
+   throw std::runtime_error("Unsupported key type");
+}
+
+int psibase::curveNidFor(AccountNumber verifyService)
+{
+   if (auto type = verifiedKeyType(verifyService))
+      return curveNid(*type);
+   throw std::runtime_error("Unsupported verify service: " + verifyService.str());
+}
+
+void psibase::checkVerifier(AccountNumber service, std::span<const char> publicKey)
+{
+   auto expected = verifierFor(publicKey);
+   if (!expected)
+      throw std::runtime_error("Unsupported public key");
+   if (*expected != service)
+      throw std::runtime_error("Key belongs to " + expected->str() + ", not " + service.str());
+}
+
 void psibase::normalizeSignature(EVP_PKEY* key, std::span<char> signature)
 {
    BIGNUM* n = nullptr;
@@ -141,14 +169,15 @@ std::unique_ptr<EVP_PKEY, OpenSSLDeleter> psibase::parsePrivateKey(std::span<con
 
 psibase::OpenSSLProver::OpenSSLProver(AccountNumber service) : service(service)
 {
-   // A key generated here lives in this process, so it uses the curve that is
-   // fastest to verify. Hardware keys (PKCS #11) are P-256.
-   auto pkey = generateKey(NID_secp256k1);
+   // The service names the kind of key: the caller chooses a curve by
+   // choosing its verifier.
+   auto pkey = generateKey(curveNidFor(service));
    if (!pkey)
    {
       handleOpenSSLError();
    }
-   pubKey     = getPublicKey(pkey.get());
+   pubKey = getPublicKey(pkey.get());
+   checkVerifier(service, pubKey);
    privateKey = pkey.release();
 }
 
@@ -161,7 +190,8 @@ psibase::OpenSSLProver::OpenSSLProver(AccountNumber service, std::span<const cha
    {
       handleOpenSSLError();
    }
-   pubKey     = getPublicKey(pkey.get());
+   pubKey = getPublicKey(pkey.get());
+   checkVerifier(service, pubKey);
    privateKey = pkey.release();
 }
 

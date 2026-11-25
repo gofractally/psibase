@@ -10,7 +10,7 @@
 #include <psibase/serviceEntry.hpp>
 #include <psibase/tester.hpp>
 #include <psibase/testerApi.hpp>
-#include <services/system/VerifySig.hpp>
+#include <psibase/verifier.hpp>
 #include "LightValidator.hpp"
 
 #include <psio/to_hex.hpp>
@@ -83,7 +83,7 @@ ProducerGroup findProducer(const psibase::JointConsensus& consensus, const State
 
 std::string keyId(const psibase::Claim& claim)
 {
-   if (claim.service == SystemService::VerifySig::service)
+   if (psibase::verifiedKeyType(claim.service))
    {
       auto fingerprint = keyFingerprint(SystemService::AuthSig::SubjectPublicKeyInfo{
           .data = {claim.rawData.begin(), claim.rawData.end()}});
