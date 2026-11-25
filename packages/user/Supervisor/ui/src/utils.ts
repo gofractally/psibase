@@ -1,7 +1,12 @@
 import { getJson, postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 
 import { loadBasic } from "./component-loading";
-import { guestBearerFor, guestFetchOptions } from "./guest-session";
+import {
+    guestBearerFor,
+    guestFetchOptions,
+    isSignInRequired,
+    requestSignIn,
+} from "./guest-session";
 import { DownloadFailed } from "./errors";
 
 export const wasmFromUrl = async (url: string) => {
@@ -16,6 +21,7 @@ export const wasmFromUrl = async (url: string) => {
         headers,
     })
         .then((res) => {
+            if (res.status === 401) requestSignIn();
             if (!res.ok) throw new DownloadFailed(url);
             return res.arrayBuffer();
         })
@@ -94,10 +100,15 @@ const getNetworkName = (): Promise<string> => {
             url,
             "query { networkName }",
             guestFetchOptions(url),
-        ).then((res) => {
-            networkName = res.data.networkName;
-            return networkName;
-        });
+        )
+            .then((res) => {
+                networkName = res.data.networkName;
+                return networkName;
+            })
+            .catch((e) => {
+                if (isSignInRequired(e)) requestSignIn();
+                throw e;
+            });
     }
     return Promise.resolve(networkName);
 };

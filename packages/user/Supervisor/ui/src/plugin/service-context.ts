@@ -1,4 +1,8 @@
-import { guestFetchOptions } from "../guest-session";
+import {
+    guestFetchOptions,
+    isSignInRequired,
+    requestSignIn,
+} from "../guest-session";
 import { pluginString, postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 
 import { ServiceMap } from "../component-loading/loader";
@@ -28,7 +32,10 @@ async function getServiceMap(service: string): Promise<ServiceMap | null> {
         url,
         query,
         guestFetchOptions(url),
-    );
+    ).catch((e) => {
+        if (isSignInRequired(e)) requestSignIn();
+        throw e;
+    });
     if (result.data.depsFor) {
         let map = new Object() as ServiceMap;
         for (const { name, service } of result.data.depsFor.deps) {

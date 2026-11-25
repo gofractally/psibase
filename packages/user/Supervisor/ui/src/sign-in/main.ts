@@ -289,7 +289,46 @@ const guestLogin = async (prf: PrfResult): Promise<GuestSession> => {
  * browser keeps, and then redirects to the page that was asked for. The
  * token travels in the request body, never in a URL.
  */
+// The apps this browser was given a session for, so signing out can take
+// those sessions back.
+const APPS_KEY = "psibase.guest-apps.v1";
+
+const rememberApp = (app: string) => {
+    const apps = new Set<string>(
+        JSON.parse(window.localStorage.getItem(APPS_KEY) ?? "[]"),
+    );
+    apps.add(app);
+    window.localStorage.setItem(APPS_KEY, JSON.stringify([...apps]));
+};
+
+/** Ends the session everywhere this browser holds it. */
+const signOutEverywhere = async () => {
+    const apps: string[] = JSON.parse(
+        window.localStorage.getItem(APPS_KEY) ?? "[]",
+    );
+    await Promise.allSettled(
+        apps
+            .filter((app) => ACCOUNT_NAME.test(app))
+            .map((app) =>
+                fetch(`${siblingOrigin(app)}/common/set-host-cookie`, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        name: "SESSION",
+                        value: "",
+                        maxAge: 0,
+                        httpOnly: true,
+                    }),
+                }),
+            ),
+    );
+    window.localStorage.removeItem(APPS_KEY);
+    clearGuestSession();
+};
+
 const submitSession = (session: GuestSession) => {
+    rememberApp(destination.app);
     const maxAge = Math.max(0, session.exp - Math.floor(Date.now() / 1000));
     const form = document.createElement("form");
     form.method = "POST";
@@ -307,6 +346,23 @@ const submitSession = (session: GuestSession) => {
     field("maxAge", String(maxAge));
     document.body.append(form);
     form.submit();
+};
+
+/** Whether the node still honours this session. */
+const sessionAccepted = async (session: GuestSession): Promise<boolean> => {
+    try {
+        const res = await fetch(`${siblingOrigin("branding")}/graphql`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/graphql",
+                Authorization: `Bearer ${session.token}`,
+            },
+            body: "{ __typename }",
+        });
+        return res.status !== 401;
+    } catch {
+        return true;
+    }
 };
 
 // ------------------------------------------------------------ return leg
@@ -478,8 +534,9 @@ const start = async () => {
 
     const session = loadGuestSession();
     const forget = $("btn-forget");
-    forget.addEventListener("click", () => {
-        clearGuestSession();
+    forget.addEventListener("click", async () => {
+        working("Signing out");
+        await signOutEverywhere();
         forget.hidden = true;
         $("foot-id").textContent = "";
         renderWelcome();
@@ -515,6 +572,24 @@ const start = async () => {
                 window.location.protocol === "http:"
                     ? "This browser did not keep the sign-in for this app. Safari only keeps it over a secure (https) connection; over http, use Chrome."
                     : "Your earlier sign-in is no longer valid here. Use your passkey to continue.",
+            );
+            return;
+        }
+        // An app sent the visitor here because the supervisor inside it
+        // had no session, although this page has one. Find out which side
+        // is wrong before sending them back into the same failure.
+        if (new URLSearchParams(window.location.search).has("refresh")) {
+            const valid = await sessionAccepted(session);
+            if (!valid) {
+                clearGuestSession();
+                forget.hidden = true;
+                $("foot-id").textContent = "";
+                renderWelcome();
+                return;
+            }
+            renderWelcome();
+            setNotice(
+                "You are signed in, but this browser keeps apps from seeing it (it isolates each site's storage). Chrome works; in Safari this happens on localhost addresses.",
             );
             return;
         }

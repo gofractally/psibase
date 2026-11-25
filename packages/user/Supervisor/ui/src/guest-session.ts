@@ -79,3 +79,20 @@ export const guestFetchOptions = (url: string): RequestInit | undefined => {
     const token = guestBearerFor(url);
     return token ? { headers: { Authorization: `Bearer ${token}` } } : undefined;
 };
+
+let signInRequested = false;
+
+/**
+ * Called when the node refuses a supervisor request for lack of a session.
+ * Embedded in an app, the supervisor cannot navigate; it asks the app's
+ * page to send the visitor through sign-in.
+ */
+export const requestSignIn = () => {
+    if (signInRequested || window.parent === window) return;
+    signInRequested = true;
+    window.parent.postMessage({ type: "PSIBASE_SIGN_IN_REQUIRED" }, "*");
+};
+
+/** True for the node's "no session" answer to a supervisor request. */
+export const isSignInRequired = (error: unknown): boolean =>
+    String((error as Error)?.message ?? error).includes("sign-in required");

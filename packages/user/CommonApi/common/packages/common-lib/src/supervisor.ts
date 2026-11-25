@@ -142,6 +142,17 @@ export class Supervisor {
             return;
         }
 
+        // The supervisor frame has no session to act with (the node requires
+        // one before serving app queries). Only this page can navigate, so
+        // it sends the visitor to sign in and come back here.
+        if (
+            messageEvent.data &&
+            messageEvent.data.type === "PSIBASE_SIGN_IN_REQUIRED"
+        ) {
+            this.onSignInRequired();
+            return;
+        }
+
         try {
             if (isSupervisorInitialized(messageEvent.data)) {
                 this.onSupervisorInitialized();
@@ -168,6 +179,19 @@ export class Supervisor {
     private onSupervisorInitialized() {
         this.loadState = { status: "ready" };
         this.settleLoadWaiters((waiter) => waiter.resolve());
+    }
+
+    private signInRequested = false;
+
+    private onSignInRequired() {
+        if (this.signInRequested || window.top !== window) return;
+        this.signInRequested = true;
+        const next = new URLSearchParams({
+            app: window.location.hostname.split(".")[0],
+            path: window.location.pathname + window.location.search,
+            refresh: "1",
+        });
+        window.location.assign(`${this.supervisorSrc}/sign-in.html?${next}`);
     }
 
     private onSupervisorStartupFailed(message: string) {
