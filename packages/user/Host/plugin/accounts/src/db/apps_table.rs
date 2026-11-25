@@ -64,14 +64,14 @@ impl AppsTable {
     }
 
     pub(crate) fn login(&self, user: &str) -> Result<(), Error> {
+        // Get the user's query token and set the app's cookie before recording
+        // the login, so that a failure (or a trap) in there leaves the app with
+        // whoever was logged in before rather than with a user that has no token.
+        HostAuth::set_logged_in_user(user, &self.app)?;
+
         logged_in_user_table().set(&self.app, user.as_bytes());
         self.connect(user);
-
-        let result = HostAuth::set_logged_in_user(user, &self.app);
-        if result.is_err() {
-            self.logout();
-        }
-        result
+        Ok(())
     }
 
     pub(crate) fn connect(&self, user: &str) {

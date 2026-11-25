@@ -361,7 +361,9 @@ dependencies = [
 name = "auth-sig"
 version = "0.29.0"
 dependencies = [
+ "k256",
  "lazy_static",
+ "p256",
  "pem",
  "psibase",
  "psibase-plugin-workspace-hack",
@@ -1425,6 +1427,7 @@ dependencies = [
 name = "host-crypto"
 version = "0.29.0"
 dependencies = [
+ "k256",
  "p256",
  "pem",
  "psibase",
@@ -1893,6 +1896,19 @@ dependencies = [
  "hmac",
  "serde",
  "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "k256"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6e3919bbaa2945715f0bb6d3934a173d1e9a59ac23767fbaaef277265a7411b"
+dependencies = [
+ "cfg-if",
+ "ecdsa",
+ "elliptic-curve",
+ "once_cell",
  "sha2",
 ]
 
@@ -3983,6 +3999,7 @@ dependencies = [
 name = "web-crypto"
 version = "0.29.0"
 dependencies = [
+ "k256",
  "p256",
  "pem",
  "psibase",

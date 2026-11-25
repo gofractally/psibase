@@ -58,6 +58,25 @@ interface admin {
     /// Any credentials that fails validation will not be imported.
     import-existing: func(credentials: list<credential>) -> result<_, list<tuple<string, error>>>;
 
+    /// Takes over an account that the supervisor has just created: stores its key on this
+    /// device and logs the account in to the active app.
+    /// Callable only by the supervisor.
+    ///
+    /// Parameters:
+    /// * `account`: The name of an existing account that uses the `auth-sig` auth service
+    /// * `private-key`: The P-256 or secp256k1 private key of the account, PKCS #8 in PEM format
+    ///
+    /// The account and key are verified before anything is stored. On success:
+    /// * the key is in the key vault and the account is known to this device, as after
+    ///   `import-existing`,
+    /// * the active app is one of the account's connected apps, and
+    /// * the account is logged in to the active app, as after `login`.
+    ///
+    /// If the login fails after the key was verified, the key stays imported and the account
+    /// stays known to this device, but it is neither connected nor logged in to the active app
+    /// and whoever was logged in to it before still is.
+    adopt-account: func(account: string, private-key: string) -> result<_, error>;
+
     /// Logs the user into the specified app and connects them to it
     login: func(user: string, app: string) -> result<_, error>;
 

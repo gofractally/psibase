@@ -1,6 +1,5 @@
 use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
-use crate::bindings::host::types::types::Pem;
-use crate::types::*;
+use crate::keys::KeyStore;
 
 fn keys_table() -> Bucket {
     Bucket::new(
@@ -22,32 +21,26 @@ fn temp_keys_table() -> Bucket {
     )
 }
 
-fn get_hash(key: &Pem) -> String {
-    let pem = pem::Pem::try_from_pem_str(&key).expect("Failed to hash key");
-    let digest = seahash::hash(&pem.contents().to_vec());
-    format!("{:x}", digest)
-}
-
 pub struct ManagedKeys;
 
-impl ManagedKeys {
-    pub fn add(pubkey: &Pem, privkey: &[u8]) {
-        keys_table().set(&get_hash(pubkey), &privkey);
+impl KeyStore for ManagedKeys {
+    fn put(&self, id: &str, private_key: &[u8]) {
+        keys_table().set(id, private_key);
     }
 
-    pub fn get(pubkey: &Pem) -> Option<Vec<u8>> {
-        keys_table().get(&get_hash(pubkey))
+    fn fetch(&self, id: &str) -> Option<Vec<u8>> {
+        keys_table().get(id)
     }
 }
 
 pub struct TempKeys;
 
-impl TempKeys {
-    pub fn add(pubkey: &Pem, privkey: &[u8]) {
-        temp_keys_table().set(&get_hash(pubkey), &privkey);
+impl KeyStore for TempKeys {
+    fn put(&self, id: &str, private_key: &[u8]) {
+        temp_keys_table().set(id, private_key);
     }
 
-    pub fn get(pubkey: &Pem) -> Option<Vec<u8>> {
-        temp_keys_table().get(&get_hash(pubkey))
+    fn fetch(&self, id: &str) -> Option<Vec<u8>> {
+        temp_keys_table().get(id)
     }
 }

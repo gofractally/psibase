@@ -83,10 +83,13 @@ impl Api for HostAuth {
     fn set_logged_in_user(user: String, app: String) -> Result<(), Error> {
         check_caller(&["host"], "set-logged-in-user@host:auth/api");
 
-        let query_token = Bucket::new(DB, &bucket_id(&user))
+        let stored_token = Bucket::new(DB, &bucket_id(&user))
             .get(&app)
-            .map(|t| psio::from_pssz::<String>(&t).unwrap())
-            .unwrap_or_else(|| Transact::get_query_token(&app, &user).unwrap());
+            .map(|t| psio::from_pssz::<String>(&t).unwrap());
+        let query_token = match stored_token {
+            Some(token) => token,
+            None => Transact::get_query_token(&app, &user)?,
+        };
 
         set_active_query_token(&query_token, &app, &user);
 

@@ -82,6 +82,11 @@ impl Admin for HostAccounts {
         import::import_existing(credentials)
     }
 
+    fn adopt_account(account: String, private_key: String) -> Result<(), Error> {
+        check_caller(&["supervisor"], "adopt-account@host:accounts/admin");
+        import::adopt_account(account, private_key, &Client::get_active_app())
+    }
+
     fn login(user: String, app: String) -> Result<(), Error> {
         check_caller(&[HOST_APP], "login@host:accounts/admin");
         AppsTable::new(&app).login(&user)

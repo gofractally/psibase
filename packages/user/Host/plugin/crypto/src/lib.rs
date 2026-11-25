@@ -15,8 +15,30 @@ use exports::host::crypto::keyvault::Guest as KeyVault;
 use trust::*;
 
 // Third-party crates
-use p256::ecdsa::SigningKey;
 use p256::pkcs8::{DecodePrivateKey, EncodePublicKey, LineEnding};
+
+/// Returns the PEM SubjectPublicKeyInfo (uncompressed point) of a PKCS #8 DER
+/// private key on P-256 or secp256k1.
+fn public_pem_from_pkcs8_der(der: &[u8]) -> Result<String, String> {
+    let p256_error = match p256::ecdsa::SigningKey::from_pkcs8_der(der) {
+        Ok(key) => {
+            return key
+                .verifying_key()
+                .to_public_key_pem(LineEnding::LF)
+                .map_err(|e| e.to_string())
+        }
+        Err(e) => e,
+    };
+    match k256::ecdsa::SigningKey::from_pkcs8_der(der) {
+        Ok(key) => key
+            .verifying_key()
+            .to_public_key_pem(LineEnding::LF)
+            .map_err(|e| e.to_string()),
+        Err(k256_error) => Err(format!(
+            "not a P-256 ({p256_error}) or secp256k1 ({k256_error}) PKCS #8 private key"
+        )),
+    }
+}
 
 psibase::define_trust! {
     descriptions {
@@ -54,13 +76,7 @@ impl KeyVault for HostCrypto {
         assert_authorized(FunctionName::pub_from_priv)?;
 
         let pem = pem::Pem::try_from_pem_str(&private_key)?;
-        let signing_key =
-            SigningKey::from_pkcs8_der(&pem.contents()).map_err(|e| CryptoError(e.to_string()))?;
-        let verifying_key = signing_key.verifying_key();
-
-        Ok(verifying_key
-            .to_public_key_pem(LineEnding::LF)
-            .map_err(|e| CryptoError(e.to_string()))?)
+        Ok(public_pem_from_pkcs8_der(pem.contents()).map_err(CryptoError)?)
     }
 
     fn to_der(key: Pem) -> Result<Vec<u8>, HostTypes::Error> {

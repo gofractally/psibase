@@ -4,6 +4,7 @@ mod errors;
 use errors::ErrorType::*;
 mod helpers;
 use helpers::*;
+mod keys;
 mod types;
 
 use trust::*;
@@ -174,7 +175,8 @@ impl Api for AuthSig {
             return false;
         };
 
-        specified_pubkey == actual_pubkey
+        // The on-chain key may hold a compressed point; the derived one never does.
+        keys::same_key(&specified_pubkey, &actual_pubkey)
     }
 }
 
