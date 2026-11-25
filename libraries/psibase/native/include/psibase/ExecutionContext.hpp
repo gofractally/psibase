@@ -1,5 +1,12 @@
 #pragma once
+#include <chrono>
+#include <cstddef>
 #include <filesystem>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <span>
+#include <vector>
 
 #include <psibase/block.hpp>
 #include <psibase/nativeTables.hpp>
@@ -60,6 +67,74 @@ namespace psibase
                               const VMOptions&   options,
                               std::uint8_t       vmVersion) const;
       WasmCacheStats stats() const;
+
+      // When code is compiled, by what the node is doing (TransactionContext
+      // applies this; gofractally/psibase#2256). The same on every engine;
+      // only how long a compile takes differs.
+      //
+      //  - A speculative run compiles what it needs and waits for it, for at
+      //    most speculativeCompileWait(). Then the run is given up and the
+      //    compile runs on, so a retry finds the module.
+      //  - A block producer running a transaction from its queue never
+      //    compiles and never waits for a compile: if the module is missing
+      //    the transaction is not in this block (mustDefer).
+      //  - A node applying a block starts the compile and goes on; whatever
+      //    executes the code first waits for it.
+      //  - Everything else (boot, the tester, callbacks, queries, signature
+      //    verification) compiles where it needs the module, as before.
+      //
+      // A thread that is compiling is never stopped. Compiles in flight are
+      // counted, and a speculative run that would start one beyond
+      // maxSpeculativeCompiles is refused.
+      static constexpr std::size_t maxSpeculativeCompiles = 4;
+      enum class CompileStart
+      {
+         ready,     ///< the module is in memory; nothing was started
+         started,   ///< this call started a compile of the code
+         inFlight,  ///< a compile of this code was queued or running already
+         full,      ///< not started: `cap` compiles are already in flight
+      };
+      /// Starts compiling the code on another thread, unless it is compiled
+      /// or being compiled already, and returns. With a cap, starts nothing
+      /// if that many compiles are in flight.
+      CompileStart compileInBackground(const Checksum256&         hash,
+                                       std::span<const char>      code,
+                                       const VMOptions&           options,
+                                       std::uint8_t               vmVersion,
+                                       std::optional<std::size_t> cap = {});
+      /// Returns true once no compile of this code is in flight; false if
+      /// one still is after `limit`. Without a limit, waits.
+      bool awaitCompile(const Checksum256&                      hash,
+                        const VMOptions&                        options,
+                        std::uint8_t                            vmVersion,
+                        std::optional<std::chrono::nanoseconds> limit = {});
+      /// For a block producer about to need this code in a transaction from
+      /// its queue: true if the transaction must wait for a later block
+      /// because the module is not compiled. A compile is then in flight
+      /// (started here if none was). False if the module is there, or if a
+      /// compile started here has ended without leaving one: the compiler
+      /// refuses the code, which whatever executes it reports.
+      bool mustDefer(const Checksum256&                           hash,
+                     const std::function<std::span<const char>()>& code,
+                     const VMOptions&                             options,
+                     std::uint8_t                                 vmVersion);
+
+      /// How long a speculative run waits for a compile. Node-local: 5 s, or
+      /// PSIBASE_SPECULATIVE_COMPILE_MS milliseconds.
+      std::chrono::nanoseconds speculativeCompileWait() const;
+      void                     setSpeculativeCompileWait(std::chrono::nanoseconds limit);
+
+      /// Called, on a compile thread, each time the compiles started by
+      /// compileInBackground have all finished: the moment a producer's
+      /// deferred transactions can go ahead. Not called by an engine that
+      /// compiles on threads of its own (LLVM AOT); there a deferred
+      /// transaction waits for the next block. Clearing it returns once no
+      /// call is in progress.
+      void onCompilesFinished(std::function<void()> callback);
+
+      /// Tests only: called on the thread about to compile a module from
+      /// wasm, by engines that report compiles (wasmtime). Set before use.
+      void setCompileHook(std::function<void(const Checksum256&)> hook);
    };
 
    struct ExecutionMemoryImpl;

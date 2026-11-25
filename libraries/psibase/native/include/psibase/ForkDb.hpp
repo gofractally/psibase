@@ -3,6 +3,7 @@
 #include <boost/container/flat_map.hpp>
 #include <boost/log/attributes/constant.hpp>
 #include <iostream>
+#include <psibase/finally.hpp>
 #include <psibase/BlockContext.hpp>
 #include <psibase/KvMerkle.hpp>
 #include <psibase/Prover.hpp>
@@ -1976,9 +1977,16 @@ namespace psibase
       // (ConfigRow::maxBlockSize). False means it belongs in the next block.
       bool fitsInBlock(const SignedTransaction& trx) { return getBlockContext()->fits(trx); }
 
-      void pushTransaction(SignedTransaction&& trx)
+      // Applies a transaction from the producer's queue to the block being
+      // produced. Returns the transaction if it was deferred instead: it
+      // needs service code this node has not compiled yet, and a producer
+      // does not compile or wait for a compile here (BlockContext::
+      // deferUncompiledCode). The caller offers it again in a later block.
+      std::optional<SignedTransaction> pushTransaction(SignedTransaction&& trx)
       {
          auto bc = getBlockContext();
+         bc->deferUncompiledCode = true;
+         auto restore            = psibase::finally{[&] { bc->deferUncompiledCode = false; }};
 
          auto             revisionAtBlockStart = getHeadRevision();
          TransactionTrace trace;
@@ -2010,12 +2018,18 @@ namespace psibase
          {
             throw;
          }
+         catch (TransactionDeferred&)
+         {
+            // Nothing was applied and the transaction is as it was taken.
+            return std::move(trx);
+         }
          catch (...)
          {
             // Don't give a false positive
             if (!trace.error)
                throw;
          }
+         return std::nullopt;
       }
 
       std::optional<SignedTransaction> nextTransaction()

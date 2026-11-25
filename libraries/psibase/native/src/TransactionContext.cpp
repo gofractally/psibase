@@ -670,8 +670,90 @@ namespace psibase
       admitNativeWasm({reinterpret_cast<const std::uint8_t*>(code.data()), code.size()},
                       impl->wasmConfig.vmOptions, vmVersion);
       BillingPause unbilled{*this};
-      blockContext.systemContext.wasmCache.compileAhead(hash, code, impl->wasmConfig.vmOptions,
-                                                        vmVersion);
+      prepareCode(hash, vmVersion, [&] { return code; }, true);
+   }
+
+   void TransactionContext::codeNotCompiled(const Checksum256&                            hash,
+                                            std::uint8_t                                  vmVersion,
+                                            const std::function<std::span<const char>()>& code)
+   {
+      prepareCode(hash, vmVersion, code, false);
+   }
+
+   // Called with billing paused. `written`: the code row is being written;
+   // otherwise the code is about to be executed and the engine has no module.
+   void TransactionContext::prepareCode(const Checksum256&                            hash,
+                                        std::uint8_t                                  vmVersion,
+                                        const std::function<std::span<const char>()>& code,
+                                        bool                                          written)
+   {
+      auto&       cache   = blockContext.systemContext.wasmCache;
+      const auto& options = impl->wasmConfig.vmOptions;
+      // A transaction of a block, as opposed to a callback, a query or a
+      // signature check.
+      const bool inBlock = !dbMode.isSubjective && dbMode.isSync && dbMode.sockets;
+      const bool speculative =
+          speculativeRun ||
+          (!dbMode.isSubjective && dbMode.isSync && !dbMode.sockets && !dbMode.verifyOnly);
+      if (speculative)
+      {
+         // The run waits for the compile, but not on its own thread: a
+         // thread that is compiling cannot be given up.
+         const auto begin   = RunClock::now();
+         bool       started = false;
+         switch (cache.compileInBackground(hash, code(), options, vmVersion,
+                                           WasmCache::maxSpeculativeCompiles))
+         {
+            case WasmCache::CompileStart::ready:
+               return;
+            case WasmCache::CompileStart::full:
+               throw std::runtime_error(
+                   "this node is compiling as many services as it does at once; try again "
+                   "shortly");
+            case WasmCache::CompileStart::started:
+               started = true;
+               break;
+            case WasmCache::CompileStart::inFlight:
+               break;
+         }
+         // A run that finds the module being compiled waits like the one
+         // that started the compile, but only that one caused it.
+         const bool done = cache.awaitCompile(hash, options, vmVersion,
+                                              cache.speculativeCompileWait());
+         if (started)
+            startedCompileTime += RunClock::now() - begin;
+         if (!done)
+            throw std::runtime_error(
+                "service code is still being compiled on this node; try again shortly");
+      }
+      else if (inBlock && blockContext.deferUncompiledCode)
+      {
+         if (cache.mustDefer(hash, code, options, vmVersion))
+         {
+            blockContext.deferral = "service code " + loggers::to_string(hash) +
+                                    " is not compiled on this node yet";
+            // Code that is only being stored does not stop the run: the
+            // transaction goes on, so that every module it stores is
+            // being compiled by the time it is offered again, and
+            // BlockContext::exec discards it at the end. Code that has to
+            // be executed stops it here.
+            if (!written)
+               throw TransactionDeferred{*blockContext.deferral};
+         }
+      }
+      else if (inBlock && !blockContext.isProducing)
+      {
+         // Applying a block: nothing here waits for a compile except the
+         // first execution of the code.
+         if (written)
+            cache.compileInBackground(hash, code(), options, vmVersion);
+         else
+            cache.awaitCompile(hash, options, vmVersion);
+      }
+      else if (written)
+         cache.compileAhead(hash, code(), options, vmVersion);
+      else
+         cache.awaitCompile(hash, options, vmVersion);
    }
 
    std::chrono::nanoseconds TransactionContext::getBillableTime()

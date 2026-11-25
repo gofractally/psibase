@@ -7,7 +7,10 @@
 #include <condition_variable>
 #include <deque>
 #include <future>
+#include <chrono>
 #include <map>
+#include <optional>
+#include <set>
 #include <thread>
 #include <boost/multi_index/key.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -152,6 +155,59 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
          compilesIdle.wait(lock, [&] { return pending.empty(); });
       }
 
+      // What WasmCache needs for the node's rule of when code is compiled
+      // (VmEngine.hpp, gofractally/psibase#2256). Added for that rule and
+      // NOT RUN: LLVM AOT is not built where this was written.
+      //
+      // Code this cache has made a backend for since the process started.
+      // A backend is checked out of `backends` while a transaction runs it,
+      // so `backends` alone would report popular code as missing.
+      std::set<PendingKey> known;
+#if defined(PSIBASE_VM_LLVM_AOT)
+      bool compilesInBackground() const override { return true; }
+      bool contains(const Checksum256& hash,
+                    const VMOptions&   options,
+                    std::uint8_t       vmVersion) const override
+      {
+         std::lock_guard lock{mutex};
+         return known.contains(PendingKey{hash, options, vmVersion});
+      }
+      // The timed form of awaitCompile below. It never takes a queued
+      // compile over: the caller is not going to compile.
+      bool awaitCompile(const Checksum256&                      hash,
+                        const VMOptions&                        options,
+                        std::uint8_t                            vmVersion,
+                        std::optional<std::chrono::nanoseconds> limit) override
+      {
+         if (!limit)
+         {
+            awaitCompile(hash, options, vmVersion);
+            return true;
+         }
+         std::shared_future<void> done;
+         {
+            std::lock_guard lock{mutex};
+            auto            it = pending.find(PendingKey{hash, options, vmVersion});
+            if (it == pending.end())
+               return true;
+            done = it->second;
+         }
+         return done.wait_for(*limit) == std::future_status::ready;
+      }
+      std::size_t compilesInFlight() const override
+      {
+         std::lock_guard lock{mutex};
+         return pending.size();
+      }
+#else
+      // The JITs compile in milliseconds where the code is first executed:
+      // there is never a compile to wait for or to keep a producer from.
+      bool contains(const Checksum256&, const VMOptions&, std::uint8_t) const override
+      {
+         return true;
+      }
+#endif
+
       // Blocks until a compile started for this code, if any, has finished.
       void awaitCompile(const Checksum256& hash, const VMOptions& options, std::uint8_t vmVersion)
       {
@@ -272,6 +328,8 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
                entry.entryPoints = nativeEntryPoints(entry.backend->get_module());
                entry.debug   = dwarf::register_with_debugger(entry.backend->get_module());
                add(std::move(entry));
+               std::lock_guard known_lock{mutex};
+               known.insert(job.key);
             }
          }
          catch (...)
@@ -386,6 +444,17 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
                 if (!backend.backend)
                 {
                    unbilled.emplace(transactionContext);
+                   // The node's rule for a module that is missing, the same
+                   // on every engine: a producer's queued transaction is
+                   // deferred here, a speculative run waits up to its bound.
+                   transactionContext.codeNotCompiled(
+                       code.codeHash, code.vmVersion,
+                       [&]
+                       {
+                          loadCode();
+                          return std::span<const char>(
+                              reinterpret_cast<const char*>(c->code.data()), c->code.size());
+                       });
                    cache.awaitCompile(code.codeHash, vmOptions, code.vmVersion);
                    backend = cache.get(code.codeHash, vmOptions, code.vmVersion);
                 }
@@ -412,6 +481,9 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
                    }
                    // The same rule as when the code was stored.
                    backend.entryPoints = nativeEntryPoints(backend.backend->get_module());
+                   std::lock_guard known_lock{cache.mutex};
+                   cache.known.insert(
+                       WasmCacheImpl::PendingKey{code.codeHash, vmOptions, code.vmVersion});
                 }
              });
       }

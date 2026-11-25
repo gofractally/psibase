@@ -957,15 +957,17 @@ void RTransact::onVerify(std::uint64_t                      id,
          tx->verified |= ready;
          if (!trace.error() && headVerifyId == tx->verifyId && tx->verifyId == runVerifyId)
          {
-            if (ready)
+            if (ready && !tx->speculative)
             {
-               if (!prevVerified && !tx->speculative)
+               if (!prevVerified)
                   broadcastTxId = tx->id;
-               queueTransaction(tx->id, tx->expiration, std::move(tx->verifies), tx->speculative);
+               queueTransaction(tx->id, tx->expiration, std::move(tx->verifies), std::nullopt);
                unverifiedTransactions.remove(*tx);
             }
             else
             {
+               // Signatures still being checked, or checked and the
+               // speculative run not finished: onSpecTrx queues it.
                unverifiedTransactions.put(*tx);
             }
          }
@@ -1028,9 +1030,35 @@ void RTransact::onSpecTrx(std::uint64_t id, psio::pssz_view<TransactionTrace> tr
                check(*trx->speculative == id,
                      "Wrong runid for speculative transaction in unverified");
                trx->speculative.reset();
-               unverified.put(*trx);
                if (trx->verified)
                   broadcastTxId = trx->id;
+               // The run has passed. If every signature is checked too the
+               // transaction can now be included; otherwise onVerify
+               // queues it.
+               const bool ready = std::ranges::none_of(
+                   trx->verifies,
+                   [](const auto& v) { return std::holds_alternative<std::uint64_t>(v); });
+               if (!ready)
+                  unverified.put(*trx);
+               else if (trx->verifies.empty() ||
+                        trx->verifyId == open<ReverifySignaturesTable>()
+                                             .get({})
+                                             .value_or(ReverifySignaturesRecord{})
+                                             .verifyId)
+               {
+                  queueTransaction(trx->id, trx->expiration, std::move(trx->verifies),
+                                   std::nullopt);
+                  unverified.remove(*trx);
+               }
+               else
+               {
+                  // The verify services changed while the run was in
+                  // flight: the signatures are checked again, as onVerify
+                  // does.
+                  auto data = open<TransactionDataTable>().getView(trx->id);
+                  check(data.has_value(), "Missing transaction data");
+                  scheduleVerify(trx->id, (*data)->trx(), trx->verified, std::nullopt);
+               }
             }
             else if (auto trx = pending.get(row->txid))
             {
@@ -1123,10 +1151,20 @@ namespace
          remaining.push_back(runid);
          pendingVerifies.put({.txid = id, .runid = runid});
       }
-      if (claims.empty())
+      // A transaction can be included once its signatures are checked AND
+      // its speculative run, if it has one, has passed: until both, it
+      // waits in the unverified table and next() cannot return it. A
+      // transaction whose run fails is dropped and reported as failed
+      // (onSpecTrx), also when it failed only because it depends on a
+      // transaction that is not in a block yet. The project owner's rule
+      // (gofractally/psibase#2256): "the speculative run must pass... dependent
+      // transactions cannot pre-validate unless separated by a block
+      // boundary... it rate limits the user to 1 per second dependent... or
+      // forces them to group it into one transaction."
+      if (claims.empty() && !speculative)
       {
          queueTransaction(id, trx.transaction()->tapos().expiration(), std::move(remaining),
-                          speculative);
+                          std::nullopt);
       }
       else
       {
@@ -1134,7 +1172,8 @@ namespace
              .id          = id,
              .expiration  = trx.transaction()->tapos().expiration(),
              .verifies    = std::move(remaining),
-             .verified    = verified,
+             // Nothing to check: only the speculative run is awaited.
+             .verified    = verified || claims.empty(),
              .speculative = speculative,
          };
          unverifiedTransactions.put(row);

@@ -11,8 +11,12 @@
 
 #include <psibase/ExecutionContext.hpp>
 
+#include <chrono>
+#include <cstddef>
 #include <filesystem>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -42,6 +46,35 @@ namespace psibase::vm
          return false;
       }
       virtual WasmCacheStats stats() const { return {}; }
+
+      // What WasmCache needs to apply the node's rule for when code is
+      // compiled (WasmCache::compileInBackground, gofractally/psibase#2256).
+      // The rule itself is not the engine's.
+      //
+      // Whether compileAhead returns before the code is compiled, because
+      // the engine compiles on threads of its own. If it does not, WasmCache
+      // runs compileAhead on its compile threads where the rule says the
+      // caller must not wait.
+      virtual bool compilesInBackground() const { return false; }
+      // For an engine that compiles in the background: returns true once no
+      // compile of this code is queued or running, false if one still is
+      // after `limit`. Without a limit it waits as long as it takes.
+      virtual bool awaitCompile(const Checksum256&,
+                                const VMOptions&,
+                                std::uint8_t,
+                                std::optional<std::chrono::nanoseconds> limit)
+      {
+         (void)limit;
+         return true;
+      }
+      // For an engine that compiles in the background: compiles queued or
+      // running.
+      virtual std::size_t compilesInFlight() const { return 0; }
+
+      // Tests only: called on the thread that is about to compile a module
+      // from wasm, by engines that report compiles (wasmtime). Set before the
+      // cache is used.
+      std::function<void(const Checksum256&)> compileHook;
    };
 
    // What one running service needs for its linear memory, if the engine

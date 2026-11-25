@@ -287,6 +287,12 @@ namespace psibase::vm_wasmtime
          // Admission is psizam's: the same checks, in the same order, as
          // the psizam engines apply before they compile.
          const std::span<const std::uint8_t> wasm     = code();
+         // `code` may have waited for a compile of this module on another
+         // thread (TransactionContext::codeNotCompiled).
+         if (auto ready = get(hash, vmOptions, vmVersion))
+            return *ready;
+         if (compileHook)
+            compileHook(hash);
          const auto                          admitted = admitNativeWasm(wasm, vmOptions, vmVersion);
          Compiled module{runtimes(debug).pooled(profile).compile_metered(wasm, admitted.costs),
                          admitted.entryPoints};
@@ -502,6 +508,19 @@ namespace psibase::vm_wasmtime
                                   [&]
                                   {
                                      loadCode();
+                                     // Not in memory and not stored: it has
+                                     // to be compiled. Whether this run
+                                     // compiles it here, waits for a compile
+                                     // or does not go on is the node's rule,
+                                     // the same on every engine.
+                                     transactionContext.codeNotCompiled(
+                                         code.codeHash, code.vmVersion,
+                                         [&]
+                                         {
+                                            return std::span<const char>(
+                                                reinterpret_cast<const char*>(c->code.data()),
+                                                c->code.size());
+                                         });
                                      return std::span<const std::uint8_t>(c->code);
                                   });
             cache.add(code.codeHash, vmOptions, code.vmVersion, *compiled);

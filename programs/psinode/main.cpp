@@ -1558,6 +1558,13 @@ void run(const std::string&              db_path,
 
    using node_type = psinode;
    node_type node(chainContext, system.get(), prover);
+   // A transaction the producer deferred because its code was being
+   // compiled is offered again as soon as the compiles have finished.
+   // Cleared before the node goes: compile threads outlive it.
+   wasmCache.onCompilesFinished(
+       [&chainContext, &node]
+       { boost::asio::post(chainContext, [&node] { node.retry_deferred_transactions(); }); });
+   auto clearCompilesFinished = psibase::finally{[&wasmCache] { wasmCache.onCompilesFinished({}); }};
    node.chain().setProofWatchdogLimit(std::chrono::milliseconds(proof_timeout_ms));
    node.set_producer_id(producer);
    node.load_producers();

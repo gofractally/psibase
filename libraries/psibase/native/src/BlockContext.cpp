@@ -3,6 +3,8 @@
 #include <psibase/serviceEntry.hpp>
 #include <psibase/finally.hpp>
 
+#include <utility>
+
 namespace psibase
 {
    BlockContext::BlockContext(psibase::SystemContext&         systemContext,
@@ -453,6 +455,25 @@ namespace psibase
       return tokens;
    }
 
+   // What a speculative run cost this node in compiles it started: the time
+   // the project owner decided is to be charged, node-locally, to whoever
+   // submitted the transaction (gofractally/psibase#2256). No service keeps
+   // such a ledger yet, so this is where the charge would be made and all
+   // that is done is to record it. `run` is the id the transaction service
+   // posted the run under (RTransact's SpeculativeTransactionTable maps it to
+   // the transaction, and so to its sender).
+   void BlockContext::reportSpeculativeCompile(std::uint64_t run, std::chrono::nanoseconds time)
+   {
+      if (time <= std::chrono::nanoseconds(0))
+         return;
+      PSIBASE_LOG(trxLogger, info)
+          << "Speculative run " << run << " waited "
+          << std::chrono::duration_cast<std::chrono::microseconds>(time).count()
+          << " us for service compiles: not charged to its submitter (no subjective ledger)";
+      if (speculativeCompileHook)
+         speculativeCompileHook(run, time);
+   }
+
    void BlockContext::callRun(psio::pssz_view<RunRow> row,
                               std::optional<std::chrono::microseconds> proofTimeout)
    {
@@ -488,8 +509,16 @@ namespace psibase
          tc.setWatchdog(std::max(maxTime, RunClock::duration::zero()));
          if (row.mode() == RunMode::speculative)
          {
+            // The limit measures the transaction's own execution: compiling
+            // what it needs is outside it (BillingPause), bounded on its own
+            // (WasmCache::speculativeCompileWait).
+            tc.speculativeRun = true;
             db.checkoutEmptySubjective();
-            auto _ = psibase::finally{[&] { db.abortSubjective(); }};
+            auto _ = psibase::finally{[&]
+                                      {
+                                         db.abortSubjective();
+                                         reportSpeculativeCompile(row.id(), tc.startedCompileTime);
+                                      }};
             tc.execNonTrxAction(0, action, atrace);
          }
          else
@@ -918,6 +947,7 @@ namespace psibase
       try
       {
          checkActive();
+         deferral.reset();
          check(enableUndo || commit, "neither enableUndo or commit is set");
 
          // TODO: verify the PSSZ encoding, allow new fields. Might be redundant elsewhere?
@@ -937,6 +967,10 @@ namespace psibase
             if (initialWatchdogLimit)
                t.setWatchdog(*initialWatchdogLimit);
             t.execTransaction();
+            // It ran to the end, but stored code this producer has not
+            // compiled: discarded like one that stopped for that reason.
+            if (deferral)
+               throw TransactionDeferred{*deferral};
 
             if (!isProducing)
             {
@@ -958,6 +992,13 @@ namespace psibase
       }
       catch (const std::exception& e)
       {
+         if (deferral)
+         {
+            // Not a result of the transaction: no trace, no report. Only
+            // asked for with enableUndo, so the block goes on.
+            PSIBASE_LOG(trxLogger, info) << "Transaction deferred: " << *deferral;
+            throw TransactionDeferred{*std::exchange(deferral, std::nullopt)};
+         }
          trace.error = e.what();
          BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
          PSIBASE_LOG(trxLogger, info) << "Transaction failed";

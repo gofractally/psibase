@@ -11,7 +11,9 @@
 #include <cassert>
 #include <chrono>
 #include <cstdint>
+#include <deque>
 #include <memory>
+#include <set>
 #include <variant>
 #include <vector>
 
@@ -293,6 +295,22 @@ namespace psibase::net
       // that was open (ConfigRow::maxBlockSize). It goes first in the next
       // block this node produces.
       std::optional<SignedTransaction> _held_transaction;
+      // Transactions taken from the queue that need service code this node
+      // has not compiled yet (ForkDb::pushTransaction). They are not applied
+      // and not failed: when the next block opens they move to _retry and
+      // are offered again, ahead of the queue. Unlike a held transaction
+      // they do not stop the loop.
+      std::vector<SignedTransaction> _deferred_transactions;
+      std::deque<SignedTransaction>  _retry_transactions;
+      // The ids of both. The queue can hand out a transaction a second
+      // time while it waits here (the transaction service queues everything
+      // again when the verify services change): that copy is dropped, or
+      // the transaction would be applied once and fail once.
+      std::set<Checksum256> _deferred_ids;
+      static Checksum256    transaction_id(const SignedTransaction& trx)
+      {
+         return sha256(trx.transaction.data(), trx.transaction.size());
+      }
 
       std::vector<std::unique_ptr<peer_connection>> _peers;
 
@@ -729,6 +747,8 @@ namespace psibase::net
          auto commit_index = chain().commit_index();
          chain().start_block(TimePointSec{duration_cast<Seconds>(block_start.time_since_epoch())},
                              self, current_term, commit_index);
+         // A new block: what was deferred in the last one is offered again.
+         retry_deferred_transactions();
          _block_timer.async_wait(
              [this, saved_leader_cancel = _leader_cancel](const std::error_code& ec)
              {
@@ -789,6 +809,19 @@ namespace psibase::net
             PSIBASE_LOG(consensus().logger, info) << log_message;
             chain().abort_block();
          }
+      }
+
+      // Offers the deferred transactions again: when a block opens, and
+      // when the compiles this node was waiting for have finished
+      // (WasmCache::onCompilesFinished), so that a deferral costs the time
+      // of the compile and not the rest of the block.
+      void retry_deferred_transactions()
+      {
+         for (auto& trx : _deferred_transactions)
+            _retry_transactions.push_back(std::move(trx));
+         _deferred_transactions.clear();
+         if (!_retry_transactions.empty())
+            schedule_process_transactions();
       }
 
       bool push_boot(std::vector<SignedTransaction>&& transactions, TransactionTrace& trace)
@@ -879,8 +912,22 @@ namespace psibase::net
          {
             auto trx = std::move(_held_transaction);
             _held_transaction.reset();
+            if (!trx && !_retry_transactions.empty())
+            {
+               trx = std::move(_retry_transactions.front());
+               _retry_transactions.pop_front();
+               _deferred_ids.erase(transaction_id(*trx));
+            }
             if (!trx)
+            {
                trx = chain().nextTransaction();
+               if (trx && _deferred_ids.contains(transaction_id(*trx)))
+               {
+                  // Already waiting here; see _deferred_ids.
+                  boost::asio::post(_ioctx, [this] { process_transactions(); });
+                  return;
+               }
+            }
             if (!trx)
             {
                _trx_loop_running = false;
@@ -894,7 +941,11 @@ namespace psibase::net
             }
             else
             {
-               chain().pushTransaction(std::move(*trx));
+               if (auto deferred = chain().pushTransaction(std::move(*trx)))
+               {
+                  _deferred_ids.insert(transaction_id(*deferred));
+                  _deferred_transactions.push_back(std::move(*deferred));
+               }
                boost::asio::post(_ioctx, [this] { process_transactions(); });
             }
          }

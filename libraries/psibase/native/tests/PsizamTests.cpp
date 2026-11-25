@@ -1,4 +1,9 @@
+#include <algorithm>
+#include <atomic>
 #include <bit>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
 #include <catch2/catch_all.hpp>
 #include <cstdio>
 #include <cstring>
@@ -1069,6 +1074,10 @@ TEST_CASE("Service code is admitted when its row is written, in every execution 
 
       CHECK_NOTHROW(writer.put(db, valid));
       CHECK(writer.stored(db, valid));
+      // A node applying a block compiles in the background; everything
+      // else here has compiled by the time the write returns.
+      if (!producing)
+         fixture.cache.finishCompiles();
       if (isWasmtime())
       {
          // Compiled where it was stored: in memory and in the artifact
@@ -1738,4 +1747,517 @@ TEST_CASE("Storing code bills the same with and without a compiled module")
    const auto again = store(other, limit);
    CHECK(again.compiled == 0);
    CHECK(again.billed < limit);
+}
+
+namespace
+{
+   // Holds every compile from wasm where it is about to start, and records
+   // the thread it is on. Declare it before the fixture whose cache it is
+   // attached to, and release it before that fixture goes.
+   struct CompileGate
+   {
+      std::mutex                   mutex;
+      std::condition_variable      changed;
+      bool                         open = true;
+      std::vector<std::thread::id> threads;
+
+      void attach(psibase::WasmCache& cache)
+      {
+         cache.setCompileHook(
+             [this](const psibase::Checksum256&)
+             {
+                std::unique_lock lock{mutex};
+                threads.push_back(std::this_thread::get_id());
+                changed.notify_all();
+                changed.wait(lock, [&] { return open; });
+             });
+      }
+      void close()
+      {
+         std::lock_guard lock{mutex};
+         open = false;
+      }
+      void release()
+      {
+         {
+            std::lock_guard lock{mutex};
+            open = true;
+         }
+         changed.notify_all();
+      }
+      // Compiles started so far.
+      std::size_t count()
+      {
+         std::lock_guard lock{mutex};
+         return threads.size();
+      }
+      void awaitStarted(std::size_t compiles)
+      {
+         std::unique_lock lock{mutex};
+         changed.wait(lock, [&] { return threads.size() >= compiles; });
+      }
+      // Whether any compile since `from` ran on the calling thread.
+      bool compiledHere(std::size_t from = 0)
+      {
+         std::lock_guard lock{mutex};
+         return std::find(threads.begin() + from, threads.end(), std::this_thread::get_id()) !=
+                threads.end();
+      }
+   };
+
+   // The fixture's service under another hash: code no cache has seen.
+   std::vector<std::uint8_t> otherService(std::uint8_t salt)
+   {
+      auto code = psizam::read_wasm(PSIBASE_PSIZAM_SERVICE_WASM);
+      code.insert(code.end(), {0, 2, 1, salt});  // a custom section named by one byte
+      return code;
+   }
+
+   // Stores code as a block that was applied before this node started left
+   // it: the rows, and no compiled module.
+   void storeUncompiled(NativeService&                   fixture,
+                        psibase::AccountNumber           account,
+                        const std::vector<std::uint8_t>& code)
+   {
+      auto record = CodeWriter::row(code);
+      fixture.block.db.kvPut(record.db, record.key(), record);
+      psibase::CodeRow row{.codeNum = account, .codeHash = record.codeHash};
+      fixture.block.db.kvPut(row.db, row.key(), row);
+   }
+}  // namespace
+
+TEST_CASE("A producer's queued transaction never compiles the code it stores")
+{
+   if (!isWasmtime())
+      SKIP("observes compiles, which only the wasmtime engine reports");
+   CompileGate   gate;
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   auto          release = psibase::finally{[&] { gate.release(); }};
+   gate.attach(fixture.cache);
+   CodeWriter writer{fixture};
+   // What ForkDb::pushTransaction sets around a transaction from the queue.
+   fixture.block.deferUncompiledCode = true;
+   const auto before                 = gate.count();
+
+   // Compiled already, as the speculative run leaves it: stored, no compile.
+   const auto cached = largeModule(40, 4, 1);
+   fixture.cache.compileAhead(CodeWriter::row(cached).codeHash,
+                              {reinterpret_cast<const char*>(cached.data()), cached.size()}, {}, 0);
+   const auto compiledBefore = gate.count();
+   CHECK(compiledBefore == before + 1);
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, cached));
+   CHECK(writer.stored(psibase::DbId::native, cached));
+   CHECK(gate.count() == compiledBefore);
+   CHECK_FALSE(fixture.block.deferral.has_value());
+
+   // Not compiled: not in this block. The write itself goes on (the
+   // transaction is discarded when it ends, BlockContext::exec), nothing
+   // is compiled on this thread, and a compile is under way on another.
+   // What the producer does with a transaction that is marked like this is
+   // in "A deferred transaction leaves no result".
+   const auto code = largeModule(40, 4, 2);
+   const auto hash = CodeWriter::row(code).codeHash;
+   const auto next = largeModule(40, 4, 5);
+   gate.close();
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK(fixture.block.deferral.has_value());
+   gate.awaitStarted(compiledBefore + 1);
+   CHECK_FALSE(gate.compiledHere(compiledBefore));
+   // The same transaction stores more code: its compile is started too, so
+   // one deferral is enough for all of it.
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, next));
+   gate.awaitStarted(compiledBefore + 2);
+   CHECK_FALSE(gate.compiledHere(compiledBefore));
+   // Offered again while the compile is in flight: deferred again, and no
+   // further compile is started.
+   fixture.block.deferral.reset();
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK(fixture.block.deferral.has_value());
+   CHECK_FALSE(fixture.cache.awaitCompile(hash, {}, 0, std::chrono::nanoseconds(0)));
+   CHECK_FALSE(fixture.cache.contains(hash, {}, 0));
+   CHECK(gate.count() == compiledBefore + 2);
+
+   // The compile finishes: the next offer is taken, without a compile.
+   gate.release();
+   fixture.cache.finishCompiles();
+   CHECK(fixture.cache.contains(hash, {}, 0));
+   fixture.block.deferral.reset();
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, next));
+   CHECK_FALSE(fixture.block.deferral.has_value());
+   CHECK(writer.stored(psibase::DbId::native, code));
+   CHECK(gate.count() == compiledBefore + 2);
+   CHECK_FALSE(gate.compiledHere(compiledBefore));
+}
+
+TEST_CASE("Code this node's compiler refuses does not keep a producer deferring")
+{
+   if (!isWasmtime())
+      SKIP("the refusal is wasmtime's");
+   // The module of "Code the engine's compiler refuses after admission":
+   // admitted by the chain, refused by wasmtime's compiler.
+   const EntryPoints         entry{0, 0};
+   std::vector<std::uint8_t> types{3}, declared{3}, exported{2}, bodies{3};
+   types.insert(types.end(), entry.types.begin(), entry.types.end());
+   types.insert(types.end(), {0x60, 0, 0});
+   declared.insert(declared.end(), entry.functions.begin(), entry.functions.end());
+   declared.push_back(2);
+   exported.insert(exported.end(), entry.exports.begin(), entry.exports.end());
+   bodies.insert(bodies.end(), entry.bodies.begin(), entry.bodies.end());
+   bodies.insert(bodies.end(), {6, 1, 0xd1, 0x86, 0x03, 0x7f, 0x0b});
+   auto code = wasmModule({});
+   section(code, 1, types);
+   section(code, 3, declared);
+   section(code, 7, exported);
+   section(code, 10, bodies);
+   const auto hash = CodeWriter::row(code).codeHash;
+
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   CodeWriter    writer{fixture};
+   fixture.block.deferUncompiledCode = true;
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK(fixture.block.deferral.has_value());
+   CHECK(fixture.cache.awaitCompile(hash, {}, 0));
+   CHECK_FALSE(fixture.cache.contains(hash, {}, 0));
+   // The compile ended without a module. The transaction is taken, as it
+   // is by a producer on an engine that compiles this code.
+   fixture.block.deferral.reset();
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK_FALSE(fixture.block.deferral.has_value());
+   CHECK(writer.stored(psibase::DbId::native, code));
+}
+
+TEST_CASE("A producer's queued transaction never compiles a service it executes")
+{
+   if (!isWasmtime())
+      SKIP("observes compiles, which only the wasmtime engine reports");
+   const psibase::AccountNumber account{"vm-cold"};
+   const auto                   code = otherService(1);
+   const auto                   hash = CodeWriter::row(code).codeHash;
+   auto                         request = [&](NativeService& fixture)
+   {
+      auto result    = fixture.action();
+      result.service = account;
+      return result;
+   };
+
+   CompileGate   gate;
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   auto          release = psibase::finally{[&] { gate.release(); }};
+   gate.attach(fixture.cache);
+   storeUncompiled(fixture, account, code);
+   fixture.block.deferUncompiledCode = true;
+   gate.close();
+   {
+      psibase::TransactionContext transaction{fixture.block, fixture.signedTransaction,
+                                              fixture.trace, psibase::DbMode::transaction()};
+      psibase::ActionTrace        trace;
+      CHECK_THROWS_AS(transaction.execNonTrxAction(0, request(fixture), trace),
+                      psibase::TransactionDeferred);
+      CHECK(fixture.block.deferral.has_value());
+   }
+   gate.awaitStarted(1);
+   CHECK_FALSE(gate.compiledHere());
+   gate.release();
+   CHECK(fixture.cache.awaitCompile(hash, {}, 0));
+   {
+      psibase::TransactionContext transaction{fixture.block, fixture.signedTransaction,
+                                              fixture.trace, psibase::DbMode::transaction()};
+      CHECK(CodeWriter::call(fixture, transaction, account) == 8);
+   }
+   CHECK(gate.count() == 1);
+
+   // What the block itself runs outside queued transactions (callbacks,
+   // queries) compiles where it needs the module: there is no later block
+   // for it. A callback of the same block, another cold service.
+   const psibase::AccountNumber other{"vm-cold2"};
+   storeUncompiled(fixture, other, otherService(2));
+   {
+      psibase::TransactionContext transaction{fixture.block, fixture.signedTransaction,
+                                              fixture.trace, psibase::DbMode::callback()};
+      CHECK(CodeWriter::call(fixture, transaction, other) == 8);
+   }
+   CHECK(gate.count() == 2);
+   CHECK(gate.compiledHere(1));
+
+   // A node that restarts has the modules stored: nothing is deferred and
+   // nothing compiled, the module is loaded where it is needed.
+   NativeService restarted{artifacts.path / "modules"};
+   storeUncompiled(restarted, account, code);
+   restarted.block.deferUncompiledCode = true;
+   {
+      psibase::TransactionContext transaction{restarted.block, restarted.signedTransaction,
+                                              restarted.trace, psibase::DbMode::transaction()};
+      CHECK(CodeWriter::call(restarted, transaction, account) == 8);
+   }
+   CHECK(restarted.cache.stats().compiled == 0);
+   CHECK(restarted.cache.stats().loaded == 1);
+}
+
+TEST_CASE("A deferred transaction leaves no result and is applied once its code is compiled")
+{
+   if (!isWasmtime())
+      SKIP("observes compiles, which only the wasmtime engine reports");
+   // A transaction service that accepts everything: start, called and
+   // processTransaction, all empty.
+   const EntryPoints         entry{0, 0};
+   std::vector<std::uint8_t> types{3}, declared{3}, exported{3}, bodies{3};
+   types.insert(types.end(), entry.types.begin(), entry.types.end());
+   types.insert(types.end(), {0x60, 0, 0});
+   declared.insert(declared.end(), entry.functions.begin(), entry.functions.end());
+   declared.push_back(2);
+   exported.insert(exported.end(), entry.exports.begin(), entry.exports.end());
+   const std::string name = "processTransaction";
+   exported.push_back(static_cast<std::uint8_t>(name.size()));
+   exported.insert(exported.end(), name.begin(), name.end());
+   exported.insert(exported.end(), {0, 2});
+   bodies.insert(bodies.end(), entry.bodies.begin(), entry.bodies.end());
+   bodies.insert(bodies.end(), {2, 0, 0x0b});
+   auto code = wasmModule({});
+   section(code, 1, types);
+   section(code, 3, declared);
+   section(code, 7, exported);
+   section(code, 10, bodies);
+   const auto hash = CodeWriter::row(code).codeHash;
+
+   psibase::Transaction unsignedTransaction;
+   unsignedTransaction.actions.push_back(psibase::Action{});
+   psibase::SignedTransaction pushed;
+   pushed.transaction = psio::shared_pssz<psibase::Transaction>{unsignedTransaction};
+
+   // What a node that had the module all along records.
+   psibase::TransactionTrace              expected;
+   std::vector<psibase::SignedTransaction> expectedBlock;
+   {
+      TempDirectory artifacts;
+      NativeService fixture{artifacts.path / "modules"};
+      storeUncompiled(fixture, psibase::transactionServiceNum, code);
+      fixture.block.active = true;
+      fixture.cache.compileAhead(hash, {reinterpret_cast<const char*>(code.data()), code.size()},
+                                 {}, 0);
+      fixture.block.deferUncompiledCode = true;
+      REQUIRE_NOTHROW(
+          fixture.block.pushTransaction(psibase::SignedTransaction{pushed}, expected, std::nullopt));
+      expectedBlock = fixture.block.current.transactions;
+   }
+
+   CompileGate   gate;
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   auto          release = psibase::finally{[&] { gate.release(); }};
+   gate.attach(fixture.cache);
+   storeUncompiled(fixture, psibase::transactionServiceNum, code);
+   fixture.block.active              = true;
+   fixture.block.deferUncompiledCode = true;
+   gate.close();
+   {
+      psibase::TransactionTrace trace;
+      auto                      offered = pushed;
+      CHECK_THROWS_AS(fixture.block.pushTransaction(std::move(offered), trace, std::nullopt),
+                      psibase::TransactionDeferred);
+      // No result of any kind, and the transaction is as it was offered.
+      CHECK_FALSE(trace.error.has_value());
+      CHECK(fixture.block.current.transactions.empty());
+      CHECK(fixture.block.transactionBytes == 0);
+      CHECK_FALSE(offered.subjectiveData.has_value());
+      CHECK(psio::to_pssz(offered) == psio::to_pssz(pushed));
+      // The block goes on.
+      CHECK(fixture.block.active);
+      CHECK_FALSE(fixture.block.deferral.has_value());
+   }
+   gate.awaitStarted(1);
+   CHECK_FALSE(gate.compiledHere());
+   gate.release();
+   CHECK(fixture.cache.awaitCompile(hash, {}, 0));
+   psibase::TransactionTrace trace;
+   CHECK_NOTHROW(
+       fixture.block.pushTransaction(psibase::SignedTransaction{pushed}, trace, std::nullopt));
+   CHECK(gate.count() == 1);
+   // What is recorded is what the node that never deferred recorded.
+   CHECK_FALSE(trace.error.has_value());
+   CHECK(trace.error == expected.error);
+   CHECK(trace.actionTraces.size() == expected.actionTraces.size());
+   CHECK(psio::to_pssz(fixture.block.current.transactions) == psio::to_pssz(expectedBlock));
+}
+
+TEST_CASE("A node applying a block does not wait for a compile where the code is stored")
+{
+   if (!isWasmtime())
+      SKIP("observes compiles, which only the wasmtime engine reports");
+   const auto                   code = otherService(3);
+   const auto                   hash = CodeWriter::row(code).codeHash;
+   const psibase::AccountNumber account{"vm-applied"};
+
+   CompileGate   gate;
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   auto          release = psibase::finally{[&] { gate.release(); }};
+   gate.attach(fixture.cache);
+   fixture.block.isProducing = false;
+   CodeWriter writer{fixture};
+   const auto before = gate.count();
+   gate.close();
+   // The write returns although the compile cannot finish.
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK(writer.stored(psibase::DbId::native, code));
+   gate.awaitStarted(before + 1);
+   CHECK_FALSE(gate.compiledHere(before));
+   CHECK_FALSE(fixture.cache.contains(hash, {}, 0));
+   CHECK(writer.compiled() == 0);
+
+   // The same block calls the new code: its first execution waits for that
+   // compile instead of starting another. The compile is let go from
+   // another thread, whenever that happens to be.
+   psibase::CodeRow row{.codeNum = account, .codeHash = hash};
+   fixture.block.db.kvPut(row.db, row.key(), row);
+   std::thread opener{[&]
+                      {
+                         std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                         gate.release();
+                      }};
+   CHECK(NativeService::value(fixture.called(writer.transaction, account)) == 8);
+   opener.join();
+   CHECK(gate.count() == before + 1);
+   CHECK_FALSE(gate.compiledHere(before));
+   CHECK(writer.compiled() == 1);
+}
+
+TEST_CASE("A speculative run gives up on a compile that takes too long, and the compile runs on")
+{
+   if (!isWasmtime())
+      SKIP("observes compiles, which only the wasmtime engine reports");
+   const auto code = largeModule(40, 4, 3);
+   const auto hash = CodeWriter::row(code).codeHash;
+
+   CompileGate   gate;
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   auto          release = psibase::finally{[&] { gate.release(); }};
+   gate.attach(fixture.cache);
+   CHECK(fixture.cache.speculativeCompileWait() == std::chrono::seconds(5));
+   fixture.cache.setSpeculativeCompileWait(std::chrono::milliseconds(20));
+   {
+      CodeWriter writer{fixture, psibase::DbMode::speculative()};
+      const auto before = gate.count();
+      gate.close();
+      CHECK_THROWS_WITH(writer.put(psibase::DbId::native, code),
+                        Catch::Matchers::ContainsSubstring("still being compiled on this node"));
+      CHECK_FALSE(writer.stored(psibase::DbId::native, code));
+      CHECK_FALSE(fixture.block.deferral.has_value());
+      // The compile is where it was: on its own thread, not stopped.
+      gate.awaitStarted(before + 1);
+      CHECK_FALSE(gate.compiledHere(before));
+      CHECK_FALSE(fixture.cache.contains(hash, {}, 0));
+      gate.release();
+      CHECK(fixture.cache.awaitCompile(hash, {}, 0));
+      CHECK(fixture.cache.contains(hash, {}, 0));
+      CHECK(gate.count() == before + 1);
+   }
+   // The transaction is sent again: its run finds the module.
+   CodeWriter writer{fixture, psibase::DbMode::speculative()};
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK(writer.stored(psibase::DbId::native, code));
+   CHECK(writer.compiled() == 0);
+   CHECK(writer.transaction.startedCompileTime == std::chrono::nanoseconds(0));
+}
+
+TEST_CASE("Speculative runs start no more compiles than the node allows at once")
+{
+   if (!isWasmtime())
+      SKIP("observes compiles, which only the wasmtime engine reports");
+   CompileGate   gate;
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   auto          release = psibase::finally{[&] { gate.release(); }};
+   gate.attach(fixture.cache);
+   CodeWriter writer{fixture, psibase::DbMode::speculative()};
+   fixture.cache.setSpeculativeCompileWait(std::chrono::milliseconds(1));
+   const auto before = gate.count();
+   gate.close();
+   const auto cap = psibase::WasmCache::maxSpeculativeCompiles;
+   for (std::uint32_t i = 0; i < cap; ++i)
+      CHECK_THROWS_WITH(writer.put(psibase::DbId::native, largeModule(40, 4, 10 + i)),
+                        Catch::Matchers::ContainsSubstring("still being compiled on this node"));
+   gate.awaitStarted(before + cap);
+   const auto beyond = largeModule(40, 4, 10 + cap);
+   CHECK_THROWS_WITH(writer.put(psibase::DbId::native, beyond),
+                     Catch::Matchers::ContainsSubstring("compiling as many services"));
+   CHECK_FALSE(writer.stored(psibase::DbId::native, beyond));
+   // Code already being compiled is not a further compile.
+   CHECK_THROWS_WITH(writer.put(psibase::DbId::native, largeModule(40, 4, 10)),
+                     Catch::Matchers::ContainsSubstring("still being compiled on this node"));
+   // A block being applied is not refused: its compile queues.
+   CHECK(fixture.cache.compileInBackground(
+             CodeWriter::row(beyond).codeHash,
+             {reinterpret_cast<const char*>(beyond.data()), beyond.size()}, {}, 0) ==
+         psibase::WasmCache::CompileStart::started);
+   CHECK(gate.count() == before + cap);
+
+   gate.release();
+   fixture.cache.finishCompiles();
+   CHECK(gate.count() == before + cap + 1);
+   fixture.cache.setSpeculativeCompileWait(std::chrono::seconds(5));
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, beyond));
+   CHECK(writer.stored(psibase::DbId::native, beyond));
+}
+
+TEST_CASE("A speculative run's limit measures its execution, not the compiles it waits for")
+{
+   if (!isWasmtime())
+      SKIP("observes compiles, which only the wasmtime engine reports");
+   using namespace std::chrono;
+   const auto compileTime = milliseconds(400);
+   const auto limit       = milliseconds(100);
+   const auto code        = largeModule(40, 4, 4);
+
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   std::atomic<bool> slow{false};
+   // An injected compile time, several times the run's limit.
+   fixture.cache.setCompileHook(
+       [&](const psibase::Checksum256&)
+       {
+          if (slow)
+             std::this_thread::sleep_for(compileTime);
+       });
+   auto loop = [&](psibase::TransactionContext& transaction)
+   {
+      auto request = fixture.action(2);  // the fixture's endless loop
+      psibase::ActionTrace result;
+      transaction.execCalledAction(0, request, result);
+   };
+   {
+      CodeWriter writer{fixture, psibase::DbMode::speculative()};
+      slow = true;
+      writer.transaction.setWatchdog(writer.transaction.getBillableTime() + limit);
+      const auto billedBefore = writer.transaction.getBillableTime();
+      // The run has already waited for the fixture's own service.
+      const auto chargedBefore = writer.transaction.startedCompileTime;
+      const auto start         = steady_clock::now();
+      CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+      const auto wall    = steady_clock::now() - start;
+      const auto billed  = writer.transaction.getBillableTime() - billedBefore;
+      const auto charged = writer.transaction.startedCompileTime - chargedBefore;
+      slow               = false;
+      CHECK(writer.stored(psibase::DbId::native, code));
+      // The compile took longer than the whole limit and the run is alive.
+      CHECK(wall >= compileTime);
+      CHECK(billed < limit);
+      CHECK_NOTHROW(fixture.called(writer.transaction, fixture.peer));
+      // What the node could charge the submitter: the compile, and nothing
+      // of it is in what the transaction is billed.
+      CHECK(charged >= compileTime);
+      CHECK(charged <= wall);
+      // Its own execution is still held to the limit.
+      CHECK_THROWS_AS(loop(writer.transaction), psibase::TimeoutException);
+   }
+   // Someone else submits the same code: the module is there, nothing to
+   // charge.
+   CodeWriter writer{fixture, psibase::DbMode::speculative()};
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK(writer.compiled() == 0);
+   CHECK(writer.transaction.startedCompileTime == nanoseconds(0));
 }
