@@ -11,6 +11,11 @@
 #include <optional>
 #include <vector>
 
+namespace psizam
+{
+   struct module;
+}
+
 namespace psibase
 {
    class NativeAotCache;
@@ -82,10 +87,49 @@ namespace psibase
    // not implement before the general parser allocates or compiles the module.
    void validateNativeWasm(std::span<const std::uint8_t> code, const NativeVMOptions& options);
 
+   /// The functions the node calls a service through, as the module exports
+   /// them: each is the wasm function index (in the function index space, so
+   /// imported functions count) of the export of that name, or nothing if
+   /// the module has no such export.
+   ///
+   /// Part of the admission rule: an export with one of these names must be
+   /// a function with exactly this signature, or the module is refused.
+   ///
+   ///    start:              (i64) -> ()       this service
+   ///    called:             (i64, i64) -> ()  this service, sender
+   ///    serve:              () -> ()
+   ///    processTransaction: () -> ()
+   ///
+   /// None is required to exist yet (gofractally/psibase#2261): a service
+   /// without one fails when the node tries to call it, as before.
+   struct NativeEntryPoints
+   {
+      std::optional<std::uint32_t> start;
+      std::optional<std::uint32_t> called;
+      std::optional<std::uint32_t> serve;
+      std::optional<std::uint32_t> processTransaction;
+      friend bool operator==(const NativeEntryPoints&, const NativeEntryPoints&) = default;
+   };
+
+   /// What admission learns about a module it admits.
+   struct NativeAdmission
+   {
+      /// psizam's stack byte cost of each defined function, in order (what
+      /// wasmtime's metered compile needs).
+      std::vector<std::uint32_t> costs;
+      NativeEntryPoints          entryPoints;
+   };
+
+   /// The entry points of a module psizam has parsed, checked as above.
+   /// admitNativeWasm does this; an engine that parses the module itself
+   /// calls it on its own parse. Throws std::runtime_error with the reason.
+   NativeEntryPoints nativeEntryPoints(const psizam::module& module);
+
    /// The chain's admission rule for service code, the same on every engine:
    /// the version names a float profile, validateNativeWasm, psizam's parser
    /// and validator under NativeVMOptions, and every import is a host
-   /// function of NativeHostFunctions.hpp with that function's signature. It
+   /// function of NativeHostFunctions.hpp with that function's signature, and
+   /// every entry point it exports has its fixed signature (NativeEntryPoints). It
    /// reads nothing but its arguments and that fixed table, so every node
    /// decides alike. It runs when a code row is
    /// written (failure aborts the transaction) and again before an engine
@@ -95,11 +139,9 @@ namespace psibase
    /// code is first executed; a compiler that refuses admitted code is a
    /// fault of that node's engine, never a property of the transaction.
    ///
-   /// Returns psizam's stack byte cost of each defined function, in order
-   /// (what wasmtime's metered compile needs). Throws std::runtime_error with
-   /// the reason.
-   std::vector<std::uint32_t> admitNativeWasm(std::span<const std::uint8_t> code,
-                                              const VMOptions&              options,
-                                              std::uint8_t                  vmVersion);
+   /// Throws std::runtime_error with the reason.
+   NativeAdmission admitNativeWasm(std::span<const std::uint8_t> code,
+                                   const VMOptions&              options,
+                                   std::uint8_t                  vmVersion);
 
 }  // namespace psibase

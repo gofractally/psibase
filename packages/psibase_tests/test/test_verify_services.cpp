@@ -176,6 +176,10 @@ TEST_CASE("SetCode: code that is not admissible fails the transaction that store
        {wasm({1,   4, 1,   0x60, 0,   0,   2,   15,  1,   3, 'e', 'n',
               'v', 7, 'k', 'v',  'C', 'l', 'o', 's', 'e', 0, 0}),
         "native WASM imports env.kvClose with a signature that is not the host function's"},
+       // An entry point with the wrong signature: (func (export "called")), no parameters.
+       {wasm({1, 4, 1, 0x60, 0, 0, 3, 2, 1, 0, 7, 10, 1, 6, 'c', 'a', 'l', 'l', 'e', 'd', 0, 0,
+              10, 4, 1, 2, 0, 0x0b}),
+        "native WASM export called must be a function (i64, i64) -> ()"},
    };
    auto stored = [&](const std::vector<char>& code)
    {

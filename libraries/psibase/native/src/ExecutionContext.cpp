@@ -81,6 +81,10 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
       std::uint8_t               vmVersion = 0;
       std::unique_ptr<backend_t>                    backend;
       std::shared_ptr<dwarf::debugger_registration> debug;
+      // The module's entry points, checked to have their fixed signatures
+      // when the backend was made, for calling by function index
+      // (gofractally/psibase#2261). Calls still go by name.
+      NativeEntryPoints                             entryPoints;
 
       auto byHash() const { return std::tie(hash, vmOptions, vmVersion); }
    };
@@ -265,6 +269,7 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
             {
                BackendEntry entry{hash, limits, vmVersion};
                entry.backend = std::make_unique<backend_t>(job.code, nullptr, options);
+               entry.entryPoints = nativeEntryPoints(entry.backend->get_module());
                entry.debug   = dwarf::register_with_debugger(entry.backend->get_module());
                add(std::move(entry));
             }
@@ -405,6 +410,8 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
                           std::make_unique<backend_t>(c->code, nullptr, this->vmOptions);
                       backend.debug = dwarf::register_with_debugger(backend.backend->get_module());
                    }
+                   // The same rule as when the code was stored.
+                   backend.entryPoints = nativeEntryPoints(backend.backend->get_module());
                 }
              });
       }

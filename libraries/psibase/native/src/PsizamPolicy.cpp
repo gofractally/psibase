@@ -339,9 +339,57 @@ namespace psibase
       }
    }  // namespace
 
-   std::vector<std::uint32_t> admitNativeWasm(std::span<const std::uint8_t> code,
-                                              const VMOptions&              options,
-                                              std::uint8_t                  vmVersion)
+   NativeEntryPoints nativeEntryPoints(const psizam::module& module)
+   {
+      constexpr std::uint8_t i64 = 0x7e;
+      struct EntryPoint
+      {
+         std::string_view                           name;
+         std::vector<std::uint8_t>                  params;
+         std::optional<std::uint32_t> NativeEntryPoints::* index;
+         const char*                                signature;
+         // Whether a module without it is refused. None is, yet: making
+         // one required is changing its `false` here.
+         bool required;
+      };
+      static const std::vector<EntryPoint> known = {
+          {"start", {i64}, &NativeEntryPoints::start, "(i64) -> ()", false},
+          {"called", {i64, i64}, &NativeEntryPoints::called, "(i64, i64) -> ()", false},
+          {"serve", {}, &NativeEntryPoints::serve, "() -> ()", false},
+          {"processTransaction", {}, &NativeEntryPoints::processTransaction, "() -> ()", false},
+      };
+      NativeEntryPoints result;
+      for (const auto& exported : module.exports)
+      {
+         const std::string_view name(reinterpret_cast<const char*>(exported.field_str.data()),
+                                     exported.field_str.size());
+         for (const auto& entry : known)
+         {
+            if (entry.name != name)
+               continue;
+            const auto refuse = [&]
+            {
+               throw std::runtime_error("native WASM export " + std::string(name) +
+                                        " must be a function " + entry.signature);
+            };
+            if (exported.kind != psizam::external_kind::Function)
+               refuse();
+            const auto& type = module.get_function_type(exported.index);
+            if (!std::ranges::equal(entry.params, type.param_types) || !type.return_types.empty())
+               refuse();
+            result.*entry.index = exported.index;
+         }
+      }
+      for (const auto& entry : known)
+         if (entry.required && !(result.*entry.index))
+            throw std::runtime_error("native WASM must export " + std::string(entry.name) +
+                                     ", a function " + entry.signature);
+      return result;
+   }
+
+   NativeAdmission admitNativeWasm(std::span<const std::uint8_t> code,
+                                   const VMOptions&              options,
+                                   std::uint8_t                  vmVersion)
    {
       NativeVMOptions policy{options, {}, vmVersion};
       validateNativeWasm(code, policy);
@@ -355,11 +403,12 @@ namespace psibase
              bytes, nullptr, policy);
          const auto& module = validator.get_module();
          checkImports(module);
-         std::vector<std::uint32_t> costs;
-         costs.reserve(module.code.size());
+         NativeAdmission result;
+         result.entryPoints = nativeEntryPoints(module);
+         result.costs.reserve(module.code.size());
          for (const auto& body : module.code)
-            costs.push_back(body.byte_stack_usage);
-         return costs;
+            result.costs.push_back(body.byte_stack_usage);
+         return result;
       }
       catch (const psizam::exception& e)
       {

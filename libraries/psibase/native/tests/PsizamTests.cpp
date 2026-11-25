@@ -1301,6 +1301,177 @@ TEST_CASE("Code that imports what the node does not provide is refused when it i
    }
 }
 
+namespace
+{
+   struct Export
+   {
+      std::string               name;
+      std::vector<std::uint8_t> params, results;
+      std::uint8_t              kind = 0;  // 0 function, 2 memory, 3 global
+   };
+   // A module with `imported` imports of env.setRetval, then one function per
+   // function export in order (so the n-th has index imported + n), one
+   // memory and one global.
+   std::vector<std::uint8_t> exporting(const std::vector<Export>& exports, std::uint32_t imported)
+   {
+      auto section = [](std::vector<std::uint8_t>& out, std::uint8_t id,
+                        const std::vector<std::uint8_t>& body)
+      {
+         out.push_back(id);
+         leb(out, body.size());
+         out.insert(out.end(), body.begin(), body.end());
+      };
+      std::uint32_t functions = 0;
+      for (const auto& e : exports)
+         functions += e.kind == 0;
+      std::vector<std::uint8_t> types, imports, declared, exported, code;
+      leb(types, functions + 1);
+      types.insert(types.end(), {0x60, 2, 0x7f, 0x7f, 0});  // type 0: env.setRetval
+      leb(imports, imported);
+      for (std::uint32_t i = 0; i < imported; ++i)
+         imports.insert(imports.end(),
+                        {3, 'e', 'n', 'v', 9, 's', 'e', 't', 'R', 'e', 't', 'v', 'a', 'l', 0, 0});
+      leb(declared, functions);
+      leb(exported, exports.size());
+      leb(code, functions);
+      std::uint32_t function = 0;
+      for (const auto& e : exports)
+      {
+         leb(exported, e.name.size());
+         exported.insert(exported.end(), e.name.begin(), e.name.end());
+         exported.push_back(e.kind);
+         if (e.kind != 0)
+         {
+            exported.push_back(0);  // the memory, or the global
+            continue;
+         }
+         types.push_back(0x60);
+         leb(types, e.params.size());
+         types.insert(types.end(), e.params.begin(), e.params.end());
+         leb(types, e.results.size());
+         types.insert(types.end(), e.results.begin(), e.results.end());
+         leb(declared, function + 1);
+         leb(exported, imported + function);
+         code.insert(code.end(), {3, 0, 0x00, 0x0b});  // no locals; unreachable; end
+         ++function;
+      }
+      auto result = wasmModule({});
+      section(result, 1, types);
+      section(result, 2, imports);
+      section(result, 3, declared);
+      section(result, 5, {1, 0, 1});                 // one memory of one page
+      section(result, 6, {1, 0x7f, 0, 0x41, 0, 0x0b});  // one immutable i32 global
+      section(result, 7, exported);
+      section(result, 10, code);
+      return result;
+   }
+}  // namespace
+
+TEST_CASE("The entry points a service exports have their fixed signatures")
+{
+   const Export start{"start", {i64}, {}}, called{"called", {i64, i64}, {}}, serve{"serve", {}, {}},
+       processTransaction{"processTransaction", {}, {}};
+
+   // Admitted, and where admission says they are. Function indices count
+   // the imported functions first.
+   {
+      auto found = psibase::admitNativeWasm(
+                       exporting({start, called, serve, processTransaction}, 0), {}, 0)
+                       .entryPoints;
+      CHECK(found == psibase::NativeEntryPoints{0u, 1u, 2u, 3u});
+      found = psibase::admitNativeWasm(
+                  exporting({serve, {"other", {i32}, {i32}}, called, start}, 3), {}, 0)
+                  .entryPoints;
+      CHECK(found == psibase::NativeEntryPoints{6u, 5u, 3u, std::nullopt});
+      // None of them is required yet, and other exports are the service's own.
+      found = psibase::admitNativeWasm(
+                  exporting({{"other", {i64}, {i64}}, {"memory", {}, {}, 2}}, 1), {}, 0)
+                  .entryPoints;
+      CHECK(found == psibase::NativeEntryPoints{});
+   }
+
+   struct Refused
+   {
+      std::string what;
+      Export      exported;
+      std::string reason;
+   };
+   std::vector<Refused> refused;
+   for (const auto& [entry, signature] :
+        {std::pair{start, "(i64) -> ()"}, std::pair{called, "(i64, i64) -> ()"},
+         std::pair{serve, "() -> ()"}, std::pair{processTransaction, "() -> ()"}})
+   {
+      const auto reason =
+          "native WASM export " + entry.name + " must be a function " + signature;
+      auto wrongType = entry;
+      if (wrongType.params.empty())
+         wrongType.params = {i32};
+      else
+         wrongType.params.back() = i32;
+      auto extra = entry;
+      extra.params.push_back(i64);
+      auto result    = entry;
+      result.results = {i32};
+      refused.push_back({entry.name + ": wrong parameter type", wrongType, reason});
+      refused.push_back({entry.name + ": one parameter too many", extra, reason});
+      if (!entry.params.empty())
+      {
+         auto missing = entry;
+         missing.params.pop_back();
+         refused.push_back({entry.name + ": one parameter too few", missing, reason});
+      }
+      refused.push_back({entry.name + ": a result", result, reason});
+      refused.push_back({entry.name + ": a global", {entry.name, {}, {}, 3}, reason});
+      refused.push_back({entry.name + ": a memory", {entry.name, {}, {}, 2}, reason});
+   }
+   for (const auto& [what, exported, reason] : refused)
+   {
+      INFO(what);
+      CHECK_THROWS_WITH(psibase::admitNativeWasm(exporting({exported}, 2), {}, 0),
+                        Catch::Matchers::ContainsSubstring(reason));
+   }
+
+   // Through the write of the code row, in every execution mode.
+   struct Mode
+   {
+      const char*     name;
+      psibase::DbMode mode;
+      bool            producing;
+      psibase::DbId   db;
+   };
+   for (auto [name, mode, producing, db] :
+        {Mode{"block being produced", psibase::DbMode::transaction(), true, psibase::DbId::native},
+         Mode{"block being applied", psibase::DbMode::transaction(), false, psibase::DbId::native},
+         Mode{"speculative", psibase::DbMode::speculative(), true, psibase::DbId::native},
+         Mode{"node-local", psibase::DbMode::callback(), true, psibase::DbId::nativeSubjective}})
+   {
+      NativeService fixture;
+      fixture.block.isProducing = producing;
+      CodeWriter writer{fixture, mode};
+      for (const auto& [what, exported, reason] : refused)
+      {
+         INFO(name << ", " << what);
+         const auto code = exporting({exported}, 1);
+         CHECK_THROWS_WITH(writer.put(db, code), Catch::Matchers::ContainsSubstring(reason));
+         CHECK_FALSE(writer.stored(db, code));
+      }
+      CHECK(writer.compiled() == 0);
+      const auto good = exporting({start, called, serve, processTransaction}, 1);
+      CHECK_NOTHROW(writer.put(db, good));
+      CHECK(writer.stored(db, good));
+      // And it runs: the node calls start and called.
+      const psibase::AccountNumber account{"vm-entry"};
+      psibase::CodeRow row{.codeNum = account, .codeHash = CodeWriter::row(good).codeHash};
+      if (db == psibase::DbId::native)
+      {
+         fixture.block.db.kvPut(row.db, row.key(), row);
+         // Its start is `unreachable`: reached means found and called.
+         CHECK_THROWS_WITH(fixture.called(writer.transaction, account),
+                           Catch::Matchers::ContainsSubstring("unreachable"));
+      }
+   }
+}
+
 TEST_CASE("A damaged stored artifact is discarded and the service compiled again")
 {
    if (!isWasmtime())
