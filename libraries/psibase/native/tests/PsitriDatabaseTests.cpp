@@ -2,6 +2,7 @@
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers.hpp>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -416,6 +417,292 @@ TEST_CASE("psitri subjective OCC retries preserve callbacks and independent writ
    REQUIRE(b);
    REQUIRE(std::string(a->begin(), a->end()) == "second");
    REQUIRE(std::string(b->begin(), b->end()) == "retry");
+}
+
+// ---- concurrent sections on the node-local databases ----------------------
+//
+// These tests state what concurrent writers of the node-local (subjective)
+// databases may rely on, in terms of what is in the database afterwards:
+// rows of different writers are all there, and a read-modify-write of a
+// shared row loses no update. They say nothing about HOW a conflict is
+// handled (a commit refused and the section run again, or a writer waiting
+// for a lock), so they hold for the optimistic scheme with key ranges and
+// for a write lock alike (gofractally/psibase#2274, #2276). Every section
+// is written the way a service runs one: the body is repeated until the
+// commit is accepted.
+//
+// NEEDS ADAPTATION if the way a refused section is reported changes: the
+// loops below expect commitSubjective() to return false and to leave the
+// section open on the current state. Nothing else here depends on the
+// mechanism.
+namespace
+{
+   // One thread's access to a shared database
+   struct NodeLocalWriter
+   {
+      WriterPtr          writer;
+      Sockets            sockets;
+      SocketAutoCloseSet closing;
+      Database           db;
+      Database::Session  session;
+      std::uint64_t      refused = 0;
+      explicit NodeLocalWriter(SharedDatabase& shared)
+          : writer(shared.createWriter()),
+            sockets(shared),
+            db(shared, shared.emptyRevision()),
+            session(db.startWrite(writer))
+      {
+      }
+      // Runs body as one section, again for as long as its commit is refused
+      template <typename F>
+      void section(F&& body)
+      {
+         db.checkoutSubjective();
+         while (true)
+         {
+            body(db);
+            if (db.commitSubjective(sockets, closing))
+               break;
+            ++refused;
+         }
+      }
+   };
+   std::string nodeLocalKeyOf(const std::optional<Database::KVResult>& r)
+   {
+      return r ? std::string(r->key.begin(), r->key.end()) : std::string();
+   }
+   std::string tableKey(std::uint64_t id)
+   {
+      char buffer[32];
+      std::snprintf(buffer, sizeof(buffer), "t/%010llu", (unsigned long long)id);
+      return buffer;
+   }
+   // All rows with a prefix, as the published state has them
+   std::vector<std::pair<std::string, std::string>> rowsWithPrefix(SharedDatabase&  shared,
+                                                                   std::string_view prefix)
+   {
+      std::vector<std::pair<std::string, std::string>> result;
+      NodeLocalWriter                                  reader(shared);
+      reader.db.checkoutSubjective();
+      std::string key(prefix);
+      while (auto row = reader.db.kvGreaterEqualRaw(DbId::subjective, span(key), prefix.size()))
+      {
+         result.emplace_back(std::string(row->key.begin(), row->key.end()),
+                             std::string(row->value.begin(), row->value.end()));
+         key = result.back().first + '\0';
+      }
+      reader.db.abortSubjective();
+      return result;
+   }
+}  // namespace
+
+TEST_CASE("a node-local section sees what earlier sections committed and nothing of aborted ones",
+          "[storage][psitri][node-local]")
+{
+   SharedDatabase  shared(directory("node-local-sequence"), config,
+                          psibase::storage::open_mode::create_new);
+   NodeLocalWriter first(shared), second(shared);
+   first.section([](Database& db) { put(db, DbId::subjective, "first", "a"); });
+   // another writer's next section sees the row
+   second.db.checkoutSubjective();
+   REQUIRE(value(second.db, DbId::subjective, "a") == "first");
+   put(second.db, DbId::subjective, "aborted", "b");
+   put(second.db, DbId::subjective, "aborted", "a");
+   second.db.abortSubjective();
+   // nothing of the aborted section is there
+   first.section(
+       [](Database& db)
+       {
+          REQUIRE(value(db, DbId::subjective, "a") == "first");
+          REQUIRE(value(db, DbId::subjective, "b") == "<missing>");
+          put(db, DbId::subjective, "first", "c");
+       });
+   second.section(
+       [](Database& db)
+       {
+          REQUIRE(value(db, DbId::subjective, "c") == "first");
+          put(db, DbId::subjective, "second", "b");
+          db.kvRemoveRaw(DbId::subjective, span("c"));
+       });
+   first.section(
+       [](Database& db)
+       {
+          REQUIRE(value(db, DbId::subjective, "a") == "first");
+          REQUIRE(value(db, DbId::subjective, "b") == "second");
+          REQUIRE(value(db, DbId::subjective, "c") == "<missing>");
+       });
+   REQUIRE(first.refused == 0);
+   REQUIRE(second.refused == 0);
+}
+
+TEST_CASE("node-local sections of different threads on rows of their own do not interfere",
+          "[storage][psitri][node-local]")
+{
+   SharedDatabase     shared(directory("node-local-disjoint"), config,
+                             psibase::storage::open_mode::create_new);
+   constexpr unsigned threads = 4, rounds = 200;
+   std::atomic<std::uint64_t> refused{0};
+   std::atomic<bool>          failed{false};
+   std::vector<std::thread>   workers;
+   for (unsigned t = 0; t < threads; ++t)
+      workers.emplace_back(
+          [&, t]
+          {
+             try
+             {
+                NodeLocalWriter w(shared);
+                auto            name = std::string(1, char('a' + t));
+                for (unsigned i = 0; i < rounds; ++i)
+                   w.section(
+                       [&](Database& db)
+                       {
+                          // Rows of this thread only, in several places of
+                          // the key space, between the rows of the others:
+                          // a put, a counter read and written, a new row
+                          // and a look at the last row of its own table.
+                          put(db, DbId::subjective, std::to_string(i), "0-" + name);
+                          auto counter = value(db, DbId::subjective, "A-" + name);
+                          auto n       = counter == "<missing>" ? 0 : std::stoul(counter);
+                          put(db, DbId::subjective, std::to_string(n + 1), "A-" + name);
+                          auto last = nodeLocalKeyOf(db.kvMaxRaw(DbId::subjective, span("z-" + name + "/")));
+                          put(db, DbId::subjective, last, "z-" + name + "/" + tableKey(i));
+                          // and a row that comes and goes
+                          if (i % 2 == 0)
+                             put(db, DbId::subjective, "temporary", "m-" + name);
+                          else
+                             db.kvRemoveRaw(DbId::subjective, span("m-" + name));
+                       });
+                refused += w.refused;
+             }
+             catch (...)
+             {
+                failed = true;
+             }
+          });
+   for (auto& w : workers)
+      w.join();
+   REQUIRE_FALSE(failed);
+   NodeLocalWriter check(shared);
+   check.section(
+       [&](Database& db)
+       {
+          for (unsigned t = 0; t < threads; ++t)
+          {
+             auto name = std::string(1, char('a' + t));
+             INFO("thread " << name);
+             // every section of the thread took effect exactly once
+             CHECK(value(db, DbId::subjective, "A-" + name) == std::to_string(rounds));
+             CHECK(value(db, DbId::subjective, "0-" + name) == std::to_string(rounds - 1));
+             // rounds is even: the last section removed the row
+             CHECK(value(db, DbId::subjective, "m-" + name) == "<missing>");
+          }
+       });
+   for (unsigned t = 0; t < threads; ++t)
+   {
+      auto name = std::string(1, char('a' + t));
+      INFO("thread " << name);
+      auto rows = rowsWithPrefix(shared, "z-" + name + "/");
+      REQUIRE(rows.size() == rounds);
+      for (unsigned i = 0; i < rounds; ++i)
+      {
+         CHECK(rows[i].first == "z-" + name + "/" + tableKey(i));
+         // each row holds the key that was last when it was written: the
+         // thread saw its own earlier sections, in order, and no row of
+         // another thread
+         CHECK(rows[i].second == (i ? "z-" + name + "/" + tableKey(i - 1) : std::string()));
+      }
+   }
+   // Not asserted, because it is a property of the mechanism and not of the
+   // result: none of these sections touches a row of another thread, so
+   // with exact conflict detection, or with a write lock, none of them has
+   // to be run twice because of what another thread wrote.
+   if (refused)
+      WARN(threads * rounds << " sections on rows of their own were refused and run again "
+                            << refused.load() << " times");
+}
+
+TEST_CASE("node-local sections of different threads on the same rows lose no update",
+          "[storage][psitri][node-local]")
+{
+   SharedDatabase     shared(directory("node-local-shared"), config,
+                             psibase::storage::open_mode::create_new);
+   constexpr unsigned threads = 4, rounds = 200;
+   std::atomic<std::uint64_t> refused{0};
+   std::atomic<bool>          failed{false};
+   std::vector<std::thread>   workers;
+   for (unsigned t = 0; t < threads; ++t)
+      workers.emplace_back(
+          [&, t]
+          {
+             try
+             {
+                NodeLocalWriter w(shared);
+                auto            name = std::string(1, char('a' + t));
+                for (unsigned i = 0; i < rounds; ++i)
+                   w.section(
+                       [&](Database& db)
+                       {
+                          // a row of this thread, below the shared rows
+                          put(db, DbId::subjective, std::to_string(i), "B-" + name);
+                          // One row that every section reads and rewrites,
+                          // the way a single statistics row is kept
+                          auto counter = value(db, DbId::subjective, "counter");
+                          auto n       = counter == "<missing>" ? 0 : std::stoul(counter);
+                          put(db, DbId::subjective, std::to_string(n + 1), "counter");
+                          // The next id of a table taken from its last row,
+                          // the way a queue of runs is appended to
+                          auto          last = nodeLocalKeyOf(db.kvMaxRaw(DbId::subjective, span("t/")));
+                          std::uint64_t id   = last.empty() ? 1 : std::stoull(last.substr(2)) + 1;
+                          put(db, DbId::subjective, name, tableKey(id));
+                          // and a row of this thread above them
+                          put(db, DbId::subjective, std::to_string(i), "y-" + name);
+                       });
+                refused += w.refused;
+             }
+             catch (...)
+             {
+                failed = true;
+             }
+          });
+   for (auto& w : workers)
+      w.join();
+   REQUIRE_FALSE(failed);
+   NodeLocalWriter check(shared);
+   check.section(
+       [&](Database& db)
+       {
+          // N threads times M increments: no section wrote over an
+          // increment it had not seen
+          CHECK(value(db, DbId::subjective, "counter") == std::to_string(threads * rounds));
+          for (unsigned t = 0; t < threads; ++t)
+          {
+             auto name = std::string(1, char('a' + t));
+             INFO("thread " << name);
+             CHECK(value(db, DbId::subjective, "B-" + name) == std::to_string(rounds - 1));
+             CHECK(value(db, DbId::subjective, "y-" + name) == std::to_string(rounds - 1));
+          }
+       });
+   // Every section appended exactly one row: the ids are 1..N*M without a
+   // gap and without two sections having taken the same one, and each
+   // thread has its M rows.
+   auto rows = rowsWithPrefix(shared, "t/");
+   REQUIRE(rows.size() == threads * rounds);
+   std::map<std::string, unsigned> perThread;
+   for (std::size_t i = 0; i < rows.size(); ++i)
+   {
+      CHECK(rows[i].first == tableKey(i + 1));
+      ++perThread[rows[i].second];
+   }
+   REQUIRE(perThread.size() == threads);
+   for (const auto& [name, count] : perThread)
+   {
+      INFO("thread " << name);
+      CHECK(count == rounds);
+   }
+   // How often a section had to be run again is the mechanism's business;
+   // these sections really do conflict.
+   INFO("sections refused and run again: " << refused.load());
+   SUCCEED();
 }
 
 TEST_CASE("psitri subjective writes and queries run beside block publication",
