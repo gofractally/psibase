@@ -671,6 +671,33 @@ auto XHttp::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
       return HttpReply{.headers = allowCors(request, {XAdmin::service, AccountNumber{"x-proxy"}})};
    }
 
+   if (target == "/identity_gate")
+   {
+      auto headers = allowCors(request, {XAdmin::service});
+      if (request.method == "PUT")
+      {
+         if (request.contentType != "application/json")
+            return error(HttpStatus::unsupportedMediaType,
+                         "Content-Type must be application/json");
+         auto body = psio::from_ijson<IdentityGateRow>(request.body);
+         PSIBASE_SUBJECTIVE_TX
+         {
+            open<IdentityGateTable>().put(body);
+         }
+         return HttpReply{.headers = std::move(headers)};
+      }
+      if (request.method != "GET")
+         return HttpReply::methodNotAllowed(request);
+      IdentityGateRow row;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         row = open<IdentityGateTable>().get({}).value_or(IdentityGateRow{});
+      }
+      HttpReply reply{.contentType = "application/json", .headers = std::move(headers)};
+      psio::to_ijson(row, reply.body);
+      return reply;
+   }
+
    if (target == "/unregister_server")
    {
       if (request.method != "POST")
@@ -818,8 +845,41 @@ extern "C" [[clang::export_name("serve")]] void serve()
 
    // Forward other requests to HttpServer
    req.removeCookies([](std::string_view name) { return !name.starts_with("__Host-"); });
+
+   // Decide whether this request must be identified before app code runs.
+   // Only this service can see the connection, so it makes the decision and
+   // the chain's HTTP service applies it.
+   bool requireIdentity = false;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      requireIdentity = XHttp{}
+                            .open<IdentityGateTable>()
+                            .get({})
+                            .value_or(IdentityGateRow{})
+                            .required;
+   }
+   bool bypassRequested = false;
+   bool forwarded       = false;
+   for (const auto& header : req.headers)
+   {
+      if (header.matches(XHttp::localBypassHeader))
+         bypassRequested = true;
+      else if (header.matches("forwarded") || header.matches("x-forwarded-for"))
+         forwarded = true;
+   }
+   if (bypassRequested)
+   {
+      std::erase_if(req.headers,
+                    [](const auto& header) { return header.matches(XHttp::localBypassHeader); });
+      // A proxy on this machine makes every client look local, so a
+      // forwarded request never qualifies.
+      if (requireIdentity && !forwarded && to<XAdmin>().isAdmin(std::optional<AccountNumber>{}, std::optional<std::int32_t>{sock},
+                                      std::vector<std::optional<IPAddress>>{}))
+         requireIdentity = false;
+   }
+
    owned.put({.socket = sock, .owner = HttpServer::service});
-   to<HttpServer>().serve(sock, req);
+   to<HttpServer>().serve(sock, req, requireIdentity);
 }  // serve()
 
 #endif

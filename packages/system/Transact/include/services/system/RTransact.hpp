@@ -257,6 +257,20 @@ namespace SystemService
    using BlockSizeTable = psibase::Table<BlockSizeRecord, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(BlockSizeTable)
 
+   /// Who a request's session token identifies.
+   ///
+   /// A named account has `user` set. A guest (a passkey-derived key that
+   /// has no account yet) has `guest` set to the lowercase hex of the first
+   /// 16 bytes of the SHA-256 of its public key. Neither is set when the
+   /// request carries no valid token.
+   struct SessionInfo
+   {
+      std::optional<psibase::AccountNumber> user;
+      std::string                           guest;
+      bool identified() const { return user.has_value() || !guest.empty(); }
+   };
+   PSIO_REFLECT(SessionInfo, user, attr(guest, utf8))
+
    // Transactions enter this service through the push_transaction endpoint
    // or over p2p (recv). Speculative execution and signature verification
    // are dispatched asynchronously. When they complete, the transaction
@@ -310,6 +324,9 @@ namespace SystemService
       std::string login(std::string rootHost);
 
       std::optional<psibase::AccountNumber> getUser(psibase::HttpRequest request);
+      /// Like getUser, but also reports guest sessions. Apps are never told
+      /// about guests; this is for the request gate and usage accounting.
+      SessionInfo getSession(psibase::HttpRequest request);
    };
    PSIO_REFLECT(RTransact,
                 method(next),
@@ -323,7 +340,8 @@ namespace SystemService
                 method(onRequeue, id, trace),
                 method(serveSys, request, socket, user),
                 method(login, rootHost),
-                method(getUser, request))
+                method(getUser, request),
+                method(getSession, request))
    PSIBASE_REFLECT_TABLES(RTransact,
                           RTransact::Subjective,
                           RTransact::Session,

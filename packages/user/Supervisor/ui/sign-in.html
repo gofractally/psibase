@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="color-scheme" content="dark light" />
+        <title>Welcome</title>
+        <style>
+            :root {
+                color-scheme: dark light;
+                --si-bg: #070b16;
+                --si-bg-2: #0d1326;
+                --si-card: rgba(18, 24, 44, 0.72);
+                --si-card-border: rgba(148, 163, 255, 0.16);
+                --si-text: #eef1fb;
+                --si-muted: #9aa3bf;
+                --si-accent: #8b9dff;
+                --si-accent-2: #5eead4;
+                --si-danger: #ff8f8f;
+                --si-shadow: 0 30px 80px -20px rgba(3, 6, 20, 0.8);
+                --si-btn-text: #0b1020;
+            }
+
+            @media (prefers-color-scheme: light) {
+                :root {
+                    --si-bg: #f3f5fc;
+                    --si-bg-2: #e7ebfa;
+                    --si-card: rgba(255, 255, 255, 0.82);
+                    --si-card-border: rgba(70, 86, 180, 0.14);
+                    --si-text: #131a33;
+                    --si-muted: #5b6482;
+                    --si-accent: #4f61e8;
+                    --si-accent-2: #0fa697;
+                    --si-danger: #c0392b;
+                    --si-shadow: 0 30px 70px -25px rgba(40, 52, 120, 0.35);
+                    --si-btn-text: #ffffff;
+                }
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            html,
+            body {
+                height: 100%;
+                margin: 0;
+            }
+
+            body {
+                font-family:
+                    ui-sans-serif,
+                    -apple-system,
+                    "SF Pro Text",
+                    "Segoe UI",
+                    Roboto,
+                    "Helvetica Neue",
+                    Arial,
+                    sans-serif;
+                color: var(--si-text);
+                background: radial-gradient(120% 90% at 50% 0%, var(--si-bg-2), var(--si-bg) 70%);
+                -webkit-font-smoothing: antialiased;
+                overflow-x: hidden;
+            }
+
+            #signin .si-backdrop {
+                position: fixed;
+                inset: 0;
+                overflow: hidden;
+                pointer-events: none;
+            }
+
+            #signin .si-orb {
+                position: absolute;
+                border-radius: 50%;
+                filter: blur(90px);
+                opacity: 0.5;
+            }
+
+            #signin .si-orb-a {
+                width: 46vmax;
+                height: 46vmax;
+                left: -12vmax;
+                top: -18vmax;
+                background: var(--si-accent);
+                animation: drift-a 22s ease-in-out infinite alternate;
+            }
+
+            #signin .si-orb-b {
+                width: 40vmax;
+                height: 40vmax;
+                right: -14vmax;
+                bottom: -20vmax;
+                background: var(--si-accent-2);
+                opacity: 0.32;
+                animation: drift-b 26s ease-in-out infinite alternate;
+            }
+
+            #signin .si-grid {
+                position: absolute;
+                inset: 0;
+                background-image:
+                    linear-gradient(var(--si-card-border) 1px, transparent 1px),
+                    linear-gradient(90deg, var(--si-card-border) 1px, transparent 1px);
+                background-size: 56px 56px;
+                mask-image: radial-gradient(70% 60% at 50% 40%, #000 0%, transparent 75%);
+                -webkit-mask-image: radial-gradient(
+                    70% 60% at 50% 40%,
+                    #000 0%,
+                    transparent 75%
+                );
+                opacity: 0.5;
+            }
+
+            @keyframes drift-a {
+                to {
+                    transform: translate(6vmax, 5vmax) scale(1.08);
+                }
+            }
+
+            @keyframes drift-b {
+                to {
+                    transform: translate(-5vmax, -4vmax) scale(1.1);
+                }
+            }
+
+            #signin .si-shell {
+                position: relative;
+                min-height: 100%;
+                display: grid;
+                place-items: center;
+                padding: 32px 20px;
+            }
+
+            #signin .si-card {
+                width: min(440px, 100%);
+                padding: 34px 34px 22px;
+                border-radius: 26px;
+                background: var(--si-card);
+                border: 1px solid var(--si-card-border);
+                box-shadow: var(--si-shadow);
+                backdrop-filter: blur(22px) saturate(140%);
+                -webkit-backdrop-filter: blur(22px) saturate(140%);
+                animation: rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+            }
+
+            @keyframes rise {
+                from {
+                    opacity: 0;
+                    transform: translateY(14px) scale(0.985);
+                }
+            }
+
+            #signin .si-brand {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 26px;
+            }
+
+            #signin .si-mark {
+                width: 38px;
+                height: 38px;
+                flex: none;
+            }
+
+            #signin .si-network {
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: 0.01em;
+                color: var(--si-muted);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            #signin h1 {
+                margin: 0 0 10px;
+                font-size: 30px;
+                line-height: 1.15;
+                letter-spacing: -0.02em;
+                font-weight: 700;
+            }
+
+            #signin h2 {
+                margin: 18px 0 8px;
+                font-size: 22px;
+                letter-spacing: -0.01em;
+            }
+
+            #signin .si-lede {
+                margin: 0 0 22px;
+                color: var(--si-muted);
+                font-size: 15.5px;
+                line-height: 1.55;
+            }
+
+            #signin .si-destination {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 12px 14px;
+                margin-bottom: 20px;
+                border-radius: 16px;
+                border: 1px solid var(--si-card-border);
+                background: color-mix(in srgb, var(--si-accent) 9%, transparent);
+            }
+
+            #signin .si-avatar {
+                width: 38px;
+                height: 38px;
+                flex: none;
+                display: grid;
+                place-items: center;
+                border-radius: 11px;
+                font-weight: 700;
+                font-size: 17px;
+                color: var(--si-btn-text);
+                background: linear-gradient(135deg, var(--si-accent), var(--si-accent-2));
+            }
+
+            #signin .si-dest-text {
+                display: grid;
+                min-width: 0;
+            }
+
+            #signin .si-dest-label {
+                font-size: 12px;
+                color: var(--si-muted);
+            }
+
+            #signin .si-dest-host {
+                font-size: 15px;
+                font-weight: 600;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            #signin .si-dest-host .si-dim {
+                color: var(--si-muted);
+                font-weight: 500;
+            }
+
+            #signin .si-notice {
+                margin: 0 0 16px;
+                padding: 11px 13px;
+                border-radius: 12px;
+                font-size: 14px;
+                line-height: 1.45;
+                color: var(--si-danger);
+                border: 1px solid color-mix(in srgb, var(--si-danger) 35%, transparent);
+                background: color-mix(in srgb, var(--si-danger) 9%, transparent);
+            }
+
+            #signin .si-btn {
+                width: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                border: 0;
+                border-radius: 15px;
+                font: inherit;
+                font-weight: 650;
+                cursor: pointer;
+                transition:
+                    transform 0.15s ease,
+                    box-shadow 0.2s ease,
+                    background 0.2s ease;
+            }
+
+            #signin .si-btn svg {
+                width: 22px;
+                height: 22px;
+            }
+
+            #signin .si-btn.si-primary {
+                padding: 15px 18px;
+                font-size: 16.5px;
+                color: var(--si-btn-text);
+                background: linear-gradient(135deg, var(--si-accent), var(--si-accent-2));
+                box-shadow: 0 14px 34px -14px var(--si-accent);
+            }
+
+            #signin .si-btn.si-primary:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 18px 40px -14px var(--si-accent);
+            }
+
+            #signin .si-btn.si-primary:active {
+                transform: translateY(0) scale(0.99);
+            }
+
+            #signin .si-btn.si-ghost {
+                margin-top: 10px;
+                padding: 12px 18px;
+                font-size: 14.5px;
+                font-weight: 550;
+                color: var(--si-text);
+                background: transparent;
+                border: 1px solid var(--si-card-border);
+            }
+
+            #signin .si-btn.si-ghost:hover {
+                background: color-mix(in srgb, var(--si-accent) 10%, transparent);
+            }
+
+            #signin .si-btn:focus-visible,
+            #signin .si-link:focus-visible {
+                outline: 2px solid var(--si-accent);
+                outline-offset: 3px;
+            }
+
+            #signin .si-points {
+                list-style: none;
+                margin: 24px 0 0;
+                padding: 20px 0 0;
+                border-top: 1px solid var(--si-card-border);
+                display: grid;
+                gap: 12px;
+            }
+
+            #signin .si-points li {
+                display: flex;
+                gap: 11px;
+                font-size: 13.5px;
+                line-height: 1.5;
+                color: var(--si-muted);
+            }
+
+            #signin .si-points strong {
+                color: var(--si-text);
+                font-weight: 600;
+            }
+
+            #signin .si-dot {
+                flex: none;
+                width: 7px;
+                height: 7px;
+                margin-top: 7px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, var(--si-accent), var(--si-accent-2));
+            }
+
+            #signin .si-view.si-center {
+                text-align: center;
+                padding: 18px 0 10px;
+            }
+
+            #signin .si-spinner {
+                width: 46px;
+                height: 46px;
+                margin: 0 auto;
+                border-radius: 50%;
+                border: 3px solid var(--si-card-border);
+                border-top-color: var(--si-accent);
+                animation: spin 0.9s linear infinite;
+            }
+
+            @keyframes spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            #signin .si-check {
+                width: 56px;
+                height: 56px;
+                margin: 0 auto;
+                display: block;
+                stroke: var(--si-accent-2);
+                stroke-width: 3;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+            }
+
+            #signin .si-check circle {
+                stroke-dasharray: 151;
+                stroke-dashoffset: 151;
+                animation: draw 0.5s ease-out forwards;
+            }
+
+            #signin .si-check path {
+                stroke-dasharray: 36;
+                stroke-dashoffset: 36;
+                animation: draw 0.3s 0.4s ease-out forwards;
+            }
+
+            @keyframes draw {
+                to {
+                    stroke-dashoffset: 0;
+                }
+            }
+
+            #signin .si-hint {
+                font-size: 13.5px;
+                color: var(--si-muted);
+                line-height: 1.5;
+            }
+
+            #signin .si-foot {
+                margin-top: 22px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 12px;
+                min-height: 20px;
+                font-size: 12px;
+                color: var(--si-muted);
+            }
+
+            #signin .si-link {
+                border: 0;
+                background: none;
+                padding: 0;
+                font: inherit;
+                color: var(--si-muted);
+                text-decoration: underline;
+                text-underline-offset: 3px;
+                cursor: pointer;
+            }
+
+            #signin .si-link:hover {
+                color: var(--si-text);
+            }
+
+            #signin [hidden] {
+                display: none !important;
+            }
+
+            @media (max-width: 480px) {
+                #signin .si-card {
+                    padding: 26px 22px 18px;
+                    border-radius: 22px;
+                }
+
+                #signin h1 {
+                    font-size: 26px;
+                }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                * {
+                    animation: none !important;
+                    transition: none !important;
+                }
+
+                #signin .si-check circle,
+                #signin .si-check path {
+                    stroke-dashoffset: 0;
+                }
+            }
+        </style>
+    </head>
+    <body id="signin">
+        <div class="si-backdrop" aria-hidden="true">
+            <div class="si-orb si-orb-a"></div>
+            <div class="si-orb si-orb-b"></div>
+            <div class="si-grid"></div>
+        </div>
+
+        <main class="si-shell">
+            <section class="si-card" aria-live="polite">
+                <header class="si-brand">
+                    <svg class="si-mark" viewBox="0 0 40 40" aria-hidden="true">
+                        <defs>
+                            <linearGradient id="mark-g" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0" stop-color="#8b9dff" />
+                                <stop offset="1" stop-color="#5eead4" />
+                            </linearGradient>
+                        </defs>
+                        <rect x="2" y="2" width="36" height="36" rx="11" fill="url(#mark-g)" />
+                        <path
+                            d="M14 29V11h7.2a6 6 0 0 1 0 12H18.5"
+                            fill="none"
+                            stroke="#0b1020"
+                            stroke-width="3.2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+                    </svg>
+                    <span class="si-network" id="network"></span>
+                </header>
+
+                <!-- Sign-in view -->
+                <div id="view-welcome" class="si-view" hidden>
+                    <h1 id="headline">Welcome</h1>
+                    <p class="si-lede" id="lede"></p>
+
+                    <div class="si-destination" id="destination" hidden>
+                        <span class="si-avatar" id="dest-avatar" aria-hidden="true"></span>
+                        <span class="si-dest-text">
+                            <span class="si-dest-label">You're opening</span>
+                            <span class="si-dest-host" id="dest-host"></span>
+                        </span>
+                    </div>
+
+                    <p class="si-notice" id="notice" hidden></p>
+
+                    <button class="si-btn si-primary" id="btn-create" type="button">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="8" cy="15" r="4" fill="none" stroke="currentColor" stroke-width="1.9" />
+                            <path
+                                d="M11 12.2 20 3.5M16.5 7l3 3M14 9.5l2.5 2.5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.9"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                        </svg>
+                        <span id="btn-create-label">Continue with a passkey</span>
+                    </button>
+                    <button class="si-btn si-ghost" id="btn-existing" type="button">
+                        I already have a passkey here
+                    </button>
+
+                    <ul class="si-points">
+                        <li>
+                            <span class="si-dot"></span>
+                            <span><strong>No password, no email.</strong> Your device's fingerprint, face or PIN is all it takes.</span>
+                        </li>
+                        <li>
+                            <span class="si-dot"></span>
+                            <span><strong>Look around as a guest.</strong> Pick a name and create an account only when you want one.</span>
+                        </li>
+                        <li>
+                            <span class="si-dot"></span>
+                            <span><strong>Your key stays with you.</strong> It is made on this device and never sent to a server.</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Working view -->
+                <div id="view-working" class="si-view si-center" hidden>
+                    <div class="si-spinner" aria-hidden="true"></div>
+                    <h2 id="working-title">One moment</h2>
+                    <p class="si-lede" id="working-detail"></p>
+                </div>
+
+                <!-- Done view -->
+                <div id="view-done" class="si-view si-center" hidden>
+                    <svg class="si-check" viewBox="0 0 52 52" aria-hidden="true">
+                        <circle cx="26" cy="26" r="24" fill="none" />
+                        <path d="M15 27l8 8 14-16" fill="none" />
+                    </svg>
+                    <h2>You're in</h2>
+                    <p class="si-lede" id="done-detail"></p>
+                </div>
+
+                <!-- Unsupported view -->
+                <div id="view-unsupported" class="si-view" hidden>
+                    <h1>This browser can't sign in yet</h1>
+                    <p class="si-lede" id="unsupported-detail"></p>
+                    <p class="si-hint">
+                        Current versions of Safari, Chrome and Edge work, on a
+                        device with a screen lock.
+                    </p>
+                </div>
+
+                <footer class="si-foot">
+                    <span id="foot-id"></span>
+                    <button class="si-link" id="btn-forget" type="button" hidden>
+                        Sign out of this browser
+                    </button>
+                </footer>
+            </section>
+        </main>
+        <script type="module" src="/src/sign-in/main.ts"></script>
+    </body>
+</html>

@@ -2562,6 +2562,25 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
+    ["@noble/curves", [\
+      ["npm:1.9.7", {\
+        "packageLocation": "../.caches/yarn/@noble-curves-npm-1.9.7-2b9efc8ab4-150014751e.zip/node_modules/@noble/curves/",\
+        "packageDependencies": [\
+          ["@noble/curves", "npm:1.9.7"],\
+          ["@noble/hashes", "npm:1.8.0"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["@noble/hashes", [\
+      ["npm:1.8.0", {\
+        "packageLocation": "../.caches/yarn/@noble-hashes-npm-1.8.0-a397449e64-06a0b52c81.zip/node_modules/@noble/hashes/",\
+        "packageDependencies": [\
+          ["@noble/hashes", "npm:1.8.0"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
     ["@nodelib/fs.scandir", [\
       ["npm:2.1.5", {\
         "packageLocation": "../.caches/yarn/@nodelib-fs.scandir-npm-2.1.5-89c67370dd-732c3b6d1b.zip/node_modules/@nodelib/fs.scandir/",\
@@ -3247,6 +3266,8 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["@bytecodealliance/jco", "npm:1.35.0"],\
           ["@bytecodealliance/preview2-shim", "npm:0.26.0"],\
+          ["@noble/curves", "npm:1.9.7"],\
+          ["@noble/hashes", "npm:1.8.0"],\
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@psibase/supervisor-ui", "workspace:user/Supervisor/ui"],\
           ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.101.0"],\

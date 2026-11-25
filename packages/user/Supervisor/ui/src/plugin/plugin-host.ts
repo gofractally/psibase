@@ -11,6 +11,7 @@ import {
     HttpRequest,
     HttpResponse,
 } from "../host-interface";
+import { guestBearerFor } from "../guest-session";
 import { Supervisor } from "../supervisor";
 import { chainId, networkName } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
@@ -133,6 +134,13 @@ export class PluginHost implements HostInterface {
             xhr.overrideMimeType("text/plain; charset=x-user-defined");
 
             const requestHeaders = new Headers(convert(req.headers));
+            // A request with no account token is made on the guest's behalf.
+            if (!requestHeaders.has("authorization")) {
+                const guestToken = guestBearerFor(req.uri);
+                if (guestToken) {
+                    requestHeaders.set("authorization", `Bearer ${guestToken}`);
+                }
+            }
             for (const [name, value] of requestHeaders.entries()) {
                 if (name !== "user-agent" && name !== "host") {
                     xhr.setRequestHeader(name, value);

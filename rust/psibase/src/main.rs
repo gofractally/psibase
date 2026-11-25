@@ -2702,7 +2702,16 @@ impl reqwest::dns::Resolve for LocalhostResolver {
 
 async fn build_client(proxy: &Option<Url>) -> Result<reqwest::Client, anyhow::Error> {
     let builder = apply_proxy(reqwest::Client::builder(), proxy)?;
+    // A node that requires a session before serving app queries lets a
+    // local connection through when it carries this header. A node ignores
+    // it on any other connection, so it is safe to send always.
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert(
+        "x-psibase-local",
+        reqwest::header::HeaderValue::from_static("1"),
+    );
     Ok(builder
+        .default_headers(headers)
         .gzip(true)
         .dns_resolver(Arc::new(LocalhostResolver::new()))
         .build()?)

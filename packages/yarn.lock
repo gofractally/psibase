@@ -1698,6 +1698,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@noble/curves@npm:^1.9.0":
+  version: 1.9.7
+  resolution: "@noble/curves@npm:1.9.7"
+  dependencies:
+    "@noble/hashes": "npm:1.8.0"
+  checksum: 10c0/150014751ebe8ca06a8654ca2525108452ea9ee0be23430332769f06808cddabfe84f248b6dbf836916bc869c27c2092957eec62c7506d68a1ed0a624017c2a3
+  languageName: node
+  linkType: hard
+
+"@noble/hashes@npm:1.8.0, @noble/hashes@npm:^1.8.0":
+  version: 1.8.0
+  resolution: "@noble/hashes@npm:1.8.0"
+  checksum: 10c0/06a0b52c81a6fa7f04d67762e08b2c476a00285858150caeaaff4037356dd5e119f45b2a530f638b77a5eeca013168ec1b655db41bae3236cb2e9d511484fc77
+  languageName: node
+  linkType: hard
+
 "@nodelib/fs.scandir@npm:2.1.5":
   version: 2.1.5
   resolution: "@nodelib/fs.scandir@npm:2.1.5"
@@ -2272,6 +2288,8 @@ __metadata:
   dependencies:
     "@bytecodealliance/jco": "npm:1.35.0"
     "@bytecodealliance/preview2-shim": "npm:0.26.0"
+    "@noble/curves": "npm:^1.9.0"
+    "@noble/hashes": "npm:^1.8.0"
     "@psibase/common-lib": "workspace:*"
     "@tanstack/react-query": "npm:^5.90.6"
     "@types/node": "npm:^22.15.0"

@@ -1,3 +1,4 @@
+import { guestFetchOptions } from "../guest-session";
 import { pluginString, postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 
 import { ServiceMap } from "../component-loading/loader";
@@ -23,7 +24,11 @@ type ServiceUiDeps = {
 async function getServiceMap(service: string): Promise<ServiceMap | null> {
     const url = siblingUrl(null, "dyn-ld", `/graphql`);
     const query = `query { depsFor(service: "${service}") { deps { name service }}}`;
-    const result = await postGraphQLGetJson<ServiceUiDeps>(url, query);
+    const result = await postGraphQLGetJson<ServiceUiDeps>(
+        url,
+        query,
+        guestFetchOptions(url),
+    );
     if (result.data.depsFor) {
         let map = new Object() as ServiceMap;
         for (const { name, service } of result.data.depsFor.deps) {

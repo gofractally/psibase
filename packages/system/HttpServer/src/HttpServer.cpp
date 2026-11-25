@@ -269,11 +269,71 @@ namespace SystemService
       }
    }
 
-   void HttpServer::serve(std::int32_t sock, HttpRequest req)
+   namespace
+   {
+      constexpr auto supervisorService = AccountNumber{"supervisor"};
+      constexpr auto transactService   = AccountNumber{"transact"};
+      constexpr auto signInPath        = "/sign-in.html";
+
+      // Requests that must work with no session, or nobody could get one.
+      bool gateExempt(AccountNumber service, const HttpRequest& req)
+      {
+         // Preflights never carry credentials.
+         if (req.method == "OPTIONS")
+            return true;
+         // The sign-in page and the supervisor's own files.
+         if (service == supervisorService)
+            return true;
+         // Shared library, root-domain lookup and the cookie-install endpoint.
+         if (service == HttpServer::commonApiService)
+            return true;
+         if (service == transactService)
+         {
+            auto path = req.path();
+            // Logging in, and transactions, which carry their own signature.
+            return path == "/login" || path == "/guest-login" || path == "/push_transaction";
+         }
+         return false;
+      }
+
+      // True for a top-level page load, where a redirect is the right answer.
+      bool isNavigation(const HttpRequest& req)
+      {
+         if (req.method != "GET")
+            return false;
+         if (auto mode = req.getHeader("sec-fetch-mode"))
+            return *mode == "navigate";
+         // Clients that do not send fetch metadata: go by what they accept.
+         if (auto accept = req.getHeader("accept"))
+            return accept->find("text/html") != std::string_view::npos;
+         return false;
+      }
+
+      std::string percentEncode(std::string_view in)
+      {
+         static const char digits[] = "0123456789ABCDEF";
+         std::string       out;
+         for (unsigned char ch : in)
+         {
+            if (std::isalnum(ch) || ch == '-' || ch == '_' || ch == '.' || ch == '~' || ch == '/')
+               out += static_cast<char>(ch);
+            else
+            {
+               out += '%';
+               out += digits[ch >> 4];
+               out += digits[ch & 15];
+            }
+         }
+         return out;
+      }
+   }  // namespace
+
+   void HttpServer::serve(std::int32_t sock, HttpRequest req, bool requireIdentity)
    {
       check(getSender() == XHttp::service, "Wrong sender");
 
-      auto user = recurse().to<RTransact>().getUser(req);
+      auto session = recurse().to<RTransact>().getSession(req);
+      auto user    = session.user;
 
       // Remove sensitive headers
       http_detail::stripAuthenticationHeaders(req);
@@ -325,6 +385,37 @@ namespace SystemService
       auto service =
           (req.target.starts_with(HttpServer::commonApiPrefix) ? HttpServer::commonApiService
                                                                : service_opt.value());
+
+      // No app code runs for a request that nobody can be billed for.
+      if (requireIdentity && !session.identified() && !gateExempt(service, req))
+      {
+         if (isNavigation(req))
+         {
+            auto loc = getSiblingUrl(req, std::optional{sock}, supervisorService, false);
+            loc.pop_back();  // getSiblingUrl ends with '/'
+            loc += signInPath;
+            loc += "?app=" + service_opt->str() + "&path=" + percentEncode(req.target);
+            auto hdrs = allowCors();
+            hdrs.push_back({"Location", loc});
+            hdrs.push_back({"Cache-Control", "no-store"});
+            sendReplyImpl(HttpServer::service, sock,
+                          {.status      = HttpStatus::found,
+                           .contentType = "text/html",
+                           .headers     = std::move(hdrs)});
+         }
+         else
+         {
+            std::string_view msg  = R"({"error":"sign-in required"})";
+            auto             hdrs = allowCors();
+            hdrs.push_back({"Cache-Control", "no-store"});
+            sendReplyImpl(HttpServer::service, sock,
+                          {.status      = HttpStatus::unauthorized,
+                           .contentType = "application/json",
+                           .body        = std::vector(msg.begin(), msg.end()),
+                           .headers     = std::move(hdrs)});
+         }
+         return;
+      }
 
       // First check the registered server
       auto                     registered = getServer(service);

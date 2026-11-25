@@ -1,12 +1,16 @@
 import { getJson, postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 
 import { loadBasic } from "./component-loading";
+import { guestBearerFor, guestFetchOptions } from "./guest-session";
 import { DownloadFailed } from "./errors";
 
 export const wasmFromUrl = async (url: string) => {
     let headers: [string, string][] = [];
-    if (queryToken) {
-        headers = [["Authorization", `Bearer ${queryToken}`]];
+    // An account's token when one is active, otherwise the guest's, so the
+    // download is attributed to someone.
+    const token = queryToken ?? guestBearerFor(url);
+    if (token) {
+        headers = [["Authorization", `Bearer ${token}`]];
     }
     return fetch(url, {
         headers,
@@ -89,6 +93,7 @@ const getNetworkName = (): Promise<string> => {
         return postGraphQLGetJson<{ data: { networkName: string } }>(
             url,
             "query { networkName }",
+            guestFetchOptions(url),
         ).then((res) => {
             networkName = res.data.networkName;
             return networkName;

@@ -1245,8 +1245,56 @@ namespace
       AccountNumber sub;
       std::string   aud;
       std::int64_t  exp;
+      // Guest sessions have no account: sub is the null account and gst
+      // identifies the guest's key. Empty for account sessions.
+      std::string gst;
    };
-   PSIO_REFLECT(LoginTokenData, sub, aud, exp)
+   PSIO_REFLECT(LoginTokenData, sub, aud, exp, attr(gst, utf8))
+
+   // POST /guest-login. The guest proves control of `key` by signing
+   // sha256(guestLoginMessage(rootHost, exp)).
+   struct GuestLoginRequest
+   {
+      std::vector<char> key;  // DER SubjectPublicKeyInfo
+      std::int64_t      exp;  // seconds since the epoch
+      std::vector<char> sig;  // 64-byte r || s, low-S
+   };
+   PSIO_REFLECT(GuestLoginRequest, key, exp, sig)
+
+   struct GuestLoginReply
+   {
+      std::string  access_token;
+      std::string  token_type = "bearer";
+      std::string  guest;
+      std::int64_t exp;
+   };
+   PSIO_REFLECT(GuestLoginReply,
+                attr(access_token, utf8),
+                attr(token_type, utf8),
+                attr(guest, utf8),
+                exp)
+
+   // A guest login proof is accepted for at most this long.
+   constexpr std::int64_t maxGuestLoginWindow = 120;
+
+   std::string guestLoginMessage(std::string_view rootHost, std::int64_t exp)
+   {
+      return std::format("psibase guest login\n{}\n{}", rootHost, exp);
+   }
+
+   std::string guestId(std::span<const char> key)
+   {
+      static const char digits[] = "0123456789abcdef";
+      auto              hash     = sha256(key.data(), key.size());
+      std::string       result;
+      for (std::size_t i = 0; i < 16; ++i)
+      {
+         auto b = static_cast<unsigned char>(hash[i]);
+         result += digits[b >> 4];
+         result += digits[b & 15];
+      }
+      return result;
+   }
 
    struct LoginReply
    {
@@ -1377,48 +1425,70 @@ std::string RTransact::login(std::string rootHost)
                                                 .exp = exp.time_since_epoch().count()});
 }
 
+namespace
+{
+   std::optional<LoginTokenData> findSessionToken(const HttpRequest& request)
+   {
+      std::vector<char>             key = getJWTKey();
+      std::optional<LoginTokenData> result;
+      auto                          rootHost = to<HttpServer>().rootHost(request.host);
+
+      auto isValidJwt = [&](const LoginTokenData& decoded)
+      { return decoded.aud == rootHost && checkExp(decoded.exp); };
+
+      for (const auto& header : request.headers)
+      {
+         if (iequal(header.name, "authorization"))
+         {
+            parseHeader(header.value,
+                        [&](std::string_view value)
+                        {
+                           std::string_view prefix = "Bearer ";
+                           if (value.starts_with(prefix))
+                           {
+                              auto token   = value.substr(prefix.size());
+                              auto decoded = decodeJWT<LoginTokenData>(key, token);
+                              if (decoded && isValidJwt(*decoded))
+                              {
+                                 result = std::move(*decoded);
+                              }
+                           }
+                        });
+            if (result)
+               return result;
+         }
+      }
+
+      std::string_view cookieName = "__Host-SESSION";
+
+      auto tokens = request.getCookie(cookieName);
+      for (const auto& token : tokens)
+      {
+         auto decoded = decodeJWT<LoginTokenData>(key, token);
+         if (decoded && isValidJwt(*decoded))
+            return decoded;
+      }
+      return {};
+   }
+}  // namespace
+
+SessionInfo RTransact::getSession(HttpRequest request)
+{
+   SessionInfo result;
+   if (auto token = findSessionToken(request))
+   {
+      if (!token->gst.empty())
+         result.guest = std::move(token->gst);
+      else if (token->sub != AccountNumber{})
+         result.user = token->sub;
+   }
+   return result;
+}
+
 std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
 {
-   std::vector<char>            key = getJWTKey();
-   std::optional<AccountNumber> result;
-   auto                         rootHost = to<HttpServer>().rootHost(request.host);
-
-   auto isValidJwt = [&](const LoginTokenData& decoded)
-   { return decoded.aud == rootHost && checkExp(decoded.exp); };
-
-   for (const auto& header : request.headers)
-   {
-      if (iequal(header.name, "authorization"))
-      {
-         parseHeader(header.value,
-                     [&](std::string_view value)
-                     {
-                        std::string_view prefix = "Bearer ";
-                        if (value.starts_with(prefix))
-                        {
-                           auto token   = value.substr(prefix.size());
-                           auto decoded = decodeJWT<LoginTokenData>(key, token);
-                           if (decoded && isValidJwt(*decoded))
-                           {
-                              result = decoded->sub;
-                           }
-                        }
-                     });
-         if (result)
-            return result;
-      }
-   }
-
-   std::string_view cookieName = "__Host-SESSION";
-
-   auto tokens = request.getCookie(cookieName);
-   for (const auto& token : tokens)
-   {
-      auto decoded = decodeJWT<LoginTokenData>(key, token);
-      if (decoded && isValidJwt(*decoded))
-         return decoded->sub;
-   }
-   return {};
+   // A guest is not a user: apps see no account for a guest session.
+   return getSession(std::move(request)).user;
 }
 
 struct SnapInfo
@@ -1540,6 +1610,37 @@ std::optional<HttpReply> RTransact::serveSys(psio::pssz_view<psibase::HttpReques
    }
 
    request.body.assign(body.begin(), body.end());
+
+   if (request.method == "POST" && target == "/guest-login")
+   {
+      auto data = parseBody<GuestLoginRequest>(request);
+      auto now  = std::chrono::duration_cast<std::chrono::seconds>(
+                      std::chrono::system_clock::now().time_since_epoch())
+                      .count();
+      if (data.exp < now || data.exp > now + maxGuestLoginWindow)
+         return make400("Guest login proof expired or too far in the future");
+      if (data.key.empty() || data.key.size() > 128 || data.sig.size() != 64)
+         return make400("Malformed guest login");
+      auto host    = std::string(rootHost(request));
+      auto message = guestLoginMessage(host, data.exp);
+      // Aborts the request if the key is unsupported or the proof is wrong.
+      const AccountNumber verifySig{"verify-sig"};
+      Actor<VerifyInterface> verify(RTransact::service, verifySig);
+      verify.verifySys(sha256(message.data(), message.size()),
+                       Claim{verifySig, data.key}, data.sig);
+
+      auto exp = now + std::chrono::duration_cast<std::chrono::seconds>(std::chrono::days(30))
+                           .count();
+      auto id    = guestId(data.key);
+      auto token = encodeJWT(getJWTKey(), LoginTokenData{.sub = AccountNumber{},
+                                                         .aud = host,
+                                                         .exp = exp,
+                                                         .gst = id});
+      HttpReply reply{.contentType = "application/json",
+                      .headers     = allowCors(request, AccountNumber{"supervisor"})};
+      psio::to_ijson(GuestLoginReply{.access_token = token, .guest = id, .exp = exp}, reply.body);
+      return reply;
+   }
 
    if (request.method == "POST" && target == "/login")
    {

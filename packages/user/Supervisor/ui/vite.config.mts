@@ -27,6 +27,7 @@ export default defineConfig((config) => ({
             input: {
                 main: path.resolve(appDirectory, "index.html"),
                 prompt: path.resolve(appDirectory, "prompt.html"),
+                "sign-in": path.resolve(appDirectory, "sign-in.html"),
             },
             output: {
                 entryFileNames: "assets/[name].js",

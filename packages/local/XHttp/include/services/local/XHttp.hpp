@@ -31,6 +31,17 @@ namespace LocalService
    using ResponseHandlerTable = psibase::Table<ResponseHandlerRow, &ResponseHandlerRow::socket>;
    PSIO_REFLECT_TYPENAME(ResponseHandlerTable)
 
+   /// Node policy: when `required` is set, requests to chain services must
+   /// carry a session (an account or a guest) before any app code runs.
+   /// Off by default.
+   struct IdentityGateRow
+   {
+      bool required = false;
+      PSIO_REFLECT(IdentityGateRow, required)
+   };
+   using IdentityGateTable = psibase::Table<IdentityGateRow, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(IdentityGateTable)
+
    /// Entry point for sockets
    struct XHttp : psibase::Service
    {
@@ -39,7 +50,13 @@ namespace LocalService
       static constexpr auto commonService = psibase::AccountNumber("x-common");
       static constexpr auto commonPrefix  = "/common/";
 
-      using Subjective = psibase::SubjectiveTables<RegServTable>;
+      using Subjective = psibase::SubjectiveTables<RegServTable, IdentityGateTable>;
+
+      /// A request from a local connection (loopback, a Unix socket or an
+      /// admin address) that carries this header and no forwarding header
+      /// skips the identity gate. The header is removed from every request
+      /// before it reaches a chain service.
+      static constexpr auto localBypassHeader = "x-psibase-local";
 
       using Session = psibase::SessionTables<PendingRequestTable, ResponseHandlerTable>;
 

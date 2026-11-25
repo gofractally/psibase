@@ -103,7 +103,12 @@ namespace SystemService
       void recv(std::int32_t socket, psio::pssz_view<std::vector<char>> data, std::uint32_t flags);
 
       // Entry point for HTTP requests
-      void serve(std::int32_t socket, psibase::HttpRequest req);
+      //
+      // When requireIdentity is set, a request with no session (neither an
+      // account nor a guest) is not passed to any app: page navigations are
+      // redirected to the sign-in page and other requests get 401. The
+      // sign-in page, /common/ and the login endpoints are exempt.
+      void serve(std::int32_t socket, psibase::HttpRequest req, bool requireIdentity);
 
       /// Returns the root host for a given host
       std::string rootHost(psio::pssz_view<std::string> host);
@@ -141,7 +146,7 @@ namespace SystemService
                 method(registerServer, server),
                 method(getServer, service),
                 method(recv, socket, data, flags),
-                method(serve, socket, req),
+                method(serve, socket, req, requireIdentity),
                 method(rootHost, attr(host, utf8)),
                 method(getSiblingUrl, req, socket, destination, keepTarget),
                 method(setRedirect, destination),
