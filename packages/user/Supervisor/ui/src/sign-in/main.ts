@@ -12,7 +12,8 @@ import {
     rootHost,
     saveGuestSession,
 } from "../guest-session";
-import { guestKeyFrom, prfInput } from "./guest-key";
+import { guestKeyFrom, prfInput, privateKeyPem } from "./guest-key";
+import { clearStash, stashKey, stashedKey } from "./key-stash";
 
 // ---------------------------------------------------------------- helpers
 
@@ -256,6 +257,9 @@ interface GuestLoginReply {
 const guestLogin = async (prf: PrfResult): Promise<GuestSession> => {
     const chainId = await fetchChainId();
     const key = guestKeyFrom(prf.secret, chainId);
+    // Remembered (encrypted, on this device only) so becoming an account
+    // later does not need the passkey again.
+    await stashKey(privateKeyPem(prf.secret, chainId), key.publicKey);
     prf.secret.fill(0);
 
     const exp = Math.floor(Date.now() / 1000) + 60;
@@ -324,6 +328,7 @@ const signOutEverywhere = async () => {
             ),
     );
     window.localStorage.removeItem(APPS_KEY);
+    await clearStash();
     clearGuestSession();
 };
 
@@ -559,6 +564,8 @@ const start = async () => {
                 unlock: async () =>
                     (await usePasskey(loadRememberedCredential())).secret,
                 fetchChainId,
+                storedKey: () => stashedKey(session.publicKey),
+                forgetStoredKey: clearStash,
                 leaveAsGuest: () => submitSession(session),
                 isCancelled: (e) => e instanceof Cancelled,
             });

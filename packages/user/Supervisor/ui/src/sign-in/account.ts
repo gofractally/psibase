@@ -30,6 +30,9 @@ export interface AccountContext {
     /** Asks for the passkey and returns its secret. */
     unlock: () => Promise<Uint8Array>;
     fetchChainId: () => Promise<string>;
+    /** The private key remembered from sign-in, if this browser has it. */
+    storedKey: () => Promise<string | undefined>;
+    forgetStoredKey: () => Promise<void>;
     /** Sends the visitor back to the app as a guest. */
     leaveAsGuest: () => void;
     isCancelled: (e: unknown) => boolean;
@@ -175,7 +178,7 @@ export const runAccountStep = async (ctx: AccountContext) => {
         steps(4);
         $("acct-title").textContent = `Welcome, ${account}`;
         $("acct-lede").textContent =
-            "Your account is ready. Confirm with your passkey to use it here.";
+            "Your account is ready to use here.";
         $("acct-providers").hidden = true;
         $("acct-name-form").hidden = true;
         const button = $("acct-continue");
@@ -273,28 +276,38 @@ export const runAccountStep = async (ctx: AccountContext) => {
         await api("/oauth/finish", { state, secret });
     };
 
-    const create = async (name: string) => {
-        notice();
-        let secret: Uint8Array | undefined;
+    // The private key: remembered from sign-in when possible, otherwise
+    // re-derived from the passkey.
+    const obtainKey = async (): Promise<string> => {
+        const stored = await ctx.storedKey();
+        if (stored) return stored;
+        ctx.working(
+            "Confirm with your passkey",
+            "Your account uses your passkey's key.",
+        );
+        const secret = await ctx.unlock();
         try {
-            ctx.working(
-                "Confirm with your passkey",
-                "Your account will use your passkey's key.",
-            );
-            secret = await ctx.unlock();
             const chainId = await ctx.fetchChainId();
-            const key = guestKeyFrom(secret, chainId);
-            if (key.publicKey !== session.publicKey) {
+            if (guestKeyFrom(secret, chainId).publicKey !== session.publicKey) {
                 throw new Error(
                     "That is a different passkey from the one you signed in with.",
                 );
             }
-            const pem = privateKeyPem(secret, chainId);
+            return privateKeyPem(secret, chainId);
+        } finally {
+            secret.fill(0);
+        }
+    };
+
+    const create = async (name: string) => {
+        notice();
+        try {
+            const pem = await obtainKey();
 
             ctx.working("Creating your account", `Reserving ${name}`);
             const reply = await api<{ transaction: string }>("/create", {
                 name,
-                key: key.publicKey,
+                key: session.publicKey,
             });
             const pushed = await fetch(
                 `${ctx.siblingOrigin("transact")}/push_transaction?wait_for=applied`,
@@ -322,8 +335,6 @@ export const runAccountStep = async (ctx: AccountContext) => {
             if (!ctx.isCancelled(e)) {
                 notice(e instanceof Error ? e.message : undefined);
             }
-        } finally {
-            secret?.fill(0);
         }
     };
 
@@ -342,24 +353,13 @@ export const runAccountStep = async (ctx: AccountContext) => {
 
     const adopt = async (account: string) => {
         notice();
-        let secret: Uint8Array | undefined;
         try {
-            ctx.working("Confirm with your passkey");
-            secret = await ctx.unlock();
-            const chainId = await ctx.fetchChainId();
-            if (guestKeyFrom(secret, chainId).publicKey !== session.publicKey) {
-                throw new Error(
-                    "That is a different passkey from the one you signed in with.",
-                );
-            }
-            await finishAdoption(account, privateKeyPem(secret, chainId));
+            await finishAdoption(account, await obtainKey());
         } catch (e) {
             await refresh();
             if (!ctx.isCancelled(e)) {
                 notice(e instanceof Error ? e.message : undefined);
             }
-        } finally {
-            secret?.fill(0);
         }
     };
 
@@ -399,6 +399,8 @@ export const runAccountStep = async (ctx: AccountContext) => {
                 `Your account ${account} exists, but this browser could not be signed in to it. Open the app and choose Connect account to try again.`,
             );
         }
+        // The key now lives in the supervisor's key store.
+        await ctx.forgetStoredKey();
         $("done-detail").textContent = `You're ${account} now`;
         ctx.show("done");
         await new Promise((r) => setTimeout(r, 1000));
