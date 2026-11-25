@@ -34,14 +34,6 @@ namespace psibase
    using DbPtr = storage::shared_root;
 
    using IndependentRevision  = std::array<DbPtr, numIndependentDatabases>;
-   // The roots of the node-local databases and how many times they had been
-   // published when the roots were taken.
-   struct SubjectiveSnapshot
-   {
-      IndependentRevision roots;
-      std::uint64_t       version = 0;
-   };
-
    // Certain rows may trigger callbacks when they are written.
    //
    struct DatabaseCallbacks
@@ -127,21 +119,18 @@ namespace psibase
                                                        std::span<const char> key);
 
       IndependentRevision getSubjective();
-      SubjectiveSnapshot  snapshotSubjective();
       // The write lock of the node-local databases, for a section
-      // (Database::checkoutSubjective ... commitSubjective). lockSubjective
-      // waits for it and returns whether nothing has been published since
-      // `version`; publishSubjective, with the lock held, replaces the
-      // published roots and applies the socket changes (false if they
-      // cannot be applied; nothing is published then).
-      bool lockSubjective(std::uint64_t version);
+      // (Database::checkoutSubjective ... commitSubjective), and, with the
+      // lock held, publication of what the section built: the roots are
+      // replaced and the socket changes applied (false if they cannot be
+      // applied; nothing is published then).
+      void lockSubjective();
       void unlockSubjective();
-      bool publishSubjective(Writer&                      writer,
-                             IndependentRevision          updated,
-                             SocketChangeSet&&            socketChanges,
-                             Sockets&                     sockets,
-                             SocketAutoCloseSet&          closing,
-                             const std::function<void()>& afterPublish = {});
+      bool publishSubjective(Writer&             writer,
+                             IndependentRevision updated,
+                             SocketChangeSet&&   socketChanges,
+                             Sockets&            sockets,
+                             SocketAutoCloseSet& closing);
 
       std::optional<bool>                isSlow() const;
       std::filesystem::path             directory() const;
@@ -224,7 +213,12 @@ namespace psibase
 
       // Manage access to subjective database
       void checkoutEmptySubjective();
+      // A section on the node-local databases that may write them: it holds
+      // their write lock from here to its commit or abort.
       void checkoutSubjective();
+      // A section that only reads: no lock, and writing in it is an error.
+      // For native code that looks something up.
+      void checkoutSubjectiveRead();
       bool commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing);
       void abortSubjective();
       // sockets options are linked to subjective checkouts. Eventually the state might

@@ -236,7 +236,7 @@ Sockets::Sockets(SharedDatabase sharedDb) : sharedDb(std::move(sharedDb))
    // emptyRevision is okay, because we only need the subjective db
    Database db{this->sharedDb, sharedDb.emptyRevision()};
    auto     session = db.startRead();
-   db.checkoutSubjective();
+   db.checkoutSubjectiveRead();
    auto                   key       = psio::encode(psio::key{}, socketPrefix());
    auto                   prefixLen = key.size();
    std::vector<SocketRow> rows;

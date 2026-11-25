@@ -494,7 +494,7 @@ namespace psibase::vm_wasmtime
             vmOptions{vmOptions},
             cache{cache}
       {
-         database.checkoutSubjective();
+         database.checkoutSubjectiveRead();
          psibase::finally _{[&] { database.abortSubjective(); }};
          auto [ca, db] = getCode(service);
 

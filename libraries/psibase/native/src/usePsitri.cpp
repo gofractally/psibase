@@ -99,13 +99,14 @@ namespace psibase
       std::shared_ptr<const Revision> head;
 
       // The write lock of the node-local (subjective) databases
-      // (gofractally/psibase#2276). Whoever changes them holds it from its
-      // first change until it has published: a section of a service from its
-      // first write to its commit or abort, native code for the one row it
-      // puts or removes. So there is one writer at a time, what it publishes
-      // is built on what was published last, and nothing has to be compared
-      // or merged. Reading never takes it: a reader works on the roots it
-      // took when it started.
+      // (gofractally/psibase#2276). Whoever may change them holds it for as
+      // long as it works on them: a section of a service from its start to
+      // its commit or abort, native code for the one row it puts or
+      // removes. So there is one writer at a time, what it publishes is
+      // built on what was published last, nothing is compared or merged,
+      // and a section never has to be run a second time. Reading without a
+      // section's right to write (Database::checkoutSubjectiveRead) never
+      // takes it: such a reader works on the roots it took when it started.
       //
       // Not a std::mutex: a section runs service code while it holds the
       // lock, and native code reached from that service code on the same
@@ -150,7 +151,7 @@ namespace psibase
          }
       };
       mutable WriteLock subjectiveMutex;
-      // Guards only the value of `subjective` and its version. A writer
+      // Guards only the value of `subjective`. A writer
       // holds subjectiveMutex for as long as it is writing;
       // readers that only need the current roots must not wait behind that.
       // Every execution context takes those roots when it is created, and on
@@ -162,13 +163,8 @@ namespace psibase
       {
          std::lock_guard l{subjectiveSnapshotMutex};
          subjective = std::move(next);
-         ++subjectiveVersion;
       }
       IndependentRevision subjective;
-      // Counts publications. A section remembers the count it started from
-      // and so knows, when it takes the write lock, whether anything was
-      // published in between.
-      std::uint64_t subjectiveVersion = 0;
 
       static constexpr auto numPersistentDatabases =
           static_cast<std::uint32_t>(DbId::endPersistent) -
@@ -446,17 +442,9 @@ namespace psibase
       return impl->subjective;
    }
 
-   SubjectiveSnapshot SharedDatabase::snapshotSubjective()
-   {
-      std::lock_guard l{impl->subjectiveSnapshotMutex};
-      return {impl->subjective, impl->subjectiveVersion};
-   }
-
-   bool SharedDatabase::lockSubjective(std::uint64_t version)
+   void SharedDatabase::lockSubjective()
    {
       impl->subjectiveMutex.lock();
-      std::lock_guard l{impl->subjectiveSnapshotMutex};
-      return impl->subjectiveVersion == version;
    }
 
    void SharedDatabase::unlockSubjective()
@@ -465,13 +453,14 @@ namespace psibase
    }
 
    // The caller holds the write lock and built `updated` on what was
-   // published last, so publishing is replacing the roots.
-   bool SharedDatabase::publishSubjective(Writer&                      writer,
-                                          IndependentRevision          updated,
-                                          SocketChangeSet&&            socketChanges,
-                                          Sockets&                     sockets,
-                                          SocketAutoCloseSet&          closing,
-                                          const std::function<void()>& afterPublish)
+   // published last, so publishing is replacing the roots. Nothing the
+   // caller's callbacks need is called from here: no lock of these
+   // databases may be held when they run.
+   bool SharedDatabase::publishSubjective(Writer&              writer,
+                                          IndependentRevision  updated,
+                                          SocketChangeSet&&    socketChanges,
+                                          Sockets&             sockets,
+                                          SocketAutoCloseSet&  closing)
    {
       check(impl->trie->owns(writer), "writer belongs to another database view");
       // Only the irreversible effects are accepted/uncancellable.
@@ -494,14 +483,9 @@ namespace psibase
       }
       impl->publishSubjective(writer, updated);
       if (snapshot.owns_lock())
-      {
          impl->subjective = std::move(updated);
-         ++impl->subjectiveVersion;
-      }
       else
          impl->setSubjective(std::move(updated));
-      if (afterPublish)
-         afterPublish();
       publication.finish();
       return true;
    }
@@ -575,38 +559,41 @@ namespace psibase
 
       DbPtr                           temporaryDb;
       // A section's hold on the write lock of the node-local databases
-      // (SharedDatabaseImpl::subjectiveMutex). A section that only reads
-      // never takes it. Its first change takes it; if something was
-      // published since the section took its roots, what the section has
-      // read may be out of date, so it is marked stale: its commit fails
-      // once, and the service's loop runs it again on the current roots,
-      // with the lock still held, so it cannot fail for that reason twice.
+      // (SharedDatabaseImpl::subjectiveMutex). A section that may write
+      // (checkoutSubjective, which is what a service gets) takes the lock
+      // when it starts and keeps it until it has committed or is abandoned:
+      // it works on the published state, nobody else can publish meanwhile,
+      // and it is never run a second time because of another writer. A
+      // read-only section (checkoutSubjectiveRead, for native code that
+      // only looks something up) takes no lock and may not write.
       //
       // The lock is held while the section's service code runs. If that
       // code has to wait for another service to be compiled, the other
       // writers wait with it. Giving the lock up and running the section
       // again in that case is possible, but it is rare and was judged not
       // worth the complexity.
-      bool          subjectiveLocked   = false;
-      bool          subjectiveStale    = false;
+      bool subjectiveLocked   = false;
+      bool subjectiveReadOnly = false;
+      // Something was written, so there is something to publish.
+      bool subjectiveDirty    = false;
       // checkoutEmptySubjective: a section on empty databases that is never
       // published (a speculative run). It takes no lock.
-      bool          subjectiveIsolated = false;
-      std::uint64_t subjectiveVersion  = 0;
-      void          subjectiveWrite()
+      bool subjectiveIsolated = false;
+      void subjectiveWrite()
       {
-         if (subjectiveLocked || subjectiveIsolated || subjectiveRevisions.empty() ||
-             !writeSession)
+         if (subjectiveRevisions.empty())
             return;
-         subjectiveStale  = !shared.lockSubjective(subjectiveVersion);
-         subjectiveLocked = true;
+         check(!subjectiveReadOnly,
+               "the node-local database cannot be written in a read-only section");
+         subjectiveDirty = true;
       }
       void releaseSubjective()
       {
          if (subjectiveLocked)
             shared.unlockSubjective();
          subjectiveLocked   = false;
-         subjectiveStale    = false;
+         subjectiveReadOnly = false;
+         subjectiveDirty    = false;
          subjectiveIsolated = false;
       }
       std::vector<SocketChange>       socketChanges;
@@ -843,17 +830,25 @@ namespace psibase
          callbackFlags      = 0;
       }
 
-      void checkoutSubjective()
+      void checkoutSubjective(bool readOnly = false)
       {
          check(subjectiveRevisions.size() <= maxSubjectiveTransactionDepth,
                "checkoutSubjective nesting exceeded limit");
          if (subjectiveRevisions.empty())
          {
-            auto snapshot     = shared.snapshotSubjective();
-            subjectiveVersion = snapshot.version;
-            subjectiveRevisions.push_back({0, std::move(snapshot.roots), temporaryDb});
+            // Without a write session nothing can be published.
+            if (!readOnly && writeSession)
+            {
+               shared.lockSubjective();
+               subjectiveLocked = true;
+            }
+            subjectiveReadOnly = readOnly;
+            subjectiveRevisions.push_back({0, shared.getSubjective(), temporaryDb});
             callbackFlags = 0;
          }
+         else
+            check(readOnly || !subjectiveReadOnly,
+                  "a section that may write cannot start inside a read-only section");
          subjectiveRevisions.push_back({socketChanges.size(), subjectiveRevisions.back().db,
                                         subjectiveRevisions.back().temporaryDb});
       }
@@ -869,58 +864,24 @@ namespace psibase
             subjectiveRevisions[subjectiveRevisions.size() - 2].temporaryDb =
                 std::move(subjectiveRevisions.back().temporaryDb);
             subjectiveRevisions.pop_back();
+            return true;
          }
-         else
+         assert(subjectiveRevisions.size() == 2);
+         DatabaseCallbacks::Flags flags = {};
+         if (writeSession && !subjectiveIsolated)
          {
-            assert(subjectiveRevisions.size() == 2);
-            if (writeSession && !subjectiveIsolated)
+            check(subjectiveLocked || socketChanges.empty(),
+                  "sockets cannot be changed in a read-only section");
+            if (subjectiveLocked && (subjectiveDirty || !socketChanges.empty()))
             {
-               // With PSIBASE_CALL_PROFILE set: how often a top-level section
-               // had to run again because something was published between
-               // its start and its first change.
-               static const bool             countCommits = std::getenv("PSIBASE_CALL_PROFILE") != nullptr;
-               static std::atomic<std::uint64_t> attempts{0}, conflicts{0};
-               if (countCommits)
+               if (!shared.publishSubjective(*writeSession, subjectiveRevisions.back().db,
+                                             std::move(socketChanges), sockets, closing))
                {
-                  auto n = ++attempts;
-                  if (n % 2000 == 0)
-                     std::fprintf(stderr, "SUBJECTIVE commits=%llu conflicts=%llu writes=%llu\n",
-                                  (unsigned long long)n, (unsigned long long)conflicts.load(),
-                                  (unsigned long long)psibaseWriteCountsHook());
-               }
-               auto afterPublish = [&]
-               {
-                  temporaryDb = std::move(subjectiveRevisions.back().temporaryDb);
-                  if (callbackFlags && shared.impl->callbacks)
-                     shared.impl->callbacks->run(callbackFlags);
-               };
-               // Socket changes are published like rows.
-               if (!socketChanges.empty())
-                  subjectiveWrite();
-               bool published = true;
-               if (subjectiveLocked)
-                  published = !subjectiveStale &&
-                              shared.publishSubjective(*writeSession, subjectiveRevisions.back().db,
-                                                       std::move(socketChanges), sockets, closing,
-                                                       afterPublish);
-               else
-               {
-                  // It changed nothing: there is nothing to publish.
-                  accounting::Publication publication;
-                  afterPublish();
-                  publication.finish();
-               }
-               if (!published)
-               {
-                  if (countCommits)
-                     ++conflicts;
-                  // The caller runs the section again, on what is published
-                  // now. The lock stays held.
-                  auto snapshot                          = shared.snapshotSubjective();
-                  subjectiveVersion                      = snapshot.version;
-                  subjectiveStale                        = false;
-                  subjectiveRevisions[0].db              = snapshot.roots;
-                  subjectiveRevisions[1].db              = std::move(snapshot.roots);
+                  // The socket changes could not be applied (a socket went
+                  // away meanwhile). Nothing was published; the caller runs
+                  // the section again on what is published, which is what
+                  // it started from: the lock is still held.
+                  subjectiveRevisions[1].db              = subjectiveRevisions[0].db;
                   subjectiveRevisions[1].temporaryDb     = subjectiveRevisions[0].temporaryDb;
                   subjectiveRevisions[0].socketChangePos = 0;
                   subjectiveRevisions[1].socketChangePos = 0;
@@ -928,9 +889,20 @@ namespace psibase
                   return false;
                }
             }
-            subjectiveRevisions.clear();
-            socketChanges.clear();
-            releaseSubjective();
+            temporaryDb = std::move(subjectiveRevisions.back().temporaryDb);
+            flags       = callbackFlags;
+         }
+         subjectiveRevisions.clear();
+         socketChanges.clear();
+         releaseSubjective();
+         // After the lock is released: a callback takes locks of its own
+         // (the run queue's), and a thread that holds one of those may be
+         // starting a section.
+         if (flags && shared.impl->callbacks)
+         {
+            accounting::Publication publication;
+            shared.impl->callbacks->run(flags);
+            publication.finish();
          }
          return true;
       }
@@ -1108,6 +1080,10 @@ namespace psibase
    void Database::checkoutSubjective()
    {
       impl->checkoutSubjective();
+   }
+   void Database::checkoutSubjectiveRead()
+   {
+      impl->checkoutSubjective(true);
    }
    bool Database::commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing)
    {
