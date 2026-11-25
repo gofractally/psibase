@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <vector>
 #include <psibase/Memo.hpp>
 #include <psibase/psibase.hpp>
 
@@ -38,6 +39,7 @@ namespace UserService
 
       // Read-only:
       std::optional<NftRecord>    getNft(NID nftId);
+      std::vector<NID>            getHeldIds(psibase::AccountNumber issuer, psibase::AccountNumber owner);
       NftHolderRecord             getNftHolder(psibase::AccountNumber account);
       std::optional<CreditRecord> getCredRecord(NID nftId);
       bool                        exists(NID nftId);
@@ -68,6 +70,7 @@ namespace UserService
       method(setAutoDebit, autodebit),
 
       method(getNft, nftId),
+      method(getHeldIds, issuer, owner),
       method(getNftHolder, account),
       method(getCredRecord, nftId),
       method(exists, nftId)
