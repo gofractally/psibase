@@ -193,7 +193,7 @@ pub mod service {
 
     /// Claim member rewards
     ///
-    /// Sends any vested token rewards to the fractal member after applying any pending levies.
+    /// Transfers any vested token rewards to the fractal member after applying any pending levies.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
@@ -205,7 +205,7 @@ pub mod service {
         let (token_id, claimed) = reward_stream.claim();
 
         if claimed.value > 0 {
-            psibase::services::tokens::Wrapper::call().credit(
+            psibase::services::tokens::Wrapper::call().transfer(
                 token_id,
                 member,
                 claimed,
