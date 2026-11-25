@@ -56,6 +56,7 @@ namespace
       std::vector<Function> functions;        // after start and called
       std::uint32_t         fillerFunctions = 0;  // () -> (), empty
       std::vector<std::uint32_t> tables;          // initial sizes
+      Bytes                      tableType{0x70};  // the element type of each
       std::vector<std::uint32_t> memories;        // initial pages
       Bytes                      globals;         // entries, encoded
       std::uint32_t              globalCount = 0;
@@ -141,7 +142,8 @@ namespace
             leb(body, tables.size());
             for (auto initial : tables)
             {
-               body.insert(body.end(), {0x70, 0});
+               append(body, tableType);
+               body.push_back(0);
                leb(body, initial);
             }
             emit(4);
@@ -801,13 +803,52 @@ TEST_CASE("What wasmtime refuses is refused by admission under the default limit
       m.elementCount = 1;
       CHECK_NOTHROW(psibase::admitNativeWasm(m.build(), {}, 0));
    }
-   // Typed function references in declarations (off; see NativeVMOptions).
+   // Typed function references (off; see NativeVMOptions): the two-byte
+   // reference types (ref ht) and (ref null ht), wherever a type can be
+   // written, and ref.null with a type index. The first pass refuses those
+   // it reads as it walks the declarations ("typed function references";
+   // for a table, "funcref table"), psizam's parser the ones in instructions
+   // ("typed references not enabled", gofractally/psizam#6).
+   // A parameter and a local.
    {
       ServiceModule m;
       m.addFunction(m.addType({0x64, 0x70}, {}), {0, 0x0b});
       refused(m.build(), "typed function references");
    }
    refused(function({1, 1, 0x63, 0x70, 0x0b}), "typed function references");
+   // A block type: block (result (ref func)) unreachable end drop, and the
+   // nullable form on a loop and an if.
+   refused(function({0, 0x02, 0x64, 0x70, 0x00, 0x0b, 0x1a, 0x0b}),
+           "typed references not enabled");
+   refused(function({0, 0x03, 0x63, 0x70, 0x00, 0x0b, 0x1a, 0x0b}),
+           "typed references not enabled");
+   refused(function({0, 0x41, 0, 0x04, 0x63, 0x70, 0x00, 0x05, 0x00, 0x0b, 0x1a, 0x0b}),
+           "typed references not enabled");
+   // A table of (ref null func).
+   {
+      ServiceModule m;
+      m.tables    = {1};
+      m.tableType = {0x63, 0x70};
+      refused(m.build(), "funcref table");
+   }
+   // An element segment of (ref func): passive, of expressions, empty.
+   {
+      ServiceModule m;
+      m.elements     = {5, 0x64, 0x70, 0};
+      m.elementCount = 1;
+      refused(m.build(), "typed function references");
+   }
+   // ref.null with a type index (type 2, () -> ()).
+   refused(function({0, 0xd0, 0x02, 0x1a, 0x0b}), "typed references not enabled");
+   // The one-byte forms of the same are admitted.
+   {
+      ServiceModule m;
+      m.tables       = {1};
+      m.elements     = {5, 0x70, 0};
+      m.elementCount = 1;
+      m.addFunction(2, {0, 0x02, 0x70, 0xd0, 0x70, 0x0b, 0x1a, 0x0b});
+      CHECK_NOTHROW(psibase::admitNativeWasm(m.build(), {}, 0));
+   }
 }
 
 TEST_CASE("A module at the ceilings that size an instance at once is stored and runs", "[limits]")

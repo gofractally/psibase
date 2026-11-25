@@ -971,6 +971,35 @@ namespace
       }
    };
 
+   // A service the chain admits and wasmtime refuses to compile. With every
+   // limit a chain value below the engines' own (gofractally/psibase#2262)
+   // and the typed-reference forms refused by admission
+   // (gofractally/psizam#6), what is left is where psizam's validator and
+   // wasmtime's disagree (gofractally/psibase#2266). This is one: a global
+   // initialised from a global the module itself defines, which psizam
+   // accepts (as WebAssembly 3.0 does) and wasmtime, without the GC
+   // proposal, refuses. When the two agree on it the tests that use this
+   // need another example, or a hook that makes the compile fail.
+   // start and called, both empty.
+   constexpr std::string_view compilerRefusal = "global.get of locally defined global";
+   std::vector<std::uint8_t>  admittedButRefusedByWasmtime()
+   {
+      const EntryPoints         entry{0, 0};
+      std::vector<std::uint8_t> types{2}, declared{2}, exported{2}, bodies{2};
+      types.insert(types.end(), entry.types.begin(), entry.types.end());
+      declared.insert(declared.end(), entry.functions.begin(), entry.functions.end());
+      exported.insert(exported.end(), entry.exports.begin(), entry.exports.end());
+      bodies.insert(bodies.end(), entry.bodies.begin(), entry.bodies.end());
+      auto code = wasmModule({});
+      section(code, 1, types);
+      section(code, 3, declared);
+      // (global i32 (i32.const 1)) (global i32 (global.get 0))
+      section(code, 6, {2, 0x7f, 0, 0x41, 1, 0x0b, 0x7f, 0, 0x23, 0, 0x0b});
+      section(code, 7, exported);
+      section(code, 10, bodies);
+      return code;
+   }
+
    // A valid module that takes far longer to compile than to admit:
    // `functions` functions of `steps` arithmetic steps each. `salt` makes
    // otherwise equal modules different code. It is a service: it also has
@@ -1138,29 +1167,9 @@ TEST_CASE("The first execution of stored code finds it compiled")
 
 TEST_CASE("Code the engine's compiler refuses after admission is stored, not a transaction error")
 {
-   // A module the chain admits and wasmtime's compiler refuses. With every
-   // limit a chain value below the engines' own (gofractally/psibase#2262)
-   // the known ones are gone; this is one that is left, a defect
-   // (gofractally/psizam#6): a block whose type is the non-null typed
-   // reference (ref func), which psizam's parser reads as funcref and
-   // wasmtime refuses without the function-references proposal. When that
-   // is fixed this test needs another example. Such a refusal must not
-   // decide the transaction: another engine compiles it.
-   // start and called (empty), and a third function with that block.
-   const EntryPoints         entry{0, 0};
-   std::vector<std::uint8_t> types{3}, declared{3}, exported{2}, bodies{3};
-   types.insert(types.end(), entry.types.begin(), entry.types.end());
-   types.insert(types.end(), {0x60, 0, 0});  // type 2: () -> ()
-   declared.insert(declared.end(), entry.functions.begin(), entry.functions.end());
-   declared.push_back(2);
-   exported.insert(exported.end(), entry.exports.begin(), entry.exports.end());
-   bodies.insert(bodies.end(), entry.bodies.begin(), entry.bodies.end());
-   bodies.insert(bodies.end(), {8, 0, 0x02, 0x64, 0x70, 0x00, 0x0b, 0x1a, 0x0b});
-   auto code = wasmModule({});
-   section(code, 1, types);
-   section(code, 3, declared);
-   section(code, 7, exported);
-   section(code, 10, bodies);
+   // Such a refusal must not decide the transaction: another engine
+   // compiles the code.
+   const auto code = admittedButRefusedByWasmtime();
    CHECK_NOTHROW(psibase::admitNativeWasm(code, {}, 0));
    TempDirectory artifacts;
    NativeService fixture{artifacts.path / "modules"};
@@ -1177,7 +1186,7 @@ TEST_CASE("Code the engine's compiler refuses after admission is stored, not a t
       psibase::CodeRow row{.codeNum = account, .codeHash = CodeWriter::row(code).codeHash};
       fixture.block.db.kvPut(row.db, row.key(), row);
       CHECK_THROWS_WITH(fixture.called(writer.transaction, account),
-                        Catch::Matchers::ContainsSubstring("function references required"));
+                        Catch::Matchers::ContainsSubstring(std::string(compilerRefusal)));
    }
 }
 
@@ -1900,22 +1909,8 @@ TEST_CASE("Code this node's compiler refuses does not keep a producer deferring"
 {
    if (!isWasmtime())
       SKIP("the refusal is wasmtime's");
-   // The module of "Code the engine's compiler refuses after admission":
-   // admitted by the chain, refused by wasmtime's compiler.
-   const EntryPoints         entry{0, 0};
-   std::vector<std::uint8_t> types{3}, declared{3}, exported{2}, bodies{3};
-   types.insert(types.end(), entry.types.begin(), entry.types.end());
-   types.insert(types.end(), {0x60, 0, 0});
-   declared.insert(declared.end(), entry.functions.begin(), entry.functions.end());
-   declared.push_back(2);
-   exported.insert(exported.end(), entry.exports.begin(), entry.exports.end());
-   bodies.insert(bodies.end(), entry.bodies.begin(), entry.bodies.end());
-   bodies.insert(bodies.end(), {8, 0, 0x02, 0x64, 0x70, 0x00, 0x0b, 0x1a, 0x0b});
-   auto code = wasmModule({});
-   section(code, 1, types);
-   section(code, 3, declared);
-   section(code, 7, exported);
-   section(code, 10, bodies);
+   // Admitted by the chain, refused by wasmtime's compiler.
+   const auto code = admittedButRefusedByWasmtime();
    const auto hash = CodeWriter::row(code).codeHash;
 
    TempDirectory artifacts;

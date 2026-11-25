@@ -196,8 +196,11 @@ namespace psibase
    //        references, GC, stack switching, custom page sizes, components
    //
    // psizam's parser has a switch for most of these; the constants below are
-   // those switches. It has none for extended constant expressions and typed
-   // references in declarations: validateNativeWasm refuses them.
+   // those switches. Typed function references are refused by its switch
+   // (enable_typed_references, gofractally/psizam#6) wherever the parser
+   // reads a reference type or a heap type: block types, table and element
+   // declarations, ref.null. It has no switch for extended constant
+   // expressions: validateNativeWasm refuses them.
    struct NativeVMOptions : VMOptions
    {
       static constexpr auto          fp                          = psizam::fp_mode::softfloat;
@@ -212,6 +215,7 @@ namespace psibase
       static constexpr bool          enable_tail_calls           = false;
       static constexpr bool          enable_sign_ext             = true;
       static constexpr bool          enable_nontrapping_fptoint  = true;
+      static constexpr bool          enable_typed_references     = false;
       // Not a parser switch: enforced by validateNativeWasm.
       static constexpr bool          enable_extended_const       = false;
       // Incoming arguments remain live across normal and tail calls. Count
