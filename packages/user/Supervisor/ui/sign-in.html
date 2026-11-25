@@ -318,6 +318,111 @@
                 font-size: inherit;
             }
 
+            #signin .si-steps {
+                list-style: none;
+                display: flex;
+                gap: 8px;
+                margin: 0 0 20px;
+                padding: 0;
+                font-size: 12px;
+                font-weight: 600;
+                letter-spacing: 0.02em;
+                color: var(--si-muted);
+            }
+
+            #signin .si-steps li {
+                flex: 1;
+                padding-top: 9px;
+                border-top: 3px solid var(--si-card-border);
+            }
+
+            #signin .si-steps li.si-done {
+                color: var(--si-text);
+                border-top-color: var(--si-accent-2);
+            }
+
+            #signin .si-steps li.si-current {
+                color: var(--si-text);
+                border-top-color: var(--si-accent);
+            }
+
+            #signin .si-stack {
+                display: grid;
+                gap: 10px;
+            }
+
+            #signin .si-btn.si-provider {
+                padding: 13px 18px;
+                font-size: 15.5px;
+                color: var(--si-text);
+                background: color-mix(in srgb, var(--si-accent) 8%, transparent);
+                border: 1px solid var(--si-card-border);
+            }
+
+            #signin .si-btn.si-provider:hover {
+                background: color-mix(in srgb, var(--si-accent) 16%, transparent);
+            }
+
+            #signin .si-label {
+                display: block;
+                margin-bottom: 8px;
+                font-size: 13.5px;
+                font-weight: 600;
+            }
+
+            #signin .si-field {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 0 14px;
+                border-radius: 14px;
+                border: 1px solid var(--si-card-border);
+                background: color-mix(in srgb, var(--si-accent) 6%, transparent);
+            }
+
+            #signin .si-field:focus-within {
+                border-color: var(--si-accent);
+                box-shadow: 0 0 0 3px color-mix(in srgb, var(--si-accent) 25%, transparent);
+            }
+
+            #signin .si-at {
+                color: var(--si-muted);
+                font-size: 18px;
+            }
+
+            #signin .si-field input,
+            #signin .si-field input:focus,
+            #signin .si-field input:focus-visible {
+                flex: 1;
+                min-width: 0;
+                padding: 14px 0;
+                border: 0;
+                border-radius: 0;
+                outline: 0;
+                box-shadow: none;
+                background: transparent;
+                color: var(--si-text);
+                font: inherit;
+                font-size: 18px;
+                font-weight: 600;
+                letter-spacing: 0.01em;
+            }
+
+            #signin #acct-name-form .si-hint {
+                margin: 8px 2px 16px;
+                min-height: 20px;
+            }
+
+            #signin .si-hint.si-bad {
+                color: var(--si-danger);
+            }
+
+            #signin .si-btn[disabled] {
+                opacity: 0.5;
+                cursor: default;
+                transform: none;
+            }
+
             #signin .si-btn:focus-visible,
             #signin .si-link:focus-visible {
                 outline: 2px solid var(--si-accent);
@@ -540,6 +645,52 @@
                             <span><strong>Your key stays with you.</strong> It is made on this device and never sent to a server.</span>
                         </li>
                     </ul>
+                </div>
+
+                <!-- Account view: a guest becomes a named account -->
+                <div id="view-account" class="si-view" hidden>
+                    <ol class="si-steps" aria-hidden="true">
+                        <li id="acct-step-1">Passkey</li>
+                        <li id="acct-step-2">Verify</li>
+                        <li id="acct-step-3">Name</li>
+                    </ol>
+                    <h1 id="acct-title">Create your account</h1>
+                    <p class="si-lede" id="acct-lede"></p>
+                    <p class="si-notice" id="acct-notice" hidden></p>
+
+                    <div id="acct-providers" class="si-stack" hidden></div>
+
+                    <form id="acct-name-form" hidden novalidate>
+                        <label class="si-label" for="acct-name">Your name on this network</label>
+                        <div class="si-field">
+                            <span class="si-at" aria-hidden="true">@</span>
+                            <input
+                                id="acct-name"
+                                name="name"
+                                type="text"
+                                inputmode="text"
+                                autocomplete="off"
+                                autocapitalize="none"
+                                autocorrect="off"
+                                spellcheck="false"
+                                maxlength="18"
+                            />
+                        </div>
+                        <p class="si-hint" id="acct-name-hint"></p>
+                        <button class="si-btn si-primary" id="acct-create" type="submit">
+                            Create account
+                        </button>
+                    </form>
+
+                    <button class="si-btn si-primary" id="acct-continue" type="button" hidden></button>
+
+                    <p class="si-below" id="acct-below">
+                        <button class="si-link" id="acct-later" type="button">Not now</button>
+                        <span id="acct-classic-sep"> · </span>
+                        <button class="si-link" id="acct-classic" type="button">
+                            Use an existing account instead
+                        </button>
+                    </p>
                 </div>
 
                 <!-- Working view -->

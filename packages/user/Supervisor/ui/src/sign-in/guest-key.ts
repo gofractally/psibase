@@ -77,3 +77,30 @@ export const guestKeyFrom = (
                 .toCompactHex(),
     };
 };
+
+// PKCS#8 header for a secp256k1 private key with no public-key field.
+const PKCS8_K1 = Uint8Array.from([
+    0x30, 0x3e, 0x02, 0x01, 0x00, 0x30, 0x10, 0x06, 0x07, 0x2a, 0x86, 0x48,
+    0xce, 0x3d, 0x02, 0x01, 0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x0a, 0x04,
+    0x27, 0x30, 0x25, 0x02, 0x01, 0x01, 0x04, 0x20,
+]);
+
+/**
+ * The private key as a PKCS#8 PEM, for the supervisor's own key store and
+ * nothing else. The store is what signs the account's transactions once
+ * the guest has become a named account.
+ */
+export const privateKeyPem = (
+    prfOutput: Uint8Array,
+    chainId: string,
+): string => {
+    const der = concatBytes(PKCS8_K1, derivePrivateKey(prfOutput, chainId));
+    const b64 = btoa(String.fromCharCode(...der));
+    return `-----BEGIN PRIVATE KEY-----\n${b64.match(/.{1,64}/g)!.join("\n")}\n-----END PRIVATE KEY-----\n`;
+};
+
+export const sha256Hex = (text: string): string =>
+    bytesToHex(sha256(utf8ToBytes(text)));
+
+export const hexToBytes = (hex: string): Uint8Array =>
+    Uint8Array.from(hex.match(/.{2}/g) ?? [], (b) => parseInt(b, 16));

@@ -5,6 +5,8 @@ import { siblingUrl } from "@psibase/common-lib";
 import { ErrorCard } from "@shared/components/error-card";
 import { supervisor } from "@shared/lib/supervisor";
 
+import { loadGuestSession } from "../../src/guest-session";
+
 interface PromptDetails {
     promptApp: string;
     promptName: string;
@@ -52,6 +54,24 @@ export const App = () => {
                 }
 
                 setActiveApp(promptDetails.activeApp);
+
+                // A passkey guest who asks to connect an account is offered
+                // the way to create one. "classic" keeps the original
+                // prompt, for importing an existing account or key.
+                if (
+                    promptDetails.promptApp === "host" &&
+                    promptDetails.promptName === "connect" &&
+                    !urlParams.has("classic") &&
+                    loadGuestSession()
+                ) {
+                    const next = new URLSearchParams({
+                        step: "account",
+                        app: promptDetails.activeApp,
+                        path: urlParams.get("returnPath") || "/",
+                    });
+                    window.location.replace(`/sign-in.html?${next}`);
+                    return;
+                }
 
                 const iframeUrl = new URL(
                     siblingUrl(null, promptDetails.promptApp, null),

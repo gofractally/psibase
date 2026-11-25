@@ -67,7 +67,7 @@ const destination = readDestination();
 
 // ------------------------------------------------------------------ views
 
-const views = ["welcome", "working", "done", "unsupported"] as const;
+const views = ["welcome", "account", "working", "done", "unsupported"] as const;
 type View = (typeof views)[number];
 
 const show = (view: View) => {
@@ -408,6 +408,11 @@ const signIn = async (mode: Mode) => {
         const session = await guestLogin(prf);
         saveGuestSession(session);
         window.localStorage.setItem(HAS_PASSKEY_KEY, session.credentialId);
+        if (accountStep) {
+            // Signed in on the way to creating an account: carry on there.
+            window.location.reload();
+            return;
+        }
         await goToDestination(session, true);
     } catch (e) {
         if (e instanceof Unsupported) {
@@ -451,6 +456,10 @@ const loadRememberedCredential = (): Uint8Array | undefined => {
     }
 };
 
+// "step=account": the visitor asked to become a named account.
+const accountStep =
+    new URLSearchParams(window.location.search).get("step") === "account";
+
 const start = async () => {
     $("network").textContent = rootName;
 
@@ -479,6 +488,25 @@ const start = async () => {
     if (session) {
         $("foot-id").textContent = `Guest ${shortId(session.guest)}`;
         forget.hidden = false;
+        if (accountStep) {
+            const { runAccountStep } = await import("./account");
+            await runAccountStep({
+                session,
+                app: destination.app,
+                path: destination.path,
+                rootName,
+                siblingOrigin,
+                $,
+                show,
+                working,
+                unlock: async () =>
+                    (await usePasskey(loadRememberedCredential())).secret,
+                fetchChainId,
+                leaveAsGuest: () => submitSession(session),
+                isCancelled: (e) => e instanceof Cancelled,
+            });
+            return;
+        }
         if (returnedRecently()) {
             // We already sent them back once and the app did not accept it.
             clearGuestSession();

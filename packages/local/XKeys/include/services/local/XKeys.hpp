@@ -41,7 +41,17 @@ namespace LocalService
       ///
       /// All the required keys myst have been created by the caller
       psibase::SignedTransaction signTx(std::vector<psibase::Action> actions);
+
+      /// Like signTx, for a transaction that someone else submits: it stays
+      /// valid for `seconds` (at most 60) instead of the few seconds signTx
+      /// allows for a transaction the node pushes itself.
+      psibase::SignedTransaction signTxFor(std::vector<psibase::Action> actions,
+                                           std::uint32_t                seconds);
    };
-   PSIO_REFLECT(XKeys, method(newKey), method(deleteKey, key), method(signTx, actions))
+   PSIO_REFLECT(XKeys,
+                method(newKey),
+                method(deleteKey, key),
+                method(signTx, actions),
+                method(signTxFor, actions, seconds))
    PSIBASE_REFLECT_TABLES(XKeys, XKeys::Subjective)
 }  // namespace LocalService

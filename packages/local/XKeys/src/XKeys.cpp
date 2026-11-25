@@ -103,6 +103,12 @@ void XKeys::deleteKey(SubjectPublicKeyInfo key)
 
 SignedTransaction XKeys::signTx(std::vector<psibase::Action> actions)
 {
+   return signTxFor(std::move(actions), 3);
+}
+
+SignedTransaction XKeys::signTxFor(std::vector<psibase::Action> actions, std::uint32_t seconds)
+{
+   check(seconds >= 1 && seconds <= 60, "transaction lifetime must be 1 to 60 seconds");
    auto sender = getSender();
 
    // Get available keys
@@ -138,7 +144,7 @@ SignedTransaction XKeys::signTx(std::vector<psibase::Action> actions)
    // Construct and sign transaction
    auto [refBlockIndex, refBlockSuffix] = to<Transact>().headTapos();
    Transaction trx{.tapos   = {.expiration = std::chrono::time_point_cast<Seconds>(
-                                   std::chrono::system_clock::now() + std::chrono::seconds(3)),
+                                   std::chrono::system_clock::now() + std::chrono::seconds(seconds)),
                                .refBlockSuffix = refBlockSuffix,
                                .refBlockIndex  = refBlockIndex},
                    .actions = std::move(actions),
