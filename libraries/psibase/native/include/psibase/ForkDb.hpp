@@ -1748,9 +1748,8 @@ namespace psibase
          if (auto bytes =
                  systemContext->sharedDatabase.kvGetSubjective(*writer, SnapshotRow::db, key))
          {
-            // A row this node wrote; anything else is ignored
-            if (psio::validate_pssz<SnapshotRow>(*bytes).ok())
-               row = psio::from_pssz<SnapshotRow>(psio::trusted{*bytes});
+            check(psio::validate_pssz<SnapshotRow>(*bytes).ok(), "Invalid snapshot row");
+            row = psio::from_pssz<SnapshotRow>(psio::trusted{*bytes});
          }
          // Check whether there are existing signatures for the same state
          if (row.state)
@@ -1848,9 +1847,8 @@ namespace psibase
          if (auto bytes =
                  systemContext->sharedDatabase.kvGetSubjective(*writer, SnapshotRow::db, key))
          {
-            // A row this node wrote; anything else is ignored
-            if (psio::validate_pssz<SnapshotRow>(*bytes).ok())
-               row = psio::from_pssz<SnapshotRow>(psio::trusted{*bytes});
+            check(psio::validate_pssz<SnapshotRow>(*bytes).ok(), "Invalid snapshot row");
+            row = psio::from_pssz<SnapshotRow>(psio::trusted{*bytes});
          }
          if (row.state && row.state->state == checksum)
          {
