@@ -3,5 +3,5 @@ description = { prompt = "Enter a description of the package", default = "An exa
 version = { prompt = "Enter the current psibase version", default = "0.29.0", type = "string", regex = "^[0-9]+.[0-9]+.[0-9]+$" }
 
 [hooks]
-pre = ["validate-project-name.rhai"]
-post = ["add-to-workspace.rhai"]
+init = ["fill-version.rhai"]
+pre = ["fill-local-paths.rhai", "validate-project-name.rhai"]

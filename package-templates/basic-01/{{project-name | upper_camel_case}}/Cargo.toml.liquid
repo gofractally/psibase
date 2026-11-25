@@ -1,11 +1,48 @@
+[workspace]
+resolver = "2"
+members = ["service", "query-service", "plugin"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.98"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+{% if local_path_psibase != "" %}
+psibase = { path = "{{local_path_psibase}}", version = "{{version}}" }
+{% else %}
+psibase = "={{version}}"
+{% endif %}
+{% if local_path_psibase_macros != "" %}
+psibase_macros = { path = "{{local_path_psibase_macros}}", version = "{{version}}" }
+{% else %}
+psibase_macros = "={{version}}"
+{% endif %}
+{% if local_path_psibase_service != "" %}
+psibase_service = { path = "{{local_path_psibase_service}}", version = "{{version}}" }
+{% else %}
+psibase_service = "={{version}}"
+{% endif %}
+async-graphql = "=7.0.17"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true
+
 [package]
-name = "{{project-name}}-pkg"                      # Crate name
+name = "{{project-name}}-pkg"
 description = "{{description}}"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
-repository.workspace = true
-homepage.workspace = true
 publish.workspace = true
 
 [package.metadata.psibase]
@@ -21,6 +58,6 @@ Permissions = "{{version}}"
 crate-type = ["rlib"]
 
 [dependencies]
-{{project-name}} = { path = "service", version = "{{version}}" }
-r-{{project-name}} = { path = "query-service", version = "{{version}}" }
-{{project-name}}-plugin = { path = "plugin", version = "{{version}}" }
+{{project-name}} = { path = "service", version = "0.0.1" }
+r-{{project-name}} = { path = "query-service", version = "0.0.1" }
+{{project-name}}-plugin = { path = "plugin", version = "0.0.1" }
