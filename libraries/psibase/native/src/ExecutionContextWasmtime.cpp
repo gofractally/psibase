@@ -3,8 +3,9 @@
 // wasmtime (Cranelift) executes; psizam decides what may execute. Every
 // service still passes validateNativeWasm and psizam's parser under
 // NativeVMOptions, so limits and enabled proposals are the chain policy. That
-// parse also yields psizam's per-function stack costs, which are compiled into
-// the module so the stack-overflow point is the same as on psizam's engines.
+// parse also yields psizam's per-function stack costs, which wasmtime's
+// compiler enforces so the stack-overflow point is the same as on psizam's
+// engines. The module itself is compiled as deployed: nothing rewrites it.
 //
 // ExecutionContext.cpp is the psizam counterpart of this file.
 
@@ -51,8 +52,9 @@ namespace psibase::vm_wasmtime
    {
       // Native stack for wasm, per executing thread. The byte budget
       // (max_stack_bytes) must run out long before this does: a frame was
-      // measured at up to 1.33 native bytes per budget byte, and each nested
-      // service call adds host frames on top.
+      // measured at up to 1.72 native bytes per budget byte (psizam's
+      // "byte budget ends recursion before the native stack can" test), and
+      // each nested service call adds host frames on top.
       constexpr std::uint64_t nativeStackBytes     = std::uint64_t(256) << 20;
       constexpr std::uint64_t nativeBytesPerBudget = 16;
 
@@ -185,7 +187,7 @@ namespace psibase::vm_wasmtime
       {
          auto options = engineOptions(profile);
          auto digest  = sha256(std::tuple{
-             std::string("psibase-wasmtime-artifact-v2"), hash, vmOptions, vmVersion,
+             std::string("psibase-wasmtime-artifact-v3"), hash, vmOptions, vmVersion,
              options.features, std::uint32_t(options.fp), std::string(wt::build_identity())});
          NativeAotCache::Key key;
          std::copy(digest.begin(), digest.end(), key.begin());
