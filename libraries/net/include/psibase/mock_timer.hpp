@@ -31,6 +31,10 @@ namespace psibase::test
       static void           reset();
       static void           reset(time_point);
       static bool           advance(time_point);
+      // Time passes and no timer is looked at: what a handler that runs
+      // for this long does to the handlers queued behind it. Timers that
+      // came due in the meantime run on the next call to advance.
+      static void stall(duration);
    };
 
    std::ostream& operator<<(std::ostream&, mock_clock::time_point);

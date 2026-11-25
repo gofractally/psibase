@@ -416,6 +416,19 @@ namespace psibase::net
                 {
                    if (ec || !is_cft())
                       return;
+                   // The timer is re-armed when a block commits, and for a
+                   // sole producer that happens on this thread. So when it
+                   // expires here, this thread was busy for that long (a
+                   // slow transaction, a loaded machine) and no other node
+                   // was waiting for it: there is none that could be
+                   // elected. Standing down would only throw away the
+                   // block in progress and start a term that this node wins
+                   // at once.
+                   if (_state == producer_state::leader && this->is_sole_producer())
+                   {
+                      randomize_timer();
+                      return;
+                   }
                    if (is_quorum_reachable())
                       _timeout.increase();
                    if (_state == producer_state::leader)
