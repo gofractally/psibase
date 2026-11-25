@@ -71,6 +71,24 @@ namespace psibase::vm_wasmtime
          return count;
       }
 
+      // How the stack budget is enforced. The compiler does it (the budget is
+      // a hidden argument and a wasm call touches no memory for it);
+      // PSIBASE_WASMTIME_STACK=rewrite selects the older module rewrite, which
+      // fails exactly the same calls, so the two can be compared.
+      wt::stack_accounting stackAccounting()
+      {
+         static const wt::stack_accounting choice = []
+         {
+            const char* text = std::getenv("PSIBASE_WASMTIME_STACK");
+            if (text && std::string_view(text) == "rewrite")
+               return wt::stack_accounting::rewrite;
+            check(!text || !*text || std::string_view(text) == "compiler",
+                  "PSIBASE_WASMTIME_STACK must be compiler or rewrite");
+            return wt::stack_accounting::compiler;
+         }();
+         return choice;
+      }
+
       wt::engine_options engineOptions(psizam::float_profile profile, bool pooled = false)
       {
          wt::engine_options o;
@@ -84,6 +102,7 @@ namespace psibase::vm_wasmtime
                                     : wt::float_profile::performance;
          o.native_stack       = nativeStackBytes;
          o.epoch_interruption = true;
+         o.stack              = stackAccounting();
          if (pooled)
          {
             o.pool_instances      = pooledInstances();
@@ -185,8 +204,9 @@ namespace psibase::vm_wasmtime
       {
          auto options = engineOptions(profile);
          auto digest  = sha256(std::tuple{
-             std::string("psibase-wasmtime-artifact-v2"), hash, vmOptions, vmVersion,
-             options.features, std::uint32_t(options.fp), std::string(wt::build_identity())});
+             std::string("psibase-wasmtime-artifact-v3"), hash, vmOptions, vmVersion,
+             options.features, std::uint32_t(options.fp), std::uint8_t(options.stack),
+             std::string(wt::build_identity())});
          NativeAotCache::Key key;
          std::copy(digest.begin(), digest.end(), key.begin());
          return key;
