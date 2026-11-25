@@ -85,12 +85,10 @@ namespace
                       std::string_view             rootHost,
                       std::optional<AccountNumber> subdomain = {})
    {
-      std::string              location;
-      std::optional<SocketRow> socketRow;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         socketRow = Native::session(KvMode::read).open<SocketTable>().get(socket);
-      }
+      std::string location;
+      // A read needs no section: outside one it is a read of what was
+      // published last and takes no lock (gofractally/psibase#2276).
+      auto socketRow = Native::session(KvMode::read).open<SocketTable>().get(socket);
       if (auto proto = forwardedProto(req))
          location += *proto + "://";
       else if (hasTls(socketRow.value().info))
@@ -278,12 +276,8 @@ extern "C" [[clang::export_name("close")]] void closeSocket()
    check(psio::validate_pssz<std::tuple<std::int32_t>>(args).ok(), "invalid arguments of close");
    auto [socket] = psio::pssz_view<std::tuple<std::int32_t>>(args);
    // if this is a response to an HTTP request, send it to the owner
-   auto                              requests = XHttp{}.open<ResponseHandlerTable>();
-   std::optional<ResponseHandlerRow> row;
-   PSIBASE_SUBJECTIVE_TX
-   {
-      row = requests.get(socket);
-   }
+   auto requests = XHttp{}.open<ResponseHandlerTable>();
+   auto row      = requests.get(socket);
 
    if (row)
    {
@@ -324,12 +318,8 @@ void XHttp::send(std::int32_t socket, psio::pssz_view<std::vector<char>> data, s
    }
    else
    {
-      auto                              requests = XHttp{}.open<ResponseHandlerTable>();
-      std::optional<ResponseHandlerRow> row;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         row = requests.get(socket);
-      }
+      auto requests = XHttp{}.open<ResponseHandlerTable>();
+      auto row      = requests.get(socket);
       if (!row || row->service != getSender() || row->type != SocketType::websocket)
          abortMessage("Wrong sender");
    }
@@ -342,11 +332,8 @@ std::int32_t XHttp::sendRequest(HttpRequest                   request,
 {
    auto sender    = getSender();
    auto codeTable = Native::subjective(KvMode::read).open<CodeTable>();
-   PSIBASE_SUBJECTIVE_TX
-   {
-      if (!codeTable.get(sender))
-         abortMessage("Only local services can use sendRequest");
-   }
+   if (!codeTable.get(sender))
+      abortMessage("Only local services can use sendRequest");
    auto requests = Temporary{}.open<TempResponseHandlerTable>();
    auto sock     = socketOpen(request, tls, endpoint);
    check(sock >= 0, "Failed to open socket");
@@ -379,11 +366,8 @@ std::int32_t XHttp::websocket(HttpRequest                   request,
    {
       request.headers.push_back({"Sec-WebSocket-Version", "13"});
    }
-   PSIBASE_SUBJECTIVE_TX
-   {
-      if (!codeTable.get(sender))
-         abortMessage("Only local services can use sendRequest");
-   }
+   if (!codeTable.get(sender))
+      abortMessage("Only local services can use sendRequest");
    auto requests = Temporary{}.open<TempResponseHandlerTable>();
    auto sock     = socketOpen(request, tls, endpoint);
    check(sock >= 0, "Failed to open socket");
@@ -626,19 +610,19 @@ bool XHttp::isSecure(int32_t socket)
       return false;
    };
 
-   std::optional<SocketRow> socketRow;
-   PSIBASE_SUBJECTIVE_TX
-   {
-      auto session = Session{receiver, KvMode::read};
-      auto temp    = Temporary{receiver, KvMode::read};
-      if (!ownedBySender(session.open<PendingRequestTable>(), &PendingRequestRow::owner) &&
-          !ownedBySender(temp.open<TempPendingRequestTable>(), &TempPendingRequestRow::owner) &&
-          !ownedBySender(session.open<ResponseHandlerTable>(), &ResponseHandlerRow::service) &&
-          !ownedBySender(temp.open<TempResponseHandlerTable>(), &TempResponseHandlerRow::service))
-         abortMessage(sender.str() + " does not own socket " + std::to_string(socket));
+   // Lookups only, so no section. The rows need not be read as of one
+   // moment: a socket's row in the socket table does not change while the
+   // socket is open, and its place in the four tables is changed only on
+   // behalf of its owner, which is the caller.
+   auto session = Session{receiver, KvMode::read};
+   auto temp    = Temporary{receiver, KvMode::read};
+   if (!ownedBySender(session.open<PendingRequestTable>(), &PendingRequestRow::owner) &&
+       !ownedBySender(temp.open<TempPendingRequestTable>(), &TempPendingRequestRow::owner) &&
+       !ownedBySender(session.open<ResponseHandlerTable>(), &ResponseHandlerRow::service) &&
+       !ownedBySender(temp.open<TempResponseHandlerTable>(), &TempResponseHandlerRow::service))
+      abortMessage(sender.str() + " does not own socket " + std::to_string(socket));
 
-      socketRow = Native::session(KvMode::read).open<SocketTable>().get(socket);
-   }
+   auto socketRow = Native::session(KvMode::read).open<SocketTable>().get(socket);
 
    return hasTls(socketRow.value().info);
 }
@@ -715,13 +699,12 @@ extern "C" [[clang::export_name("serve")]] void serve()
    {
       auto codeTable   = Native::subjective(KvMode::read).open<CodeTable>();
       auto serverTable = XHttp{}.open<RegServTable>();
-      auto code        = std::optional<CodeRow>{};
-      auto server      = std::optional<RegisteredServiceRow>{};
-      PSIBASE_SUBJECTIVE_TX
-      {
-         server = serverTable.get(service);
-         code   = codeTable.get(service);
-      }
+      // Two lookups on every request, without a section (which would
+      // wait for every writer). The rows are written by different
+      // requests (register_server; the installation of a service) and
+      // need not be read as of one moment.
+      std::optional<RegisteredServiceRow> server = serverTable.get(service);
+      std::optional<CodeRow>              code   = codeTable.get(service);
       // Required for bootstrapping
       if (!server && service == XHttp::service)
          server = {service, service};
@@ -746,10 +729,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
          {
             return;
          }
-         PSIBASE_SUBJECTIVE_TX
-         {
-            code = codeTable.get(XSites::service);
-         }
+         code = codeTable.get(XSites::service);
          if (code)
          {
             owned.put({.socket = sock, .owner = XSites::service});

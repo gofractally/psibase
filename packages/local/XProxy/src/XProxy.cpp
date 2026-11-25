@@ -164,12 +164,9 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest request, std::optional<std
    }
 
    // Try the upstream server
-   auto                           table = open<OriginServerTable>();
-   std::optional<OriginServerRow> originServer;
-   PSIBASE_SUBJECTIVE_TX
-   {
-      originServer = table.get(subdomain);
-   }
+   // A lookup: no section
+   auto table        = open<OriginServerTable>();
+   auto originServer = table.get(subdomain);
    if (originServer)
    {
       if (originServer->bypassPrefixes &&
@@ -304,12 +301,8 @@ void XProxy::recv(std::int32_t                        socket,
                   std::uint32_t                       flags)
 {
    check(getSender() == XHttp::service, "Wrong sender");
-   auto                        table = open<WebSocketTable>();
-   std::optional<WebSocketRow> row;
-   PSIBASE_SUBJECTIVE_TX
-   {
-      row = table.get(socket);
-   }
+   auto table = open<WebSocketTable>();
+   auto row   = table.get(socket);
    if (row)
       to<XHttp>().send(row->to, data, flags);
 }
