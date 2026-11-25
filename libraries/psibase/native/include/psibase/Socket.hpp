@@ -15,6 +15,7 @@ namespace psibase
 {
    struct Sockets;
    struct AutoCloseSocket;
+   struct UsageRecord;
 
    struct CloseLock
    {
@@ -47,9 +48,21 @@ namespace psibase
       void remove(Writer& writer);
       void writeInfo(Writer& writer);
 
+      // Usage metering (gofractally/psibase#2270): the record that what
+      // this socket carries is charged to; null if nothing is. It can be
+      // replaced while the socket is in use (a request that turns out to be
+      // authenticated, a websocket that becomes a peer connection), from
+      // another thread than the one that sends, hence the lock.
+      std::shared_ptr<UsageRecord> usage() const;
+      void                         setUsage(std::shared_ptr<UsageRecord> record);
+
       std::int32_t           id;
       bool                   closed = false;
       std::weak_ptr<Sockets> weak_sockets;
+
+     private:
+      mutable std::mutex           usageMutex;
+      std::shared_ptr<UsageRecord> usageRecord;
    };
 
    struct SocketAutoCloseSet;
@@ -135,6 +148,8 @@ namespace psibase
                              SocketAutoCloseSet*        owner,
                              std::vector<SocketChange>* diff,
                              std::function<void(const std::shared_ptr<net::connection_base>&)>);
+      /// The socket with this id, if there is one (usage metering).
+      std::shared_ptr<Socket> get(std::int32_t fd);
       /// Marks a socket for closing. This is irreversible and cannot
       /// be affected directly by WASM. This should be called when
       /// the socket is closed at the remote end, when there is an

@@ -12,6 +12,7 @@
 #include <psibase/BlockContext.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/SystemContext.hpp>
+#include <psibase/UsageMeter.hpp>
 #include <psibase/WebSocket.hpp>
 #include <psibase/db.hpp>
 #include <psibase/peer_manager.hpp>
@@ -384,6 +385,12 @@ namespace psibase::http
                    }
                    else
                    {
+                      // Usage metering: payload bytes sent, per message
+                      if (auto usage = self->usage())
+                      {
+                         usage->add(UsageField::bytesOut, bytes_transferred);
+                         usage->add(UsageField::messagesOut, 1);
+                      }
                       callback = std::move(self->outbox.front().callback);
                       self->outbox.pop_front();
                    }
@@ -424,6 +431,12 @@ namespace psibase::http
                 }
                 else
                 {
+                   // Usage metering: payload bytes received, per message
+                   if (auto usage = self->usage())
+                   {
+                      usage->add(UsageField::bytesIn, bytes_read);
+                      usage->add(UsageField::messagesIn, 1);
+                   }
                    if (self->handleP2P())
                       return;
                    if (auto l = self->server.sharedState->sockets()->lockRecv(self))

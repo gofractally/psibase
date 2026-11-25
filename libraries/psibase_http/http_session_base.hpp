@@ -17,6 +17,11 @@
 
 #include "server_state.hpp"
 
+namespace psibase
+{
+   struct UsageRecord;
+}
+
 namespace psibase::http
 {
 
@@ -45,6 +50,8 @@ namespace psibase::http
       {
          virtual ~work()           = default;
          virtual void operator()() = 0;
+         // Usage metering: who the bytes of this response are charged to
+         std::shared_ptr<UsageRecord> usage;
       };
       // This queue is used for HTTP pipelining.
       std::vector<std::unique_ptr<work>> items;
@@ -80,6 +87,20 @@ namespace psibase::http
 
      public:
       bool pause_read = false;
+
+      // Usage metering (gofractally/psibase#2270).
+      //
+      // The record of the request being handled: handle_request sets it,
+      // and the response is charged to it unless reply_usage names another
+      // (a request whose identity changed while it was served).
+      std::shared_ptr<UsageRecord> usage;
+      std::shared_ptr<UsageRecord> reply_usage;
+      // The transport peer is looked at once per connection: whether its
+      // forwarding headers are believed, and whether `usage` is the record
+      // of the peer itself (true) or of a forwarded address (false).
+      bool usage_resolved = false;
+      bool usage_trusted  = false;
+      bool usage_direct   = false;
 
       // Returns `true` if we have reached the queue limit
       bool is_full() const { return items.size() >= limit; }

@@ -8,6 +8,7 @@
 #include <boost/type_erasure/is_empty.hpp>
 #include <fstream>
 #include <psibase/BlockContext.hpp>
+#include <psibase/UsageMeter.hpp>
 #include <psibase/HttpHeaders.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
@@ -389,6 +390,9 @@ namespace psibase::http
             BOOST_LOG_SCOPED_LOGGER_TAG(logger, "ResponseTime",
                                         std::chrono::duration_cast<std::chrono::microseconds>(
                                             endTime - queryTimes.startTime));
+            // Usage metering: the reply belongs to this request's identity,
+            // whatever the connection is doing by now.
+            session->reply_usage = this->usage();
             (*session)(make_reply(this));
          }
          if (session->can_read())
@@ -757,6 +761,74 @@ namespace psibase::http
           std::move(req), send.shared_from_this(), std::forward<F>(f), std::forward<E>(e));
    }
 
+   namespace
+   {
+      // Usage metering (gofractally/psibase#2270).
+
+      // The size of a request as the client sent it, near enough: the
+      // request line, the header fields and the body. Taken from the parsed
+      // message, not from the read, which can run into the next request of
+      // a pipelining client.
+      std::uint64_t requestBytes(const http_session_base::request_type& req)
+      {
+         // "METHOD target HTTP/1.1\r\n" and the empty line
+         std::uint64_t result = req.method_string().size() + req.target().size() + 12 + 2;
+         for (const auto& field : req)
+            // "name: value\r\n"
+            result += field.name_string().size() + field.value().size() + 4;
+         return result + req.body().size();
+      }
+
+      // The record an unauthenticated request is charged to: the client's
+      // address. Forwarding headers are read only if the transport peer is
+      // a trusted proxy (psibase::UsageIdentity::resolve). A connection whose peer
+      // is not one pays for this once.
+      std::shared_ptr<UsageRecord> resolveUsage(UsageMeter&                            meter,
+                                                const http_session_base::request_type& req,
+                                                http_session_base&                     session)
+      {
+         if (!meter.enabled())
+            return nullptr;
+         const auto& proxies = meter.settings().trustedProxies;
+         bool        reuse   = session.usage_resolved && session.usage_direct && session.usage &&
+                               !session.usage->detached() &&
+                               !isAggregate(session.usage->identity.kind);
+         if (reuse && !session.usage_trusted)
+            return session.usage;
+         std::optional<SocketEndpoint> endpoint;
+         try
+         {
+            endpoint = session.remote_endpoint();
+         }
+         catch (...)
+         {
+            // The peer is gone; the request is still counted
+         }
+         bool trusted = endpoint && isTrustedUsageProxy(*endpoint, proxies);
+         std::vector<std::optional<IPAddress>> forwarded;
+         if (trusted)
+         {
+            HttpRequest headers;
+            for (const auto& field : req)
+            {
+               HttpHeader header{std::string(field.name_string()), std::string(field.value())};
+               if (header.matches("forwarded") || header.matches("x-forwarded-for"))
+                  headers.headers.push_back(std::move(header));
+            }
+            if (!headers.headers.empty())
+               forwarded = forwardedFor(headers);
+            else if (reuse)
+               return session.usage;
+         }
+         auto identity          = UsageIdentity::resolve(endpoint, forwarded, proxies);
+         session.usage          = meter.find(identity, session.usage);
+         session.usage_resolved = true;
+         session.usage_trusted  = trusted;
+         session.usage_direct   = forwarded.empty();
+         return session.usage;
+      }
+   }  // namespace
+
    // This function produces an HTTP response for the given
    // request. The type of the response object depends on the
    // contents of the request, so the interface requires the
@@ -767,6 +839,28 @@ namespace psibase::http
    {
       auto [req_host, req_target] = parse_request_target(req);
       HttpReplyBuilder builder{server, req};
+
+      // Usage metering: one request, its bytes, and the wall clock of this
+      // function, charged when it returns to whoever the request belongs
+      // to by then: the client's address, or the account if the request
+      // turned out to be authenticated while it was served.
+      auto                         usageStart = steady_clock::now();
+      auto                         usageMeter = server.sharedState->usage();
+      std::shared_ptr<UsageRecord> usageRecord = resolveUsage(*usageMeter, req, send);
+      std::shared_ptr<Socket>      usageSocket;
+      send.reply_usage.reset();
+      psibase::finally chargeUsage{
+          [&, bytes = usageRecord ? requestBytes(req) : 0]
+          {
+             if (!usageRecord)
+                return;
+             auto who = usageSocket ? usageSocket->usage() : nullptr;
+             if (!who)
+                who = usageRecord;
+             who->add(UsageField::requests, 1);
+             who->add(UsageField::bytesIn, bytes);
+             who->add(UsageField::requestNs, steady_clock::now() - usageStart);
+          }};
 
       try
       {
@@ -853,6 +947,9 @@ namespace psibase::http
                 },
                 [builder](const std::string& message)
                 { return builder.error(bhttp::status::internal_server_error, message); });
+            socket->setUsage(usageRecord);
+            usageSocket = socket;
+            usageMeter->enforceQuota(usageRecord);
 
             {
                SignedTransaction  trx;
