@@ -61,7 +61,7 @@ namespace SystemService
 
          psibase::check(msg.size() == 64, "Signing failed");
 
-         // verify-sig only accepts the low-S form: s <= n/2.
+         // The verifiers only accept the low-S form: s <= n/2.
          auto ec = dynamic_cast<const Botan::EC_PrivateKey*>(key.get());
          psibase::check(ec != nullptr, "Not an elliptic curve key");
          const Botan::BigInt& order = ec->domain().get_order();

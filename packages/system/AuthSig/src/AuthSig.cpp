@@ -2,11 +2,11 @@
 
 #include <concepts>
 #include <psibase/dispatch.hpp>
+#include <psibase/verifier.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/Spki.hpp>
 #include <services/system/StagedTx.hpp>
-#include <services/system/VerifySig.hpp>
 
 using namespace psibase;
 
@@ -24,6 +24,13 @@ namespace SystemService
          return lhs.size() == rhs.size() && std::memcmp(lhs.data(), rhs.data(), lhs.size()) == 0;
       }
 
+      // A key is stored only if some verifier accepts it; otherwise nothing
+      // could ever authorize the account.
+      void checkKey(const SubjectPublicKeyInfo& key)
+      {
+         check(verifierFor(key.data).has_value(), "unsupported public key");
+      }
+
       bool AuthSig::checkAuthSys(uint32_t                    flags,
                                  psibase::AccountNumber      sender,
                                  ServiceMethod               action,
@@ -33,10 +40,15 @@ namespace SystemService
 
          check(row.has_value(), "sender does not have a public key");
 
+         // A claim counts only if it names the verifier for the stored key's
+         // type: any other service would be checking something else.
          const auto& expected = row->pubkey.data;
+         const auto  verifier = verifierFor(expected);
+         if (!verifier)
+            return false;
          for (auto& claim : claims)
          {
-            if (claim.service == VerifySig::service && equalByteVector(claim.rawData, expected))
+            if (claim.service == *verifier && equalByteVector(claim.rawData, expected))
             {
                return true;
             }
@@ -53,7 +65,7 @@ namespace SystemService
 
       void AuthSig::setKey(SubjectPublicKeyInfo key)
       {
-         check(SubjectPublicKeyInfo::validate(key.data), "invalid public key");
+         checkKey(key);
          auto authTable = open<AuthTable>(KvMode::readWrite);
          authTable.put(AuthRecord{.account = getSender(), .pubkey = std::move(key)});
       }
@@ -77,7 +89,7 @@ namespace SystemService
 
       void AuthSig::newAccount(psibase::AccountNumber name, SubjectPublicKeyInfo key)
       {
-         check(SubjectPublicKeyInfo::validate(key.data), "invalid public key");
+         checkKey(key);
          auto authTable = open<AuthTable>(KvMode::readWrite);
          authTable.put(AuthRecord{.account = name, .pubkey = std::move(key)});
 
