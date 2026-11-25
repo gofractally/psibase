@@ -74,18 +74,15 @@ namespace psibase
    // ceiling here rules out (see max_func_local_bytes). psitest still runs
    // test modules on it: gofractally/psibase#2231.
    inline constexpr std::array<VMOptionCeiling, vmOptionCount> vmOptionCeilings = {{
-       PSIBASE_VM_CEILING(max_mutable_global_bytes, 262'144, "",
-           "no engine limit below 2^32; 16 bytes for each of the 16,384 globals allowed"),
+       PSIBASE_VM_CEILING(max_mutable_global_bytes, 1'600'000, "",
+           "no engine limit below 2^32; 16 bytes for each of the 100,000 globals allowed"),
        PSIBASE_VM_CEILING(max_pages, 65'536, "",
            "wasm32 itself; PZ detail/parser.hpp:752, WP validator/core.rs:803"),
-       PSIBASE_VM_CEILING(max_table_elements, 65'536,
-           "gofractally/psibase#2272: lifted when the wasmtime adapter instantiates a module "
-           "too large for its instance pool without the pool",
-           "the wasmtime adapter: a slot of its instance pool holds a table of 65,536 elements "
-           "(ExecutionContextWasmtime.cpp pool_table_elements), and wasmtime checks a module "
-           "against the pool when it compiles it, so a module with a larger table cannot be "
-           "compiled there (measured: 1,048,576; gofractally/psibase#2272). wasmtime itself has "
-           "no limit below 2^32"),
+       PSIBASE_VM_CEILING(max_table_elements, 1'048'576, "",
+           "no engine limit below 2^32; chosen. A slot of the wasmtime adapter's instance pool "
+           "holds a table of 65,536 elements (ExecutionContextWasmtime.cpp pool_table_elements); "
+           "a module with a larger table is compiled and run on the engine without a pool "
+           "(gofractally/psibase#2272), so the pool does not set this"),
        PSIBASE_VM_CEILING(max_stack_bytes, 16 * 1024 * 1024, "",
            "the wasmtime adapter: 16 native bytes per budget byte in a 256 MiB native stack, "
            "ExecutionContextWasmtime.cpp nativeStackBytes / nativeBytesPerBudget"),
@@ -98,26 +95,22 @@ namespace psibase
            "measured good. WP MAX_WASM_TYPES is 1,000,000, validator.rs:739"),
        PSIBASE_VM_CEILING(max_import_section_elements, 10'000, "",
            "WP MAX_WASM_IMPORTS 1,000,000, validator.rs:767; kept low so that max_type_size is "
-           "the only bound on the size of imports and exports, and for the 4 MiB instance of the "
-           "adapter's pool, see max_global_section_elements"),
+           "the only bound on the size of imports and exports"),
        PSIBASE_VM_CEILING(max_function_section_elements, 100'000, "",
            "WP MAX_WASM_FUNCTIONS 1,000,000, validator.rs:796; wasmtime needed 5.97 GB to "
-           "compile 1,000,000 empty functions (survey B5), 0.75 GB at this ceiling; and the 4 MiB "
-           "instance of the adapter's pool, see max_global_section_elements"),
+           "compile 1,000,000 empty functions (survey B5), 0.75 GB at this ceiling"),
        PSIBASE_VM_CEILING(max_table_section_elements, 1, "",
            "the node gives a service one table: wasmtime StoreLimits tables = 1, PZ shim "
            "lib.rs:669; the host interface addresses one table"),
        PSIBASE_VM_CEILING(max_memory_section_elements, 1, "",
            "multi-memory is off on wasmtime; the host interface addresses one memory"),
-       PSIBASE_VM_CEILING(max_global_section_elements, 16'384,
-           "gofractally/psibase#2272: lifted when the wasmtime adapter instantiates a module "
-           "too large for its instance pool without the pool",
-           "the wasmtime adapter: a slot of its instance pool holds an instance of 4 MiB (PZ "
-           "wasmtime/shim/src/lib.rs max_core_instance_size) and a module that needs more cannot "
-           "be compiled there. Measured: 32 bytes per function, 32 more per import, 16 per global; "
-           "the 100,000 functions and 10,000 imports allowed take 3.84 MB and leave room for "
-           "these (4.10 MB in all; gofractally/psibase#2272). WP "
-           "MAX_WASM_GLOBALS is 1,000,000, validator.rs:889"),
+       PSIBASE_VM_CEILING(max_global_section_elements, 100'000, "",
+           "WP MAX_WASM_GLOBALS 1,000,000, validator.rs:889; chosen, as "
+           "max_function_section_elements. A slot of the wasmtime adapter's instance pool holds "
+           "an instance of 4 MiB (PZ wasmtime/shim/src/lib.rs max_core_instance_size; measured: "
+           "32 bytes per function, 32 more per import, 16 per global); a module that needs more "
+           "is compiled and run on the engine without a pool (gofractally/psibase#2272), so the "
+           "pool does not set this"),
        PSIBASE_VM_CEILING(max_export_section_elements, 10'000, "",
            "WP MAX_WASM_EXPORTS 1,000,000, validator.rs:911; see max_import_section_elements"),
        PSIBASE_VM_CEILING(max_element_section_elements, 100'000, "",

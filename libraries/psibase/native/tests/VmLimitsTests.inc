@@ -816,8 +816,11 @@ TEST_CASE("A module at the ceilings that size an instance at once is stored and 
       SKIP("stores code as the wasmtime engine does");
    // What an instance holds grows with the functions that can be referenced,
    // the globals and the table; wasmtime's instance pool has a size per
-   // slot. Every function is in an element segment, so every one of them
-   // can be referenced.
+   // slot, which this module exceeds twice over (a table of 1,048,576
+   // elements against 65,536; an instance above 4 MiB). It is compiled and
+   // run on the engine without a pool (gofractally/psibase#2272). Every
+   // function is in an element segment, so every one of them can be
+   // referenced.
    const auto    limits = psibase::vmOptionsAtCeiling();
    ServiceModule m;
    m.imports         = limits.max_import_section_elements;
