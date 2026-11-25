@@ -1,4 +1,4 @@
-use psibase::HttpStatus::{BadRequest, Unauthorized};
+use psibase::HttpStatus::{BadRequest, Forbidden, Unauthorized};
 use psibase::*;
 
 use crate::batch::{batch_ops_from_body, decode_fixed_hex, BatchOp, Duration};
@@ -67,13 +67,18 @@ pub(crate) struct HostDbRequest {
 impl HostDbRequest {
     /// Resolves cookies and the route for `serveSys`.
     ///
-    /// The reply already has CORS when the request sends `Origin`. A presented
+    /// `root` is the request host's root. `Origin` must be the supervisor
+    /// service origin on that root; otherwise `403` with no CORS headers.
+    /// An accepted reply allows that origin with credentials. A presented
     /// device cookie is re-set. `PUT /kv/device` mints one when it is absent.
     /// Any other storage read or write without a device cookie is `401` and
     /// sends no `Set-Cookie`.
-    pub(crate) fn accept(http: &HttpRequest) -> Result<(Self, HostDbReply), HttpReply> {
+    pub(crate) fn accept(http: &HttpRequest, root: &str) -> Result<(Self, HostDbReply), HttpReply> {
         let mut reply = HostDbReply::empty();
-        reply.mirror_request_origin(http);
+        let Some(origin) = service_origin(http, account!("supervisor"), root) else {
+            return Err(reply.set_status(Forbidden));
+        };
+        reply.allow_origin(origin);
         let device = match Self::device_state(http) {
             DeviceState::Malformed => return Err(reply.set_status(BadRequest)),
             DeviceState::Missing => None,

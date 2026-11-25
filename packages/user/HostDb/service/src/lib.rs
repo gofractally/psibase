@@ -23,8 +23,9 @@ mod service {
     ///
     /// # Access
     ///
-    /// - Use credentialed fetches. When the client sends `Origin`, responses echo
-    ///   CORS for that value. Device and session cookies identify the client.
+    /// - `Origin` must be `supervisor.{root}`; otherwise `403` with no CORS headers.
+    /// - Use credentialed fetches. Responses allow that origin with credentials,
+    ///   including errors. Device and session cookies identify the client.
     ///
     /// # Cookies
     ///
@@ -85,7 +86,8 @@ mod service {
     }
 
     fn serve_sys_impl(request: HttpRequest) -> Result<HttpReply, HttpReply> {
-        let (mut req, mut reply) = HostDbRequest::accept(&request)?;
+        let root = HttpServer::call().rootHost(request.host.clone());
+        let (mut req, mut reply) = HostDbRequest::accept(&request, &root)?;
         match req.take_route() {
             Route::CorsPreflight => Ok(reply.finish_with_status(NoContent)),
             Route::NotFound => Ok(reply.set_status(NotFound)),
