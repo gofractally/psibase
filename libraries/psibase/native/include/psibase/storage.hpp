@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -174,14 +175,22 @@ namespace psibase::storage
    // and a clone of the database sees the same one. clear() empties it.
    //
    // Writers. The engine has one writer per root, and writers of different
-   // roots do not wait for each other. This root has a write session of its
-   // own, which the chain's writer never uses, and a mutex of its own, which
-   // the chain's writer never takes: a write here holds that mutex for one
-   // insert and does not enter the gate chain publication goes through.
-   // (An engine session may be used by one thread at a time, not only by the
-   // thread that made it; the mutex is what makes that so. A session per
-   // writing thread would spend one of the engine's 64 session slots, and
-   // an allocation segment, on every thread that ever compiled a module.)
+   // roots do not wait for each other. This root is written by one thread of
+   // its own, started by the first write: that thread creates the root's
+   // write session, is the only one that ever uses it, and closes it. An
+   // engine write session is created and used on a single thread, always.
+   // put(), erase() and clear() hand the change to that thread and return
+   // when it is published, so what a caller stored is there for the next
+   // reader, or throw what went wrong. The chain's writer and the gate chain
+   // publication goes through are never involved. What is queued is one
+   // request per waiting caller (the data stays with the caller), at most
+   // 64. When the last handle to the database goes, the thread finishes what
+   // it was handed and is joined before the engine closes.
+   //
+   // Values. The engine stores a value of any size up to 4 GiB in chunks of
+   // just under 32 MiB. The largest stored and read back through this root
+   // in a test is 40 MiB (NativeAotDatabaseTests); the largest compiled
+   // module of the services in the tree is 5.6 MB.
    //
    // Readers use the calling thread's engine reader, as every read of the
    // database does, and take a snapshot of the root: they wait for no writer.
@@ -209,6 +218,11 @@ namespace psibase::storage
       void clear();
       // Every key with the size of its value, in key order.
       std::vector<std::pair<std::vector<char>, std::uint64_t>> sizes();
+      // The thread that writes this root, once something has been written.
+      std::thread::id writer_thread() const;
+      // For tests: called, on the thread about to write, before every write
+      // to a cache root of this process. Null removes it.
+      static void set_write_hook(void (*hook)());
    };
 
    class database

@@ -12,6 +12,10 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
+#include <functional>
+#include <deque>
+#include <condition_variable>
 #include <fstream>
 #include <map>
 #include <mutex>
@@ -178,6 +182,122 @@ namespace psibase::storage
       }
    };
 
+   // The one thread that writes the cache root. It creates the root's write
+   // session itself and nothing else ever touches that session: an engine
+   // write session is created and used on a single thread. Other threads hand
+   // it a change and wait until it is published (or has failed).
+   //
+   // The queue holds no data, only the waiting callers' requests, and each
+   // caller has at most one: what is queued is bounded by the threads that
+   // are waiting, and a waiting thread compiles nothing more. It is capped
+   // all the same; a caller that finds it full waits for room.
+   class CacheWriter
+   {
+     public:
+      using Change = std::function<Snapshot(Engine::write_session&)>;
+
+      explicit CacheWriter(Engine::database& engine) : engine(engine)
+      {
+         thread = std::thread([this] { run(); });
+      }
+      // Finishes every request already handed over, then stops. The session
+      // is closed by its own thread before the join returns.
+      ~CacheWriter()
+      {
+         {
+            std::lock_guard lock(mutex);
+            stopping = true;
+         }
+         ready.notify_all();
+         room.notify_all();
+         thread.join();
+      }
+      std::thread::id id() const { return thread.get_id(); }
+
+      // Applies `change` to the root on the writer thread and returns when it
+      // is visible to readers. Throws what the change threw; throws if the
+      // writer has been told to stop.
+      void apply(const Change& change)
+      {
+         Request          request{&change};
+         std::unique_lock lock(mutex);
+         room.wait(lock, [&] { return stopping || queue.size() < maxQueued; });
+         if (stopping)
+            throw std::runtime_error("the cache root's writer has stopped");
+         queue.push_back(&request);
+         ready.notify_one();
+         finished.wait(lock, [&] { return request.done; });
+         if (request.error)
+            std::rethrow_exception(request.error);
+      }
+
+     private:
+      struct Request
+      {
+         const Change*      change;
+         bool               done = false;
+         std::exception_ptr error;
+      };
+      static constexpr std::size_t maxQueued = 64;
+
+      void run()
+      {
+         // Created here, used here, destroyed here.
+         std::shared_ptr<Engine::write_session> session;
+         std::exception_ptr                     unusable;
+         try
+         {
+            session = engine.start_write_session();
+         }
+         catch (...)
+         {
+            unusable = std::current_exception();
+         }
+         std::unique_lock lock(mutex);
+         for (;;)
+         {
+            ready.wait(lock, [&] { return stopping || !queue.empty(); });
+            if (queue.empty())
+               break;  // stopping, and drained
+            Request* request = queue.front();
+            queue.pop_front();
+            room.notify_one();
+            lock.unlock();
+            std::exception_ptr error = unusable;
+            if (!error)
+               try
+               {
+                  if (auto hook = cacheWriteHook.load())
+                     hook();
+                  session->set_root(cacheRootIndex, (*request->change)(*session));
+               }
+               catch (...)
+               {
+                  // A failed change is the caller's to report; this thread
+                  // goes on to the next.
+                  error = std::current_exception();
+               }
+            lock.lock();
+            request->error = error;
+            request->done  = true;
+            finished.notify_all();
+         }
+         lock.unlock();
+         session.reset();
+      }
+
+      Engine::database&       engine;
+      std::mutex              mutex;
+      std::condition_variable ready, room, finished;
+      std::deque<Request*>    queue;
+      bool                    stopping = false;
+      std::thread             thread;
+
+     public:
+      // Test hook: called on the thread that is about to write the root.
+      static inline std::atomic<void (*)()> cacheWriteHook{nullptr};
+   };
+
    inline std::atomic<std::uint64_t> nextStateId{1};
    struct State;
    // storage.hpp names the state without defining it.
@@ -193,22 +313,25 @@ namespace psibase::storage
       // One engine reader per thread that has read this database.
       std::mutex                                                           threadReadersMutex;
       std::map<std::thread::id, std::shared_ptr<Engine::read_session>>     threadReaders;
-      // The cache root's own writer (see cache_root). Guarded by cacheMutex,
-      // never by `access`; made by the first write.
-      std::mutex                             cacheMutex;
-      std::shared_ptr<Engine::write_session> cacheWriter;
+      // The cache root's own writer thread (see cache_root), started by the
+      // first write. Never involved with `access`.
+      std::mutex                   cacheWriterMutex;
+      std::unique_ptr<CacheWriter> cacheWriter;
       const std::uint64_t id = nextStateId.fetch_add(1, std::memory_order_relaxed);
       std::filesystem::path                  path;
       bool                                   readonly  = false;
       bool                                   temporary = false;
       ~State()
       {
+         // First: the cache root's writer finishes what it was handed, closes
+         // its session on its own thread and is joined. Nothing can hand it
+         // more: whoever could holds this State, and no one does any longer.
+         cacheWriter.reset();
          access.invoke(
              [&]
              {
                 readers.close();
                 threadReaders.clear();
-                cacheWriter.reset();
                 writer.reset();
                 engine.reset();
              },
@@ -1275,21 +1398,36 @@ namespace psibase::storage
       }
       // One change to the cache root: continue from what is published, edit
       // copy-on-write, publish without a flush. Readers see the root before
-      // or after, never between.
-      template <class F>
-      void editCache(State& state, F&& change)
+      // or after, never between. Runs on the root's writer thread; returns
+      // once the change is published.
+      void editCache(State& state, const CacheWriter::Change& change)
       {
          if (state.readonly)
             return;
-         std::lock_guard lock(state.cacheMutex);
-         if (!state.cacheWriter)
-            state.cacheWriter = state.engine->start_write_session();
-         auto& writer = *state.cacheWriter;
-         writer.set_root(cacheRootIndex, change(writer));
+         CacheWriter* writer;
+         {
+            std::lock_guard lock(state.cacheWriterMutex);
+            if (!state.cacheWriter)
+               state.cacheWriter = std::make_unique<CacheWriter>(*state.engine);
+            writer = state.cacheWriter.get();
+         }
+         writer->apply(change);
       }
    }  // namespace
 
    cache_root::cache_root(std::shared_ptr<database_state> state) : state(std::move(state)) {}
+
+   std::thread::id cache_root::writer_thread() const
+   {
+      auto&           s = cacheState(state);
+      std::lock_guard lock(s.cacheWriterMutex);
+      return s.cacheWriter ? s.cacheWriter->id() : std::thread::id{};
+   }
+
+   void cache_root::set_write_hook(void (*hook)())
+   {
+      CacheWriter::cacheWriteHook = hook;
+   }
 
    bool cache_root::writable() const noexcept
    {

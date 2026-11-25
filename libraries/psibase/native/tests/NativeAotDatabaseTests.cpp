@@ -9,6 +9,8 @@
 #include <atomic>
 #include <chrono>
 #include <cstring>
+#include <mutex>
+#include <set>
 #include <thread>
 #include "TempDirectory.hpp"
 
@@ -326,7 +328,6 @@ TEST_CASE("Modules are stored while the chain publishes, and neither waits for t
       auto          settings = config;
       settings.sync          = sync;
       Node node{root.path / "node", NativeAotDatabase::defaultMaxBytes, settings};
-      auto writer = node.shared.createWriter();
 
       constexpr unsigned blocks = 200, stores = 50, storers = 4;
       const auto         module = artifact(1, 1 << 20);
@@ -339,7 +340,9 @@ TEST_CASE("Modules are stored while the chain publishes, and neither waits for t
       auto publish = [&](unsigned first, const std::atomic<bool>* until = nullptr)
       {
          Times      times;
-         const auto start = steady_clock::now();
+         // Made on the thread that publishes.
+         auto       writer = node.shared.createWriter();
+         const auto start  = steady_clock::now();
          for (unsigned i = 0; until ? !until->load() || i < blocks : i < blocks; ++i)
          {
             const auto begin = steady_clock::now();
@@ -417,6 +420,114 @@ TEST_CASE("Modules are stored while the chain publishes, and neither waits for t
       if (sync == storage::durability::none)
          CHECK(publishBeside.longest < storeBeside.total);
    }
+}
+
+namespace
+{
+   std::mutex                writersMutex;
+   std::set<std::thread::id> writers;
+   std::atomic<unsigned>     writes{0};
+}  // namespace
+
+TEST_CASE("Every write of the compiled-module root is made by its one writer thread")
+{
+   TempDirectory root;
+   const auto    path = root.path / "node";
+   {
+      std::lock_guard lock{writersMutex};
+      writers.clear();
+      writes = 0;
+   }
+   storage::cache_root::set_write_hook(
+       []
+       {
+          std::lock_guard lock{writersMutex};
+          writers.insert(std::this_thread::get_id());
+          ++writes;
+       });
+   constexpr unsigned        threads = 10, each = 30;
+   std::set<std::thread::id> callers{std::this_thread::get_id()};
+   std::thread::id           writer;
+   {
+      Node node{path};
+      CHECK(node.shared.cacheRoot().writer_thread() == std::thread::id{});  // nothing written yet
+      node.cache.store(key(1), artifact(1, 1000));
+      writer = node.shared.cacheRoot().writer_thread();
+      CHECK(writer != std::thread::id{});
+      CHECK(writer != std::this_thread::get_id());
+
+      std::atomic<unsigned>    missing{0};
+      std::vector<std::thread> workers;
+      std::mutex               callersMutex;
+      for (unsigned t = 0; t < threads; ++t)
+         workers.emplace_back(
+             [&, t]
+             {
+                {
+                   std::lock_guard lock{callersMutex};
+                   callers.insert(std::this_thread::get_id());
+                }
+                for (unsigned i = 0; i < each; ++i)
+                {
+                   const auto id = 100 * (t + 1) + i;
+                   node.cache.store(key(id), artifact(id, 20000));
+                   // Stored means there for the next reader, on any thread.
+                   missing += node.cache.load(key(id)) != artifact(id, 20000);
+                   if (i % 3 == 0)
+                      node.cache.remove(key(id));
+                }
+             });
+      for (auto& worker : workers)
+         worker.join();
+      CHECK(missing == 0);
+      node.store->clear();
+      node.cache.store(key(2), artifact(2, 1000));
+      CHECK(node.shared.cacheRoot().writer_thread() == writer);
+   }
+   storage::cache_root::set_write_hook(nullptr);
+   std::lock_guard lock{writersMutex};
+   // 1 store, then per thread 30 stores and 10 removes, a clear and a store.
+   CHECK(writes == 1 + threads * (each + each / 3) + 2);
+   REQUIRE(writers.size() == 1);
+   CHECK(*writers.begin() == writer);
+   CHECK(callers.count(writer) == 0);
+}
+
+TEST_CASE("The database closes with module stores in flight and loses none that returned")
+{
+   TempDirectory           root;
+   const auto              path    = root.path / "node";
+   constexpr unsigned      threads = 8, each = 25;
+   std::atomic<unsigned>   stored{0};
+   {
+      // Each thread has its own handles to the database and the store; the
+      // database closes when the last of them lets go, on whichever thread
+      // that is, while the others may still be handing over stores.
+      auto                     node = std::make_shared<Node>(path);
+      std::vector<std::thread> workers;
+      for (unsigned t = 0; t < threads; ++t)
+         workers.emplace_back(
+             [node, t, &stored]() mutable
+             {
+                for (unsigned i = 0; i < each * (t + 1) / threads; ++i)
+                {
+                   node->cache.store(key(1000 * (t + 1) + i), artifact(t + i, 100000));
+                   ++stored;
+                }
+                node.reset();
+             });
+      node.reset();
+      for (auto& worker : workers)
+         worker.join();
+   }
+   Node     node{path};
+   unsigned found = 0;
+   for (unsigned t = 0; t < threads; ++t)
+      for (unsigned i = 0; i < each * (t + 1) / threads; ++i)
+         found += node.cache.load(key(1000 * (t + 1) + i)) == artifact(t + i, 100000);
+   CHECK(found == stored);
+   CHECK(node.store->entries() == stored);
+   CHECK(node.cache.discarded() == 0);
 }
 
 TEST_CASE("Reverting and pruning blocks neither loses nor restores compiled modules")

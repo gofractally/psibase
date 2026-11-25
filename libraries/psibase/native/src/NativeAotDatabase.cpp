@@ -151,10 +151,16 @@ namespace psibase
             impl->root.erase(view(old));
          impl->root.put(view(key), record);
       }
-      catch (...)
+      catch (const std::exception& e)
       {
          // The record may not be there; the accounting says it is, which
-         // only brings eviction forward.
+         // only brings eviction forward. The module is compiled again when
+         // it is next needed.
+         PSIBASE_LOG(loggers::generic::get(), warning)
+             << "A compiled module was not stored in the node's database: " << e.what();
+      }
+      catch (...)
+      {
       }
    }
 
