@@ -928,6 +928,8 @@ namespace psibase::http
             BlockContext  bc{*system, system->sharedDatabase.getHead(),
                             system->sharedDatabase.createWriter(), true};
             bc.start();
+            // Runs posted while this request is served are charged to it
+            bc.usage = usageRecord;
 
             auto socket = makeHttpSocket(
                 std::move(req), send,

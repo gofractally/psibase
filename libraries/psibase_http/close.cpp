@@ -26,6 +26,7 @@ void psibase::http::callClose(const server_state&     server,
       BlockContext bc{*system, system->sharedDatabase.getHead(),
                       system->sharedDatabase.createWriter(), true};
       bc.start();
+      bc.usage = usageRecord;
 
       SignedTransaction trx;
       TransactionTrace  trace;

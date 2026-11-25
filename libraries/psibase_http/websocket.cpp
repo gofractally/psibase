@@ -61,6 +61,7 @@ void WebSocket::handleMessage(CloseLock&& l, bool binary)
    BlockContext bc{*system, system->sharedDatabase.getHead(), system->sharedDatabase.createWriter(),
                    true};
    bc.start();
+   bc.usage = usageRecord;
 
    SignedTransaction trx;
    TransactionTrace  trace;

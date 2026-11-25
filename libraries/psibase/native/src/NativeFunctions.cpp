@@ -5,6 +5,7 @@
 #include <psibase/PsizamPolicy.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
+#include <psibase/UsageMeter.hpp>
 #include <psibase/saturating.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/finally.hpp>
@@ -266,6 +267,43 @@ namespace psibase
                 psio::pssz_view<NotifyRow>(value);
             db.setCallbackFlags(DatabaseCallbacks::runQueueFlag);
          }
+      }
+
+      // Usage metering (gofractally/psibase#2270): the identity whose
+      // request, message or run is executing is remembered as the origin of
+      // a run it posts, in memory, keyed by the run's id, until the row is
+      // removed. Nothing is written for it. The write may belong to a
+      // subjective transaction that is retried or abandoned; remembering
+      // an origin for a run that never exists costs one map entry.
+      std::optional<std::uint64_t> runIdOfKey(std::span<const char> key)
+      {
+         static const auto prefix = psio::to_key(runPrefix());
+         if (key.size() != prefix.size() + 8 ||
+             std::memcmp(key.data(), prefix.data(), prefix.size()) != 0)
+            return {};
+         std::uint64_t id = 0;
+         for (std::size_t i = 0; i < 8; ++i)
+            id = (id << 8) | static_cast<unsigned char>(key[prefix.size() + i]);
+         return id;
+      }
+
+      void noteRunPosted(TransactionContext& tc, std::span<const char> key)
+      {
+         auto& bc    = tc.blockContext;
+         auto  meter = bc.systemContext.usage.get();
+         if (!meter || !meter->enabled())
+            return;
+         if (auto id = runIdOfKey(key))
+            meter->setRunOrigin(*id, bc.usage ? bc.usage : meter->node());
+      }
+
+      void noteRunRemoved(TransactionContext& tc, std::span<const char> key)
+      {
+         auto meter = tc.blockContext.systemContext.usage.get();
+         if (!meter || !meter->enabled())
+            return;
+         if (auto id = runIdOfKey(key))
+            meter->clearRunOrigin(*id);
       }
 
       void verifyScheduledSnapshotRow(std::span<const char> key, std::span<const char> value)
@@ -813,6 +851,7 @@ namespace psibase
              {
                 verifyWriteSubjective(database, fullKey, {value.data(), value.size()});
                 admitStoredCode(transactionContext, fullKey, {value.data(), value.size()});
+                noteRunPosted(transactionContext, fullKey);
              }
              else if (bucketDb == DbId::nativeSession)
              {
@@ -852,6 +891,8 @@ namespace psibase
                           notifyKvMut(*this, bucketDb, fullKey.size(), existing->size(), -1);
                        }
                     }
+                    if (bucketDb == DbId::nativeSubjective)
+                       noteRunRemoved(transactionContext, fullKey);
                     database.kvRemoveRaw(bucketDb, fullKey);
                  });
    }

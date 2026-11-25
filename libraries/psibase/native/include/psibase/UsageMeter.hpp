@@ -118,8 +118,9 @@ namespace psibase
       UsageHandle node() { return find(UsageIdentity::local("node")); }
 
       // The identity that posted a run, remembered in memory from the write
-      // of its row until the row is removed. A run with no remembered origin
-      // (posted before a restart, or more than maxRunOrigins pending) is
+      // of its row until the row is removed. At most maxRunOrigins are
+      // remembered; beyond that the oldest is forgotten. A run with no
+      // remembered origin (posted before a restart, or forgotten) is
       // charged to `local:unknown`; a run posted by work that had no
       // identity to `local:node`.
       static constexpr std::size_t maxRunOrigins = 65536;
@@ -200,6 +201,7 @@ namespace psibase
       std::vector<UsageHandle> detached_;
 
       std::mutex                                     runMutex_;
-      std::unordered_map<std::uint64_t, UsageHandle> runOrigins_;
+      // Ordered: run ids grow, so the first entry is the oldest.
+      std::map<std::uint64_t, UsageHandle> runOrigins_;
    };
 }  // namespace psibase

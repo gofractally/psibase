@@ -240,6 +240,24 @@ TEST_CASE("usage meter: attribution")
    CHECK(idle.rows.empty());
    CHECK(idle.removed.empty());
 
+   // A record that counted nothing is not written, and is forgotten once
+   // nobody holds it: a client whose requests are all charged to an account
+   // leaves no record of its address.
+   {
+      auto unused = t.meter.find(id("ip:203.0.113.99"));
+      auto held   = t.meter.collect();
+      CHECK(held.rows.empty());
+      CHECK(!unused->detached());
+      CHECK(t.meter.find(id("ip:203.0.113.99")) == unused);
+   }
+   auto dropped = t.meter.collect();
+   CHECK(dropped.rows.empty());
+   CHECK(dropped.removed.empty());
+   stored.apply(dropped);
+   CHECK(!stored.find("ip:203.0.113.99"));
+   CHECK(!stored.find("expired:ip"));
+   CHECK(t.meter.totals()[1].records == 1);
+
    // Off: no handles at all
    UsageSettings off;
    off.enabled = false;

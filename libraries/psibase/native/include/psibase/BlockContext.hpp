@@ -12,6 +12,7 @@
 
 namespace psibase
 {
+   struct UsageRecord;
    // A block producer is not ready to apply a transaction from its queue in
    // the block it has open: the transaction needs service code this node has
    // not compiled (WasmCache::mustDefer). Nothing about the transaction: it
@@ -28,6 +29,13 @@ namespace psibase
       Database          db;
       WriterPtr         writer;
       Database::Session session;
+      // Usage metering (gofractally/psibase#2270): the record that the work
+      // done in this context is charged to, and that is remembered as the
+      // origin of every run posted from it. Set by whoever creates the
+      // context for a request, a socket message or a posted run. Always
+      // null in a context that produces or applies a block: nothing on the
+      // consensus path reads or writes it.
+      std::shared_ptr<UsageRecord> usage;
       Block             current           = {};
       bool              isProducing       = false;
       bool              isReadOnly        = false;

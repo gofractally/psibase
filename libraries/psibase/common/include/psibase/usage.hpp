@@ -120,7 +120,8 @@ namespace psibase
       // Wall clock the node spent handling requests and inbound messages
       // (not the time a reply waited for something else to happen).
       std::uint64_t requestNs = 0;
-      // Trial (speculative) runs posted for this identity.
+      // Trial (speculative) runs of transactions this identity pushed that
+      // the node started.
       std::uint64_t trxPushed = 0;
       // Trial runs that finished without / with an error.
       std::uint64_t trialOk     = 0;

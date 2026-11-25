@@ -100,9 +100,13 @@ namespace psibase
       std::lock_guard l{runMutex_};
       auto            pos = runOrigins_.find(run);
       if (pos != runOrigins_.end())
+      {
          pos->second = origin;
-      else if (runOrigins_.size() < maxRunOrigins)
-         runOrigins_.emplace(run, origin);
+         return;
+      }
+      if (runOrigins_.size() >= maxRunOrigins)
+         runOrigins_.erase(runOrigins_.begin());
+      runOrigins_.emplace(run, origin);
    }
 
    void UsageMeter::clearRunOrigin(std::uint64_t run)
@@ -163,7 +167,9 @@ namespace psibase
                                        std::memory_order_relaxed);
       target->flushed += record->flushed;
       target->dirty = true;
-      changes.removed.push_back(record->identity);
+      // A record that never counted anything was never written
+      if (!isZero(record->flushed))
+         changes.removed.push_back(record->identity);
       // Someone may still hold the record and add to it.
       detached_.push_back(record);
    }
@@ -237,7 +243,11 @@ namespace psibase
             continue;
          auto keepUntil =
              saturatingAdd(record->lastSeen, settings_.retention.seconds(record->flushed));
-         if (keepUntil <= now)
+         // A record that counted nothing and that nobody holds any more (the
+         // map and `all` do) is not kept: the address of a client whose
+         // requests all turned out to be authenticated leaves no trace.
+         bool unused = isZero(record->flushed) && record.use_count() <= 2;
+         if (unused || keepUntil <= now)
             detach(record, UsageKind::expired, changes);
          else
             live[record->identity.kind].push_back(
@@ -272,7 +282,9 @@ namespace psibase
       {
          if (record->dirty)
          {
-            changes.rows.push_back(toRow(*record, record->flushed));
+            // Nothing is written for a record until it has counted something
+            if (!isZero(record->flushed))
+               changes.rows.push_back(toRow(*record, record->flushed));
             record->dirty = false;
          }
       }
