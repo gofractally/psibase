@@ -528,6 +528,7 @@ namespace psibase::net
                   PSIBASE_LOG(logger, info) << "Node is non-voting";
                   _new_term_timer.cancel();
                   stop_leader();
+                  this->drop_deferred_transactions();
                }
                _state = producer_state::nonvoting;
             }
@@ -1131,6 +1132,7 @@ namespace psibase::net
                if (!is_leader() || !is_term_ready())
                {
                   stop_leader();
+                  this->drop_deferred_transactions();
                   _state = producer_state::follower;
                   Base::switch_fork();
                }

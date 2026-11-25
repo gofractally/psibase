@@ -1929,6 +1929,66 @@ TEST_CASE("Code this node's compiler refuses does not keep a producer deferring"
    CHECK(writer.stored(psibase::DbId::native, code));
 }
 
+TEST_CASE("A producer defers code that was compiled and has since been evicted")
+{
+   if (!isWasmtime())
+      SKIP("observes compiles, which only the wasmtime engine reports");
+   // "A compile this producer started has ended and there is no module"
+   // does not mean the compiler refused the code: the module may have been
+   // compiled and then have left the memory cache and the artifact store.
+   // The producer must then defer again, not compile where it stands.
+   CompileGate   gate;
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   auto          release = psibase::finally{[&] { gate.release(); }};
+   gate.attach(fixture.cache);
+   CodeWriter writer{fixture};
+   fixture.block.deferUncompiledCode = true;
+
+   const auto code = largeModule(40, 4, 21);
+   const auto hash = CodeWriter::row(code).codeHash;
+   // Deferred once; the compile this producer started leaves the module.
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   REQUIRE(fixture.block.deferral.has_value());
+   fixture.cache.finishCompiles();
+   REQUIRE(fixture.cache.contains(hash, {}, 0));
+
+   // Evicted: from the store, and from memory by more modules than the
+   // memory cache holds.
+   std::error_code ignored;
+   for (const auto& entry : std::filesystem::recursive_directory_iterator(artifacts.path, ignored))
+      if (entry.is_regular_file(ignored))
+         std::filesystem::remove(entry.path(), ignored);
+   for (int i = 0; i < 8; ++i)
+   {
+      const auto other = largeModule(40, 4, 30 + i);
+      fixture.cache.compileAhead(CodeWriter::row(other).codeHash,
+                                 {reinterpret_cast<const char*>(other.data()), other.size()}, {},
+                                 0);
+   }
+   for (const auto& entry : std::filesystem::recursive_directory_iterator(artifacts.path, ignored))
+      if (entry.is_regular_file(ignored))
+         std::filesystem::remove(entry.path(), ignored);
+   REQUIRE_FALSE(fixture.cache.contains(hash, {}, 0));
+
+   // Offered again: deferred, and compiled on a compile thread.
+   const auto before = gate.count();
+   gate.close();
+   fixture.block.deferral.reset();
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK(fixture.block.deferral.has_value());
+   gate.awaitStarted(before + 1);
+   CHECK_FALSE(gate.compiledHere(before));
+   gate.release();
+   fixture.cache.finishCompiles();
+   CHECK(fixture.cache.contains(hash, {}, 0));
+   CHECK(gate.count() == before + 1);
+   fixture.block.deferral.reset();
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK_FALSE(fixture.block.deferral.has_value());
+   CHECK(writer.stored(psibase::DbId::native, code));
+}
+
 TEST_CASE("A producer's queued transaction never compiles a service it executes")
 {
    if (!isWasmtime())

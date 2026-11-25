@@ -174,6 +174,7 @@ namespace psibase::net
                _election_timer.cancel();
                _timeout.stop();
                stop_leader("Stopping boot block production");
+               this->drop_deferred_transactions();
                _state = producer_state::unknown;
             }
          }
@@ -213,6 +214,7 @@ namespace psibase::net
                _election_timer.cancel();
                _timeout.stop();
                stop_leader();
+               this->drop_deferred_transactions();
             }
             _state = producer_state::nonvoting;
          }
@@ -353,6 +355,7 @@ namespace psibase::net
                match_index[0].clear();
                match_index[1].clear();
                stop_leader();
+               this->drop_deferred_transactions();
                _state = producer_state::follower;
                randomize_timer();
                Base::switch_fork();
@@ -434,6 +437,7 @@ namespace psibase::net
                    if (_state == producer_state::leader)
                    {
                       stop_leader();
+                      this->drop_deferred_transactions();
                       _state = producer_state::candidate;
                    }
                    if (_state == producer_state::follower || _state == producer_state::candidate)
