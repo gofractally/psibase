@@ -1,6 +1,7 @@
 #include <psibase/prefix.hpp>
 
 #include <stdexcept>
+#include <unistd.h>
 
 #ifdef __APPLE__
 #include <libproc.h>

@@ -51,7 +51,7 @@ The following is a list of dependencies you are required to install:
 | Package        | Minimum Version | Description                                                                                                                                                      |
 | -------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | autoconf       | 2.69            | A tool for producing configure scripts for building, installing, and packaging software                                                                          |
-| binaryen       | 113             | A compiler and toolchain infrastructure library for WebAssembly                                                                                                  |
+| binaryen       | 133             | A compiler and toolchain infrastructure library for WebAssembly                                                                                                  |
 | boost          | 1.78            | A collection of C++ libraries                                                                                                                                    |
 | clang + llvm   | 16              | The LLVM compiler and toolchain for C/C++ and the libraries to interface with it                                                                                 |
 | cmake          | 3.22.1          | A build system generator that creates makefiles used for compilation                                                                                             |

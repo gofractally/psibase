@@ -4,7 +4,18 @@
 # - wasm-opt does not handle debug info, so RelWithDebInfo doesn't work
 # - clang doesn't pass any feature control options to wasm-opt, so it
 #   generates code that won't run on psibase.
+#
+# Services are compiled with wide arithmetic, which wasm-opt understands from
+# version 133. An older wasm-opt cannot read such a module at all, so the
+# module is left as the linker produced it: correct, only not size-optimized.
+# wasm-opt holds the two results of a wide instruction as a tuple, which it
+# only accepts with multivalue enabled; every psibase engine runs multi-value.
 if which wasm-opt >/dev/null 2>&1
 then
-    wasm-opt --enable-sign-ext --enable-nontrapping-float-to-int --enable-simd --enable-bulk-memory "$@"
+    if wasm-opt --help 2>/dev/null | grep -q -- --enable-wide-arithmetic
+    then
+        wasm-opt --enable-sign-ext --enable-nontrapping-float-to-int --enable-simd --enable-bulk-memory --enable-wide-arithmetic --enable-multivalue "$@"
+    else
+        echo "psibase-wasm-opt: $(wasm-opt --version) predates wide arithmetic (need 133 or newer); skipping optimization" >&2
+    fi
 fi

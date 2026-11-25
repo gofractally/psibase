@@ -55,7 +55,34 @@ namespace SystemService
             verifySeq.put(row);
          }
       }
+
+      // The version to record for a deployment. Version 0 in a request means
+      // "whatever this chain's default is": every existing client sends 0.
+      std::uint8_t resolveVersion(std::uint8_t vmType, std::uint8_t requested)
+      {
+         check(vmType == 0, "unsupported type or version");
+         if (requested == 0)
+            return SetCode{}
+                .open<DefaultVmVersionTable>()
+                .get({})
+                .value_or(DefaultVmVersionRow{})
+                .vmVersion;
+         check(requested <= vmVersionPerformance, "unsupported type or version");
+         return requested;
+      }
    }  // namespace
+
+   std::uint8_t SetCode::defaultVmVersion()
+   {
+      return resolveVersion(0, 0);
+   }
+
+   void SetCode::setDefaultVmVersion(std::uint8_t vmVersion)
+   {
+      check(getSender() == getReceiver(), "only setcode may set the default version");
+      check(vmVersion <= vmVersionPerformance, "unsupported type or version");
+      open<DefaultVmVersionTable>().put(DefaultVmVersionRow{vmVersion});
+   }
 
    void SetCode::init()
    {
@@ -89,7 +116,7 @@ namespace SystemService
       auto codeTable       = native.open<CodeTable>();
       auto codeByHashTable = native.open<CodeByHashTable>();
       check(getSender() == service, "sender must match service account");
-      check(vmType == 0 && vmVersion == 0, "unsupported type or version");
+      vmVersion = resolveVersion(vmType, vmVersion);
 
       auto account = codeTable.get(service);
       if (!account)
@@ -147,7 +174,7 @@ namespace SystemService
       auto stagedCode = tables.open<StagedCodeTable>();
 
       check(!code.empty(), "Cannot stage empty code");
-      check(vmType == 0 && vmVersion == 0, "unsupported type or version");
+      vmVersion = resolveVersion(vmType, vmVersion);
 
       Checksum256 codeHash = sha256(code.data(), code.size());
 
@@ -204,14 +231,17 @@ namespace SystemService
       auto native     = Native::tables();
       auto codeTable  = native.open<CodeTable>();
 
-      check(vmType == 0 && vmVersion == 0, "unsupported type or version");
+      check(vmType == 0, "unsupported type or version");
 
       // Verify and remove the staged code record
       auto staged = stagedCode.get(std::tuple(from, id, service));
       check(staged.has_value(), "staged code does not exist");
+      // The version was settled when the code was staged. 0 here accepts it;
+      // anything else must name it.
       check(staged->codeHash == codeHash && staged->vmType == vmType &&
-                staged->vmVersion == vmVersion,
+                (vmVersion == 0 || staged->vmVersion == vmVersion),
             "staged code does not match");
+      vmVersion = staged->vmVersion;
       stagedCode.remove(*staged);
 
       auto account = codeTable.get(service);

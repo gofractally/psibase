@@ -1,22 +1,38 @@
 #include <boost/filesystem/operations.hpp>
-#include <debug_eos_vm/debug_eos_vm.hpp>
 #include <psibase/ActionContext.hpp>
 #include <psibase/LogSocket.hpp>
 #include <psibase/NativeFunctions.hpp>
+#include <psibase/NativeVM.hpp>
 #include <psibase/Prover.hpp>
+#include <psibase/PsizamPolicy.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/api.hpp>
+#include <psibase/finally.hpp>
 #include <psibase/log.hpp>
 #include <psibase/prefix.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/version.hpp>
-#include <psio/finally.hpp>
-#include <psio/to_bin.hpp>
-#include <psio/to_json.hpp>
-#include <psio/view.hpp>
+#include <psio/json.hpp>
+#include <psio/json_value.hpp>
+#include <psio/pssz_view.hpp>
+#include <psizam/debug/debug.hpp>
+#include "VmConsensusReplay.hpp"
 
 #include <stdio.h>
+#include <time.h>
+#ifdef __APPLE__
+#include <crt_externs.h>
+#endif
+
+static char** host_environment()
+{
+#ifdef __APPLE__
+   return *_NSGetEnviron();
+#else
+   return ::environ;
+#endif
+}
 #include <bitset>
 #include <chrono>
 #include <optional>
@@ -26,12 +42,12 @@
 
 using namespace std::literals;
 
-using eosio::vm::span;
+using std::span;
+namespace dwarf = psizam::debug;
 using psibase::WatchdogManager;
-using psio::convert_to_bin;
 
 struct callbacks;
-using rhf_t = eosio::vm::registered_host_functions<callbacks>;
+using rhf_t = psizam::registered_host_functions<callbacks>;
 
 using cl_flags_t = std::bitset<16>;
 enum cl_flags
@@ -41,33 +57,19 @@ enum cl_flags
 
 void backtrace();
 
-struct vm_options
+struct vm_options : psibase::NativeVMOptions
 {
-   static constexpr bool          enable_simd          = true;
-   static constexpr bool          enable_bulk_memory   = true;
    static constexpr std::uint32_t max_func_local_bytes = 1024 * 1024;
-   static constexpr std::uint32_t max_stack_bytes      = 1024 * 1024;
+   vm_options()
+       : NativeVMOptions(psibase::VMOptions{std::numeric_limits<std::uint32_t>::max(), 65536,
+                                            std::numeric_limits<std::uint32_t>::max(), 1024 * 1024},
+                         psibase::nativeAotCacheFromEnvironment())
+   {
+   }
 };
 
-#ifdef __x86_64__
-template <>
-void eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<callbacks, true>,
-                                    true>::on_unreachable()
-{
-   backtrace();
-   eosio::vm::throw_<wasm_interpreter_exception>("unreachable");
-}
-#endif
-
-using backend_t = eosio::vm::backend<  //
-    rhf_t,
-#ifdef __x86_64__
-    eosio::vm::jit_profile,
-#else
-    eosio::vm::interpreter,
-#endif
-    vm_options,
-    debug_eos_vm::debug_instr_map>;
+using backend_t =
+    psizam::backend<rhf_t, psibase::NativeVM, vm_options, psizam::debug::debug_instr_map>;
 
 inline constexpr int max_backtrace_frames = 512;
 
@@ -214,7 +216,7 @@ struct state
 {
    const char*                              wasm;
    dwarf::info&                             dwarf_info;
-   eosio::vm::wasm_allocator&               wa;
+   psizam::wasm_allocator&                  wa;
    backend_t&                               backend;
    std::vector<std::string>                 args;
    cl_flags_t                               additional_args;
@@ -229,7 +231,7 @@ struct state
 };
 
 template <typename T>
-using wasm_ptr = eosio::vm::argument_proxy<T*>;
+using wasm_ptr = psizam::argument_proxy<T*>;
 
 struct test_chain;
 
@@ -253,6 +255,7 @@ struct NullSocket : psibase::Socket
 
 struct test_chain
 {
+   psibase::vm_consensus_replay::Capture vmReplayCapture;
    ::state&                                 state;
    std::set<test_chain_ref*>                refs;
    psibase::SharedDatabase                  db;
@@ -298,11 +301,11 @@ struct test_chain
 
    test_chain(::state&                         state,
               const std::filesystem::path&     path,
-              const triedent::database_config& config,
-              triedent::open_mode              mode)
+              const psibase::storage::database_config& config,
+              psibase::storage::open_mode              mode)
        : test_chain{state, {path, config, mode}}
    {
-      if (mode != triedent::open_mode::read_only)
+      if (mode != psibase::storage::open_mode::read_only)
       {
          sys->sockets->set(*writer, psibase::SocketRow::producer_multicast,
                            std::make_shared<NullSocket>());
@@ -367,6 +370,7 @@ struct test_chain
       nativeFunctionsTransactionContext.reset();
       altBlockContext.reset();
 
+      vmReplayCapture.begin(db, head, name);
       blockContext =
           std::make_unique<psibase::BlockContext>(*sys, revisionAtBlockStart, writer, true);
 
@@ -389,6 +393,7 @@ struct test_chain
          nativeFunctionsActionContext.reset();
          nativeFunctionsTransactionContext.reset();
          auto [revision, blockId] = blockContext->writeRevision(NullProver{}, psibase::Claim{});
+         vmReplayCapture.finish(db, revision, blockContext->current);
          head                     = revision;
          db.setHead(*writer, revision);
          db.removeRevisions(*writer, blockId);  // temp rule: head is now irreversible
@@ -604,7 +609,7 @@ struct HttpSocket : psibase::AutoCloseSocket
          constexpr char defaultMessage[] = "service did not send a response";
          reply.body = std::vector(&defaultMessage[0], defaultMessage + sizeof(defaultMessage) - 1);
       }
-      sendImpl(psio::to_frac(reply));
+      sendImpl(psio::to_pssz(reply));
    }
    void send(psibase::Writer&, std::span<const char> data, std::uint32_t flags) override
    {
@@ -612,7 +617,9 @@ struct HttpSocket : psibase::AutoCloseSocket
          psibase::abortMessage("Invalid flags for HttpSocket: " + std::to_string(flags));
       if (!response.empty())
          return;
-      auto reply  = psio::view<const psibase::HttpReply>{data};
+      psibase::check(psio::validate_pssz<psibase::HttpReply>(data).ok(),
+                     "HttpReply has invalid format");
+      auto reply  = psio::pssz_view<psibase::HttpReply>{data};
       auto status = reply.status().unpack();
       auto code   = static_cast<std::uint16_t>(status);
       psibase::check(code >= 100 && code <= 599,
@@ -631,7 +638,7 @@ struct HttpSocket : psibase::AutoCloseSocket
    }
    void logResponse()
    {
-      auto view    = psio::view<const psibase::HttpReply>(psio::prevalidated{response});
+      auto view    = psio::pssz_view<psibase::HttpReply>(response);
       auto endTime = std::chrono::steady_clock::now();
 
       BOOST_LOG_SCOPED_LOGGER_TAG(chain->logger, "Trace", std::move(trace));
@@ -693,7 +700,7 @@ struct callbacks
    void check_bounds(void* data, size_t size)
    {
       volatile auto check = *((const char*)data + size - 1);
-      eosio::vm::ignore_unused_variable_warning(check);
+      psizam::ignore_unused_variable_warning(check);
    }
 
    std::string span_str(span<const char> str) { return {str.data(), str.size()}; }
@@ -759,7 +766,8 @@ struct callbacks
    int32_t wasi_environ_sizes_get(wasm_ptr<uint32_t> environc, wasm_ptr<uint32_t> bufsize)
    {
       std::size_t totalSize = 0;
-      char**      p         = environ;
+      char**      environment = host_environment();
+      char**      p           = environment;
       for (; *p; ++p)
       {
          auto size = std::strlen(*p) + 1;
@@ -767,9 +775,9 @@ struct callbacks
             return wasi_errno_overflow;
          totalSize += size;
       }
-      if (totalSize > 0xffffffffu || p - environ > 0xffffffffu)
+      if (totalSize > 0xffffffffu || p - environment > 0xffffffffu)
          return wasi_errno_overflow;
-      *environc = p - environ;
+      *environc = p - environment;
       *bufsize  = totalSize;
       return 0;
    }
@@ -779,12 +787,12 @@ struct callbacks
       auto pages = state.backend.get_context().current_linear_memory();
       if (pages < 0)
          return wasi_errno_fault;
-      std::size_t end = static_cast<std::size_t>(pages) * eosio::vm::page_size;
+      std::size_t end = static_cast<std::size_t>(pages) * psizam::page_size;
       if (env > end || buf > end)
          return wasi_errno_fault;
       char* memory = state.backend.get_context().linear_memory();
 
-      for (char** p = ::environ; *p; ++p)
+      for (char** p = host_environment(); *p; ++p)
       {
          auto size = std::strlen(*p) + 1;
          if (end - buf < size || end - env < 4)
@@ -807,6 +815,25 @@ struct callbacks
       else if (id == 1)
       {  // CLOCK_MONOTONIC
          result = std::chrono::steady_clock::now().time_since_epoch();
+      }
+      else if (id == 2 || id == 3)
+      {  // Standard WASI PROCESS_CPUTIME_ID and THREAD_CPUTIME_ID.
+         // Host clock IDs differ between platforms; do not pass WASI IDs
+         // directly to clock_gettime or substitute elapsed time for CPU time.
+         timespec stamp;
+         const auto clock = id == 2 ? CLOCK_PROCESS_CPUTIME_ID : CLOCK_THREAD_CPUTIME_ID;
+         if (::clock_gettime(clock, &stamp) != 0)
+            return wasi_errno_inval;
+         constexpr uint64_t nanos_per_second = 1'000'000'000;
+         if (stamp.tv_sec < 0 || stamp.tv_nsec < 0 ||
+             static_cast<uint64_t>(stamp.tv_nsec) >= nanos_per_second)
+            return wasi_errno_inval;
+         const auto seconds = static_cast<uint64_t>(stamp.tv_sec);
+         const auto nanos   = static_cast<uint64_t>(stamp.tv_nsec);
+         if (seconds > (std::numeric_limits<uint64_t>::max() - nanos) / nanos_per_second)
+            return wasi_errno_overflow;
+         *time = seconds * nanos_per_second + nanos;
+         return wasi_errno_success;
       }
       else
       {
@@ -982,12 +1009,12 @@ struct callbacks
       std::string cPath = "/" + span_str(path);
       if (flags & wasi_lookupflags_symlink_follow)
       {
-         if (::lstat(cPath.c_str(), &stat) < 0)
+         if (::stat(cPath.c_str(), &stat) < 0)
             return wasi_errno_noent;
       }
       else
       {
-         if (::stat(cPath.c_str(), &stat) < 0)
+         if (::lstat(cPath.c_str(), &stat) < 0)
             return wasi_errno_noent;
       }
       auto result = wasi_filestat_t::from_stat(stat);
@@ -1108,6 +1135,9 @@ struct callbacks
          *nwritten += iovs_item.buf_len;
       }
 
+      if ((fd == STDOUT_FILENO || fd == STDERR_FILENO) && fflush(file->f) != 0)
+         return wasi_errno_io;
+
       return 0;
    }
 
@@ -1128,6 +1158,9 @@ struct callbacks
 
          size_t bytes_read = fread(iovs_buf, 1, iovs_item.buf_len, file->f);
          *nread += bytes_read;
+
+         if (bytes_read < iovs_item.buf_len && ferror(file->f))
+            return wasi_errno_io;
 
          if (bytes_read < iovs_item.buf_len)
             return 0;
@@ -1168,6 +1201,15 @@ struct callbacks
       return result;
    }
 
+   // The tester ABI: four sizing hints, as laid out by the guest.
+   struct TesterDatabaseConfig
+   {
+      std::uint64_t hot_bytes;
+      std::uint64_t warm_bytes;
+      std::uint64_t cool_bytes;
+      std::uint64_t cold_bytes;
+   };
+
    uint32_t testerCreateChain(uint64_t hot_bytes,
                               uint64_t warm_bytes,
                               uint64_t cool_bytes,
@@ -1175,15 +1217,15 @@ struct callbacks
    {
       state.chains.push_back(std::make_unique<test_chain>(
           state, std::filesystem::temp_directory_path(),
-          triedent::database_config{hot_bytes, warm_bytes, cool_bytes, cold_bytes},
-          triedent::open_mode::temporary));
+          psibase::storage::database_config{hot_bytes, warm_bytes, cool_bytes, cold_bytes},
+          psibase::storage::open_mode::temporary));
       return state.chains.size() - 1;
    }
 
    uint32_t testerOpenChain(span<const char>                          path,
                             wasi_oflags_t                             oflags,
                             wasi_rights_t                             fs_rights_base,
-                            wasm_ptr<const triedent::database_config> config)
+                            wasm_ptr<const TesterDatabaseConfig> config)
    {
       bool read   = fs_rights_base & wasi_rights_fd_read;
       bool write  = fs_rights_base & wasi_rights_fd_write;
@@ -1193,27 +1235,30 @@ struct callbacks
 
       psibase::check(read, "Chain cannot be opened without read access");
 
-      triedent::open_mode mode;
+      psibase::storage::open_mode mode;
       if (!write)
       {
          if (create || excl || trunc)
             throw std::runtime_error("Unsupported combination of flags for openChain");
-         mode = triedent::open_mode::read_only;
+         mode = psibase::storage::open_mode::read_only;
       }
       else if (!create && !excl && !trunc)
-         mode = triedent::open_mode::read_write;
+         mode = psibase::storage::open_mode::read_write;
       else if (create && !excl && !trunc)
-         mode = triedent::open_mode::create;
+         mode = psibase::storage::open_mode::create;
       else if (create && excl && !trunc)
-         mode = triedent::open_mode::create_new;
+         mode = psibase::storage::open_mode::create_new;
       else if (create && !excl && trunc)
-         mode = triedent::open_mode::trunc;
+         mode = psibase::storage::open_mode::trunc;
       else
          throw std::runtime_error("Unsupported combination of flags for openChain");
 
       state.chains.push_back(std::make_unique<test_chain>(
           state, std::string_view{path.data(), path.size()},
-          create ? *config : triedent::database_config{1 << 27, 1 << 27, 1 << 27, 1 << 27}, mode));
+          create ? psibase::storage::database_config{config->hot_bytes, config->warm_bytes,
+                                                     config->cool_bytes, config->cold_bytes}
+                 : psibase::storage::database_config{1 << 27, 1 << 27, 1 << 27, 1 << 27},
+          mode));
       return state.chains.size() - 1;
    }
 
@@ -1259,8 +1304,7 @@ struct callbacks
                             span<const char> args_packed)
    {
       auto&              chain = assert_chain(chain_index);
-      psio::input_stream s     = {args_packed.data(), args_packed.size()};
-      auto               act   = psio::from_frac<psibase::Action>(args_packed);
+      auto               act   = psio::from_pssz<psibase::Action>(args_packed);
 
       auto dbMode = psibase::DbMode::from(static_cast<psibase::RunMode>(mode));
 
@@ -1310,7 +1354,9 @@ struct callbacks
          trace.error = e.what();
       }
 
-      state.result_value = psio::convert_to_frac(trace);
+      if (trace.error && std::getenv("PSIBASE_TESTER_TRACE_ERRORS"))
+         std::fprintf(stderr, "psitest native trace error: %s\n", trace.error->c_str());
+      state.result_value = psio::to_pssz(trace);
       state.result_key.clear();
       psibase::check(state.result_value.size() <= 0xffff'ffffu, "Transaction trace too large");
       return state.result_value.size();
@@ -1319,8 +1365,7 @@ struct callbacks
    uint32_t testerPushTransaction(uint32_t chain_index, span<const char> args_packed)
    {
       auto&              chain     = assert_chain(chain_index);
-      psio::input_stream s         = {args_packed.data(), args_packed.size()};
-      auto               signedTrx = psio::from_frac<psibase::SignedTransaction>(args_packed);
+      auto               signedTrx = psio::from_pssz<psibase::SignedTransaction>(args_packed);
 
       chain.start_if_needed();
       BOOST_LOG_SCOPED_THREAD_TAG("TimeStamp", chain.getTimestamp());
@@ -1333,11 +1378,18 @@ struct callbacks
          proofBC.start(chain.blockContext->current.header.time);
          psibase::check(!proofBC.isGenesisBlock || signedTrx.proofs.empty(),
                         "Genesis block may not have proofs");
+         psibase::check(signedTrx.proofs.size() == signedTrx.transaction->claims().size(),
+                        "proofs and claims must have same size");
+         // Match node admission: objective consumers may rely on verified claims.
+         // Proof time is deliberately outside objective transaction timing/limits.
+         for (std::size_t i = 0; i < signedTrx.proofs.size(); ++i)
+            proofBC.verifyProof(signedTrx, trace, i, std::nullopt, nullptr, {});
+
 
          if (signedTrx.subjectiveData)
          {
             chain.blockContext->isProducing = false;
-            auto resetProducing = psio::finally{[&] { chain.blockContext->isProducing = true; }};
+            auto resetProducing = psibase::finally{[&] { chain.blockContext->isProducing = true; }};
             chain.blockContext->replayTransaction(std::move(signedTrx), trace);
          }
          else
@@ -1362,7 +1414,9 @@ struct callbacks
       }
 
       // std::cout << eosio::format_json(trace) << "\n";
-      state.result_value = psio::convert_to_frac(trace);
+      if (trace.error && std::getenv("PSIBASE_TESTER_TRACE_ERRORS"))
+         std::fprintf(stderr, "psitest native trace error: %s\n", trace.error->c_str());
+      state.result_value = psio::to_pssz(trace);
       state.result_key.clear();
       psibase::check(state.result_value.size() <= 0xffff'ffffu, "Transaction trace too large");
       return state.result_value.size();
@@ -1373,7 +1427,9 @@ struct callbacks
       auto& chain = assert_chain(chain_index);
 
       auto startTime = std::chrono::steady_clock::now();
-      auto req       = psio::view<const psibase::HttpRequest>(args_packed);
+      psibase::check(psio::validate_pssz<psibase::HttpRequest>(args_packed).ok(),
+                     "HttpRequest has invalid format");
+      auto req       = psio::pssz_view<psibase::HttpRequest>(args_packed);
       BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "RequestMethod", req.method().unpack());
       BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "RequestTarget", req.target().unpack());
       BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "RequestHost", req.host().unpack());
@@ -1406,7 +1462,7 @@ struct callbacks
          auto                        startExecTime = std::chrono::steady_clock::now();
 
          chain.sys->sockets->add(*chain.writer, socket, &tc.ownedSockets);
-         auto setStatus = psio::finally(
+         auto setStatus = psibase::finally(
              [&]
              {
                 auto endExecTime = std::chrono::steady_clock::now();
@@ -1428,7 +1484,7 @@ struct callbacks
             psibase::Action action{
                 .sender  = psibase::AccountNumber(),
                 .service = psibase::proxyServiceNum,
-                .rawData = psio::convert_to_frac(std::tuple(socket->id, req.unpack())),
+                .rawData = psio::to_pssz(std::tuple(socket->id, req.unpack())),
             };
             tc.execServe(action, atrace);
          }
@@ -1498,12 +1554,12 @@ struct callbacks
       state.result_value = std::move(n.result_value);
    }
 
-   uint32_t setResult(const std::optional<psio::input_stream>& o)
+   uint32_t setResult(const std::optional<std::span<const char>>& o)
    {
       state.result_key.clear();
       if (o)
       {
-         state.result_value.assign(o->pos, o->end);
+         state.result_value.assign(o->begin(), o->end());
          return state.result_value.size();
       }
       else
@@ -1522,8 +1578,8 @@ struct callbacks
       }
       else
       {
-         state.result_key.assign(o->key.pos, o->key.end);
-         state.result_value.assign(o->value.pos, o->value.end);
+         state.result_key.assign(o->key.begin(), o->key.end());
+         state.result_value.assign(o->value.begin(), o->value.end());
          return state.result_value.size();
       }
    }
@@ -1572,7 +1628,7 @@ struct callbacks
       }
    }
 
-   uint32_t getResult(eosio::vm::span<char> dest, uint32_t offset)
+   uint32_t getResult(std::span<char> dest, uint32_t offset)
    {
       if (offset < state.result_value.size() && dest.size())
          memcpy(dest.data(), state.result_value.data() + offset,
@@ -1580,7 +1636,7 @@ struct callbacks
       return state.result_value.size();
    }
 
-   uint32_t getKey(eosio::vm::span<char> dest)
+   uint32_t getKey(std::span<char> dest)
    {
       if (!state.result_key.empty())
          memcpy(dest.data(), state.result_key.data(),
@@ -1588,17 +1644,17 @@ struct callbacks
       return state.result_key.size();
    }
 
-   uint32_t kvGet(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
+   uint32_t kvGet(std::uint32_t chain_index, uint32_t db, std::span<const char> key)
    {
       auto& chain = assert_chain(chain_index);
       return setResult(
           chain.database().kvGetRaw(getDbRead(chain, db).db, {key.data(), key.size()}));
    }
 
-   uint32_t kvGreaterEqual(std::uint32_t               chain_index,
-                           uint32_t                    db,
-                           eosio::vm::span<const char> key,
-                           uint32_t                    matchKeySize)
+   uint32_t kvGreaterEqual(std::uint32_t         chain_index,
+                           uint32_t              db,
+                           std::span<const char> key,
+                           uint32_t              matchKeySize)
    {
       psibase::check(matchKeySize <= key.size(), "matchKeySize is larger than key");
       auto& chain = assert_chain(chain_index);
@@ -1606,10 +1662,10 @@ struct callbacks
                                                           {key.data(), key.size()}, matchKeySize));
    }
 
-   uint32_t kvLessThan(std::uint32_t               chain_index,
-                       uint32_t                    db,
-                       eosio::vm::span<const char> key,
-                       uint32_t                    matchKeySize)
+   uint32_t kvLessThan(std::uint32_t         chain_index,
+                       uint32_t              db,
+                       std::span<const char> key,
+                       uint32_t              matchKeySize)
    {
       psibase::check(matchKeySize <= key.size(), "matchKeySize is larger than key");
       auto& chain = assert_chain(chain_index);
@@ -1617,17 +1673,17 @@ struct callbacks
                                                       {key.data(), key.size()}, matchKeySize));
    }
 
-   uint32_t kvMax(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
+   uint32_t kvMax(std::uint32_t chain_index, uint32_t db, std::span<const char> key)
    {
       auto& chain = assert_chain(chain_index);
       return setResult(
           chain.database().kvMaxRaw(getDbRead(chain, db).db, {key.data(), key.size()}));
    }
 
-   void kvPut(std::uint32_t               chain_index,
-              uint32_t                    db,
-              eosio::vm::span<const char> key,
-              eosio::vm::span<const char> value)
+   void kvPut(std::uint32_t         chain_index,
+              uint32_t              db,
+              std::span<const char> key,
+              std::span<const char> value)
    {
       auto& chain = assert_chain(chain_index);
       state.result_key.clear();
@@ -1636,7 +1692,7 @@ struct callbacks
                                 {value.data(), value.size()});
    }
 
-   void kvRemove(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
+   void kvRemove(std::uint32_t chain_index, uint32_t db, std::span<const char> key)
    {
       auto& chain = assert_chain(chain_index);
       state.result_key.clear();
@@ -1742,7 +1798,7 @@ void fill_substitutions(::state& state, const std::map<std::string, std::string>
       std::vector<uint8_t> bcode;
       try
       {
-         acode = eosio::vm::read_wasm(a);
+         acode = psizam::read_wasm(a);
       }
       catch (...)
       {
@@ -1751,7 +1807,7 @@ void fill_substitutions(::state& state, const std::map<std::string, std::string>
       }
       try
       {
-         bcode = eosio::vm::read_wasm(b);
+         bcode = psizam::read_wasm(b);
       }
       catch (...)
       {
@@ -1771,13 +1827,15 @@ static void run(const char*                               wasm,
                 const std::map<std::string, std::string>& substitutions,
                 const cl_flags_t&                         additional_args)
 {
-   eosio::vm::wasm_allocator wa;
-   auto                      code = eosio::vm::read_wasm(wasm);
-   backend_t                 backend(code, nullptr);
-   psio::input_stream        s{(const char*)code.data(), code.size()};
+   psizam::wasm_allocator wa;
+   auto                   code = psizam::read_wasm(wasm);
+   vm_options             options;
+   psibase::validateNativeWasm(code, options);
+   backend_t backend(code, nullptr, options);
+   psizam::debug::binary::input_stream s{(const char*)code.data(), code.size()};
    //
    auto dwarf_info = dwarf::get_info_from_wasm(s);
-   auto reg        = debug_eos_vm::enable_debug(code, backend, dwarf_info, s);
+   auto reg        = psizam::debug::enable_debug(code, backend, dwarf_info, s);
 
    ::state state{wasm, dwarf_info, wa, backend, args, additional_args};
    fill_substitutions(state, substitutions);
@@ -1788,6 +1846,23 @@ static void run(const char*                               wasm,
    state.files.emplace_back();  // reserve space for fd 3: root dir
    backend.set_wasm_allocator(&wa);
 
+   psizam::detail::scoped_trap_observer observe_traps{
+       +[](const char* message, void* data) noexcept
+       {
+          auto& cb = *static_cast<callbacks*>(data);
+          if (std::string_view(message) == "unreachable" &&
+              psizam::detail::active_code_allocator == &cb.state.backend.get_module().allocator)
+          {
+             try
+             {
+                cb.backtrace();
+             }
+             catch (...)
+             {
+             }
+          }
+       },
+       &cb};
    rhf_t::resolve(backend.get_module());
    backend.initialize(&cb);
    backend(cb, "env", "_start");
@@ -1850,6 +1925,9 @@ int main(int argc, char* argv[])
    {
       auto prefix = psibase::installPrefix();
       ::setenv("PSIBASE_DATADIR", (prefix / "share" / "psibase").c_str(), 1);
+      // WASI libc resolves relative paths using PWD. Test launchers can
+      // change cwd without updating that inherited environment variable.
+      ::setenv("PWD", boost::filesystem::current_path().c_str(), 1);
    }
    bool                               show_usage   = false;
    bool                               error        = false;
@@ -1934,8 +2012,8 @@ int main(int argc, char* argv[])
    }
    try
    {
-      psibase::loggers::configure(
-          psio::convert_from_json<psibase::loggers::Config>(psio::convert_to_json(logConfig)));
+      psibase::loggers::configure(psibase::loggers::Config::fromJson(
+          psio::from_ijson<psio::json_value>(psio::to_ijson(logConfig))));
       std::vector<std::string> args{argv + next_arg, argv + argc};
       psibase::ExecutionContext::registerHostFunctions();
       register_callbacks();
@@ -1946,7 +2024,7 @@ int main(int argc, char* argv[])
    {
       std::cerr << "tester wasm asserted: " << e.what() << "\n";
    }
-   catch (eosio::vm::exception& e)
+   catch (psizam::exception& e)
    {
       std::cerr << "vm::exception: " << e.detail() << "\n";
    }

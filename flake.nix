@@ -178,6 +178,39 @@
         # unpinned `cargo install wasm-tools`.
         wasmTools = pkgs.wasm-tools;
 
+        # nixos-26.05 ships binaryen 129. Services are compiled with wide
+        # arithmetic, and wasm-opt cannot read those instructions before 133.
+        binaryen133 = pkgs.stdenv.mkDerivation rec {
+          pname = "binaryen";
+          version = "133";
+
+          src =
+            let
+              base = "https://github.com/WebAssembly/binaryen/releases/download/version_${version}";
+            in
+            if pkgs.stdenv.hostPlatform.isAarch64 then
+              pkgs.fetchurl {
+                url = "${base}/binaryen-version_${version}-aarch64-linux.tar.gz";
+                sha256 = "sha256-icB+pW+vOND77PNsqOwHIXVnFhhfJltWjhM9Qn8pm/g=";
+              }
+            else
+              pkgs.fetchurl {
+                url = "${base}/binaryen-version_${version}-x86_64-linux.tar.gz";
+                sha256 = "sha256-LcnHgT9TdduT2W6tS3giL8w+Jne7uDIpevR5d4KjdIk=";
+              };
+
+          dontBuild = true;
+          dontConfigure = true;
+          sourceRoot = "binaryen-version_${version}";
+
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out
+            cp -r bin include lib $out/
+            runHook postInstall
+          '';
+        };
+
         # nixpkgs gnumake ships only `make`. CMake and some configure scripts look for
         # `gmake` first, so without this a host `gmake` would be picked up via the
         # inherited PATH.
@@ -210,7 +243,7 @@
           cargoComponent
           cargoGenerate
           cargoEdit
-          binaryen
+          binaryen133
           wabt
           wasmPack
           wasmTools

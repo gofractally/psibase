@@ -1,13 +1,116 @@
 #include <psibase/TransactionContext.hpp>
 
 #include <condition_variable>
-#include <eosio/vm/execution_context.hpp>
 #include <mutex>
+#include <optional>
 #include <psibase/ActionContext.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio/finally.hpp>
+#include <psibase/finally.hpp>
+#include <psizam/detail/execution_context.hpp>
 #include <thread>
+#include <chrono>
+#include <cstdio>
+#include <csignal>
+#include <cstdlib>
+#include <map>
+
+// Optional call profile: with PSIBASE_CALL_PROFILE set, the time spent in each
+// service (excluding the services it calls) and in setting up execution
+// contexts is accumulated and printed when the process exits.
+namespace
+{
+   struct CallProfile
+   {
+      struct Entry
+      {
+         std::uint64_t calls = 0, exclusive = 0, contexts = 0, contextTime = 0;
+      };
+      static bool enabled()
+      {
+         static const bool on = std::getenv("PSIBASE_CALL_PROFILE") != nullptr;
+         static const int  hooked = on ? (std::signal(SIGUSR1, [](int) { flush() = 1; }), 0) : 0;
+         (void)hooked;
+         return on;
+      }
+      // Set by SIGUSR1: print and clear the table at the next top-level call.
+      static volatile std::sig_atomic_t& flush()
+      {
+         static volatile std::sig_atomic_t f = 0;
+         return f;
+      }
+      static std::mutex& mutex()
+      {
+         static std::mutex m;
+         return m;
+      }
+      static std::map<psibase::AccountNumber, Entry>& table()
+      {
+         static std::map<psibase::AccountNumber, Entry> t;
+         static const int registered = (std::atexit(&CallProfile::dump), 0);
+         (void)registered;
+         return t;
+      }
+      static std::uint64_t now()
+      {
+         return std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch())
+             .count();
+      }
+      static void dump()
+      {
+         std::uint64_t total = 0, calls = 0, ctx = 0, ctxTime = 0;
+         for (auto& [k, e] : table())
+            total += e.exclusive, calls += e.calls, ctx += e.contexts, ctxTime += e.contextTime;
+         std::fprintf(stderr, "CALLPROFILE total_ms=%.1f calls=%llu contexts=%llu context_ms=%.1f\n",
+                      total / 1e6, (unsigned long long)calls, (unsigned long long)ctx, ctxTime / 1e6);
+         for (auto& [k, e] : table())
+            std::fprintf(stderr,
+                         "CALLPROFILE service=%s calls=%llu exclusive_ms=%.1f contexts=%llu "
+                         "context_ms=%.1f\n",
+                         k.str().c_str(), (unsigned long long)e.calls, e.exclusive / 1e6,
+                         (unsigned long long)e.contexts, e.contextTime / 1e6);
+      }
+      struct Scope
+      {
+         static inline thread_local Scope* current = nullptr;
+         psibase::AccountNumber service;
+         Scope*                 parent = nullptr;
+         std::uint64_t          start = 0, child = 0, ctx = 0;
+         bool                   created = false, on;
+         explicit Scope(psibase::AccountNumber service) : service(service), on(enabled())
+         {
+            if (on)
+            {
+               parent  = current;
+               current = this;
+               start   = now();
+            }
+         }
+         ~Scope()
+         {
+            if (!on)
+               return;
+            auto elapsed = now() - start;
+            current      = parent;
+            if (parent)
+               parent->child += elapsed;
+            std::lock_guard l{mutex()};
+            auto&           e = table()[service];
+            ++e.calls;
+            e.exclusive += elapsed - child - ctx;
+            e.contexts += created;
+            e.contextTime += ctx;
+            if (!parent && flush())
+            {
+               flush() = 0;
+               dump();
+               table().clear();
+            }
+         }
+      };
+   };
+}  // namespace
 
 namespace psibase
 {
@@ -23,26 +126,52 @@ namespace psibase
    struct TransactionContextImpl
    {
       explicit TransactionContextImpl(SystemContext& context)
-          : vmTimedOut(eosio::vm::timed_run_has_timed_out),
-            watchdog(*context.watchdogManager, [this] { asyncTimeout(); })
+          : vmTimedOut(psizam::detail::timed_run_has_timed_out),
+            vmTimedOutBefore(vmTimedOut.load()),
+            watchdog(std::in_place, *context.watchdogManager, [this] { asyncTimeout(); })
       {
+      }
+      ~TransactionContextImpl() noexcept
+      {
+         // Removing the watchdog waits for an in-flight manager callback.
+         // Do this before taking mutex: the callback takes manager -> Tx.
+         watchdog.reset();
+         std::lock_guard guard{mutex};
+         altExecContexts.clear();
+         executionContexts.clear();
+         // The watchdog marks this thread's VM as timed out, and each entry point
+         // restores the mark when it returns. But a timeout can be reported
+         // synchronously (a storage call notices the spent budget) before the
+         // watchdog thread fires: the entry point has then already returned, and
+         // the late callback would leave the mark set for whatever runs next on
+         // this thread. No callback can arrive after the reset above.
+         if (timedOut)
+            vmTimedOut.store(vmTimedOutBefore);
+      }
+      void clearAltExecutionContexts()
+      {
+         std::lock_guard guard{mutex};
+         altExecContexts.clear();
+         if (timedOut)
+            throw TimeoutException{};
       }
       void asyncTimeout();
 
       WasmConfigRow wasmConfig;
 
-      // mutex protects timedOut and insertions in executionContexts
+      // mutex protects timedOut and lookup/insertion/clear in both context maps.
       std::mutex                                mutex    = {};
       bool                                      timedOut = false;
       std::atomic<bool>&                        vmTimedOut;
-      eosio::vm::stack_manager                  altStack;
+      const bool                                vmTimedOutBefore;
+      psizam::detail::stack_manager             altStack;
       std::map<AccountNumber, ExecutionContext> executionContexts = {};
       // alt execution contexts are used when executing in a different
       // run mode. They are always run in a subjective mode, and
       // may be reset when not currently executing.
       bool                                      altMode         = false;
       std::map<AccountNumber, ExecutionContext> altExecContexts = {};
-      Watchdog                                  watchdog;
+      std::optional<Watchdog>                   watchdog;
    };
 
    TransactionContext::TransactionContext(BlockContext&            blockContext,
@@ -71,7 +200,10 @@ namespace psibase
    static void execProcessTransaction(TransactionContext& self);
 
    void TransactionContext::execTransaction()
+   try
    {
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto         storageAccounting = impl->watchdog->accountingScope();
       ScopedAtomic saved{impl->vmTimedOut};
       // Prepare for execution
       auto& db         = blockContext.db;
@@ -83,16 +215,17 @@ namespace psibase
 
       if (blockContext.needGenesisAction)
       {
-         // TODO: full fracpack validate, no unknown, recursive
+         // TODO: full PSSZ validation, no unknown, recursive
          //       might be redundant elsewhere?
          auto trxView     = *signedTransaction.transaction;
          auto actionsView = trxView.actions();
          check(actionsView.size() == 1, "genesis transaction must have exactly 1 action");
-         execGenesisAction(*this, actionsView[0]);
+         execGenesisAction(*this, actionsView[0].unpack());
          blockContext.needGenesisAction = false;
       }
       else
       {
+         CallProfile::Scope profile{AccountNumber{"transact"}};
          execProcessTransaction(*this);
       }
 
@@ -102,6 +235,10 @@ namespace psibase
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
       blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
    }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
+   }
 
    static void execGenesisAction(TransactionContext& self, const Action& action)
    {
@@ -110,7 +247,9 @@ namespace psibase
       try
       {
          auto& db   = self.blockContext.db;
-         auto  data = psio::from_frac_strict<GenesisActionData>(action.rawData);
+         check(psio::validate_strict<GenesisActionData>(psio::pssz{}, action.rawData).ok(),
+               "invalid genesis action data");
+         auto data = psio::from_pssz<GenesisActionData>(psio::trusted{action.rawData});
          for (auto& service : data.services)
          {
             check(service.service.value, "account 0 is reserved");
@@ -127,6 +266,11 @@ namespace psibase
             }
             setCode(db, service.service, service.vmType, service.vmVersion,
                     {service.code.data(), service.code.size()});
+            if (service.vmType == 0)
+               self.blockContext.systemContext.wasmCache.compileAhead(
+                   sha256(service.code.data(), service.code.size()),
+                   {reinterpret_cast<const char*>(service.code.data()), service.code.size()},
+                   self.vmOptions(), service.vmVersion);
          }
       }
       catch (const std::exception& e)
@@ -153,7 +297,7 @@ namespace psibase
       Action action{
           .sender  = AccountNumber(),
           .service = transactionServiceNum,
-          .rawData = psio::convert_to_frac(args),
+          .rawData = psio::to_pssz(args),
       };
       auto& atrace  = self.transactionTrace.actionTraces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
@@ -172,20 +316,30 @@ namespace psibase
    }
 
    void TransactionContext::execVerifyProof(size_t i)
+   try
    {
-      // TODO: fracpack validation, allowing new fields in inner transaction. Might be redundant elsewhere?
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto storageAccounting = impl->watchdog->accountingScope();
+      // TODO: PSSZ validation, allowing new fields in inner transaction. Might be redundant elsewhere?
       auto trxView    = *signedTransaction.transaction;
       auto claimsView = trxView.claims();
       check(signedTransaction.proofs.size() == claimsView.size(),
             "proofs and claims must have same size");
       auto id = sha256(signedTransaction.transaction.data(), signedTransaction.transaction.size());
-      execVerifyProof(id, claimsView[i], signedTransaction.proofs[i]);
+      execVerifyProof(id, claimsView[i].unpack(), signedTransaction.proofs[i]);
+   }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
    }
 
    void TransactionContext::execVerifyProof(const Checksum256& id,
                                             Claim              claim,
                                             std::vector<char>  proof)
+   try
    {
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto         storageAccounting = impl->watchdog->accountingScope();
       ScopedAtomic saved{impl->vmTimedOut};
       auto&        db  = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
@@ -203,7 +357,7 @@ namespace psibase
           .sender  = {},
           .service = data.claim.service,
           .method  = MethodNumber{"verifySys"},
-          .rawData = psio::convert_to_frac(data),
+          .rawData = psio::to_pssz(data),
       };
       auto& atrace     = transactionTrace.actionTraces.emplace_back();
       atrace.action    = action;
@@ -220,11 +374,18 @@ namespace psibase
          throw;
       }
    }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
+   }
 
    void TransactionContext::execNonTrxAction(uint64_t      callerFlags,
                                              const Action& action,
                                              ActionTrace&  atrace)
+   try
    {
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto         storageAccounting = impl->watchdog->accountingScope();
       ScopedAtomic saved{impl->vmTimedOut};
       auto&        db      = blockContext.db;
       config               = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
@@ -238,7 +399,15 @@ namespace psibase
       ActionContext ac = {*this, action, atrace};
       try
       {
-         auto& ec = getExecutionContext(action.service);
+         CallProfile::Scope profile{action.service};
+         auto               before = impl->executionContexts.size() + impl->altExecContexts.size();
+         auto               t0     = profile.on ? CallProfile::now() : 0;
+         auto&              ec     = getExecutionContext(action.service);
+         if (profile.on)
+         {
+            profile.ctx     = CallProfile::now() - t0;
+            profile.created = impl->executionContexts.size() + impl->altExecContexts.size() != before;
+         }
          ec.execCalled(callerFlags, ac);
       }
       catch (std::exception& e)
@@ -248,16 +417,31 @@ namespace psibase
          throw;
       }
    }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
+   }
 
    void TransactionContext::execCalledAction(uint64_t      callerFlags,
                                              const Action& action,
                                              ActionTrace&  atrace)
+   try
    {
-      atrace.action    = action;
-      ActionContext ac = {*this, action, atrace};
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto storageAccounting = impl->watchdog->accountingScope();
+      atrace.action          = action;
+      ActionContext ac       = {*this, action, atrace};
       try
       {
-         auto& ec = getExecutionContext(action.service);
+         CallProfile::Scope profile{action.service};
+         auto               before = impl->executionContexts.size() + impl->altExecContexts.size();
+         auto               t0     = profile.on ? CallProfile::now() : 0;
+         auto&              ec     = getExecutionContext(action.service);
+         if (profile.on)
+         {
+            profile.ctx     = CallProfile::now() - t0;
+            profile.created = impl->executionContexts.size() + impl->altExecContexts.size() != before;
+         }
          ec.execCalled(callerFlags, ac);
       }
       catch (std::exception& e)
@@ -266,12 +450,19 @@ namespace psibase
          throw;
       }
    }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
+   }
 
    void TransactionContext::execCalledAction(uint64_t      callerFlags,
                                              const Action& action,
                                              ActionTrace&  atrace,
                                              CallFlags     flags)
+   try
    {
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto storageAccounting = impl->watchdog->accountingScope();
       if (flags == CallFlags::none)
       {
          execCalledAction(callerFlags, action, atrace);
@@ -287,7 +478,7 @@ namespace psibase
             impl->altMode       = true;
             dbMode.isSync       = flags == CallFlags::runModeCallback;
             dbMode.isSubjective = true;
-            return psio::finally{[this]
+            return psibase::finally{[this]
                                  {
                                     impl->altMode       = false;
                                     dbMode.isSync       = true;
@@ -315,7 +506,7 @@ namespace psibase
                {
                   // These can be cleared safely, because none of them
                   // are currently running.
-                  impl->altExecContexts.clear();
+                  impl->clearAltExecutionContexts();
                }
             }
             auto& subjective = signedTransaction.subjectiveData;
@@ -325,10 +516,17 @@ namespace psibase
          importedHandles.clear();
       }
    }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
+   }
 
    // TODO: different wasmConfig, controlled by config file
    void TransactionContext::execServe(const Action& action, ActionTrace& atrace)
+   try
    {
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto         storageAccounting = impl->watchdog->accountingScope();
       ScopedAtomic saved{impl->vmTimedOut};
       auto&        db  = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
@@ -351,11 +549,18 @@ namespace psibase
          throw;
       }
    }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
+   }
 
    void TransactionContext::execExport(std::string_view fn,
                                        const Action&    action,
                                        ActionTrace&     atrace)
+   try
    {
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto         storageAccounting = impl->watchdog->accountingScope();
       ScopedAtomic saved{impl->vmTimedOut};
       auto&        db  = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
@@ -378,14 +583,26 @@ namespace psibase
          throw;
       }
    }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
+   }
 
    ExecutionContext& TransactionContext::getExecutionContext(AccountNumber service)
    {
       auto& executionContexts = impl->altMode ? impl->altExecContexts : impl->executionContexts;
-      auto  it                = executionContexts.find(service);
-      if (it != executionContexts.end())
-         return it->second;
-      impl->watchdog.pause();
+      {
+         std::lock_guard guard{impl->mutex};
+         if (impl->timedOut)
+            throw TimeoutException{};
+         auto it = executionContexts.find(service);
+         if (it != executionContexts.end())
+            return it->second;
+      }
+      // Creating a context is billed like any other work, except for
+      // compiling the service: the context pauses the budget around that
+      // itself (BillingPause). Pausing here cost two thread CPU clock reads
+      // for every service a transaction calls, compiled or not.
       check(impl->executionContexts.size() < blockContext.systemContext.executionMemories.size(),
             "exceeded maximum number of running services");
       if (impl->executionContexts.size() + impl->altExecContexts.size() >=
@@ -402,7 +619,7 @@ namespace psibase
              // If there are no alt contexts, clearing them won't help.
              !impl->altExecContexts.empty())
          {
-            impl->altExecContexts.clear();
+            impl->clearAltExecutionContexts();
          }
          else
          {
@@ -422,7 +639,6 @@ namespace psibase
          throw TimeoutException{};
       auto& result = executionContexts.insert({service, std::move(execContext)}).first->second;
       guard.unlock();
-      impl->watchdog.resume();
       return result;
    }
 
@@ -433,16 +649,32 @@ namespace psibase
       vmTimedOut = true;
       for (auto& [_, ec] : executionContexts)
          ec.asyncTimeout();
+      for (auto& [_, ec] : altExecContexts)
+         ec.asyncTimeout();
+   }
+
+   TransactionContext::BillingPause::BillingPause(TransactionContext& context) : context(context)
+   {
+      context.impl->watchdog->pause();
+   }
+   TransactionContext::BillingPause::~BillingPause()
+   {
+      context.impl->watchdog->resume();
    }
 
    std::chrono::nanoseconds TransactionContext::getBillableTime()
    {
-      return impl->watchdog.elapsed();
+      return impl->watchdog->elapsed();
    }
 
-   void TransactionContext::setWatchdog(CpuClock::duration watchdogLimit)
+   const VMOptions& TransactionContext::vmOptions() const
    {
-      impl->watchdog.setLimit(watchdogLimit);
+      return impl->wasmConfig.vmOptions;
+   }
+
+   void TransactionContext::setWatchdog(RunClock::duration watchdogLimit)
+   {
+      impl->watchdog->setLimit(watchdogLimit);
    }  // TransactionContext::setWatchdog
 
    const WasmConfigRow& TransactionContext::getWasmConfig() const
@@ -450,7 +682,7 @@ namespace psibase
       return impl->wasmConfig;
    }
 
-   eosio::vm::stack_manager& TransactionContext::getAltStack()
+   psizam::detail::stack_manager& TransactionContext::getAltStack()
    {
       return impl->altStack;
    }
