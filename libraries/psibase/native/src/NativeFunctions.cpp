@@ -222,6 +222,10 @@ namespace psibase
                "WasmConfigRow has incorrect key");
          // Reject an unusable execution policy while the privileged write can
          // still fail, rather than accepting a row that prevents its repair.
+         // No member above the lowest absolute limit of any supported
+         // engine (vmOptionCeilings): above it, nodes on different engines
+         // would not accept the same code.
+         checkVMOptionCeilings(row.vmOptions);
          static_cast<void>(NativeVMOptions{row.vmOptions});
       }
 

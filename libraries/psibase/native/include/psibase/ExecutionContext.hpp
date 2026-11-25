@@ -29,10 +29,20 @@ namespace psibase
       std::uint64_t compiled  = 0;  ///< modules compiled from wasm
       std::uint64_t loaded    = 0;  ///< modules taken from the artifact store
       std::uint64_t discarded = 0;  ///< stored artifacts that failed verification
+      /// Of `compiled` and of `loaded`, the modules that do not fit a slot of
+      /// the engine's instance pool and were taken by the engine without one
+      /// (wasmtime; gofractally/psibase#2272).
+      std::uint64_t compiledPoolless = 0;
+      std::uint64_t loadedPoolless   = 0;
    };
 
    class NativeAotCache;
    struct WasmCacheImpl;
+   namespace vm
+   {
+      struct Cache;
+      struct Engine;
+   }  // namespace vm
    struct WasmCache
    {
       std::shared_ptr<WasmCacheImpl> impl;
@@ -43,6 +53,8 @@ namespace psibase
       WasmCache(uint32_t cacheSize, const std::filesystem::path& nativeArtifactPath = {});
       /// Compiled modules are kept between runs in `artifacts`.
       WasmCache(uint32_t cacheSize, std::shared_ptr<NativeAotCache> artifacts);
+      /// Tests only: the node's rule over an engine cache the caller made.
+      WasmCache(const vm::Engine& engine, std::shared_ptr<vm::Cache> cache);
       WasmCache(const WasmCache&);
       WasmCache(WasmCache&&);
       ~WasmCache();
@@ -111,9 +123,10 @@ namespace psibase
       /// For a block producer about to need this code in a transaction from
       /// its queue: true if the transaction must wait for a later block
       /// because the module is not compiled. A compile is then in flight
-      /// (started here if none was). False if the module is there, or if a
-      /// compile started here has ended without leaving one: the compiler
-      /// refuses the code, which whatever executes it reports.
+      /// (started here if none was). False if the module is there, or if
+      /// the engine reports that a compile of it ended without one
+      /// (vm::Cache::refused): the compiler refuses the code, which whatever
+      /// executes it reports.
       bool mustDefer(const Checksum256&                           hash,
                      const std::function<std::span<const char>()>& code,
                      const VMOptions&                             options,

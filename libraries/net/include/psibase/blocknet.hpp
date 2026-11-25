@@ -816,6 +816,25 @@ namespace psibase::net
          }
       }
 
+      // Called where this node stops producing (not where it only abandons
+      // a block and opens the next one). What was deferred is forgotten: it
+      // is only ever drained while this node produces, so anything left
+      // would be offered when the node next leads, possibly much later, and
+      // a transaction another producer included meanwhile would then fail
+      // here as a duplicate. Nothing is reported for a transaction dropped
+      // here: it was never applied and never failed. It is still pending in
+      // the transaction service and with the producers it was forwarded
+      // to. This node's queue offers it again if the block it was taken in
+      // was abandoned (the queue position is part of that block's state);
+      // if that block was produced, the queue has moved past it and it is
+      // for the other producers to include, or it expires.
+      void drop_deferred_transactions()
+      {
+         _deferred_transactions.clear();
+         _retry_transactions.clear();
+         _deferred_ids.clear();
+      }
+
       // Offers the deferred transactions again: when a block opens, and
       // when the compiles this node was waiting for have finished
       // (WasmCache::onCompilesFinished), so that a deferral costs the time
@@ -975,6 +994,7 @@ namespace psibase::net
          // current block and try to hand off leadership before
          // shutting down.
          stop_leader();
+         drop_deferred_transactions();
          _state = producer_state::shutdown;
       }
 

@@ -800,6 +800,15 @@ void RTransact::onTrx(const Checksum256& id, psio::pssz_view<TransactionTrace> t
             table.put(
                 TxSuccessRecord{.id = id, .blockNum = blockNum, .trace = reducedTrace(trace)});
       }
+      else if (Transact::Tables{Transact::service}.open<IncludedTrxTable>().get(
+                   std::tuple(row->expiration, id)))
+      {
+         // The transaction is in the chain: this was a second attempt to
+         // apply it (a producer offering a transaction it had kept, after
+         // another producer included it), and it failed as a duplicate.
+         // That is not the transaction failing, and nothing is reported.
+         return;
+      }
       else
       {
          PSIBASE_SUBJECTIVE_TX

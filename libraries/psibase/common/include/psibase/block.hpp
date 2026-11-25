@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+#include <bit>
 #include <psibase/AccountNumber.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/check.hpp>
@@ -151,39 +153,124 @@ namespace psibase
       PSIO_REFLECT(BlockHeaderAuthAccount, codeNum, codeHash, vmType, vmVersion);
    };
 
-   // The existing eos-vm implementation limits are:
-   // - branch offsets, and stack offsets must fit in a signed 32-bit int
-   // - The total compiled module size must be < 1 GB (note that this
-   //   implies that 32-bit branches are okay.) The maximum amplification
-   //   factor is currently 79, if we round up to 128, that means that
-   //   wasms up to 8 MB are safe, which is coincidentally the db maxValueSize.
+   // The chain's limits on service code. Every limit that decides whether a
+   // module is accepted is a member here: admission (admitNativeWasm) enforces
+   // each one, the same on every engine, and no engine applies a tighter one
+   // of its own. A configuration row is refused if a member exceeds its hard
+   // ceiling, the lowest absolute limit of any supported engine for that
+   // member: the table is vmOptionCeilings in PsizamPolicy.hpp.
    //
+   // The names are the option names of psizam's parser where it has the
+   // option (it reads them from this struct by name), and follow that style
+   // where it has none. All members are 32-bit; a count limit is the largest
+   // count accepted.
+   //
+   // The record is extensible (no definitionWillNotChange): limits will be
+   // added, and the temporary ones removed. It has no variable-size member,
+   // so it needs no maxDynamicData.
    struct VMOptions
    {
-      // This is a safe value that is larger than any reasonable stack size
-      static constexpr std::uint32_t max_func_local_bytes = 128 * 1024 * 1024;
       static constexpr bool          enable_simd          = true;
       static constexpr bool          enable_bulk_memory   = true;
       static constexpr std::uint32_t stack_usage_for_call = 4096;
 
+      // --- Execution ---
+      // Bytes of mutable globals (i32/f32 4, i64/f64 8, v128 16, references 8)
       std::uint32_t max_mutable_global_bytes = 1024;
-      std::uint32_t max_pages                = 512;  // 32 MiB
-      std::uint32_t max_table_elements       = 8192;
-      // This is the total across all modules
+      // Linear memory, initial and grown, in 64 KiB pages
+      std::uint32_t max_pages = 512;  // 32 MiB
+      // Table elements, initial and grown
+      std::uint32_t max_table_elements = 8192;
+      // Stack budget of a transaction, across all the calls it nests. A
+      // call takes the function's stack cost from it: the bytes that
+      // max_func_local_bytes limits, plus 16. Not an acceptance limit: a
+      // function that costs more than is left traps when it is called.
       std::uint32_t max_stack_bytes = 1024 * 1024;
+
+      // --- The module ---
+      std::uint32_t max_module_bytes = 8 * 1024 * 1024;
+      // Entries per section
+      std::uint32_t max_type_section_elements     = 4096;
+      std::uint32_t max_import_section_elements   = 256;
+      std::uint32_t max_function_section_elements = 20000;
+      std::uint32_t max_table_section_elements    = 1;
+      std::uint32_t max_memory_section_elements   = 1;
+      std::uint32_t max_global_section_elements   = 1024;
+      std::uint32_t max_export_section_elements   = 256;
+      std::uint32_t max_element_section_elements  = 256;
+      std::uint32_t max_data_section_elements     = 16384;
+      // Items of one element segment; bytes of one data segment
+      std::uint32_t max_element_segment_elements = 65536;
+      std::uint32_t max_data_segment_bytes       = 8 * 1024 * 1024;
+      // Bytes of an import module name, an import or export name, and a
+      // custom section's name
+      std::uint32_t max_symbol_bytes = 1024;
+      // 1 + over imports and exports: 2 + parameters + results for a
+      // function, 1 for anything else
+      std::uint32_t max_type_size = 100000;
+
+      // --- A function ---
+      std::uint32_t max_function_params  = 64;
+      std::uint32_t max_function_results = 16;
+      // Parameters plus declared locals
+      std::uint32_t max_function_locals = 2048;
+      // Bytes of parameters, locals and the deepest operand stack (sizes as
+      // for max_mutable_global_bytes): the function's stack cost less 16.
+      // This is also the bound on values live at once: a value is at least
+      // 4 bytes.
+      std::uint32_t max_func_local_bytes = 65536;
+      // Bytes of a function body, locals declarations included
+      std::uint32_t max_code_bytes = 1024 * 1024;
+      std::uint32_t max_br_table_elements = 4096;
+      // Blocks, loops and ifs open at once, the function itself included
+      std::uint32_t max_nested_structures = 1024;
+      // Parameters of a block, loop or if
+      std::uint32_t max_block_params = 16;
 
       friend auto operator<=>(const VMOptions&, const VMOptions&) = default;
       PSIO_REFLECT(VMOptions,
                    max_mutable_global_bytes,
                    max_pages,
                    max_table_elements,
-                   max_stack_bytes)
+                   max_stack_bytes,
+                   max_module_bytes,
+                   max_type_section_elements,
+                   max_import_section_elements,
+                   max_function_section_elements,
+                   max_table_section_elements,
+                   max_memory_section_elements,
+                   max_global_section_elements,
+                   max_export_section_elements,
+                   max_element_section_elements,
+                   max_data_section_elements,
+                   max_element_segment_elements,
+                   max_data_segment_bytes,
+                   max_symbol_bytes,
+                   max_type_size,
+                   max_function_params,
+                   max_function_results,
+                   max_function_locals,
+                   max_func_local_bytes,
+                   max_code_bytes,
+                   max_br_table_elements,
+                   max_nested_structures,
+                   max_block_params)
    };
+   // Every member is a 32-bit integer and nothing else is stored.
+   inline constexpr std::size_t vmOptionCount = sizeof(VMOptions) / sizeof(std::uint32_t);
+   static_assert(sizeof(VMOptions) == vmOptionCount * sizeof(std::uint32_t));
+   /// Every member set to `value`.
+   constexpr VMOptions uniformVMOptions(std::uint32_t value)
+   {
+      std::array<std::uint32_t, vmOptionCount> values;
+      values.fill(value);
+      return std::bit_cast<VMOptions>(values);
+   }
 
    struct BlockHeaderWasmConfig
    {
       uint32_t    numExecutionMemories = 0;
-      VMOptions   vmOptions            = {0, 0, 0, 0};
+      VMOptions   vmOptions            = uniformVMOptions(0);
       friend bool operator==(const BlockHeaderWasmConfig&, const BlockHeaderWasmConfig&) = default;
       PSIO_REFLECT(BlockHeaderWasmConfig, numExecutionMemories, vmOptions)
    };

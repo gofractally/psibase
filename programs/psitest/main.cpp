@@ -62,10 +62,18 @@ struct vm_options : psibase::NativeVMOptions
 {
    static constexpr std::uint32_t max_func_local_bytes = 1024 * 1024;
    vm_options()
-       : NativeVMOptions(psibase::VMOptions{std::numeric_limits<std::uint32_t>::max(), 65536,
-                                            std::numeric_limits<std::uint32_t>::max(), 1024 * 1024},
-                         psibase::nativeAotCacheFromEnvironment())
+       : NativeVMOptions(testerLimits(), psibase::nativeAotCacheFromEnvironment())
    {
+   }
+   // A test program is not service code: no limit but those of the format.
+   static psibase::VMOptions testerLimits()
+   {
+      auto result = psibase::uniformVMOptions(std::numeric_limits<std::uint32_t>::max());
+      result.max_pages                   = 65536;
+      result.max_stack_bytes             = 1024 * 1024;
+      result.max_table_section_elements  = 1;
+      result.max_memory_section_elements = 1;
+      return result;
    }
 };
 

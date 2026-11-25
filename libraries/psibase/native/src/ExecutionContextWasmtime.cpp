@@ -173,20 +173,45 @@ namespace psibase::vm_wasmtime
          // engine finds them, and checks their signatures, when a module is
          // compiled or loaded.
          wt::module module;
+         // Set if the module belongs to the engine without an instance pool
+         // because it does not fit a pool slot at all (see Compiled).
+         bool       poolless = false;
          // The module loaded into the engine without an instance pool, once
          // an instance of it could not be taken from the pool.
          std::optional<wt::module> unpooled;
       };
+      // A compiled module and the engine it belongs to. wasmtime checks a
+      // module against the instance pool's slot size when the pooled engine
+      // compiles or loads it, so a module that is too large for a slot (its
+      // table, or the instance itself) cannot exist there. Such a module is
+      // compiled on the engine without a pool and always instantiated there:
+      // the pool's slot size is this node's tuning and never decides whether
+      // a service can run (gofractally/psibase#2272).
+      struct Compiled
+      {
+         wt::module module;
+         bool       poolless = false;
+      };
+      static bool exceedsPool(const std::exception& e)
+      {
+         return std::string_view(e.what()).find("pooling allocator") != std::string_view::npos;
+      }
       mutable std::mutex                           mutex;
       std::uint32_t                                cacheSize;
       std::list<Entry>                             entries;
       std::map<Key, std::list<Entry>::iterator>    index;
+      // Code compileAhead could not compile (vm::Cache::refused): recorded
+      // there, removed where a module of it is added.
+      vm::RefusedCode<Key>                         refusedCode;
       // Compiled modules kept between runs. wasmtime executes what it loads
       // from here as it is; the cache returns only what it has verified
       // (NativeAotCache.hpp).
       std::shared_ptr<NativeAotCache>              artifacts;
       std::atomic<std::uint64_t>                   compiled{0};
       std::atomic<std::uint64_t>                   loaded{0};
+      // Of those, the modules that went to the engine without a pool.
+      std::atomic<std::uint64_t>                   compiledPoolless{0};
+      std::atomic<std::uint64_t>                   loadedPoolless{0};
       // Whether the services of this cache run with debugging support. Fixed
       // for the cache's lifetime: its modules belong to that mode's engines.
       const bool                                   debug = vm::serviceDebugging();
@@ -228,7 +253,7 @@ namespace psibase::vm_wasmtime
       // threads that need the same new module both compile it and store the
       // same artifact, and different modules compile side by side.
       template <typename Code>
-      wt::module obtain(const Checksum256&    hash,
+      Compiled obtain(const Checksum256&    hash,
                         const VMOptions&      vmOptions,
                         std::uint8_t          vmVersion,
                         psizam::float_profile profile,
@@ -242,9 +267,24 @@ namespace psibase::vm_wasmtime
             if (auto stored = artifacts->load(key))
                try
                {
-                  auto module = runtimes(debug).pooled(profile).load(std::span(
-                      reinterpret_cast<const std::uint8_t*>(stored->data()), stored->size()));
+                  const std::span artifact(reinterpret_cast<const std::uint8_t*>(stored->data()),
+                                           stored->size());
+                  Compiled        module = [&]
+                  {
+                     try
+                     {
+                        return Compiled{runtimes(debug).pooled(profile).load(artifact)};
+                     }
+                     catch (const std::exception& e)
+                     {
+                        if (!exceedsPool(e))
+                           throw;
+                        return Compiled{runtimes(debug).unpooled(profile).load(artifact), true};
+                     }
+                  }();
                   ++loaded;
+                  if (module.poolless)
+                     ++loadedPoolless;
                   PSIBASE_LOG(loggers::generic::get(), debug)
                       << "Service code " << loggers::to_string(hash) << " (vmVersion "
                       << unsigned(vmVersion) << ") loaded from the compiled-module cache";
@@ -264,8 +304,24 @@ namespace psibase::vm_wasmtime
          if (compileHook)
             compileHook(hash);
          const auto                          admitted = admitNativeWasm(wasm, vmOptions, vmVersion);
-         auto module = runtimes(debug).pooled(profile).compile_metered(wasm, admitted.costs);
+         Compiled result = [&]
+         {
+            try
+            {
+               return Compiled{runtimes(debug).pooled(profile).compile_metered(wasm, admitted.costs)};
+            }
+            catch (const std::exception& e)
+            {
+               if (!exceedsPool(e))
+                  throw;
+               return Compiled{
+                   runtimes(debug).unpooled(profile).compile_metered(wasm, admitted.costs), true};
+            }
+         }();
+         auto& module = result.module;
          ++compiled;
+         if (result.poolless)
+            ++compiledPoolless;
          std::size_t stored = 0;
          if (artifacts)
          {
@@ -278,10 +334,10 @@ namespace psibase::vm_wasmtime
              << "Service code " << loggers::to_string(hash) << " (vmVersion " << unsigned(vmVersion)
              << ") compiled: " << wasm.size() << " bytes of wasm, " << stored
              << " bytes of native code";
-         return module;
+         return result;
       }
 
-      std::optional<wt::module> get(const Checksum256& hash,
+      std::optional<Compiled> get(const Checksum256& hash,
                                   const VMOptions&   vmOptions,
                                   std::uint8_t       vmVersion)
       {
@@ -290,7 +346,7 @@ namespace psibase::vm_wasmtime
          if (it == index.end())
             return std::nullopt;
          entries.splice(entries.end(), entries, it->second);
-         return it->second->module;
+         return Compiled{it->second->module, it->second->poolless};
       }
 
       // The module as the engine without an instance pool holds it.
@@ -334,7 +390,14 @@ namespace psibase::vm_wasmtime
          try
          {
             auto profile = nativeFloatProfile(vmVersion);
-            if (!profile || contains(hash, vmOptions, vmVersion))
+            if (!profile)
+            {
+               // Nothing here compiles it, now or later.
+               std::lock_guard lock{mutex};
+               refusedCode.record(Key{hash, vmOptions, vmVersion});
+               return;
+            }
+            if (contains(hash, vmOptions, vmVersion))
                return;
             add(hash, vmOptions, vmVersion,
                 obtain(hash, vmOptions, vmVersion, *profile,
@@ -350,7 +413,19 @@ namespace psibase::vm_wasmtime
                 << "Service code " << loggers::to_string(hash) << " (vmVersion "
                 << unsigned(vmVersion) << ") was not compiled when it was stored: " << e.what()
                 << ". It stays stored and is compiled again when it is first executed.";
+            // The explicit record a producer's deferral asks for: without
+            // it the code would be deferred until its transaction expired.
+            std::lock_guard lock{mutex};
+            refusedCode.record(Key{hash, vmOptions, vmVersion});
          }
+      }
+
+      bool refused(const Checksum256& hash,
+                   const VMOptions&   vmOptions,
+                   std::uint8_t       vmVersion) const override
+      {
+         std::lock_guard lock{mutex};
+         return refusedCode.contains(Key{hash, vmOptions, vmVersion});
       }
 
       bool contains(const Checksum256& hash,
@@ -363,19 +438,21 @@ namespace psibase::vm_wasmtime
 
       WasmCacheStats stats() const override
       {
-         return {compiled.load(), loaded.load(), artifacts ? artifacts->discarded() : 0};
+         return {compiled.load(), loaded.load(), artifacts ? artifacts->discarded() : 0,
+                 compiledPoolless.load(), loadedPoolless.load()};
       }
 
       void add(const Checksum256& hash,
                const VMOptions&   vmOptions,
                std::uint8_t       vmVersion,
-               const wt::module&  compiled)
+               const Compiled&    compiled)
       {
          std::lock_guard lock{mutex};
          Key             key{hash, vmOptions, vmVersion};
+         refusedCode.erase(key);
          if (index.count(key))
             return;
-         entries.push_back(Entry{key, compiled});
+         entries.push_back(Entry{key, compiled.module, compiled.poolless});
          index[key] = std::prev(entries.end());
          while (entries.size() > cacheSize)
          {
@@ -398,6 +475,8 @@ namespace psibase::vm_wasmtime
       WasmCacheImpl&                                         cache;
       psizam::float_profile floatProfile = psizam::float_profile::strict;
       std::optional<wt::module>                              module;
+      // The module belongs to the engine without an instance pool.
+      bool                                                   poolless = false;
       // Reading the stack counter goes through the store, which is not const.
       mutable std::optional<wt::instance<ExecutionContextImpl>> instance;
       // Guards the interrupter, which another thread fires on timeout.
@@ -485,7 +564,8 @@ namespace psibase::vm_wasmtime
                                   });
             cache.add(code.codeHash, vmOptions, code.vmVersion, *compiled);
          }
-         module = *compiled;
+         module   = compiled->module;
+         poolless = compiled->poolless;
       }
 
       std::pair<CodeRow, DbId> getCode(AccountNumber service)
@@ -518,12 +598,16 @@ namespace psibase::vm_wasmtime
              .max_memory_bytes   = std::uint64_t(vmOptions.max_pages) * 65536,
              .max_table_elements = vmOptions.max_table_elements,
          };
-         try
-         {
-            instance.emplace(runtimes(cache.debug).pooled(floatProfile), *module, *this, limits);
-         }
-         catch (const wt::instantiation_error&)
-         {
+         if (poolless)
+            instance.emplace(runtimes(cache.debug).unpooled(floatProfile), *module, *this, limits);
+         else
+            try
+            {
+               instance.emplace(runtimes(cache.debug).pooled(floatProfile), *module, *this,
+                                limits);
+            }
+            catch (const wt::instantiation_error&)
+            {
 
             // No slot is free, or this module does not fit one. Nothing has
             // run; the engine without a pool creates the same instance, or

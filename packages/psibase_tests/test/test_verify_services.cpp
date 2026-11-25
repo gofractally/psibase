@@ -167,7 +167,7 @@ TEST_CASE("SetCode: code that is not admissible fails the transaction that store
        // An imported memory: services import functions only.
        {wasm({2, 7, 1, 0, 0, 2, 0, 1, 0}), "native WASM permits function imports only"},
        // 513 pages of memory on a chain that allows 512.
-       {wasm({5, 4, 1, 0, 0x81, 0x04}), "native WASM initial resource exceeds chain policy"},
+       {wasm({5, 4, 1, 0, 0x81, 0x04}), "native WASM exceeds max_pages"},
        // An import the node has no host function for: (import "env" "nosuch" (func)).
        {wasm({1,   4,   1, 0x60, 0,   0,   2,   14,  1,   3, 'e',
               'n', 'v', 6, 'n',  'o', 's', 'u', 'c', 'h', 0, 0}),

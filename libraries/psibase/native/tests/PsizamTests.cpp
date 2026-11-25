@@ -1029,7 +1029,7 @@ TEST_CASE("Service code is admitted when its row is written, in every execution 
        // Syntactically valid, against the chain policy: an imported memory,
        // and a memory larger than max_pages (513 pages against 512).
        {wasmModule({2, 7, 1, 0, 0, 2, 0, 1, 0}), "native WASM permits function imports only"},
-       {wasmModule({5, 4, 1, 0, 0x81, 0x04}), "native WASM initial resource exceeds chain policy"},
+       {wasmModule({5, 4, 1, 0, 0x81, 0x04}), "native WASM exceeds max_pages"},
        // Passes the declaration check and fails psizam's validator: a
        // function declared to return an i32 that returns nothing.
        {wasmModule({1, 5, 1, 0x60, 0, 1, 0x7f, 3, 2, 1, 0, 10, 4, 1, 2, 0, 0x0b}), ""},
@@ -1138,10 +1138,15 @@ TEST_CASE("The first execution of stored code finds it compiled")
 
 TEST_CASE("Code the engine's compiler refuses after admission is stored, not a transaction error")
 {
-   // wasmtime caps a function at 50000 locals; the chain policy bounds
-   // locals by bytes and admits this module (gofractally/psibase#2256). Such
-   // a refusal must not decide the transaction: another engine compiles it.
-   // start and called (empty), and a third function with 50001 i32 locals.
+   // A module the chain admits and wasmtime's compiler refuses. With every
+   // limit a chain value below the engines' own (gofractally/psibase#2262)
+   // the known ones are gone; this is one that is left, a defect
+   // (gofractally/psizam#6): a block whose type is the non-null typed
+   // reference (ref func), which psizam's parser reads as funcref and
+   // wasmtime refuses without the function-references proposal. When that
+   // is fixed this test needs another example. Such a refusal must not
+   // decide the transaction: another engine compiles it.
+   // start and called (empty), and a third function with that block.
    const EntryPoints         entry{0, 0};
    std::vector<std::uint8_t> types{3}, declared{3}, exported{2}, bodies{3};
    types.insert(types.end(), entry.types.begin(), entry.types.end());
@@ -1150,7 +1155,7 @@ TEST_CASE("Code the engine's compiler refuses after admission is stored, not a t
    declared.push_back(2);
    exported.insert(exported.end(), entry.exports.begin(), entry.exports.end());
    bodies.insert(bodies.end(), entry.bodies.begin(), entry.bodies.end());
-   bodies.insert(bodies.end(), {6, 1, 0xd1, 0x86, 0x03, 0x7f, 0x0b});
+   bodies.insert(bodies.end(), {8, 0, 0x02, 0x64, 0x70, 0x00, 0x0b, 0x1a, 0x0b});
    auto code = wasmModule({});
    section(code, 1, types);
    section(code, 3, declared);
@@ -1172,7 +1177,7 @@ TEST_CASE("Code the engine's compiler refuses after admission is stored, not a t
       psibase::CodeRow row{.codeNum = account, .codeHash = CodeWriter::row(code).codeHash};
       fixture.block.db.kvPut(row.db, row.key(), row);
       CHECK_THROWS_WITH(fixture.called(writer.transaction, account),
-                        Catch::Matchers::ContainsSubstring("too many locals"));
+                        Catch::Matchers::ContainsSubstring("function references required"));
    }
 }
 
@@ -1905,7 +1910,7 @@ TEST_CASE("Code this node's compiler refuses does not keep a producer deferring"
    declared.push_back(2);
    exported.insert(exported.end(), entry.exports.begin(), entry.exports.end());
    bodies.insert(bodies.end(), entry.bodies.begin(), entry.bodies.end());
-   bodies.insert(bodies.end(), {6, 1, 0xd1, 0x86, 0x03, 0x7f, 0x0b});
+   bodies.insert(bodies.end(), {8, 0, 0x02, 0x64, 0x70, 0x00, 0x0b, 0x1a, 0x0b});
    auto code = wasmModule({});
    section(code, 1, types);
    section(code, 3, declared);
@@ -1923,6 +1928,175 @@ TEST_CASE("Code this node's compiler refuses does not keep a producer deferring"
    CHECK_FALSE(fixture.cache.contains(hash, {}, 0));
    // The compile ended without a module. The transaction is taken, as it
    // is by a producer on an engine that compiles this code.
+   fixture.block.deferral.reset();
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK_FALSE(fixture.block.deferral.has_value());
+   CHECK(writer.stored(psibase::DbId::native, code));
+}
+
+namespace
+{
+   // An engine cache that compiles on threads of its own, as the LLVM AOT
+   // adapter does, reduced to what WasmCache asks of one. A compile it is
+   // given "ends" when the test says how.
+   struct FakeBackgroundCache : psibase::vm::Cache
+   {
+      bool        module    = false;
+      bool        compiling = false;
+      bool        refuses   = false;
+      std::size_t compiles  = 0;
+
+      std::vector<std::span<const char>> span() const override { return {}; }
+      void compileAhead(const psibase::Checksum256&,
+                        std::span<const char>,
+                        const psibase::VMOptions&,
+                        std::uint8_t) override
+      {
+         ++compiles;
+         compiling = true;
+      }
+      bool contains(const psibase::Checksum256&,
+                    const psibase::VMOptions&,
+                    std::uint8_t) const override
+      {
+         return module;
+      }
+      bool refused(const psibase::Checksum256&,
+                   const psibase::VMOptions&,
+                   std::uint8_t) const override
+      {
+         return refuses;
+      }
+      bool compilesInBackground() const override { return true; }
+      bool awaitCompile(const psibase::Checksum256&,
+                        const psibase::VMOptions&,
+                        std::uint8_t,
+                        std::optional<std::chrono::nanoseconds>) override
+      {
+         return !compiling;
+      }
+      std::size_t compilesInFlight() const override { return compiling ? 1 : 0; }
+   };
+}  // namespace
+
+TEST_CASE("A producer's deferral asks the engine whether the compiler refused the code")
+{
+   // WasmCache::mustDefer over an engine that compiles in the background,
+   // which no engine built here does: the outcome of a compile is the
+   // engine's to report (vm::Cache::refused), and nothing is inferred from
+   // a compile having been started and the module being absent.
+   auto                       engine = std::make_shared<FakeBackgroundCache>();
+   psibase::WasmCache         cache{psibase::vm::selected(), engine};
+   const psibase::Checksum256 hash{};
+   const std::vector<char>    wasm{0, 'a', 's', 'm'};
+   std::size_t                read = 0;
+   auto                       code = [&]
+   {
+      ++read;
+      return std::span<const char>(wasm);
+   };
+
+   // The interface's default: an engine that records nothing refuses nothing.
+   struct Plain : psibase::vm::Cache
+   {
+      std::vector<std::span<const char>> span() const override { return {}; }
+      void compileAhead(const psibase::Checksum256&,
+                        std::span<const char>,
+                        const psibase::VMOptions&,
+                        std::uint8_t) override
+      {
+      }
+   };
+   CHECK_FALSE(Plain{}.refused(hash, {}, 0));
+
+   // Absent: a compile is started and the transaction deferred.
+   CHECK(cache.mustDefer(hash, code, {}, 0));
+   CHECK(engine->compiles == 1);
+   // In flight: deferred, and no second compile.
+   CHECK(cache.mustDefer(hash, code, {}, 0));
+   CHECK(engine->compiles == 1);
+   // The compile ended and left a module: taken.
+   engine->compiling = false;
+   engine->module    = true;
+   CHECK_FALSE(cache.mustDefer(hash, code, {}, 0));
+   // The module has been evicted. A compile was started here before and is
+   // over, and there is no module; the engine does not say it refused the
+   // code, so it is compiled again and the transaction deferred.
+   engine->module = false;
+   CHECK(cache.mustDefer(hash, code, {}, 0));
+   CHECK(engine->compiles == 2);
+   // That compile ends without a module and the engine reports the
+   // refusal: the transaction goes on, and no further compile is started.
+   engine->compiling = false;
+   engine->refuses   = true;
+   CHECK_FALSE(cache.mustDefer(hash, code, {}, 0));
+   CHECK_FALSE(cache.mustDefer(hash, code, {}, 0));
+   CHECK(engine->compiles == 2);
+   // The code was read only for the two compiles.
+   CHECK(read == 2);
+   // A backend made since (first use) withdraws the refusal; evicted again,
+   // it defers again.
+   engine->refuses = false;
+   CHECK(cache.mustDefer(hash, code, {}, 0));
+   CHECK(engine->compiles == 3);
+}
+
+TEST_CASE("A producer defers code that was compiled and has since been evicted")
+{
+   if (!isWasmtime())
+      SKIP("observes compiles, which only the wasmtime engine reports");
+   // "A compile this producer started has ended and there is no module"
+   // does not mean the compiler refused the code: the module may have been
+   // compiled and then have left the memory cache and the artifact store.
+   // The producer must then defer again, not compile where it stands. The
+   // engine reports a refusal itself (vm::Cache::refused); this module was
+   // never refused, so nothing says so.
+   CompileGate   gate;
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   auto          release = psibase::finally{[&] { gate.release(); }};
+   gate.attach(fixture.cache);
+   CodeWriter writer{fixture};
+   fixture.block.deferUncompiledCode = true;
+
+   const auto code = largeModule(40, 4, 21);
+   const auto hash = CodeWriter::row(code).codeHash;
+   // Deferred once; the compile this producer started leaves the module.
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   REQUIRE(fixture.block.deferral.has_value());
+   fixture.cache.finishCompiles();
+   REQUIRE(fixture.cache.contains(hash, {}, 0));
+
+   // Evicted: from the store, and from memory by more modules than the
+   // memory cache holds.
+   std::error_code ignored;
+   for (const auto& entry : std::filesystem::recursive_directory_iterator(artifacts.path, ignored))
+      if (entry.is_regular_file(ignored))
+         std::filesystem::remove(entry.path(), ignored);
+   for (int i = 0; i < 8; ++i)
+   {
+      const auto other = largeModule(40, 4, 30 + i);
+      fixture.cache.compileAhead(CodeWriter::row(other).codeHash,
+                                 {reinterpret_cast<const char*>(other.data()), other.size()}, {},
+                                 0);
+   }
+   for (const auto& entry : std::filesystem::recursive_directory_iterator(artifacts.path, ignored))
+      if (entry.is_regular_file(ignored))
+         std::filesystem::remove(entry.path(), ignored);
+   REQUIRE_FALSE(fixture.cache.contains(hash, {}, 0));
+
+   // Offered again: deferred, and compiled on a compile thread.
+   const auto before = gate.count();
+   gate.close();
+   fixture.block.deferral.reset();
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK(fixture.block.deferral.has_value());
+   gate.awaitStarted(before + 1);
+   CHECK_FALSE(gate.compiledHere(before));
+   gate.release();
+   fixture.cache.finishCompiles();
+   CHECK(fixture.cache.contains(hash, {}, 0));
+   CHECK(gate.count() == before + 1);
    fixture.block.deferral.reset();
    CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
    CHECK_FALSE(fixture.block.deferral.has_value());
@@ -2261,3 +2435,5 @@ TEST_CASE("A speculative run's limit measures its execution, not the compiles it
    CHECK(writer.compiled() == 0);
    CHECK(writer.transaction.startedCompileTime == nanoseconds(0));
 }
+
+#include "VmLimitsTests.inc"

@@ -177,8 +177,6 @@ namespace psibase
       // As the LLVM AOT adapter's own queue: beyond this, code waits for
       // its first execution.
       static constexpr std::size_t maxQueuedCompiles = 256;
-      // What mustDefer remembers having started.
-      static constexpr std::size_t maxStarted = 1024;
 
       const vm::Engine*          engine;
       std::shared_ptr<vm::Cache> cache;
@@ -191,8 +189,6 @@ namespace psibase
       std::set<Key>            inFlight;
       std::vector<std::thread> workers;
       bool                     stopping = false;
-      // Compiles mustDefer started, oldest first.
-      std::deque<Key>          started;
       // WasmCache::onCompilesFinished; called and replaced under its mutex.
       std::mutex               finishedMutex;
       std::function<void()>    finished;
@@ -250,7 +246,9 @@ namespace psibase
             try
             {
                const auto& [hash, options, vmVersion] = job.key;
-               // Logs what it cannot compile and does not throw.
+               // Logs what it cannot compile and does not throw. A refusal
+               // is recorded by the engine (vm::Cache::refused) before this
+               // returns, so it is known by the time the key leaves inFlight.
                cache->compileAhead(hash, job.code, options, vmVersion);
             }
             catch (...)
@@ -355,6 +353,10 @@ namespace psibase
       impl = std::make_shared<WasmCacheImpl>(&engine,
                                              engine.makeCache(cacheSize, std::move(artifacts)));
    }
+   WasmCache::WasmCache(const vm::Engine& engine, std::shared_ptr<vm::Cache> cache)
+       : impl{std::make_shared<WasmCacheImpl>(&engine, std::move(cache))}
+   {
+   }
    WasmCache::WasmCache(const WasmCache& src) : impl{src.impl} {}
    WasmCache::WasmCache(WasmCache&& src) : impl{std::move(src.impl)} {}
    WasmCache::~WasmCache() {}
@@ -415,25 +417,30 @@ namespace psibase
                              const VMOptions&                              options,
                              std::uint8_t                                  vmVersion)
    {
-      // The common case: it is there.
+      // The common case: it is there. "There" is what the engine's
+      // contains() says, and on wasmtime that is the memory cache only: a
+      // module that is in the artifact store but not in memory is deferred
+      // here for one block although loading it takes milliseconds. That is
+      // deliberate for the write of a code row (the load is done by the
+      // compile thread started below); do not read "compiled" as "in
+      // memory or stored". At first use the wasmtime adapter looks in the
+      // store itself before it asks, so a restarted producer defers nothing.
       if (impl->cache->contains(hash, options, vmVersion))
          return false;
       const WasmCacheImpl::Key key{hash, options, vmVersion};
       if (impl->compiling(key))
          return true;
-      {
-         // A compile started here for this producer has ended and left no
-         // module: the compiler refuses this code. Waiting for another
-         // compile would never end; the transaction goes on, and the code
-         // fails where it is executed, as on a node that never deferred.
-         std::lock_guard lock{impl->mutex};
-         if (std::ranges::find(impl->started, key) != impl->started.end())
-            return false;
-         impl->started.push_back(key);
-         if (impl->started.size() > WasmCacheImpl::maxStarted)
-            impl->started.pop_front();
-      }
-      // If it arrived in the meantime there is nothing to wait for.
+      // The engine says a compile of this code ended without a module: its
+      // compiler refuses it. Waiting for another compile would never end;
+      // the transaction goes on, and the code fails where it is executed,
+      // as on a node that never deferred. The same question on every
+      // engine, whoever's threads compile; nothing is inferred here from
+      // the module being absent.
+      if (impl->cache->refused(hash, options, vmVersion))
+         return false;
+      // Anything else that is absent is not compiled yet (never compiled,
+      // or compiled and evicted since): start a compile and defer. If it
+      // arrived in the meantime there is nothing to wait for.
       return impl->start(key, code(), std::nullopt) != CompileStart::ready;
    }
 
