@@ -100,8 +100,9 @@ namespace psibase
    ///    serve:              () -> ()
    ///    processTransaction: () -> ()
    ///
-   /// None is required to exist yet (gofractally/psibase#2261): a service
-   /// without one fails when the node tries to call it, as before.
+   /// start and called are required: a module without either is refused
+   /// (gofractally/psibase#2261). serve and processTransaction are optional:
+   /// a service without one fails when the node tries to call it.
    struct NativeEntryPoints
    {
       std::optional<std::uint32_t> start;
@@ -129,7 +130,8 @@ namespace psibase
    /// the version names a float profile, validateNativeWasm, psizam's parser
    /// and validator under NativeVMOptions, and every import is a host
    /// function of NativeHostFunctions.hpp with that function's signature, and
-   /// every entry point it exports has its fixed signature (NativeEntryPoints). It
+   /// it exports start and called, and every entry point it exports has its
+   /// fixed signature (NativeEntryPoints). It
    /// reads nothing but its arguments and that fixed table, so every node
    /// decides alike. It runs when a code row is
    /// written (failure aborts the transaction) and again before an engine

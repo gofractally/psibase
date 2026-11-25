@@ -180,6 +180,16 @@ TEST_CASE("SetCode: code that is not admissible fails the transaction that store
        {wasm({1, 4, 1, 0x60, 0, 0, 3, 2, 1, 0, 7, 10, 1, 6, 'c', 'a', 'l', 'l', 'e', 'd', 0, 0,
               10, 4, 1, 2, 0, 0x0b}),
         "native WASM export called must be a function (i64, i64) -> ()"},
+       // A required entry point is missing. Types 0 (i64) -> () and 1 (i64, i64) -> ();
+       // only (func (export "called") (type 1)), then only (func (export "start") (type 0)),
+       // then a module with neither.
+       {wasm({1, 10, 2, 0x60, 1, 0x7e, 0, 0x60, 2, 0x7e, 0x7e, 0,  3,  2, 1, 1,    7,
+              10, 1, 6, 'c',  'a', 'l', 'l', 'e', 'd', 0, 0,    10, 4, 1, 2, 0, 0x0b}),
+        "native WASM must export start, a function (i64) -> ()"},
+       {wasm({1, 10, 2, 0x60, 1, 0x7e, 0, 0x60, 2, 0x7e, 0x7e, 0, 3,  2, 1, 0, 7,
+              9, 1,  5, 's',  't', 'a', 'r', 't', 0, 0,    10, 4, 1, 2, 0, 0x0b}),
+        "native WASM must export called, a function (i64, i64) -> ()"},
+       {wasm({}), "native WASM must export start, a function (i64) -> ()"},
    };
    auto stored = [&](const std::vector<char>& code)
    {

@@ -348,13 +348,15 @@ namespace psibase
          std::vector<std::uint8_t>                  params;
          std::optional<std::uint32_t> NativeEntryPoints::* index;
          const char*                                signature;
-         // Whether a module without it is refused. None is, yet: making
-         // one required is changing its `false` here.
+         // Whether a module without it is refused (gofractally/psibase#2261).
+         // Every action goes through start and called, so a service must
+         // have both; serve and processTransaction are for the services
+         // that are asked for them.
          bool required;
       };
       static const std::vector<EntryPoint> known = {
-          {"start", {i64}, &NativeEntryPoints::start, "(i64) -> ()", false},
-          {"called", {i64, i64}, &NativeEntryPoints::called, "(i64, i64) -> ()", false},
+          {"start", {i64}, &NativeEntryPoints::start, "(i64) -> ()", true},
+          {"called", {i64, i64}, &NativeEntryPoints::called, "(i64, i64) -> ()", true},
           {"serve", {}, &NativeEntryPoints::serve, "() -> ()", false},
           {"processTransaction", {}, &NativeEntryPoints::processTransaction, "() -> ()", false},
       };

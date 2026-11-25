@@ -934,9 +934,42 @@ namespace
       out.push_back(static_cast<std::uint8_t>(value));
    }
 
+   void section(std::vector<std::uint8_t>&       out,
+                std::uint8_t                     id,
+                const std::vector<std::uint8_t>& body)
+   {
+      out.push_back(id);
+      leb(out, body.size());
+      out.insert(out.end(), body.begin(), body.end());
+   }
+
+   // What a module built by hand needs to be admitted as a service: the two
+   // entry points every service exports, `start` and `called`, with empty
+   // bodies. The caller appends `types` to its type section (they become
+   // types `firstType` and `firstType + 1`) and `bodies` to its code
+   // section, and emits `functions` and `exports` as given if it declares
+   // no other function or export; the two functions are then
+   // `firstFunction` and `firstFunction + 1`.
+   struct EntryPoints
+   {
+      std::vector<std::uint8_t> types{0x60, 1, 0x7e, 0, 0x60, 2, 0x7e, 0x7e, 0};
+      std::vector<std::uint8_t> functions, exports;
+      std::vector<std::uint8_t> bodies{2, 0, 0x0b, 2, 0, 0x0b};
+      EntryPoints(std::uint32_t firstType, std::uint32_t firstFunction)
+      {
+         leb(functions, firstType);
+         leb(functions, firstType + 1);
+         exports = {5, 's', 't', 'a', 'r', 't', 0};
+         leb(exports, firstFunction);
+         exports.insert(exports.end(), {6, 'c', 'a', 'l', 'l', 'e', 'd', 0});
+         leb(exports, firstFunction + 1);
+      }
+   };
+
    // A valid module that takes far longer to compile than to admit:
    // `functions` functions of `steps` arithmetic steps each. `salt` makes
-   // otherwise equal modules different code.
+   // otherwise equal modules different code. It is a service: it also has
+   // the two entry points.
    std::vector<std::uint8_t> largeModule(std::uint32_t functions,
                                          std::uint32_t steps,
                                          std::uint32_t salt)
@@ -950,22 +983,26 @@ namespace
          body.insert(body.end(), {0x20, 0, 0x73});  // local.get 0; i32.xor
       }
       body.push_back(0x0b);
-      std::vector<std::uint8_t> types, code;
-      leb(types, functions);
-      leb(code, functions);
+      const EntryPoints         entry{1, functions};
+      std::vector<std::uint8_t> types{3, 0x60, 1, 0x7f, 1, 0x7f};  // type 0: (i32) -> i32
+      std::vector<std::uint8_t> declared, exported{2}, code;
+      types.insert(types.end(), entry.types.begin(), entry.types.end());
+      leb(declared, functions + 2);
+      leb(code, functions + 2);
       for (std::uint32_t i = 0; i < functions; ++i)
       {
-         types.push_back(0);
+         declared.push_back(0);
          leb(code, body.size());
          code.insert(code.end(), body.begin(), body.end());
       }
-      auto result = wasmModule({1, 6, 1, 0x60, 1, 0x7f, 1, 0x7f});  // (i32) -> i32
-      result.push_back(3);
-      leb(result, types.size());
-      result.insert(result.end(), types.begin(), types.end());
-      result.push_back(10);
-      leb(result, code.size());
-      result.insert(result.end(), code.begin(), code.end());
+      declared.insert(declared.end(), entry.functions.begin(), entry.functions.end());
+      exported.insert(exported.end(), entry.exports.begin(), entry.exports.end());
+      code.insert(code.end(), entry.bodies.begin(), entry.bodies.end());
+      auto result = wasmModule({});
+      section(result, 1, types);
+      section(result, 3, declared);
+      section(result, 7, exported);
+      section(result, 10, code);
       return result;
    }
 
@@ -1095,8 +1132,21 @@ TEST_CASE("Code the engine's compiler refuses after admission is stored, not a t
    // wasmtime caps a function at 50000 locals; the chain policy bounds
    // locals by bytes and admits this module (gofractally/psibase#2256). Such
    // a refusal must not decide the transaction: another engine compiles it.
-   const auto code =
-       wasmModule({1, 4, 1, 0x60, 0, 0, 3, 2, 1, 0, 10, 8, 1, 6, 1, 0xd1, 0x86, 0x03, 0x7f, 0x0b});
+   // start and called (empty), and a third function with 50001 i32 locals.
+   const EntryPoints         entry{0, 0};
+   std::vector<std::uint8_t> types{3}, declared{3}, exported{2}, bodies{3};
+   types.insert(types.end(), entry.types.begin(), entry.types.end());
+   types.insert(types.end(), {0x60, 0, 0});  // type 2: () -> ()
+   declared.insert(declared.end(), entry.functions.begin(), entry.functions.end());
+   declared.push_back(2);
+   exported.insert(exported.end(), entry.exports.begin(), entry.exports.end());
+   bodies.insert(bodies.end(), entry.bodies.begin(), entry.bodies.end());
+   bodies.insert(bodies.end(), {6, 1, 0xd1, 0x86, 0x03, 0x7f, 0x0b});
+   auto code = wasmModule({});
+   section(code, 1, types);
+   section(code, 3, declared);
+   section(code, 7, exported);
+   section(code, 10, bodies);
    CHECK_NOTHROW(psibase::admitNativeWasm(code, {}, 0));
    TempDirectory artifacts;
    NativeService fixture{artifacts.path / "modules"};
@@ -1125,7 +1175,8 @@ namespace
       std::vector<std::uint8_t> params, results;
       std::uint8_t              kind = 0;  // 0 function, 1 table, 2 memory, 3 global
    };
-   // A module that only imports: one function type per function import.
+   // A service that only imports: one function type per function import,
+   // and the two entry points every service must have.
    std::vector<std::uint8_t> importing(const std::vector<Import>& imports)
    {
       std::vector<std::uint8_t> types, section;
@@ -1158,19 +1209,20 @@ namespace
                section.insert(section.end(), {0x7f, 0});  // i32, immutable
          }
       }
+      const EntryPoints         entry{functions, functions};
+      std::vector<std::uint8_t> typeSection, declared{2}, exported{2}, code{2};
+      leb(typeSection, functions + 2);
+      typeSection.insert(typeSection.end(), types.begin(), types.end());
+      typeSection.insert(typeSection.end(), entry.types.begin(), entry.types.end());
+      declared.insert(declared.end(), entry.functions.begin(), entry.functions.end());
+      exported.insert(exported.end(), entry.exports.begin(), entry.exports.end());
+      code.insert(code.end(), entry.bodies.begin(), entry.bodies.end());
       auto result = wasmModule({});
-      if (functions)
-      {
-         std::vector<std::uint8_t> count;
-         leb(count, functions);
-         result.push_back(1);
-         leb(result, count.size() + types.size());
-         result.insert(result.end(), count.begin(), count.end());
-         result.insert(result.end(), types.begin(), types.end());
-      }
-      result.push_back(2);
-      leb(result, section.size());
-      result.insert(result.end(), section.begin(), section.end());
+      ::section(result, 1, typeSection);
+      ::section(result, 2, section);
+      ::section(result, 3, declared);
+      ::section(result, 7, exported);
+      ::section(result, 10, code);
       return result;
    }
    constexpr std::uint8_t i32 = 0x7f, i64 = 0x7e;
@@ -1228,10 +1280,8 @@ TEST_CASE("The host functions a service may import are a fixed table")
    const psibase::AccountNumber account{"vm-imports"};
    psibase::CodeRow row{.codeNum = account, .codeHash = CodeWriter::row(code).codeHash};
    fixture.block.db.kvPut(row.db, row.key(), row);
-   // It has no entry points, so calling it fails, but only once it is linked.
-   CHECK_THROWS_WITH(fixture.called(writer.transaction, account),
-                     !Catch::Matchers::ContainsSubstring("import") &&
-                         !Catch::Matchers::ContainsSubstring("mapping"));
+   // Its entry points do nothing: calling it succeeds, so it was linked.
+   CHECK_NOTHROW(fixture.called(writer.transaction, account));
 }
 
 TEST_CASE("Code that imports what the node does not provide is refused when it is stored")
@@ -1314,13 +1364,6 @@ namespace
    // memory and one global.
    std::vector<std::uint8_t> exporting(const std::vector<Export>& exports, std::uint32_t imported)
    {
-      auto section = [](std::vector<std::uint8_t>& out, std::uint8_t id,
-                        const std::vector<std::uint8_t>& body)
-      {
-         out.push_back(id);
-         leb(out, body.size());
-         out.insert(out.end(), body.begin(), body.end());
-      };
       std::uint32_t functions = 0;
       for (const auto& e : exports)
          functions += e.kind == 0;
@@ -1383,12 +1426,40 @@ TEST_CASE("The entry points a service exports have their fixed signatures")
                   exporting({serve, {"other", {i32}, {i32}}, called, start}, 3), {}, 0)
                   .entryPoints;
       CHECK(found == psibase::NativeEntryPoints{6u, 5u, 3u, std::nullopt});
-      // None of them is required yet, and other exports are the service's own.
+      // start and called are all a service must have; other exports are its own.
       found = psibase::admitNativeWasm(
-                  exporting({{"other", {i64}, {i64}}, {"memory", {}, {}, 2}}, 1), {}, 0)
+                  exporting({{"other", {i64}, {i64}}, called, {"memory", {}, {}, 2}, start}, 1),
+                  {}, 0)
                   .entryPoints;
-      CHECK(found == psibase::NativeEntryPoints{});
+      CHECK(found == psibase::NativeEntryPoints{3u, 2u, std::nullopt, std::nullopt});
    }
+
+   // A module without start, without called, or without either is refused,
+   // by name; serve and processTransaction do not stand in for them.
+   struct Missing
+   {
+      std::string         what;
+      std::vector<Export> exports;
+      std::string         reason;
+   };
+   const std::string       noStart  = "native WASM must export start, a function (i64) -> ()";
+   const std::string       noCalled = "native WASM must export called, a function (i64, i64) -> ()";
+   const std::vector<Missing> missing = {
+       {"no start", {called, serve, processTransaction}, noStart},
+       {"no called", {start, serve, processTransaction}, noCalled},
+       {"neither", {serve, processTransaction, {"other", {i64}, {i64}}}, noStart},
+       {"no export at all", {}, noStart},
+       // The name on something that is not the entry point does not count.
+       {"start under another name", {{"Start", {i64}, {}}, called}, noStart},
+   };
+   for (const auto& [what, exports, reason] : missing)
+   {
+      INFO(what);
+      CHECK_THROWS_WITH(psibase::admitNativeWasm(exporting(exports, 2), {}, 0),
+                        Catch::Matchers::ContainsSubstring(reason));
+   }
+   CHECK_THROWS_WITH(psibase::admitNativeWasm(wasmModule({}), {}, 0),
+                     Catch::Matchers::ContainsSubstring(noStart));
 
    struct Refused
    {
@@ -1455,7 +1526,18 @@ TEST_CASE("The entry points a service exports have their fixed signatures")
          CHECK_THROWS_WITH(writer.put(db, code), Catch::Matchers::ContainsSubstring(reason));
          CHECK_FALSE(writer.stored(db, code));
       }
+      for (const auto& [what, exports, reason] : missing)
+      {
+         INFO(name << ", " << what);
+         const auto code = exporting(exports, 1);
+         CHECK_THROWS_WITH(writer.put(db, code), Catch::Matchers::ContainsSubstring(reason));
+         CHECK_FALSE(writer.stored(db, code));
+      }
       CHECK(writer.compiled() == 0);
+      // Both required ones and neither optional one: admitted.
+      const auto least = exporting({start, called}, 1);
+      CHECK_NOTHROW(writer.put(db, least));
+      CHECK(writer.stored(db, least));
       const auto good = exporting({start, called, serve, processTransaction}, 1);
       CHECK_NOTHROW(writer.put(db, good));
       CHECK(writer.stored(db, good));
