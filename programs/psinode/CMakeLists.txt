@@ -105,6 +105,8 @@ if(Python_Interpreter_FOUND)
     add_psinode_test(test_fetch)
     add_psinode_test(test_websocket)
     add_psinode_test(test_timer)
+    add_psinode_test(test_usage)
+    set_tests_properties(psinode_test_usage PROPERTIES PROCESSORS 4)
 endif()
 
 configure_file(config.in ${ROOT_BINARY_DIR}/share/psibase/config.in COPYONLY)

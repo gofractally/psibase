@@ -693,7 +693,7 @@ void write_om_usage(const std::vector<psibase::UsageMeter::KindTotal>& totals, a
    counter("psinode_usage_sent_messages", "", "Websocket messages sent", &C::messagesOut, false);
    counter("psinode_usage_request_seconds", "seconds", "Wall clock of handling requests",
            &C::requestNs, true);
-   counter("psinode_usage_pushed_transactions", "", "Trial runs posted", &C::trxPushed, false);
+   counter("psinode_usage_pushed_transactions", "", "Trial runs started", &C::trxPushed, false);
    counter("psinode_usage_trial_seconds", "seconds", "Wall clock of trial runs", &C::trialNs,
            true);
    counter("psinode_usage_compile_seconds", "seconds", "Compile time started by trial runs",
