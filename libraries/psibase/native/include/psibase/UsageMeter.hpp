@@ -135,7 +135,10 @@ namespace psibase
       void enforceQuota(const UsageHandle& /*who*/) {}
 
       // Storage. All three must run on the thread that owns `writer`, and
-      // flush() on one thread at a time (psinode has one thread for it).
+      // flush() on one thread at a time. That thread must be one that uses
+      // the database anyway (psinode: the chain thread): the engine has a
+      // fixed number of session slots, one per thread, and metering must
+      // not take one (gofractally/psibase#2273).
       //
       // load: reads the stored records; call once, before use.
       // publishSettings: writes UsageConfigRow for the reporting service.

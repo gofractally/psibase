@@ -702,40 +702,44 @@ void write_om_usage(const std::vector<psibase::UsageMeter::KindTotal>& totals, a
            &C::verifyNs, true);
 }
 
-// Writes the usage counters to the node's storage every interval, on its
-// own thread with its own write session, and once more when the node stops.
+// Writes the usage counters to the node's storage every interval and once
+// more when the node stops.
+//
+// The writing is done on the chain thread, the thread that owns `ctx`,
+// which reads and writes the database already: the storage engine has a
+// fixed number of session slots, one per thread that touches the database,
+// and aborts when they run out (gofractally/psibase#2273), so metering
+// must not bring a thread of its own to the database. The thread here only
+// keeps time; it never touches storage.
 struct UsageFlusher
 {
-   UsageFlusher(psibase::SharedDatabase db, std::shared_ptr<psibase::UsageMeter> meter)
+   UsageFlusher(boost::asio::io_context&             ctx,
+                psibase::SharedDatabase              db,
+                std::shared_ptr<psibase::UsageMeter> meter)
+       : db(std::move(db)), meter(std::move(meter))
    {
-      if (!meter->enabled())
+      if (!this->meter->enabled())
          return;
-      auto interval = std::chrono::seconds(
-          std::max<std::uint64_t>(meter->settings().flushSeconds, 1));
-      worker = std::jthread{
-          [this, db = std::move(db), meter = std::move(meter), interval]() mutable
-          {
-             auto writer = db.createWriter();
-             bool last   = false;
-             while (!last)
-             {
-                {
-                   std::unique_lock l{mutex};
-                   cond.wait_for(l, interval, [this] { return done; });
-                   last = done;
-                }
-                try
-                {
-                   meter->flush(db, *writer);
-                }
-                catch (std::exception& e)
-                {
-                   PSIBASE_LOG(psibase::loggers::generic::get(), warning)
-                       << "Usage counters not written: " << e.what();
-                }
-             }
-          }};
+      auto interval =
+          std::chrono::seconds(std::max<std::uint64_t>(this->meter->settings().flushSeconds, 1));
+      ticker = std::jthread{[this, &ctx, interval]
+                            {
+                               std::unique_lock l{mutex};
+                               while (!cond.wait_for(l, interval, [this] { return done; }))
+                               {
+                                  // One at a time: a busy chain thread is not
+                                  // given a queue of flushes.
+                                  if (!pending.exchange(true))
+                                     boost::asio::post(ctx, [this]
+                                                       {
+                                                          pending = false;
+                                                          flush();
+                                                       });
+                               }
+                            }};
    }
+   // Runs on the thread that ran `ctx`, after it has stopped running it and
+   // before `ctx` is destroyed.
    ~UsageFlusher()
    {
       {
@@ -743,11 +747,31 @@ struct UsageFlusher
          done = true;
       }
       cond.notify_one();
+      if (ticker.joinable())
+         ticker.join();
+      if (meter->enabled())
+         flush();
    }
-   std::condition_variable cond;
-   std::mutex              mutex;
-   bool                    done = false;
-   std::jthread            worker;
+   void flush()
+   {
+      try
+      {
+         auto writer = db.createWriter();
+         meter->flush(db, *writer);
+      }
+      catch (std::exception& e)
+      {
+         PSIBASE_LOG(psibase::loggers::generic::get(), warning)
+             << "Usage counters not written: " << e.what();
+      }
+   }
+   psibase::SharedDatabase              db;
+   std::shared_ptr<psibase::UsageMeter> meter;
+   std::condition_variable              cond;
+   std::mutex                           mutex;
+   bool                                 done = false;
+   std::atomic<bool>                    pending{false};
+   std::jthread                         ticker;
 };
 
 std::int64_t read_as_microseconds(std::istream& is, long clk_tck)
@@ -1410,9 +1434,8 @@ void run(const std::string&              db_path,
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
 
-   // Usage metering: continue from the stored counters, tell the reporting
-   // service how the meter is configured, and write the counters as the
-   // node runs. Destroyed (last flush) after everything that counts.
+   // Usage metering: continue from the stored counters and tell the
+   // reporting service how the meter is configured.
    auto usageMeter = sharedState->usage();
    usageMeter->configure(usage_settings);
    {
@@ -1420,7 +1443,6 @@ void run(const std::string&              db_path,
       usageMeter->load(system->sharedDatabase, *writer);
       usageMeter->publishSettings(system->sharedDatabase, *writer);
    }
-   UsageFlusher usageFlusher{system->sharedDatabase, usageMeter};
 
    PSIBASE_LOG(psibase::loggers::generic::get(), info)
        << "Storage engine=psitri.big sync=" << db_conf.syncName
@@ -1639,6 +1661,11 @@ void run(const std::string&              db_path,
 
    RunQueue                runQueue{sharedState, std::chrono::milliseconds(proof_timeout_ms)};
    boost::asio::io_context chainContext;
+
+   // Usage metering: write the counters as the node runs, on this thread.
+   // Declared after chainContext so that it stops, and writes once more,
+   // before chainContext goes.
+   UsageFlusher usageFlusher{chainContext, system->sharedDatabase, usageMeter};
 
    auto shutdown_sockets = psibase::finally{[&system] { system->sockets->shutdown(); }};
 
