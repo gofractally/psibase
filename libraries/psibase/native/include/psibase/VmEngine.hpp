@@ -11,8 +11,10 @@
 
 #include <psibase/ExecutionContext.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
+#include <deque>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -28,6 +30,27 @@ namespace psibase
 
 namespace psibase::vm
 {
+   // The code an engine's cache has found its compiler to refuse: what
+   // Cache::refused answers from. Bounded, oldest first out. Not
+   // synchronized: used under the cache's own mutex.
+   template <typename Key>
+   struct RefusedCode
+   {
+      static constexpr std::size_t maxKeys = 1024;
+      std::deque<Key>              keys;
+
+      bool contains(const Key& key) const { return std::ranges::find(keys, key) != keys.end(); }
+      void record(const Key& key)
+      {
+         if (contains(key))
+            return;
+         keys.push_back(key);
+         if (keys.size() > maxKeys)
+            keys.pop_front();
+      }
+      void erase(const Key& key) { std::erase(keys, key); }
+   };
+
    // Compiled services, shared by the transactions of one SystemContext.
    struct Cache
    {
@@ -46,6 +69,18 @@ namespace psibase::vm
          return false;
       }
       virtual WasmCacheStats stats() const { return {}; }
+      // Whether a compile of this code that compileAhead ran or started has
+      // ended without a module, and none has been made since: this node's
+      // compiler refuses the code (or its compile threads leave it to the
+      // first execution), so waiting for another compile would never end.
+      // The engine records this where the compile ends; it is never
+      // inferred from the module being absent, which is also true of a
+      // module that was compiled and has since been evicted
+      // (WasmCache::mustDefer).
+      virtual bool refused(const Checksum256&, const VMOptions&, std::uint8_t) const
+      {
+         return false;
+      }
 
       // What WasmCache needs to apply the node's rule for when code is
       // compiled (WasmCache::compileInBackground, gofractally/psibase#2256).

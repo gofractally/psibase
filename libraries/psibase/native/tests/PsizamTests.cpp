@@ -1934,6 +1934,113 @@ TEST_CASE("Code this node's compiler refuses does not keep a producer deferring"
    CHECK(writer.stored(psibase::DbId::native, code));
 }
 
+namespace
+{
+   // An engine cache that compiles on threads of its own, as the LLVM AOT
+   // adapter does, reduced to what WasmCache asks of one. A compile it is
+   // given "ends" when the test says how.
+   struct FakeBackgroundCache : psibase::vm::Cache
+   {
+      bool        module    = false;
+      bool        compiling = false;
+      bool        refuses   = false;
+      std::size_t compiles  = 0;
+
+      std::vector<std::span<const char>> span() const override { return {}; }
+      void compileAhead(const psibase::Checksum256&,
+                        std::span<const char>,
+                        const psibase::VMOptions&,
+                        std::uint8_t) override
+      {
+         ++compiles;
+         compiling = true;
+      }
+      bool contains(const psibase::Checksum256&,
+                    const psibase::VMOptions&,
+                    std::uint8_t) const override
+      {
+         return module;
+      }
+      bool refused(const psibase::Checksum256&,
+                   const psibase::VMOptions&,
+                   std::uint8_t) const override
+      {
+         return refuses;
+      }
+      bool compilesInBackground() const override { return true; }
+      bool awaitCompile(const psibase::Checksum256&,
+                        const psibase::VMOptions&,
+                        std::uint8_t,
+                        std::optional<std::chrono::nanoseconds>) override
+      {
+         return !compiling;
+      }
+      std::size_t compilesInFlight() const override { return compiling ? 1 : 0; }
+   };
+}  // namespace
+
+TEST_CASE("A producer's deferral asks the engine whether the compiler refused the code")
+{
+   // WasmCache::mustDefer over an engine that compiles in the background,
+   // which no engine built here does: the outcome of a compile is the
+   // engine's to report (vm::Cache::refused), and nothing is inferred from
+   // a compile having been started and the module being absent.
+   auto                       engine = std::make_shared<FakeBackgroundCache>();
+   psibase::WasmCache         cache{psibase::vm::selected(), engine};
+   const psibase::Checksum256 hash{};
+   const std::vector<char>    wasm{0, 'a', 's', 'm'};
+   std::size_t                read = 0;
+   auto                       code = [&]
+   {
+      ++read;
+      return std::span<const char>(wasm);
+   };
+
+   // The interface's default: an engine that records nothing refuses nothing.
+   struct Plain : psibase::vm::Cache
+   {
+      std::vector<std::span<const char>> span() const override { return {}; }
+      void compileAhead(const psibase::Checksum256&,
+                        std::span<const char>,
+                        const psibase::VMOptions&,
+                        std::uint8_t) override
+      {
+      }
+   };
+   CHECK_FALSE(Plain{}.refused(hash, {}, 0));
+
+   // Absent: a compile is started and the transaction deferred.
+   CHECK(cache.mustDefer(hash, code, {}, 0));
+   CHECK(engine->compiles == 1);
+   // In flight: deferred, and no second compile.
+   CHECK(cache.mustDefer(hash, code, {}, 0));
+   CHECK(engine->compiles == 1);
+   // The compile ended and left a module: taken.
+   engine->compiling = false;
+   engine->module    = true;
+   CHECK_FALSE(cache.mustDefer(hash, code, {}, 0));
+   // The module has been evicted. A compile was started here before and is
+   // over, and there is no module; the engine does not say it refused the
+   // code, so it is compiled again and the transaction deferred.
+   engine->module = false;
+   CHECK(cache.mustDefer(hash, code, {}, 0));
+   CHECK(engine->compiles == 2);
+   // That compile ends without a module and the engine reports the
+   // refusal: the transaction goes on, and no further compile is started.
+   engine->compiling = false;
+   engine->refuses   = true;
+   CHECK_FALSE(cache.mustDefer(hash, code, {}, 0));
+   CHECK_FALSE(cache.mustDefer(hash, code, {}, 0));
+   CHECK(engine->compiles == 2);
+   // The code was read only for the two compiles.
+   CHECK(read == 2);
+   // A backend made since (first use) withdraws the refusal; evicted again,
+   // it defers again.
+   engine->refuses = false;
+   CHECK(cache.mustDefer(hash, code, {}, 0));
+   CHECK(engine->compiles == 3);
+}
+
 TEST_CASE("A producer defers code that was compiled and has since been evicted")
 {
    if (!isWasmtime())
@@ -1941,7 +2048,9 @@ TEST_CASE("A producer defers code that was compiled and has since been evicted")
    // "A compile this producer started has ended and there is no module"
    // does not mean the compiler refused the code: the module may have been
    // compiled and then have left the memory cache and the artifact store.
-   // The producer must then defer again, not compile where it stands.
+   // The producer must then defer again, not compile where it stands. The
+   // engine reports a refusal itself (vm::Cache::refused); this module was
+   // never refused, so nothing says so.
    CompileGate   gate;
    TempDirectory artifacts;
    NativeService fixture{artifacts.path / "modules"};

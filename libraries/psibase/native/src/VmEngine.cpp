@@ -177,9 +177,6 @@ namespace psibase
       // As the LLVM AOT adapter's own queue: beyond this, code waits for
       // its first execution.
       static constexpr std::size_t maxQueuedCompiles = 256;
-      // How many refusals (and, on an engine with its own compile threads,
-      // started compiles) mustDefer remembers.
-      static constexpr std::size_t maxStarted = 1024;
 
       const vm::Engine*          engine;
       std::shared_ptr<vm::Cache> cache;
@@ -192,17 +189,6 @@ namespace psibase
       std::set<Key>            inFlight;
       std::vector<std::thread> workers;
       bool                     stopping = false;
-      // Code a compile thread here compiled and that left no module: this
-      // node's compiler refuses it. Recorded by the compile thread when the
-      // compile ends, never inferred later from the module being absent (a
-      // module that was compiled and has since left the memory cache and
-      // the artifact store is absent too, and must be compiled again on a
-      // compile thread, not where a producer needs it). Oldest first.
-      std::deque<Key>          refused;
-      // Only for an engine with its own compile threads (LLVM AOT), which
-      // does not tell this class how a compile ended: the compiles
-      // mustDefer started, oldest first. See mustDefer.
-      std::deque<Key>          started;
       // WasmCache::onCompilesFinished; called and replaced under its mutex.
       std::mutex               finishedMutex;
       std::function<void()>    finished;
@@ -260,30 +246,15 @@ namespace psibase
             try
             {
                const auto& [hash, options, vmVersion] = job.key;
-               // Logs what it cannot compile and does not throw.
+               // Logs what it cannot compile and does not throw. A refusal
+               // is recorded by the engine (vm::Cache::refused) before this
+               // returns, so it is known by the time the key leaves inFlight.
                cache->compileAhead(hash, job.code, options, vmVersion);
             }
             catch (...)
             {
             }
-            bool left = false;
-            try
-            {
-               const auto& [hash, options, vmVersion] = job.key;
-               left = cache->contains(hash, options, vmVersion);
-            }
-            catch (...)
-            {
-            }
             lock.lock();
-            if (left)
-               std::erase(refused, job.key);
-            else if (std::ranges::find(refused, job.key) == refused.end())
-            {
-               refused.push_back(job.key);
-               if (refused.size() > maxStarted)
-                  refused.pop_front();
-            }
             inFlight.erase(job.key);
             compileDone.notify_all();
             if (inFlight.empty())
@@ -382,6 +353,10 @@ namespace psibase
       impl = std::make_shared<WasmCacheImpl>(&engine,
                                              engine.makeCache(cacheSize, std::move(artifacts)));
    }
+   WasmCache::WasmCache(const vm::Engine& engine, std::shared_ptr<vm::Cache> cache)
+       : impl{std::make_shared<WasmCacheImpl>(&engine, std::move(cache))}
+   {
+   }
    WasmCache::WasmCache(const WasmCache& src) : impl{src.impl} {}
    WasmCache::WasmCache(WasmCache&& src) : impl{std::move(src.impl)} {}
    WasmCache::~WasmCache() {}
@@ -455,30 +430,14 @@ namespace psibase
       const WasmCacheImpl::Key key{hash, options, vmVersion};
       if (impl->compiling(key))
          return true;
-      const bool engineCompiles = impl->cache->compilesInBackground();
-      {
-         std::lock_guard lock{impl->mutex};
-         // A compile thread here compiled this code and it left no module:
-         // the compiler refuses it. Waiting for another compile would never
-         // end; the transaction goes on, and the code fails where it is
-         // executed, as on a node that never deferred.
-         if (std::ranges::find(impl->refused, key) != impl->refused.end())
-            return false;
-         if (engineCompiles)
-         {
-            // The engine compiles on its own threads and does not report
-            // how a compile ended, so a refusal can only be inferred: a
-            // compile was started for this producer, is over, and there is
-            // no module. The same is true of a module that was compiled and
-            // has since been evicted; on such an engine that one case goes
-            // on to the engine's own first-use path instead of deferring.
-            if (std::ranges::find(impl->started, key) != impl->started.end())
-               return false;
-            impl->started.push_back(key);
-            if (impl->started.size() > WasmCacheImpl::maxStarted)
-               impl->started.pop_front();
-         }
-      }
+      // The engine says a compile of this code ended without a module: its
+      // compiler refuses it. Waiting for another compile would never end;
+      // the transaction goes on, and the code fails where it is executed,
+      // as on a node that never deferred. The same question on every
+      // engine, whoever's threads compile; nothing is inferred here from
+      // the module being absent.
+      if (impl->cache->refused(hash, options, vmVersion))
+         return false;
       // Anything else that is absent is not compiled yet (never compiled,
       // or compiled and evicted since): start a compile and defer. If it
       // arrived in the meantime there is nothing to wait for.

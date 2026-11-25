@@ -181,6 +181,9 @@ namespace psibase::vm_wasmtime
       std::uint32_t                                cacheSize;
       std::list<Entry>                             entries;
       std::map<Key, std::list<Entry>::iterator>    index;
+      // Code compileAhead could not compile (vm::Cache::refused): recorded
+      // there, removed where a module of it is added.
+      vm::RefusedCode<Key>                         refusedCode;
       // Compiled modules kept between runs. wasmtime executes what it loads
       // from here as it is; the cache returns only what it has verified
       // (NativeAotCache.hpp).
@@ -334,7 +337,14 @@ namespace psibase::vm_wasmtime
          try
          {
             auto profile = nativeFloatProfile(vmVersion);
-            if (!profile || contains(hash, vmOptions, vmVersion))
+            if (!profile)
+            {
+               // Nothing here compiles it, now or later.
+               std::lock_guard lock{mutex};
+               refusedCode.record(Key{hash, vmOptions, vmVersion});
+               return;
+            }
+            if (contains(hash, vmOptions, vmVersion))
                return;
             add(hash, vmOptions, vmVersion,
                 obtain(hash, vmOptions, vmVersion, *profile,
@@ -350,7 +360,19 @@ namespace psibase::vm_wasmtime
                 << "Service code " << loggers::to_string(hash) << " (vmVersion "
                 << unsigned(vmVersion) << ") was not compiled when it was stored: " << e.what()
                 << ". It stays stored and is compiled again when it is first executed.";
+            // The explicit record a producer's deferral asks for: without
+            // it the code would be deferred until its transaction expired.
+            std::lock_guard lock{mutex};
+            refusedCode.record(Key{hash, vmOptions, vmVersion});
          }
+      }
+
+      bool refused(const Checksum256& hash,
+                   const VMOptions&   vmOptions,
+                   std::uint8_t       vmVersion) const override
+      {
+         std::lock_guard lock{mutex};
+         return refusedCode.contains(Key{hash, vmOptions, vmVersion});
       }
 
       bool contains(const Checksum256& hash,
@@ -373,6 +395,7 @@ namespace psibase::vm_wasmtime
       {
          std::lock_guard lock{mutex};
          Key             key{hash, vmOptions, vmVersion};
+         refusedCode.erase(key);
          if (index.count(key))
             return;
          entries.push_back(Entry{key, compiled});

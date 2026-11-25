@@ -163,8 +163,22 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
       // A backend is checked out of `backends` while a transaction runs it,
       // so `backends` alone would report popular code as missing.
       std::set<PendingKey> known;
+      // Code a compile thread took and made no backend for: the compiler
+      // threw, or the code carries debug information, which only the first
+      // execution compiles. Recorded by the thread when the job ends, under
+      // `mutex`; removed where a backend of the code is added. This is what
+      // keeps a producer from deferring such code until its transaction
+      // expires (vm::Cache::refused). NOT RUN, as above.
+      vm::RefusedCode<PendingKey> refusedCode;
 #if defined(PSIBASE_VM_LLVM_AOT)
       bool compilesInBackground() const override { return true; }
+      bool refused(const Checksum256& hash,
+                   const VMOptions&   options,
+                   std::uint8_t       vmVersion) const override
+      {
+         std::lock_guard lock{mutex};
+         return refusedCode.contains(PendingKey{hash, options, vmVersion});
+      }
       bool contains(const Checksum256& hash,
                     const VMOptions&   options,
                     std::uint8_t       vmVersion) const override
@@ -239,6 +253,8 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
       {
          std::lock_guard<std::mutex> lock{mutex};
          auto&                       ind = backends.get<ByAge>();
+         if (entry.backend)
+            refusedCode.erase(PendingKey{entry.hash, entry.vmOptions, entry.vmVersion});
          ind.push_back(std::move(entry));
          while (ind.size() > cacheSize)
             ind.pop_front();
@@ -312,6 +328,7 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
          Job job = std::move(jobs.front());
          jobs.pop_front();
          lock.unlock();
+         bool made = false;
          try
          {
             // Code that fails here fails the same way, with its error
@@ -330,12 +347,17 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
                add(std::move(entry));
                std::lock_guard known_lock{mutex};
                known.insert(job.key);
+               made = true;
             }
          }
          catch (...)
          {
          }
          lock.lock();
+         // Before the key leaves `pending`: whoever then finds no compile
+         // in flight finds the outcome.
+         if (!made)
+            refusedCode.record(job.key);
          pending.erase(job.key);
          lock.unlock();
          job.done.set_value();
