@@ -311,6 +311,11 @@ namespace psibase::storage
       std::shared_ptr<Engine::write_session> writer;
       ReaderPool                             readers;
       // One engine reader per thread that has read this database.
+      // Engine sessions on one database: 64 slots. This layer uses at most
+      // maxThreadReaders + the pool's 32 for reads and three for writes
+      // (chain, subjective, compiled modules); the rest is the engine's own
+      // background threads and headroom.
+      static constexpr std::size_t                                         maxThreadReaders = 16;
       std::mutex                                                           threadReadersMutex;
       std::map<std::thread::id, std::shared_ptr<Engine::read_session>>     threadReaders;
       // The cache root's own writer thread (see cache_root), started by the
@@ -392,7 +397,7 @@ namespace psibase::storage
    // one per database the first time it reads and keeps it. Requests come and go
    // (psibase makes a storage session per request); the thread's reader stays.
    // A strand that moves between threads simply uses whichever thread it is on.
-   // The shared pool is only the fallback when the engine has no session slot left.
+   // The shared pool is the fallback once State::maxThreadReaders threads have one.
    Engine::read_session* threadReader(State& state)
    {
       struct Cached
@@ -408,7 +413,15 @@ namespace psibase::storage
       Engine::read_session* session = nullptr;
       {
          std::lock_guard lock(state.threadReadersMutex);
-         auto&           slot = state.threadReaders[std::this_thread::get_id()];
+         // The engine has a fixed number of session slots per database and
+         // asking for one more ends the process (gofractally/psibase#2273),
+         // so the sessions made here are counted, not tried: beyond the
+         // budget a thread reads through the pool. An entry is kept until
+         // the database closes, also for a thread that has exited.
+         if (state.threadReaders.size() >= State::maxThreadReaders &&
+             !state.threadReaders.contains(std::this_thread::get_id()))
+            return nullptr;
+         auto& slot = state.threadReaders[std::this_thread::get_id()];
          if (!slot)
          {
             try
