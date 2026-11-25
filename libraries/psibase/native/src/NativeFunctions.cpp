@@ -443,7 +443,43 @@ namespace psibase
             throw std::runtime_error("Unrecognized key in nativeSubjective");
       }
 
-      void verifyWriteSession(TransactionContext& context,
+      // Usage metering (gofractally/psibase#2270): SocketIdentityRow is a
+      // message, not a row. A local service (x-http) writes it once it has
+      // verified the login token of the request on socket `fd`; from then
+      // on that request is charged to the account instead of the client's
+      // address: its socket (the request's counts, the reply, a websocket
+      // it becomes) and, if this context is serving that request, the runs
+      // it posts. Nothing is stored.
+      void applySocketIdentity(TransactionContext& tc,
+                               std::span<const char> key,
+                               std::span<const char> value)
+      {
+         check(psio::validate_strict<SocketIdentityRow>(psio::pssz{}, value).ok(),
+               "SocketIdentityRow has invalid format");
+         auto row      = psio::from_pssz<SocketIdentityRow>(psio::trusted{value});
+         auto expected = psio::to_key(row.key());
+         check(key.size() == expected.size() &&
+                   !std::memcmp(key.data(), expected.data(), key.size()),
+               "SocketIdentityRow has incorrect key");
+         auto& bc    = tc.blockContext;
+         auto  meter = bc.systemContext.usage.get();
+         if (!meter || !meter->enabled())
+            return;
+         auto identity = UsageIdentity::account(row.account);
+         check(isValid(identity), "SocketIdentityRow does not name an account");
+         auto socket = bc.systemContext.sockets->get(row.fd);
+         if (!socket)
+            return;
+         auto previous = socket->usage();
+         auto record   = meter->find(identity);
+         socket->setUsage(record);
+         // Only the context that serves this socket's request changes with it
+         if (bc.usage && bc.usage == previous)
+            bc.usage = record;
+      }
+
+      // Returns false if the write was consumed and must not be stored.
+      bool verifyWriteSession(TransactionContext& context,
                               std::span<const char>  key,
                               std::span<const char>  value)
       {
@@ -461,8 +497,14 @@ namespace psibase
             verifyPendingShutdownRow(context, key, value);
          else if (table == timerTable)
             verifyTimerRow(context.blockContext.db, key, value);
+         else if (table == socketIdentityTable)
+         {
+            applySocketIdentity(context, key, value);
+            return false;
+         }
          else
             throw std::runtime_error("Unrecognized key in nativeSession");
+         return true;
       }
 
       void verifyRemoveConstrained(TransactionContext& context,
@@ -855,7 +897,9 @@ namespace psibase
              }
              else if (bucketDb == DbId::nativeSession)
              {
-                verifyWriteSession(transactionContext, fullKey, {value.data(), value.size()});
+                if (!verifyWriteSession(transactionContext, fullKey,
+                                        {value.data(), value.size()}))
+                   return;
              }
              database.kvPutRaw(bucketDb, {fullKey.data(), fullKey.size()},
                                {value.data(), value.size()});

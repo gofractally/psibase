@@ -635,6 +635,10 @@ namespace psibase
       {
          return Tables{proxyKvOpen(DbId::nativeSession, {}, mode), mode};
       }
+      static Tables sessionDirect(KvMode mode = KvMode::readWrite)
+      {
+         return Tables{UniqueKvHandle{kvOpen(DbId::nativeSession, {}, mode)}, mode};
+      }
    };
 
 }  // namespace psibase

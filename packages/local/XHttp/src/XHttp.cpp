@@ -7,6 +7,7 @@
 #include <services/local/XAdmin.hpp>
 #include <services/local/XDb.hpp>
 #include <services/local/XSites.hpp>
+#include <services/system/RTransact.hpp>
 
 using namespace psibase;
 using namespace LocalService;
@@ -169,6 +170,37 @@ namespace
       auto native = Native::Tables{to<XDb>().open(DbId::native, prefix, mode), mode};
       auto row    = native.open<StatusTable>().get({});
       return row && row->head;
+   }
+
+   // Usage metering (gofractally/psibase#2270): a request with a valid
+   // login token is charged to the account it names, not to the client's
+   // address. Native resolves the address; the token can only be checked
+   // here, by the transaction service that issued it. A request without
+   // credentials pays nothing for this; one with credentials pays one
+   // call. The result is handed to native as a SocketIdentityRow, which
+   // native consumes without storing anything.
+   //
+   // This is done by x-http, the node's own service, and not by
+   // http-server, which resolves the user again for the requests it
+   // routes: http-server is a chain service, the same on every node, and
+   // must not depend on what one node's local services provide.
+   void identifyUser(std::int32_t sock, const HttpRequestRef& req)
+   {
+      if (!req.getHeader("authorization") && req.getCookie("__Host-SESSION").empty())
+         return;
+      if (!chainIsBooted())
+         return;
+      HttpRequest credentials{.host        = req.host,
+                              .method      = req.method,
+                              .target      = req.target,
+                              .contentType = req.contentType,
+                              .headers     = req.headers};
+      if (auto user = to<RTransact>().getUser(std::move(credentials)))
+      {
+         Native::sessionDirect(KvMode::readWrite)
+             .open<SocketIdentityTable>()
+             .put(SocketIdentityRow{sock, *user});
+      }
    }
 }  // namespace
 
@@ -710,6 +742,8 @@ extern "C" [[clang::export_name("serve")]] void serve()
       sendNotFound(sock, req);
       return;
    }
+
+   identifyUser(sock, req);
 
    if (auto service = XHttp::getService(req.host, rootHost); service != AccountNumber{})
    {
