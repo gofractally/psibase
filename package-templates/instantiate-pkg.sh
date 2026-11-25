@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Scaffold a stand-alone package from package-templates/basic-01.
+# Instantiate package-templates/basic-01 into a stand-alone package.
 # Usage:
-#   ./package-templates/new.sh [--destination DIR] [--name NAME] [--version VER] [cargo-generate args…]
-# Destination, name, and version are prompted when omitted (version default
-# from rust/Cargo.toml [workspace.package]).
+#   ./package-templates/instantiate-pkg.sh [--destination DIR] [--name NAME] [--version VER] [cargo-generate args…]
+#
+# Wraps cargo-generate so generation can land under packages/user (a virtual
+# workspace) via a temp stage. Version default and local psibase crate paths
+# are filled by template .rhai hooks when possible; this script exports
+# PSIBASE_INSTANTIATE_APP_DIR so those hooks compute paths for the final
+# location (not the temp stage).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -12,36 +16,6 @@ NAME=""
 VERSION=""
 PASSTHRU=()
 SILENT=0
-
-read_rust_workspace_version() {
-  local cargo_toml="$1"
-  sed -n '/^\[workspace.package\]/,/^\[/{s/^version = "\([^"]*\)"/\1/p}' "$cargo_toml" | head -1
-}
-
-# If start (or an ancestor) is a psibase monorepo checkout, print absolute rust/.
-find_monorepo_rust() {
-  local d="$1"
-  while [[ -n "$d" && "$d" != "/" ]]; do
-    if [[ -f "$d/rust/Cargo.toml" && -d "$d/rust/psibase" ]]; then
-      echo "$d/rust"
-      return 0
-    fi
-    d="$(dirname "$d")"
-  done
-  return 1
-}
-
-# Relative path from package root to monorepo rust/, or "" for crates.io.
-default_psibase_rust_root() {
-  local app_dir="$1"
-  local search_from="$2"
-  local rust_abs
-  if rust_abs="$(find_monorepo_rust "$search_from")"; then
-    realpath -m --relative-to="$app_dir" "$rust_abs"
-  else
-    echo ""
-  fi
-}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -66,15 +40,13 @@ while [[ $# -gt 0 ]]; do
       cat <<EOF
 Usage: $0 [--destination DIR] [--name NAME] [--version VER] [cargo-generate args…]
 
-Scaffolds a stand-alone package (own Cargo workspace) using
-package-templates/basic-01. Does not register the package in any parent
-workspace.
+Instantiates package-templates/basic-01 as a stand-alone Cargo workspace.
+Does not register the package in any parent workspace.
 
-Version defaults to rust/Cargo.toml [workspace.package]. Prompted when
-omitted unless --silent.
-
-If the destination sits inside a psibase monorepo, psibase crates use a
-relative path to that tree's rust/; otherwise crates.io pins.
+Stages through a temp dir so the result can land under packages/user (virtual
+workspace). Template hooks fill psibase version (from rust/Cargo.toml when
+inside a monorepo) and local_path_psibase* (else crates.io). Pass --version to
+override the hook/default.
 EOF
       exit 0
       ;;
@@ -84,12 +56,6 @@ EOF
       ;;
   esac
 done
-
-DEFAULT_VERSION="$(read_rust_workspace_version "$ROOT/rust/Cargo.toml")"
-if [[ -z "$DEFAULT_VERSION" ]]; then
-  echo "error: could not read version from $ROOT/rust/Cargo.toml" >&2
-  exit 1
-fi
 
 if [[ -z "$DEST" ]]; then
   if [[ "$SILENT" -eq 1 ]]; then
@@ -117,18 +83,8 @@ if [[ -z "$NAME" ]]; then
   exit 1
 fi
 
-if [[ -z "$VERSION" ]]; then
-  if [[ "$SILENT" -eq 1 ]]; then
-    VERSION="$DEFAULT_VERSION"
-  else
-    read -r -p "Psibase version [$DEFAULT_VERSION]: " VERSION
-    VERSION="${VERSION:-$DEFAULT_VERSION}"
-  fi
-fi
-
 CAMEL="$(echo "$NAME" | sed -E 's/(^|-)([a-z])/\U\2/g')"
 APP_DIR="$DEST/$CAMEL"
-RUST_ROOT="$(default_psibase_rust_root "$APP_DIR" "$DEST")"
 
 # Binary is `cargo-generate` with a `generate` subcommand; cargo subcommand is
 # `cargo generate` (same flags).
@@ -152,11 +108,14 @@ STAGE="$(mktemp -d "${TMPDIR:-/tmp}/psibase-new.XXXXXX")"
 cleanup_stage() { rm -rf "$STAGE"; }
 trap cleanup_stage EXIT
 
-if [[ -n "$RUST_ROOT" ]]; then
-  echo "Generating '$NAME' into $APP_DIR (psibase $VERSION, path $RUST_ROOT)…"
-else
-  echo "Generating '$NAME' into $APP_DIR (psibase $VERSION, crates.io)…"
+DEFINES=(--define "description=An example application")
+if [[ -n "$VERSION" ]]; then
+  DEFINES+=(--define "version=$VERSION")
 fi
+
+echo "Instantiating '$NAME' into $APP_DIR…"
+# Final app dir for .rhai path/version hooks (stage destination is not final).
+export PSIBASE_INSTANTIATE_APP_DIR="$APP_DIR"
 "${GENERATE[@]}" \
   --path "$ROOT/package-templates" \
   --destination "$STAGE" \
@@ -164,8 +123,7 @@ fi
   -v \
   --allow-commands \
   --name "$NAME" \
-  --define "version=$VERSION" \
-  --define "psibase_rust_root=$RUST_ROOT" \
+  "${DEFINES[@]}" \
   "${PASSTHRU[@]}" \
   basic-01
 

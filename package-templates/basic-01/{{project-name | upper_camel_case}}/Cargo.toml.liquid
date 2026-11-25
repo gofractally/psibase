@@ -3,20 +3,26 @@ resolver = "2"
 members = ["service", "query-service", "plugin"]
 
 [workspace.package]
-version = "{{version}}"
+version = "0.0.1"
 edition = "2021"
 rust-version = "1.98"
 license = "MIT"
 publish = false
 
 [workspace.dependencies]
-{% if psibase_rust_root != "" %}
-psibase = { path = "{{psibase_rust_root}}/psibase", version = "{{version}}" }
-psibase_macros = { path = "{{psibase_rust_root}}/psibase_macros", version = "{{version}}" }
-psibase_service = { path = "{{psibase_rust_root}}/psibase_service", version = "{{version}}" }
+{% if local_path_psibase != "" %}
+psibase = { path = "{{local_path_psibase}}", version = "{{version}}" }
 {% else %}
 psibase = "={{version}}"
+{% endif %}
+{% if local_path_psibase_macros != "" %}
+psibase_macros = { path = "{{local_path_psibase_macros}}", version = "{{version}}" }
+{% else %}
 psibase_macros = "={{version}}"
+{% endif %}
+{% if local_path_psibase_service != "" %}
+psibase_service = { path = "{{local_path_psibase_service}}", version = "{{version}}" }
+{% else %}
 psibase_service = "={{version}}"
 {% endif %}
 async-graphql = "=7.0.17"
@@ -52,6 +58,6 @@ Permissions = "{{version}}"
 crate-type = ["rlib"]
 
 [dependencies]
-{{project-name}} = { path = "service", version = "{{version}}" }
-r-{{project-name}} = { path = "query-service", version = "{{version}}" }
-{{project-name}}-plugin = { path = "plugin", version = "{{version}}" }
+{{project-name}} = { path = "service", version = "0.0.1" }
+r-{{project-name}} = { path = "query-service", version = "0.0.1" }
+{{project-name}}-plugin = { path = "plugin", version = "0.0.1" }

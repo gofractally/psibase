@@ -9,6 +9,12 @@ Plugin WIT for Host / Transact / Permissions is **vendored** under
 copy the corresponding `world.wit` into that tree and point
 `plugin/Cargo.toml.liquid` at it.
 
+Template hooks (`fill-version.rhai`, `fill-local-paths.rhai`) default the
+psibase version from `rust/Cargo.toml` when inside a monorepo, and set
+`local_path_psibase` / `local_path_psibase_macros` / `local_path_psibase_service`
+to those crates (otherwise crates.io `={{version}}`). The generated app’s own
+package version is always `0.0.1`.
+
 # Install
 
 `cargo install cargo-generate`
@@ -17,22 +23,20 @@ copy the corresponding `world.wit` into that tree and point
 
 ## Instantiating the template
 
-From the monorepo root (prompts for destination, name, and version when omitted;
-version defaults to `rust/Cargo.toml` `[workspace.package]`):
+Use `instantiate-pkg.sh` when the destination is under a virtual workspace
+(e.g. `packages/user`): it stages through a temp dir, then moves the result.
+It exports `PSIBASE_INSTANTIATE_APP_DIR` so the hooks compute paths for the
+final location.
 
 ```bash
-./package-templates/new.sh
+./package-templates/instantiate-pkg.sh
 # or:
-./package-templates/new.sh --destination ./packages/user --name my-app --version 0.29.0
+./package-templates/instantiate-pkg.sh --destination ./packages/user --name my-app --version 0.29.0
 ```
 
-`new.sh` pins `psibase` crates to this repo’s `rust/` via a relative path.
-To use crates.io pins instead, pass an empty root through cargo-generate:
-
-```bash
-cargo generate -p ./package-templates --destination /path/to/parent --init \
-  -v --allow-commands --name my-app --define psibase_rust_root= basic-01
-```
+Outside a virtual-workspace parent you can call `cargo generate` directly
+against `./package-templates` (still pass `--allow-commands` so the hooks can
+run). Prefer `instantiate-pkg.sh` in this repo.
 
 ## Building the app
 
