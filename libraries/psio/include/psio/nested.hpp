@@ -82,7 +82,7 @@ namespace psio
    {
       std::vector<char> tmp;
       from_json(tmp, stream);
-      from_frac(obj.value, tmp);
+      check(from_frac(obj.value, tmp), "Invalid fracpack data");
    }
 
    // Handles any type that backs to a byte vector

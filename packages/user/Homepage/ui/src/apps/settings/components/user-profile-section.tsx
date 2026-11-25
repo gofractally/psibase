@@ -1,4 +1,5 @@
 import { Trash, Upload } from "lucide-react";
+import { useState } from "react";
 
 import { FormProfile } from "@/components/form-profile";
 import { Panel } from "@/components/page-header";
@@ -7,13 +8,12 @@ import { colorFor } from "@/lib/colors";
 
 import { Avatar } from "@shared/components/avatar";
 import { useAvatar } from "@shared/hooks/use-avatar";
-import { useCacheBust } from "@shared/hooks/use-cache-bust";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useProfile } from "@shared/hooks/use-profile";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
-import { toast } from "@shared/shadcn/ui/sonner";
 
+import { AvatarCropDialog } from "../../contacts/components/avatar-crop-dialog";
 import { useRemoveAvatar } from "../../contacts/hooks/use-remove-avatar";
 import { useSetProfile } from "../../contacts/hooks/use-set-profile";
 import { useUploadAvatar } from "../../contacts/hooks/use-upload-avatar";
@@ -26,8 +26,6 @@ export const UserProfileSection = () => {
     const { mutateAsync: removeAvatar, isPending: isRemovingAvatar } =
         useRemoveAvatar();
 
-    const { setBustedUser } = useCacheBust();
-
     const { data: currentUser } = useCurrentUser();
     const {
         data: profile,
@@ -36,28 +34,18 @@ export const UserProfileSection = () => {
         isFetching,
         error,
     } = useProfile(currentUser, true, {});
-    const { mutateAsync: uploadAvatar, isPending: isUploadingAvatar } =
+    const { mutate: uploadAvatar, isPending: isUploadingAvatar } =
         useUploadAvatar();
 
     const isPending = isSettingProfile || isRemovingAvatar || isUploadingAvatar;
 
-    const handleImageChange = async (
-        e: React.ChangeEvent<HTMLInputElement>,
-    ) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const buffer = await file.arrayBuffer();
-            await uploadAvatar({
-                avatar: {
-                    contentType: file.type,
-                    content: new Uint8Array(buffer),
-                },
-            });
-            toast.success("Avatar uploaded");
+    const [fileToCrop, setFileToCrop] = useState<File | null>(null);
 
-            if (currentUser) {
-                setBustedUser(currentUser);
-            }
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if (file) {
+            setFileToCrop(file);
         }
     };
 
@@ -112,6 +100,7 @@ export const UserProfileSection = () => {
                             type="file"
                             accept="image/*"
                             onChange={handleImageChange}
+                            disabled={isPending}
                             className="hidden"
                         />
                         {type === "uploaded" && (
@@ -155,6 +144,16 @@ export const UserProfileSection = () => {
                     </div>
                 )}
             </div>
+            {fileToCrop && (
+                <AvatarCropDialog
+                    file={fileToCrop}
+                    onCancel={() => setFileToCrop(null)}
+                    onConfirm={(crop) => {
+                        uploadAvatar({ file: fileToCrop, crop });
+                        setFileToCrop(null);
+                    }}
+                />
+            )}
         </Panel>
     );
 };

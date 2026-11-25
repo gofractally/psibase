@@ -8,6 +8,8 @@ const tokenSummaryFields = `
     id
     symbol
     precision
+    iconHash
+    owner
     settings {
         untransferable
     }
@@ -17,6 +19,7 @@ const qs = {
     tokenMeta: (tokenId: string) => `
         token(tokenId: "${tokenId}") {
             id
+            owner
             settings {
                 untransferable
                 unrecallable
@@ -83,6 +86,7 @@ export {
 
 const zTokenMetaNodeSchema = z.object({
     id: z.number(),
+    owner: zAccount.nullable(),
     settings: z.object({
         untransferable: z.boolean(),
         unrecallable: z.boolean(),
@@ -141,6 +145,8 @@ export const zTokenSummarySchema = z.object({
     id: z.number(),
     symbol: z.string().nullable(),
     precision: z.number(),
+    iconHash: z.string().nullable(),
+    owner: zAccount.nullable(),
     settings: z.object({
         untransferable: z.boolean(),
     }),

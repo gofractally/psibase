@@ -1,43 +1,43 @@
-import { useMutation } from "@tanstack/react-query";
-import { z } from "zod";
+import type { ImageCrop } from "@shared/lib/prepare-image";
 
-import { supervisor } from "@shared/lib/supervisor";
+import { useMutation } from "@tanstack/react-query";
+
+import { useCacheBust } from "@shared/hooks/use-cache-bust";
+import { callPluginFunction, homepage } from "@shared/lib/plugins";
+import { AVATAR_OPTIONS, prepareImage } from "@shared/lib/prepare-image";
+import SharedQueryKey from "@shared/lib/query-keys";
+import { zAccount } from "@shared/lib/schemas/account";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-const zAvatar = z.object({
-    contentType: z.string(),
-    content: z.any(),
-});
-
-const Params = z.object({
-    avatar: zAvatar,
-});
-
-export const useUploadAvatar = () =>
-    useMutation<void, Error, z.infer<typeof Params>>({
+export const useUploadAvatar = () => {
+    const { setBustedUser } = useCacheBust();
+    return useMutation<
+        void,
+        Error,
+        { file: File; crop?: ImageCrop },
+        string | number
+    >({
         mutationKey: ["uploadAvatar"],
-        mutationFn: async (params) => {
-            const { avatar } = Params.parse(params);
-
-            void (await supervisor.functionCall({
-                method: "uploadAvatar",
-                params: [avatar],
-                service: "homepage",
-                intf: "contacts",
-            }));
-        },
-        onSuccess: (_, __, toastId) => {
-            toast.success("Avatar uploaded", {
-                id: z.string().or(z.number()).parse(toastId),
+        mutationFn: async ({ file, crop }) => {
+            const avatar = await prepareImage(file, {
+                ...AVATAR_OPTIONS,
+                crop,
             });
+            await callPluginFunction(homepage.contacts.uploadAvatar, [avatar]);
         },
         onMutate: () => toast.loading("Uploading avatar..."),
-        onError: (error, _, toastId) => {
-            const options = { id: z.string().or(z.number()).parse(toastId) };
-            if (error instanceof Error) {
-                toast.error(error.message, options);
-            } else {
-                toast.error("An unknown error occurred", options);
-            }
+        onSuccess: (_data, _variables, toastId, context) => {
+            toast.success("Avatar uploaded", { id: toastId });
+
+            const currentUser = zAccount.parse(
+                context.client.getQueryData(SharedQueryKey.currentUser()),
+            );
+            setBustedUser(currentUser);
+        },
+        onError: (error, _variables, toastId) => {
+            toast.error(error.message || "Failed to upload avatar", {
+                id: toastId,
+            });
         },
     });
+};

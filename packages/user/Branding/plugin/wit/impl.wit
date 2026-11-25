@@ -6,6 +6,7 @@ world impl {
     import transact:plugin/api;
     include sites:plugin/imports;
 
+    export types;
     export api;
     export queries;
 }

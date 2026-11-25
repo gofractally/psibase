@@ -14,6 +14,7 @@ mod from_bin;
 mod graph_ql;
 mod hex;
 mod http;
+pub mod image_content_type;
 mod internal_macros;
 #[cfg(not(target_family = "wasm"))]
 mod local_socket;
