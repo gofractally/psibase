@@ -433,9 +433,9 @@ namespace psibase::vm_wasmtime
          initialized = true;
       }
 
-      // The time an action took, for its trace. This is elapsed time, read
-      // without a system call; the thread's CPU clock is read only where a
-      // value is billed.
+      // The time an action took, for its trace: elapsed time on the monotonic
+      // clock, read without a system call. It is the clock the transaction's
+      // limit and its bill use (RunClock).
       struct RecordActionTime
       {
          explicit RecordActionTime(ActionContext& actionContext) : actionContext(actionContext) {}
