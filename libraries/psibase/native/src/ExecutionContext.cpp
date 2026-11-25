@@ -82,8 +82,8 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
       std::unique_ptr<backend_t>                    backend;
       std::shared_ptr<dwarf::debugger_registration> debug;
       // The module's entry points, checked to have their fixed signatures
-      // when the backend was made, for calling by function index
-      // (gofractally/psibase#2261). Calls still go by name.
+      // when the backend was made: the service is entered by these function
+      // indices (gofractally/psibase#2261).
       NativeEntryPoints                             entryPoints;
 
       auto byHash() const { return std::tie(hash, vmOptions, vmVersion); }
@@ -452,8 +452,8 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
                 // auto startTime = std::chrono::steady_clock::now();
                 backend.backend->set_wasm_allocator(&wa);
                 backend.backend->initialize(getAltStack(), this);
-                (*backend.backend)(getAltStack(), *this, "env", "start",
-                                   currentActContext->action.service.value);
+                enter(backend.entryPoints.start, "start",
+                      currentActContext->action.service.value);
                 initialized = true;
                 // auto us     = std::chrono::duration_cast<std::chrono::microseconds>(
                 //     std::chrono::steady_clock::now() - startTime);
@@ -474,6 +474,20 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
          ActionContext&                        actionContext;
          std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
       };
+
+      // Enters the service through one of its entry points. Where the
+      // module exports it, admission recorded its function index and checked
+      // its signature (NativeEntryPoints), so the call goes by index and the
+      // export list is not scanned for the name. Where it does not, the call
+      // by name reports that, as it always did.
+      template <typename... Args>
+      void enter(const std::optional<std::uint32_t>& index, std::string_view name, Args... args)
+      {
+         if (index)
+            backend.backend->call_by_index(getAltStack(), *this, *index, args...);
+         else
+            (*backend.backend)(getAltStack(), *this, "env", name, args...);
+      }
 
       template <typename F>
       void run(ActionContext& actionContext, F f)
@@ -549,7 +563,7 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
    void ExecutionContextImpl::execProcessTransaction(ActionContext& actionContext)
    {
       run(actionContext, [&] {  //
-         (*backend.backend)(getAltStack(), *this, "env", "processTransaction");
+         enter(backend.entryPoints.processTransaction, "processTransaction");
       });
    }
 
@@ -567,16 +581,15 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
       }
 
       run(actionContext, [&] {  //
-         (*backend.backend)(getAltStack(), *this, "env", "called",
-                                  actionContext.action.service.value,
-                                  actionContext.action.sender.value);
+         enter(backend.entryPoints.called, "called", actionContext.action.service.value,
+               actionContext.action.sender.value);
       });
    }
 
    void ExecutionContextImpl::execServe(ActionContext& actionContext)
    {
       run(actionContext, [&] {  //
-         (*backend.backend)(getAltStack(), *this, "env", "serve");
+         enter(backend.entryPoints.serve, "serve");
       });
    }
 

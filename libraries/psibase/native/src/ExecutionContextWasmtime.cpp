@@ -166,20 +166,13 @@ namespace psibase::vm_wasmtime
    {
       // Code under different versions compiles differently from the same bytes.
       using Key = std::tuple<Checksum256, VMOptions, std::uint8_t>;
-      // A compiled module and what admission found its entry points to be:
-      // each export present has been checked to have its fixed signature
-      // (NativeEntryPoints), so a caller may bind it by index without
-      // checking again.
-      struct Compiled
-      {
-         wt::module        module;
-         NativeEntryPoints entryPoints;
-      };
       struct Entry
       {
          Key        key;
+         // The compiled module. It carries where its entry points are: the
+         // engine finds them, and checks their signatures, when a module is
+         // compiled or loaded.
          wt::module module;
-         NativeEntryPoints entryPoints;
          // The module loaded into the engine without an instance pool, once
          // an instance of it could not be taken from the pool.
          std::optional<wt::module> unpooled;
@@ -215,13 +208,11 @@ namespace psibase::vm_wasmtime
       {
          auto options = engineOptions(profile, debug);
          auto digest  = sha256(std::tuple{
-             std::string("psibase-wasmtime-artifact-v4"), hash, vmOptions, vmVersion,
+             std::string("psibase-wasmtime-artifact-v5"), hash, vmOptions, vmVersion,
              options.features, std::uint32_t(options.fp),
              // Service debugging: the two debugging options an artifact is
              // tied to. A runtime only loads artifacts made with the same.
              options.backtrace_details, options.debug_info,
-             // What is stored with the compiled module: its entry points.
-             std::string("entry-points-1"),
              std::string(wt::build_identity())});
          NativeAotCache::Key key;
          std::copy(digest.begin(), digest.end(), key.begin());
@@ -236,17 +227,8 @@ namespace psibase::vm_wasmtime
       // Called on the thread that needs the module, with no lock held: two
       // threads that need the same new module both compile it and store the
       // same artifact, and different modules compile side by side.
-      // An artifact is the serialized module followed by its entry points:
-      // four function indices, little-endian, none being all ones.
-      static constexpr std::size_t entryPointBytes = 16;
-      static std::array<std::optional<std::uint32_t> NativeEntryPoints::*, 4> entryPointOrder()
-      {
-         return {&NativeEntryPoints::start, &NativeEntryPoints::called, &NativeEntryPoints::serve,
-                 &NativeEntryPoints::processTransaction};
-      }
-
       template <typename Code>
-      Compiled obtain(const Checksum256&    hash,
+      wt::module obtain(const Checksum256&    hash,
                         const VMOptions&      vmOptions,
                         std::uint8_t          vmVersion,
                         psizam::float_profile profile,
@@ -257,23 +239,11 @@ namespace psibase::vm_wasmtime
          // the store returns it only if it is what was stored.
          const auto key = artifactKey(hash, vmOptions, vmVersion, profile);
          if (artifacts)
-            if (auto stored = artifacts->load(key); stored && stored->size() > entryPointBytes)
+            if (auto stored = artifacts->load(key))
                try
                {
-                  const auto        size = stored->size() - entryPointBytes;
-                  NativeEntryPoints entryPoints;
-                  for (std::size_t i = 0; i < 4; ++i)
-                  {
-                     std::uint32_t index = 0;
-                     for (std::size_t byte = 0; byte < 4; ++byte)
-                        index |= std::uint32_t(std::uint8_t((*stored)[size + 4 * i + byte]))
-                                 << (8 * byte);
-                     if (index != 0xffffffffu)
-                        entryPoints.*entryPointOrder()[i] = index;
-                  }
-                  Compiled module{runtimes(debug).pooled(profile).load(std::span(
-                                      reinterpret_cast<const std::uint8_t*>(stored->data()), size)),
-                                  entryPoints};
+                  auto module = runtimes(debug).pooled(profile).load(std::span(
+                      reinterpret_cast<const std::uint8_t*>(stored->data()), stored->size()));
                   ++loaded;
                   PSIBASE_LOG(loggers::generic::get(), debug)
                       << "Service code " << loggers::to_string(hash) << " (vmVersion "
@@ -288,20 +258,13 @@ namespace psibase::vm_wasmtime
          // the psizam engines apply before they compile.
          const std::span<const std::uint8_t> wasm     = code();
          const auto                          admitted = admitNativeWasm(wasm, vmOptions, vmVersion);
-         Compiled module{runtimes(debug).pooled(profile).compile_metered(wasm, admitted.costs),
-                         admitted.entryPoints};
+         auto module = runtimes(debug).pooled(profile).compile_metered(wasm, admitted.costs);
          ++compiled;
          std::size_t stored = 0;
          if (artifacts)
          {
-            auto artifact = module.module.serialize();
+            auto artifact = module.serialize();
             stored        = artifact.size();
-            for (auto member : entryPointOrder())
-            {
-               const std::uint32_t index = (admitted.entryPoints.*member).value_or(0xffffffffu);
-               for (std::size_t byte = 0; byte < 4; ++byte)
-                  artifact.push_back(static_cast<std::uint8_t>(index >> (8 * byte)));
-            }
             artifacts->store(
                 key, std::span(reinterpret_cast<const char*>(artifact.data()), artifact.size()));
          }
@@ -312,7 +275,7 @@ namespace psibase::vm_wasmtime
          return module;
       }
 
-      std::optional<Compiled> get(const Checksum256& hash,
+      std::optional<wt::module> get(const Checksum256& hash,
                                   const VMOptions&   vmOptions,
                                   std::uint8_t       vmVersion)
       {
@@ -321,7 +284,7 @@ namespace psibase::vm_wasmtime
          if (it == index.end())
             return std::nullopt;
          entries.splice(entries.end(), entries, it->second);
-         return Compiled{it->second->module, it->second->entryPoints};
+         return it->second->module;
       }
 
       // The module as the engine without an instance pool holds it.
@@ -400,13 +363,13 @@ namespace psibase::vm_wasmtime
       void add(const Checksum256& hash,
                const VMOptions&   vmOptions,
                std::uint8_t       vmVersion,
-               const Compiled&    compiled)
+               const wt::module&  compiled)
       {
          std::lock_guard lock{mutex};
          Key             key{hash, vmOptions, vmVersion};
          if (index.count(key))
             return;
-         entries.push_back(Entry{key, compiled.module, compiled.entryPoints});
+         entries.push_back(Entry{key, compiled});
          index[key] = std::prev(entries.end());
          while (entries.size() > cacheSize)
          {
@@ -429,9 +392,6 @@ namespace psibase::vm_wasmtime
       WasmCacheImpl&                                         cache;
       psizam::float_profile floatProfile = psizam::float_profile::strict;
       std::optional<wt::module>                              module;
-      // The module's entry points as admission validated them, for binding
-      // by index (gofractally/psibase#2261). Calls still go by name.
-      NativeEntryPoints                                      entryPoints;
       // Reading the stack counter goes through the store, which is not const.
       mutable std::optional<wt::instance<ExecutionContextImpl>> instance;
       // Guards the interrupter, which another thread fires on timeout.
@@ -506,8 +466,7 @@ namespace psibase::vm_wasmtime
                                   });
             cache.add(code.codeHash, vmOptions, code.vmVersion, *compiled);
          }
-         module      = compiled->module;
-         entryPoints = compiled->entryPoints;
+         module = *compiled;
       }
 
       std::pair<CodeRow, DbId> getCode(AccountNumber service)
