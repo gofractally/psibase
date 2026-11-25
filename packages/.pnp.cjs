@@ -114,7 +114,7 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./",\
         "packageDependencies": [\
           ["@babel/template", "npm:7.29.7"],\
-          ["@bytecodealliance/jco", "npm:1.35.0"],\
+          ["@bytecodealliance/jco", "npm:1.41.0"],\
           ["@dicebear/collection", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.4.2"],\
           ["@dicebear/core", "npm:9.4.2"],\
           ["@eslint/js", "npm:9.39.4"],\
@@ -214,73 +214,73 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["@andreiltd/componentize-qjs-binding-darwin-arm64", [\
-      ["npm:0.4.5", {\
-        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-darwin-arm64-npm-0.4.5-210510fe0e/node_modules/@andreiltd/componentize-qjs-binding-darwin-arm64/",\
+      ["npm:0.5.0", {\
+        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-darwin-arm64-npm-0.5.0-d09cb34a5b/node_modules/@andreiltd/componentize-qjs-binding-darwin-arm64/",\
         "packageDependencies": [\
-          ["@andreiltd/componentize-qjs-binding-darwin-arm64", "npm:0.4.5"]\
+          ["@andreiltd/componentize-qjs-binding-darwin-arm64", "npm:0.5.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@andreiltd/componentize-qjs-binding-darwin-x64", [\
-      ["npm:0.4.5", {\
-        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-darwin-x64-npm-0.4.5-7db6167cb9/node_modules/@andreiltd/componentize-qjs-binding-darwin-x64/",\
+      ["npm:0.5.0", {\
+        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-darwin-x64-npm-0.5.0-1ce6757d4e/node_modules/@andreiltd/componentize-qjs-binding-darwin-x64/",\
         "packageDependencies": [\
-          ["@andreiltd/componentize-qjs-binding-darwin-x64", "npm:0.4.5"]\
+          ["@andreiltd/componentize-qjs-binding-darwin-x64", "npm:0.5.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@andreiltd/componentize-qjs-binding-linux-arm64-gnu", [\
-      ["npm:0.4.5", {\
-        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-linux-arm64-gnu-npm-0.4.5-2a260df609/node_modules/@andreiltd/componentize-qjs-binding-linux-arm64-gnu/",\
+      ["npm:0.5.0", {\
+        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-linux-arm64-gnu-npm-0.5.0-1887bd526d/node_modules/@andreiltd/componentize-qjs-binding-linux-arm64-gnu/",\
         "packageDependencies": [\
-          ["@andreiltd/componentize-qjs-binding-linux-arm64-gnu", "npm:0.4.5"]\
+          ["@andreiltd/componentize-qjs-binding-linux-arm64-gnu", "npm:0.5.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@andreiltd/componentize-qjs-binding-linux-arm64-musl", [\
-      ["npm:0.4.5", {\
-        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-linux-arm64-musl-npm-0.4.5-8eb83377fb/node_modules/@andreiltd/componentize-qjs-binding-linux-arm64-musl/",\
+      ["npm:0.5.0", {\
+        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-linux-arm64-musl-npm-0.5.0-863a03d914/node_modules/@andreiltd/componentize-qjs-binding-linux-arm64-musl/",\
         "packageDependencies": [\
-          ["@andreiltd/componentize-qjs-binding-linux-arm64-musl", "npm:0.4.5"]\
+          ["@andreiltd/componentize-qjs-binding-linux-arm64-musl", "npm:0.5.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@andreiltd/componentize-qjs-binding-linux-x64-gnu", [\
-      ["npm:0.4.5", {\
-        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-linux-x64-gnu-npm-0.4.5-4c985b4e17/node_modules/@andreiltd/componentize-qjs-binding-linux-x64-gnu/",\
+      ["npm:0.5.0", {\
+        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-linux-x64-gnu-npm-0.5.0-59db098959/node_modules/@andreiltd/componentize-qjs-binding-linux-x64-gnu/",\
         "packageDependencies": [\
-          ["@andreiltd/componentize-qjs-binding-linux-x64-gnu", "npm:0.4.5"]\
+          ["@andreiltd/componentize-qjs-binding-linux-x64-gnu", "npm:0.5.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@andreiltd/componentize-qjs-binding-linux-x64-musl", [\
-      ["npm:0.4.5", {\
-        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-linux-x64-musl-npm-0.4.5-fe511c1102/node_modules/@andreiltd/componentize-qjs-binding-linux-x64-musl/",\
+      ["npm:0.5.0", {\
+        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-linux-x64-musl-npm-0.5.0-2a99a14720/node_modules/@andreiltd/componentize-qjs-binding-linux-x64-musl/",\
         "packageDependencies": [\
-          ["@andreiltd/componentize-qjs-binding-linux-x64-musl", "npm:0.4.5"]\
+          ["@andreiltd/componentize-qjs-binding-linux-x64-musl", "npm:0.5.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@andreiltd/componentize-qjs-binding-win32-arm64-msvc", [\
-      ["npm:0.4.5", {\
-        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-win32-arm64-msvc-npm-0.4.5-816e998ed9/node_modules/@andreiltd/componentize-qjs-binding-win32-arm64-msvc/",\
+      ["npm:0.5.0", {\
+        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-win32-arm64-msvc-npm-0.5.0-1c53a0c5e7/node_modules/@andreiltd/componentize-qjs-binding-win32-arm64-msvc/",\
         "packageDependencies": [\
-          ["@andreiltd/componentize-qjs-binding-win32-arm64-msvc", "npm:0.4.5"]\
+          ["@andreiltd/componentize-qjs-binding-win32-arm64-msvc", "npm:0.5.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@andreiltd/componentize-qjs-binding-win32-x64-msvc", [\
-      ["npm:0.4.5", {\
-        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-win32-x64-msvc-npm-0.4.5-16cac85086/node_modules/@andreiltd/componentize-qjs-binding-win32-x64-msvc/",\
+      ["npm:0.5.0", {\
+        "packageLocation": "./.yarn/unplugged/@andreiltd-componentize-qjs-binding-win32-x64-msvc-npm-0.5.0-e642662b4f/node_modules/@andreiltd/componentize-qjs-binding-win32-x64-msvc/",\
         "packageDependencies": [\
-          ["@andreiltd/componentize-qjs-binding-win32-x64-msvc", "npm:0.4.5"]\
+          ["@andreiltd/componentize-qjs-binding-win32-x64-msvc", "npm:0.5.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -588,12 +588,12 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "HARD"\
       }],\
-      ["npm:0.22.0", {\
-        "packageLocation": "../.caches/yarn/@bytecodealliance-componentize-js-npm-0.22.0-00585441c3-f6f65c94ad.zip/node_modules/@bytecodealliance/componentize-js/",\
+      ["npm:0.23.0", {\
+        "packageLocation": "../.caches/yarn/@bytecodealliance-componentize-js-npm-0.23.0-483c6f8ad8-54549d53a7.zip/node_modules/@bytecodealliance/componentize-js/",\
         "packageDependencies": [\
-          ["@bytecodealliance/componentize-js", "npm:0.22.0"],\
+          ["@bytecodealliance/componentize-js", "npm:0.23.0"],\
           ["@bytecodealliance/jco", "npm:1.24.1"],\
-          ["@bytecodealliance/weval", "npm:0.4.1"],\
+          ["@bytecodealliance/weval", "npm:0.5.1"],\
           ["@bytecodealliance/wizer", "npm:10.0.0"],\
           ["es-module-lexer", "npm:1.7.0"],\
           ["oxc-parser", "npm:0.76.0"]\
@@ -621,21 +621,21 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "HARD"\
       }],\
-      ["npm:1.35.0", {\
-        "packageLocation": "../.caches/yarn/@bytecodealliance-jco-npm-1.35.0-810881f650-94647eeedb.zip/node_modules/@bytecodealliance/jco/",\
+      ["npm:1.41.0", {\
+        "packageLocation": "../.caches/yarn/@bytecodealliance-jco-npm-1.41.0-3b54d867b0-a5f1df6036.zip/node_modules/@bytecodealliance/jco/",\
         "packageDependencies": [\
-          ["@bytecodealliance/componentize-js", "npm:0.22.0"],\
+          ["@bytecodealliance/componentize-js", "npm:0.23.0"],\
           ["@bytecodealliance/componentize-js-0-19-3", [\
             "@bytecodealliance/componentize-js",\
             "npm:0.19.3"\
           ]],\
-          ["@bytecodealliance/jco", "npm:1.35.0"],\
-          ["@bytecodealliance/jco-std", "virtual:810881f65092464f472108e4982a3f2701f7f0a11db175af209ff4e538c20ebb78acd0a39075b6efb3198ef763b13c4f8788ff7b09fbe527c078798af6bdcaa3#npm:0.5.0"],\
-          ["@bytecodealliance/jco-transpile", "npm:0.15.0"],\
-          ["@bytecodealliance/preview2-shim", "npm:0.26.0"],\
-          ["binaryen", "npm:130.0.0"],\
+          ["@bytecodealliance/jco", "npm:1.41.0"],\
+          ["@bytecodealliance/jco-std", "virtual:3b54d867b01b967dde50666c1c187e2c41bc341fb14d335ae90070e83651f4d9aefffd99eb0d22c1eef3a3ba61070fa899443314a3072cc484e67fff5a0a6db9#npm:0.10.0"],\
+          ["@bytecodealliance/jco-transpile", "npm:0.23.0"],\
+          ["@bytecodealliance/preview2-shim", "npm:0.31.0"],\
+          ["binaryen", "npm:132.0.0"],\
           ["commander", "npm:14.0.3"],\
-          ["componentize-qjs", "npm:0.4.5"],\
+          ["componentize-qjs", "npm:0.5.0"],\
           ["mkdirp", "npm:3.0.1"],\
           ["regexpu-core", "npm:6.4.0"],\
           ["rolldown", "npm:1.2.11"],\
@@ -739,18 +739,19 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["@bytecodealliance/jco-std", [\
-      ["npm:0.5.0", {\
-        "packageLocation": "../.caches/yarn/@bytecodealliance-jco-std-npm-0.5.0-7d9dfe6222-55678531dc.zip/node_modules/@bytecodealliance/jco-std/",\
+      ["npm:0.10.0", {\
+        "packageLocation": "../.caches/yarn/@bytecodealliance-jco-std-npm-0.10.0-072aa121b9-af35bffc5a.zip/node_modules/@bytecodealliance/jco-std/",\
         "packageDependencies": [\
-          ["@bytecodealliance/jco-std", "npm:0.5.0"]\
+          ["@bytecodealliance/jco-std", "npm:0.10.0"]\
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:810881f65092464f472108e4982a3f2701f7f0a11db175af209ff4e538c20ebb78acd0a39075b6efb3198ef763b13c4f8788ff7b09fbe527c078798af6bdcaa3#npm:0.5.0", {\
-        "packageLocation": "./.yarn/__virtual__/@bytecodealliance-jco-std-virtual-c537aa4f5b/2/.caches/yarn/@bytecodealliance-jco-std-npm-0.5.0-7d9dfe6222-55678531dc.zip/node_modules/@bytecodealliance/jco-std/",\
+      ["virtual:3b54d867b01b967dde50666c1c187e2c41bc341fb14d335ae90070e83651f4d9aefffd99eb0d22c1eef3a3ba61070fa899443314a3072cc484e67fff5a0a6db9#npm:0.10.0", {\
+        "packageLocation": "./.yarn/__virtual__/@bytecodealliance-jco-std-virtual-28f8f6e7a6/2/.caches/yarn/@bytecodealliance-jco-std-npm-0.10.0-072aa121b9-af35bffc5a.zip/node_modules/@bytecodealliance/jco-std/",\
         "packageDependencies": [\
-          ["@bytecodealliance/jco-std", "virtual:810881f65092464f472108e4982a3f2701f7f0a11db175af209ff4e538c20ebb78acd0a39075b6efb3198ef763b13c4f8788ff7b09fbe527c078798af6bdcaa3#npm:0.5.0"],\
-          ["@bytecodealliance/preview2-shim", "npm:0.26.0"],\
+          ["@bytecodealliance/jco-std", "virtual:3b54d867b01b967dde50666c1c187e2c41bc341fb14d335ae90070e83651f4d9aefffd99eb0d22c1eef3a3ba61070fa899443314a3072cc484e67fff5a0a6db9#npm:0.10.0"],\
+          ["@bytecodealliance/preview2-shim", "npm:0.31.0"],\
+          ["@noble/hashes", "npm:1.8.0"],\
           ["@types/bytecodealliance__preview2-shim", null],\
           ["acorn", "npm:8.17.0"],\
           ["acorn-walk", "npm:8.3.5"],\
@@ -758,6 +759,7 @@ const RAW_RUNTIME_STATE =
           ["punycode", "npm:2.3.1"],\
           ["readable-stream", "npm:4.7.0"],\
           ["urlpattern-polyfill", "npm:10.1.0"],\
+          ["web-streams-polyfill", "npm:4.2.0"],\
           ["whatwg-url", "npm:14.2.0"]\
         ],\
         "packagePeers": [\
@@ -768,14 +770,14 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["@bytecodealliance/jco-transpile", [\
-      ["npm:0.15.0", {\
-        "packageLocation": "../.caches/yarn/@bytecodealliance-jco-transpile-npm-0.15.0-d3c92f7508-3037b94284.zip/node_modules/@bytecodealliance/jco-transpile/",\
+      ["npm:0.23.0", {\
+        "packageLocation": "../.caches/yarn/@bytecodealliance-jco-transpile-npm-0.23.0-1a868b5819-c31879fedf.zip/node_modules/@bytecodealliance/jco-transpile/",\
         "packageDependencies": [\
-          ["@bytecodealliance/jco-transpile", "npm:0.15.0"],\
-          ["@bytecodealliance/preview2-shim", "npm:0.26.0"],\
-          ["@bytecodealliance/preview3-shim", "npm:0.7.0"],\
-          ["binaryen", "npm:130.0.0"],\
-          ["oxc-minify", "npm:0.136.0"]\
+          ["@bytecodealliance/jco-transpile", "npm:0.23.0"],\
+          ["@bytecodealliance/preview2-shim", "npm:0.31.0"],\
+          ["@bytecodealliance/preview3-shim", "npm:0.13.0"],\
+          ["binaryen", "npm:132.0.0"],\
+          ["oxc-minify", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -788,11 +790,11 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "HARD"\
       }],\
-      ["npm:0.26.0", {\
-        "packageLocation": "../.caches/yarn/@bytecodealliance-preview2-shim-npm-0.26.0-cc5b08cd55-1bd05239c1.zip/node_modules/@bytecodealliance/preview2-shim/",\
+      ["npm:0.31.0", {\
+        "packageLocation": "../.caches/yarn/@bytecodealliance-preview2-shim-npm-0.31.0-4c0c58f622-311084ec6f.zip/node_modules/@bytecodealliance/preview2-shim/",\
         "packageDependencies": [\
           ["@bytecodealliance/jco-node-fs", "npm:0.3.2"],\
-          ["@bytecodealliance/preview2-shim", "npm:0.26.0"]\
+          ["@bytecodealliance/preview2-shim", "npm:0.31.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -806,12 +808,12 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "HARD"\
       }],\
-      ["npm:0.7.0", {\
-        "packageLocation": "../.caches/yarn/@bytecodealliance-preview3-shim-npm-0.7.0-1d65afcfe8-f359dcb9d1.zip/node_modules/@bytecodealliance/preview3-shim/",\
+      ["npm:0.13.0", {\
+        "packageLocation": "../.caches/yarn/@bytecodealliance-preview3-shim-npm-0.13.0-1682fdcfb1-789b716524.zip/node_modules/@bytecodealliance/preview3-shim/",\
         "packageDependencies": [\
           ["@bytecodealliance/jco-node-fs", "npm:0.3.2"],\
-          ["@bytecodealliance/preview2-shim", "npm:0.26.0"],\
-          ["@bytecodealliance/preview3-shim", "npm:0.7.0"]\
+          ["@bytecodealliance/preview2-shim", "npm:0.31.0"],\
+          ["@bytecodealliance/preview3-shim", "npm:0.13.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -825,6 +827,16 @@ const RAW_RUNTIME_STATE =
           ["decompress", "npm:4.2.1"],\
           ["decompress-tar", "npm:4.1.1"],\
           ["decompress-unzip", "npm:4.0.1"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:0.5.1", {\
+        "packageLocation": "../.caches/yarn/@bytecodealliance-weval-npm-0.5.1-f922b18eb2-dde6e2fd25.zip/node_modules/@bytecodealliance/weval/",\
+        "packageDependencies": [\
+          ["@bytecodealliance/weval", "npm:0.5.1"],\
+          ["@napi-rs/lzma", "npm:1.4.5"],\
+          ["fflate", "npm:0.8.3"],\
+          ["tar", "npm:7.5.23"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -2500,13 +2512,6 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["npm:1.2.4", {\
-        "packageLocation": "../.caches/yarn/@napi-rs-wasm-runtime-npm-1.2.4-f4c8c072f8-4bd7be975f.zip/node_modules/@napi-rs/wasm-runtime/",\
-        "packageDependencies": [\
-          ["@napi-rs/wasm-runtime", "npm:1.2.4"]\
-        ],\
-        "linkType": "SOFT"\
-      }],\
       ["virtual:42dcef386e70f274c73e7ab49172cb142744f117387eb099354d53f79d8f73172954c353919648545c9c233a2ddb171780d211bf92525a9192fe833520a4538e#npm:1.1.5", {\
         "packageLocation": "./.yarn/__virtual__/@napi-rs-wasm-runtime-virtual-6eaded26c4/2/.caches/yarn/@napi-rs-wasm-runtime-npm-1.1.5-001295d921-727f2b6ae0.zip/node_modules/@napi-rs/wasm-runtime/",\
         "packageDependencies": [\
@@ -2542,22 +2547,13 @@ const RAW_RUNTIME_STATE =
           "@types/emnapi__runtime"\
         ],\
         "linkType": "HARD"\
-      }],\
-      ["virtual:b1b17edb8fb757b622aba72dad1ff5bbb39d5cd056d44e3c1bc74ef24a706c660f2db8943ce6f90469d349bbfac4bc08461d805d3fc7d344975dcf937e6732b8#npm:1.2.4", {\
-        "packageLocation": "./.yarn/__virtual__/@napi-rs-wasm-runtime-virtual-5da9f55465/2/.caches/yarn/@napi-rs-wasm-runtime-npm-1.2.4-f4c8c072f8-4bd7be975f.zip/node_modules/@napi-rs/wasm-runtime/",\
+      }]\
+    ]],\
+    ["@noble/hashes", [\
+      ["npm:1.8.0", {\
+        "packageLocation": "../.caches/yarn/@noble-hashes-npm-1.8.0-a397449e64-06a0b52c81.zip/node_modules/@noble/hashes/",\
         "packageDependencies": [\
-          ["@emnapi/core", "npm:1.11.1"],\
-          ["@emnapi/runtime", "npm:1.11.1"],\
-          ["@napi-rs/wasm-runtime", "virtual:b1b17edb8fb757b622aba72dad1ff5bbb39d5cd056d44e3c1bc74ef24a706c660f2db8943ce6f90469d349bbfac4bc08461d805d3fc7d344975dcf937e6732b8#npm:1.2.4"],\
-          ["@tybys/wasm-util", "npm:0.10.4"],\
-          ["@types/emnapi__core", null],\
-          ["@types/emnapi__runtime", null]\
-        ],\
-        "packagePeers": [\
-          "@emnapi/core",\
-          "@emnapi/runtime",\
-          "@types/emnapi__core",\
-          "@types/emnapi__runtime"\
+          ["@noble/hashes", "npm:1.8.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -2622,184 +2618,172 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["@oxc-minify/binding-android-arm-eabi", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-android-arm-eabi-npm-0.136.0-747a1fe316/node_modules/@oxc-minify/binding-android-arm-eabi/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-android-arm-eabi-npm-0.151.0-2997ea953b/node_modules/@oxc-minify/binding-android-arm-eabi/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-android-arm-eabi", "npm:0.136.0"]\
+          ["@oxc-minify/binding-android-arm-eabi", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-android-arm64", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-android-arm64-npm-0.136.0-0ed9cea265/node_modules/@oxc-minify/binding-android-arm64/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-android-arm64-npm-0.151.0-cef435ded9/node_modules/@oxc-minify/binding-android-arm64/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-android-arm64", "npm:0.136.0"]\
+          ["@oxc-minify/binding-android-arm64", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-darwin-arm64", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-darwin-arm64-npm-0.136.0-490509dfc0/node_modules/@oxc-minify/binding-darwin-arm64/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-darwin-arm64-npm-0.151.0-42ab1192c9/node_modules/@oxc-minify/binding-darwin-arm64/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-darwin-arm64", "npm:0.136.0"]\
+          ["@oxc-minify/binding-darwin-arm64", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-darwin-x64", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-darwin-x64-npm-0.136.0-5727e891c3/node_modules/@oxc-minify/binding-darwin-x64/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-darwin-x64-npm-0.151.0-cb59bbda4f/node_modules/@oxc-minify/binding-darwin-x64/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-darwin-x64", "npm:0.136.0"]\
+          ["@oxc-minify/binding-darwin-x64", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-freebsd-x64", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-freebsd-x64-npm-0.136.0-f96ca25b23/node_modules/@oxc-minify/binding-freebsd-x64/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-freebsd-x64-npm-0.151.0-f5c2ea6cd1/node_modules/@oxc-minify/binding-freebsd-x64/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-freebsd-x64", "npm:0.136.0"]\
+          ["@oxc-minify/binding-freebsd-x64", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-linux-arm-gnueabihf", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-arm-gnueabihf-npm-0.136.0-26795458a5/node_modules/@oxc-minify/binding-linux-arm-gnueabihf/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-arm-gnueabihf-npm-0.151.0-45d0180e66/node_modules/@oxc-minify/binding-linux-arm-gnueabihf/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-linux-arm-gnueabihf", "npm:0.136.0"]\
+          ["@oxc-minify/binding-linux-arm-gnueabihf", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-linux-arm-musleabihf", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-arm-musleabihf-npm-0.136.0-d4833810fa/node_modules/@oxc-minify/binding-linux-arm-musleabihf/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-arm-musleabihf-npm-0.151.0-5c875e957e/node_modules/@oxc-minify/binding-linux-arm-musleabihf/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-linux-arm-musleabihf", "npm:0.136.0"]\
+          ["@oxc-minify/binding-linux-arm-musleabihf", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-linux-arm64-gnu", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-arm64-gnu-npm-0.136.0-7847a2defc/node_modules/@oxc-minify/binding-linux-arm64-gnu/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-arm64-gnu-npm-0.151.0-2f4023917e/node_modules/@oxc-minify/binding-linux-arm64-gnu/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-linux-arm64-gnu", "npm:0.136.0"]\
+          ["@oxc-minify/binding-linux-arm64-gnu", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-linux-arm64-musl", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-arm64-musl-npm-0.136.0-d0c006d9a9/node_modules/@oxc-minify/binding-linux-arm64-musl/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-arm64-musl-npm-0.151.0-ca4013d042/node_modules/@oxc-minify/binding-linux-arm64-musl/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-linux-arm64-musl", "npm:0.136.0"]\
+          ["@oxc-minify/binding-linux-arm64-musl", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-linux-ppc64-gnu", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-ppc64-gnu-npm-0.136.0-0dee3a9dc8/node_modules/@oxc-minify/binding-linux-ppc64-gnu/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-ppc64-gnu-npm-0.151.0-454750f3b6/node_modules/@oxc-minify/binding-linux-ppc64-gnu/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-linux-ppc64-gnu", "npm:0.136.0"]\
+          ["@oxc-minify/binding-linux-ppc64-gnu", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-linux-riscv64-gnu", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-riscv64-gnu-npm-0.136.0-a07942aafa/node_modules/@oxc-minify/binding-linux-riscv64-gnu/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-riscv64-gnu-npm-0.151.0-be107c2078/node_modules/@oxc-minify/binding-linux-riscv64-gnu/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-linux-riscv64-gnu", "npm:0.136.0"]\
+          ["@oxc-minify/binding-linux-riscv64-gnu", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-linux-riscv64-musl", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-riscv64-musl-npm-0.136.0-51d5f77439/node_modules/@oxc-minify/binding-linux-riscv64-musl/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-riscv64-musl-npm-0.151.0-6f3698334c/node_modules/@oxc-minify/binding-linux-riscv64-musl/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-linux-riscv64-musl", "npm:0.136.0"]\
+          ["@oxc-minify/binding-linux-riscv64-musl", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-linux-s390x-gnu", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-s390x-gnu-npm-0.136.0-5e2cb23fae/node_modules/@oxc-minify/binding-linux-s390x-gnu/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-s390x-gnu-npm-0.151.0-ae9d77110a/node_modules/@oxc-minify/binding-linux-s390x-gnu/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-linux-s390x-gnu", "npm:0.136.0"]\
+          ["@oxc-minify/binding-linux-s390x-gnu", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-linux-x64-gnu", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-x64-gnu-npm-0.136.0-6fd056695a/node_modules/@oxc-minify/binding-linux-x64-gnu/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-x64-gnu-npm-0.151.0-895486bc16/node_modules/@oxc-minify/binding-linux-x64-gnu/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-linux-x64-gnu", "npm:0.136.0"]\
+          ["@oxc-minify/binding-linux-x64-gnu", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-linux-x64-musl", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-x64-musl-npm-0.136.0-6ec1300adf/node_modules/@oxc-minify/binding-linux-x64-musl/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-linux-x64-musl-npm-0.151.0-e09cce4c66/node_modules/@oxc-minify/binding-linux-x64-musl/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-linux-x64-musl", "npm:0.136.0"]\
+          ["@oxc-minify/binding-linux-x64-musl", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-openharmony-arm64", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-openharmony-arm64-npm-0.136.0-6bd9894063/node_modules/@oxc-minify/binding-openharmony-arm64/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-openharmony-arm64-npm-0.151.0-7de729b285/node_modules/@oxc-minify/binding-openharmony-arm64/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-openharmony-arm64", "npm:0.136.0"]\
-        ],\
-        "linkType": "HARD"\
-      }]\
-    ]],\
-    ["@oxc-minify/binding-wasm32-wasi", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-wasm32-wasi-npm-0.136.0-b1b17edb8f/node_modules/@oxc-minify/binding-wasm32-wasi/",\
-        "packageDependencies": [\
-          ["@emnapi/core", "npm:1.11.1"],\
-          ["@emnapi/runtime", "npm:1.11.1"],\
-          ["@napi-rs/wasm-runtime", "virtual:b1b17edb8fb757b622aba72dad1ff5bbb39d5cd056d44e3c1bc74ef24a706c660f2db8943ce6f90469d349bbfac4bc08461d805d3fc7d344975dcf937e6732b8#npm:1.2.4"],\
-          ["@oxc-minify/binding-wasm32-wasi", "npm:0.136.0"]\
+          ["@oxc-minify/binding-openharmony-arm64", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-win32-arm64-msvc", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-win32-arm64-msvc-npm-0.136.0-2aad09bce1/node_modules/@oxc-minify/binding-win32-arm64-msvc/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-win32-arm64-msvc-npm-0.151.0-52f074def6/node_modules/@oxc-minify/binding-win32-arm64-msvc/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-win32-arm64-msvc", "npm:0.136.0"]\
+          ["@oxc-minify/binding-win32-arm64-msvc", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-win32-ia32-msvc", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-win32-ia32-msvc-npm-0.136.0-2e461f32b7/node_modules/@oxc-minify/binding-win32-ia32-msvc/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-win32-ia32-msvc-npm-0.151.0-45fdcde910/node_modules/@oxc-minify/binding-win32-ia32-msvc/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-win32-ia32-msvc", "npm:0.136.0"]\
+          ["@oxc-minify/binding-win32-ia32-msvc", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
     ]],\
     ["@oxc-minify/binding-win32-x64-msvc", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-win32-x64-msvc-npm-0.136.0-144bcdf06c/node_modules/@oxc-minify/binding-win32-x64-msvc/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "./.yarn/unplugged/@oxc-minify-binding-win32-x64-msvc-npm-0.151.0-f98607dc60/node_modules/@oxc-minify/binding-win32-x64-msvc/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-win32-x64-msvc", "npm:0.136.0"]\
+          ["@oxc-minify/binding-win32-x64-msvc", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -3245,8 +3229,8 @@ const RAW_RUNTIME_STATE =
       ["workspace:user/Supervisor/ui", {\
         "packageLocation": "./user/Supervisor/ui/",\
         "packageDependencies": [\
-          ["@bytecodealliance/jco", "npm:1.35.0"],\
-          ["@bytecodealliance/preview2-shim", "npm:0.26.0"],\
+          ["@bytecodealliance/jco", "npm:1.41.0"],\
+          ["@bytecodealliance/preview2-shim", "npm:0.31.0"],\
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@psibase/supervisor-ui", "workspace:user/Supervisor/ui"],\
           ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.101.0"],\
@@ -3302,8 +3286,8 @@ const RAW_RUNTIME_STATE =
       ["workspace:local/XAdmin/ui", {\
         "packageLocation": "./local/XAdmin/ui/",\
         "packageDependencies": [\
-          ["@bytecodealliance/jco", "npm:1.35.0"],\
-          ["@bytecodealliance/preview2-shim", "npm:0.26.0"],\
+          ["@bytecodealliance/jco", "npm:1.41.0"],\
+          ["@bytecodealliance/preview2-shim", "npm:0.31.0"],\
           ["@hookform/resolvers", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.4.0"],\
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@psibase/xadmin-ui", "workspace:local/XAdmin/ui"],\
@@ -7482,14 +7466,6 @@ const RAW_RUNTIME_STATE =
           ["tslib", "npm:2.8.1"]\
         ],\
         "linkType": "HARD"\
-      }],\
-      ["npm:0.10.4", {\
-        "packageLocation": "../.caches/yarn/@tybys-wasm-util-npm-0.10.4-5e98901564-27947f254e.zip/node_modules/@tybys/wasm-util/",\
-        "packageDependencies": [\
-          ["@tybys/wasm-util", "npm:0.10.4"],\
-          ["tslib", "npm:2.8.1"]\
-        ],\
-        "linkType": "HARD"\
       }]\
     ]],\
     ["@types/argparse", [\
@@ -9408,10 +9384,10 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "HARD"\
       }],\
-      ["npm:130.0.0", {\
-        "packageLocation": "../.caches/yarn/binaryen-npm-130.0.0-cd6aeb2b35-58a155ea42.zip/node_modules/binaryen/",\
+      ["npm:132.0.0", {\
+        "packageLocation": "../.caches/yarn/binaryen-npm-132.0.0-9bf0c30e6a-05e23f27ef.zip/node_modules/binaryen/",\
         "packageDependencies": [\
-          ["binaryen", "npm:130.0.0"]\
+          ["binaryen", "npm:132.0.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -9945,18 +9921,18 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["componentize-qjs", [\
-      ["npm:0.4.5", {\
-        "packageLocation": "../.caches/yarn/componentize-qjs-npm-0.4.5-2036a58909-5731cf199d.zip/node_modules/componentize-qjs/",\
+      ["npm:0.5.0", {\
+        "packageLocation": "../.caches/yarn/componentize-qjs-npm-0.5.0-3dc5c66612-14769d4bfc.zip/node_modules/componentize-qjs/",\
         "packageDependencies": [\
-          ["@andreiltd/componentize-qjs-binding-darwin-arm64", "npm:0.4.5"],\
-          ["@andreiltd/componentize-qjs-binding-darwin-x64", "npm:0.4.5"],\
-          ["@andreiltd/componentize-qjs-binding-linux-arm64-gnu", "npm:0.4.5"],\
-          ["@andreiltd/componentize-qjs-binding-linux-arm64-musl", "npm:0.4.5"],\
-          ["@andreiltd/componentize-qjs-binding-linux-x64-gnu", "npm:0.4.5"],\
-          ["@andreiltd/componentize-qjs-binding-linux-x64-musl", "npm:0.4.5"],\
-          ["@andreiltd/componentize-qjs-binding-win32-arm64-msvc", "npm:0.4.5"],\
-          ["@andreiltd/componentize-qjs-binding-win32-x64-msvc", "npm:0.4.5"],\
-          ["componentize-qjs", "npm:0.4.5"]\
+          ["@andreiltd/componentize-qjs-binding-darwin-arm64", "npm:0.5.0"],\
+          ["@andreiltd/componentize-qjs-binding-darwin-x64", "npm:0.5.0"],\
+          ["@andreiltd/componentize-qjs-binding-linux-arm64-gnu", "npm:0.5.0"],\
+          ["@andreiltd/componentize-qjs-binding-linux-arm64-musl", "npm:0.5.0"],\
+          ["@andreiltd/componentize-qjs-binding-linux-x64-gnu", "npm:0.5.0"],\
+          ["@andreiltd/componentize-qjs-binding-linux-x64-musl", "npm:0.5.0"],\
+          ["@andreiltd/componentize-qjs-binding-win32-arm64-msvc", "npm:0.5.0"],\
+          ["@andreiltd/componentize-qjs-binding-win32-x64-msvc", "npm:0.5.0"],\
+          ["componentize-qjs", "npm:0.5.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -11719,6 +11695,15 @@ const RAW_RUNTIME_STATE =
         "packagePeers": [\
           "@types/picomatch",\
           "picomatch"\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["fflate", [\
+      ["npm:0.8.3", {\
+        "packageLocation": "../.caches/yarn/fflate-npm-0.8.3-35acaff861-eab181ca37.zip/node_modules/fflate/",\
+        "packageDependencies": [\
+          ["fflate", "npm:0.8.3"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -14180,30 +14165,29 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["oxc-minify", [\
-      ["npm:0.136.0", {\
-        "packageLocation": "../.caches/yarn/oxc-minify-npm-0.136.0-437b49aa7f-78a84b771b.zip/node_modules/oxc-minify/",\
+      ["npm:0.151.0", {\
+        "packageLocation": "../.caches/yarn/oxc-minify-npm-0.151.0-e93daf668d-b0287f83d0.zip/node_modules/oxc-minify/",\
         "packageDependencies": [\
-          ["@oxc-minify/binding-android-arm-eabi", "npm:0.136.0"],\
-          ["@oxc-minify/binding-android-arm64", "npm:0.136.0"],\
-          ["@oxc-minify/binding-darwin-arm64", "npm:0.136.0"],\
-          ["@oxc-minify/binding-darwin-x64", "npm:0.136.0"],\
-          ["@oxc-minify/binding-freebsd-x64", "npm:0.136.0"],\
-          ["@oxc-minify/binding-linux-arm-gnueabihf", "npm:0.136.0"],\
-          ["@oxc-minify/binding-linux-arm-musleabihf", "npm:0.136.0"],\
-          ["@oxc-minify/binding-linux-arm64-gnu", "npm:0.136.0"],\
-          ["@oxc-minify/binding-linux-arm64-musl", "npm:0.136.0"],\
-          ["@oxc-minify/binding-linux-ppc64-gnu", "npm:0.136.0"],\
-          ["@oxc-minify/binding-linux-riscv64-gnu", "npm:0.136.0"],\
-          ["@oxc-minify/binding-linux-riscv64-musl", "npm:0.136.0"],\
-          ["@oxc-minify/binding-linux-s390x-gnu", "npm:0.136.0"],\
-          ["@oxc-minify/binding-linux-x64-gnu", "npm:0.136.0"],\
-          ["@oxc-minify/binding-linux-x64-musl", "npm:0.136.0"],\
-          ["@oxc-minify/binding-openharmony-arm64", "npm:0.136.0"],\
-          ["@oxc-minify/binding-wasm32-wasi", "npm:0.136.0"],\
-          ["@oxc-minify/binding-win32-arm64-msvc", "npm:0.136.0"],\
-          ["@oxc-minify/binding-win32-ia32-msvc", "npm:0.136.0"],\
-          ["@oxc-minify/binding-win32-x64-msvc", "npm:0.136.0"],\
-          ["oxc-minify", "npm:0.136.0"]\
+          ["@oxc-minify/binding-android-arm-eabi", "npm:0.151.0"],\
+          ["@oxc-minify/binding-android-arm64", "npm:0.151.0"],\
+          ["@oxc-minify/binding-darwin-arm64", "npm:0.151.0"],\
+          ["@oxc-minify/binding-darwin-x64", "npm:0.151.0"],\
+          ["@oxc-minify/binding-freebsd-x64", "npm:0.151.0"],\
+          ["@oxc-minify/binding-linux-arm-gnueabihf", "npm:0.151.0"],\
+          ["@oxc-minify/binding-linux-arm-musleabihf", "npm:0.151.0"],\
+          ["@oxc-minify/binding-linux-arm64-gnu", "npm:0.151.0"],\
+          ["@oxc-minify/binding-linux-arm64-musl", "npm:0.151.0"],\
+          ["@oxc-minify/binding-linux-ppc64-gnu", "npm:0.151.0"],\
+          ["@oxc-minify/binding-linux-riscv64-gnu", "npm:0.151.0"],\
+          ["@oxc-minify/binding-linux-riscv64-musl", "npm:0.151.0"],\
+          ["@oxc-minify/binding-linux-s390x-gnu", "npm:0.151.0"],\
+          ["@oxc-minify/binding-linux-x64-gnu", "npm:0.151.0"],\
+          ["@oxc-minify/binding-linux-x64-musl", "npm:0.151.0"],\
+          ["@oxc-minify/binding-openharmony-arm64", "npm:0.151.0"],\
+          ["@oxc-minify/binding-win32-arm64-msvc", "npm:0.151.0"],\
+          ["@oxc-minify/binding-win32-ia32-msvc", "npm:0.151.0"],\
+          ["@oxc-minify/binding-win32-x64-msvc", "npm:0.151.0"],\
+          ["oxc-minify", "npm:0.151.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -15742,7 +15726,7 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./",\
         "packageDependencies": [\
           ["@babel/template", "npm:7.29.7"],\
-          ["@bytecodealliance/jco", "npm:1.35.0"],\
+          ["@bytecodealliance/jco", "npm:1.41.0"],\
           ["@dicebear/collection", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.4.2"],\
           ["@dicebear/core", "npm:9.4.2"],\
           ["@eslint/js", "npm:9.39.4"],\
@@ -16539,6 +16523,18 @@ const RAW_RUNTIME_STATE =
           ["minipass", "npm:7.1.3"],\
           ["minizlib", "npm:3.1.0"],\
           ["tar", "npm:7.5.16"],\
+          ["yallist", "npm:5.0.0"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:7.5.23", {\
+        "packageLocation": "../.caches/yarn/tar-npm-7.5.23-271bb77336-41324dc475.zip/node_modules/tar/",\
+        "packageDependencies": [\
+          ["@isaacs/fs-minipass", "npm:4.0.1"],\
+          ["chownr", "npm:3.0.0"],\
+          ["minipass", "npm:7.1.3"],\
+          ["minizlib", "npm:3.1.0"],\
+          ["tar", "npm:7.5.23"],\
           ["yallist", "npm:5.0.0"]\
         ],\
         "linkType": "HARD"\
@@ -17673,6 +17669,15 @@ const RAW_RUNTIME_STATE =
           ["wasm-transpiled", "workspace:local/XAdmin/ui/wasm"]\
         ],\
         "linkType": "SOFT"\
+      }]\
+    ]],\
+    ["web-streams-polyfill", [\
+      ["npm:4.2.0", {\
+        "packageLocation": "../.caches/yarn/web-streams-polyfill-npm-4.2.0-ca5b71e575-d7a5ece7a0.zip/node_modules/web-streams-polyfill/",\
+        "packageDependencies": [\
+          ["web-streams-polyfill", "npm:4.2.0"]\
+        ],\
+        "linkType": "HARD"\
       }]\
     ]],\
     ["webidl-conversions", [\

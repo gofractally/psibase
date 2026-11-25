@@ -28,13 +28,15 @@ export interface PluginPostDetails {
     body: BodyType;
 }
 
-/// Imports exposed to privileged plugins
+/// Imports exposed to privileged plugins.
+/// Under JSPI, sendRequest returns a Promise so jco can wrap it with
+/// WebAssembly.Suspending; without JSPI it returns HttpResponse synchronously.
 export interface BridgeImports {
     "supervisor:bridge/intf": {
         sendRequest: (
             req: HttpRequest,
             withCredentials?: boolean,
-        ) => HttpResponse;
+        ) => HttpResponse | Promise<HttpResponse>;
         serviceStack: () => string[];
         getRootDomain: () => string;
         getChainId: () => string;
