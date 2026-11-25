@@ -13,7 +13,8 @@ import unittest
 import os
 import time
 from predicates import *
-from services import Tokens, Transact, XAdmin
+from services import AuthSig, Tokens, Transact, XAdmin
+from psinode import PrivateKey
 import websockets
 from test_websocket import websocket_url
 
@@ -229,6 +230,59 @@ class TestUsage(unittest.TestCase):
         self.assertEqual(total['trialOk'], 0)
 
     @testutil.psinode_test
+    def test_signature_and_compile(self, cluster):
+        # A signed transaction costs a signature check, and a transaction
+        # that needs code this node has not compiled costs a compile. Both
+        # are charged to whoever pushed the transaction.
+        (a,) = cluster.complete(*testutil.generate_names(1), env={'PSIBASE_NATIVE_AOT_CACHE': os.path.join(cluster.dir, 'fresh-aot-cache')})
+        a.boot(packages=['Minimal', 'Explorer', 'TokenUsers'])
+        a.push_action('alice', 'tokens', 'debit', FAUCET_DEBIT)
+        a.wait(new_block())
+        key = PrivateKey()
+        AuthSig(a).set_key('alice', key)
+        a.wait(new_block())
+
+        signer = forwarded_api(a, '198.51.100.20')
+        Transact(signer).push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":100}, "memo":"signed"}, keys=[key])
+        def verified():
+            usage = me(signer)['usage']
+            return usage if usage and int(usage['total']['verifyRuns']) >= 1 and int(usage['total']['trialOk']) >= 1 else None
+        total = counters(wait_for(verified)['total'])
+        self.assertEqual(total['trxPushed'], 1)
+        self.assertGreaterEqual(total['verifyRuns'], 1)
+        self.assertGreater(total['verifyNs'], 0)
+        # An unsigned transaction from another client costs no signature check
+        other = forwarded_api(a, '198.51.100.21')
+        Transact(other).push_action('bob', 'tokens', 'debit', FAUCET_DEBIT)
+        def pushed():
+            usage = me(other)['usage']
+            return usage if usage and int(usage['total']['trialOk']) >= 1 else None
+        self.assertEqual(counters(wait_for(pushed)['total'])['verifyRuns'], 0)
+
+        # New code: whoever pushes the transaction whose trial run has to
+        # compile it pays for the compile; the others do not. The package
+        # is installed by the operator's own client (local:unix) and first
+        # called by an anonymous client.
+        def compile_ns(api):
+            return counters(me(api)['usage']['total'])['compileNs']
+        before = {'signer': compile_ns(signer), 'other': compile_ns(other)}
+        local_before = wait_for(lambda: identity(a, 'local:unix'))['total']['compileNs']
+        a.install(sources=[testutil.test_packages()], packages=['Counter'])
+        a.wait(new_block())
+        caller = forwarded_api(a, '198.51.100.22')
+        Transact(caller).push_action('bob', 'counter', 'inc', {"key":"","id":0})
+        def compiled():
+            local = identity(a, 'local:unix')['total']['compileNs'] - local_before
+            usage = me(caller)['usage']
+            called = int(usage['total']['compileNs']) if usage else 0
+            return (local, called) if usage and int(usage['total']['trialOk']) >= 1 and local + called > 0 else None
+        (local, called) = wait_for(compiled)
+        print('compile charged: local:unix %d ns, the first caller %d ns' % (local, called))
+        self.assertGreater(local + called, 0)
+        self.assertEqual(compile_ns(signer), before['signer'])
+        self.assertEqual(compile_ns(other), before['other'])
+
+    @testutil.psinode_test
     async def test_websocket(self, cluster):
         (a,) = cluster.complete(*testutil.generate_names(1))
         XAdmin(a).install(os.path.join(testutil.test_packages(), "WSEcho.psi"))
@@ -259,12 +313,19 @@ class TestUsage(unittest.TestCase):
         a = testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer', 'TokenUsers'])
         a.push_action('alice', 'tokens', 'debit', FAUCET_DEBIT)
         a.wait(new_block())
+        # alice signs: a forwarded transaction costs the receiving node a
+        # signature check too, and the peer connection pays for it
+        key = PrivateKey()
+        AuthSig(a).set_key('alice', key)
+        a.wait(new_block())
         entry = prods[2]
         entry.wait(new_block())
+        time.sleep(2)
         peers_before = [kind_total(node, 'peer')['trxPushed'] for node in prods]
+        verify_before = [kind_total(node, 'peer')['verifyRuns'] for node in prods]
 
         anon = forwarded_api(entry)
-        Transact(anon).push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":100}, "memo":"forward"})
+        Transact(anon).push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":100}, "memo":"forward"}, keys=[key])
 
         def pushed():
             usage = me(anon)['usage']
@@ -277,6 +338,13 @@ class TestUsage(unittest.TestCase):
         peers_after = wait_for(forwarded)
         # The entry node did not receive its own transaction from a peer
         self.assertEqual(peers_after[2], peers_before[2])
+        self.assertGreaterEqual(counters(me(anon)['usage']['total'])['verifyRuns'], 1)
+        def verified():
+            now = [kind_total(node, 'peer') for node in prods]
+            return now if sum(n['verifyRuns'] for n in now) > sum(verify_before) else None
+        peer_totals = wait_for(verified)
+        self.assertEqual(peer_totals[2]['verifyRuns'], verify_before[2])
+        self.assertGreater(sum(n['verifyNs'] for n in peer_totals), 0)
         for node in prods[0:2]:
             # No client of these nodes pushed anything
             self.assertEqual(kind_total(node, 'ip')['trxPushed'], 0)
