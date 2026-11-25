@@ -36,7 +36,7 @@ namespace psibase
       SharedState(SharedDatabase db, psibase::WasmCache wasmCache);
       ~SharedState();
 
-      std::vector<std::span<const char>> dbSpan() const;
+      std::filesystem::path databaseDirectory() const;
       std::vector<std::span<const char>> codeSpan() const;
       std::vector<std::span<const char>> linearMemorySpan() const;
 

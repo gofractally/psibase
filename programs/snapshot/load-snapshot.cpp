@@ -48,11 +48,11 @@ void read_footer_row(SnapshotFooter& footer, std::span<const char> key, std::spa
 {
    if (key.size() == 3 && key[0] == 0 && key[1] == StateChecksum::table && key[2] == 0)
    {
-      footer.hash = psio::from_frac<StateChecksum>(value);
+      footer.hash = psio::from_pssz<StateChecksum>(value);
    }
    else if (key.size() >= 3 && key[0] == 0 && key[1] == StateSignature::table && key[2] == 0)
    {
-      footer.signatures.push_back(psio::from_frac<StateSignature>(value));
+      footer.signatures.push_back(psio::from_pssz<StateSignature>(value));
    }
 }
 
@@ -87,10 +87,10 @@ std::string keyId(const psibase::Claim& claim)
    {
       auto fingerprint = keyFingerprint(SystemService::AuthSig::SubjectPublicKeyInfo{
           .data = {claim.rawData.begin(), claim.rawData.end()}});
-      return psio::hex(fingerprint.data(), fingerprint.data() + 32, {':'});
+      return psio::to_hex(fingerprint.data(), fingerprint.data() + 32, {':'});
    }
    else
-      return psio::convert_to_json(claim);
+      return psio::to_ijson(claim);
 }
 
 std::size_t weakThreshold(const psibase::BftConsensus& c)
@@ -147,13 +147,13 @@ int verifyHeaders(psibase::TestChain&          chain,
       }
       else
       {
-         auto key  = psio::composite_key(psibase::blockDataPrefix(), info.header.commitNum);
+         auto key  = psio::to_key(std::tuple{psibase::blockDataPrefix(), info.header.commitNum});
          auto size = raw::kvGreaterEqual(chain.nativeHandle(), psibase::BlockDataRow::db,
                                          key.data(), key.size(), key.size());
          if (size != -1)
          {
             auto aux         = psibase::getResult(size);
-            auxConsensusData = psio::from_frac<psibase::BlockDataRow>(aux).auxConsensusData;
+            auxConsensusData = psio::from_pssz<psibase::BlockDataRow>(aux).auxConsensusData;
          }
       }
       if (auto consensusChange = validator.push(psibase::SignedBlock{
@@ -232,7 +232,7 @@ int verifySignatures(std::uint32_t                  authServices,
       psibase::VerifyArgs args{hash, sig.claim, sig.rawData};
       psibase::Action     act{.service = sig.claim.service,
                               .method  = psibase::MethodNumber{"verifySys"},
-                              .rawData = psio::to_frac(args)};
+                              .rawData = psio::to_pssz(args)};
       auto trace = tester::runAction(authServices, psibase::RunMode::verify, false, act);
       if (!trace.error || trace.error->empty())
       {
@@ -382,7 +382,7 @@ std::vector<psibase::BlockHeaderAuthAccount> getAuthServices(std::uint32_t chain
 {
    std::vector<psibase::BlockHeaderAuthAccount> result;
 
-   auto key   = psio::convert_to_key(psibase::codePrefix());
+   auto key   = psio::encode(psio::key{}, psibase::codePrefix());
    auto value = std::vector<char>();
    auto match = key.size();
    while (true)
@@ -395,7 +395,7 @@ std::vector<psibase::BlockHeaderAuthAccount> getAuthServices(std::uint32_t chain
       raw::getResult(value.data(), value.size(), 0);
       key.resize(raw::getKey(nullptr, 0));
       raw::getKey(key.data(), key.size());
-      auto row = psio::from_frac<psibase::CodeRow>(value);
+      auto row = psio::from_pssz<psibase::CodeRow>(value);
 
       if (row.flags & psibase::CodeRow::isVerify)
       {
@@ -595,8 +595,8 @@ int main(int argc, const char* const* argv)
    }
    raw::commitState(handle);
    std::cerr << "Snapshot successfully loaded\n"
-             << "Chain: " << psio::hex(newStatus->chainId.begin(), newStatus->chainId.end())
+             << "Chain: " << psio::to_hex(newStatus->chainId.begin(), newStatus->chainId.end())
              << "\nHead: "
-             << psio::hex(newStatus->head->blockId.begin(), newStatus->head->blockId.end())
+             << psio::to_hex(newStatus->head->blockId.begin(), newStatus->head->blockId.end())
              << std::endl;
 }
