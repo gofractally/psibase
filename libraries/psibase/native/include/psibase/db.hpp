@@ -142,6 +142,25 @@ namespace psibase
                                                        DbId                  db,
                                                        std::span<const char> key);
 
+      // Several puts and removes of native rows published together: one
+      // acquisition of the subjective write lock for the whole batch. For
+      // native code that writes many rows off the request path (the usage
+      // meter's periodic flush); keep a batch small, since subjective
+      // commits wait while it is applied.
+      struct SubjectiveWrite
+      {
+         std::vector<char>                key;
+         std::optional<std::vector<char>> value;  // empty: remove
+      };
+      void kvWriteSubjective(Writer& writer, DbId db, std::span<const SubjectiveWrite> writes);
+      // Every row whose key starts with `prefix`, in key order, from the
+      // current published state.
+      void kvScanSubjective(
+          Writer&               reader,
+          DbId                  db,
+          std::span<const char> prefix,
+          const std::function<void(std::span<const char> key, std::span<const char> value)>& f);
+
       IndependentRevision getSubjective();
       bool                commitSubjective(Writer&                writer,
                                            IndependentRevision&   original,

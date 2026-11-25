@@ -8,6 +8,7 @@ namespace psibase
    struct WatchdogManager;
    struct Sockets;
    struct Mount;
+   class UsageMeter;
 
    struct SystemContext
    {
@@ -17,6 +18,9 @@ namespace psibase
       std::shared_ptr<WatchdogManager> watchdogManager;
       std::shared_ptr<Sockets>         sockets;
       std::shared_ptr<Mount>           mountpoints;
+      // Node-local usage metering (gofractally/psibase#2270). Null where
+      // nothing meters (the tester); every measuring point checks.
+      std::shared_ptr<UsageMeter> usage;
 
       void setNumMemories(size_t n)
       {
@@ -44,6 +48,7 @@ namespace psibase
 
       std::shared_ptr<Sockets> sockets();
       std::shared_ptr<Mount>   mountpoints();
+      std::shared_ptr<UsageMeter> usage();
 
       std::unique_ptr<SystemContext> getSystemContext();
       void                           addSystemContext(std::unique_ptr<SystemContext> context);

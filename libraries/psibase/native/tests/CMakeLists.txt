@@ -29,6 +29,12 @@ target_link_directories(SecretsTests PRIVATE ${ICU_LIBRARY_DIR})
 target_link_libraries(SecretsTests psibase Catch2::Catch2WithMain Threads::Threads)
 add_test(NAME SecrestsTests COMMAND SecretsTests)
 
+add_executable(UsageMeterTests UsageMeterTests.cpp)
+target_link_directories(UsageMeterTests PRIVATE ${ICU_LIBRARY_DIR})
+target_link_libraries(UsageMeterTests PRIVATE psibase Catch2::Catch2WithMain Threads::Threads)
+add_test(NAME UsageMeterTests COMMAND UsageMeterTests)
+set_tests_properties(UsageMeterTests PROPERTIES TIMEOUT 60)
+
 add_executable(PsitriDatabaseTests PsitriDatabaseTests.cpp)
 target_compile_definitions(PsitriDatabaseTests PRIVATE PSIBASE_STORAGE_TEST_ROOT="${ROOT_BINARY_DIR}/storage-contract-databases")
 target_link_directories(PsitriDatabaseTests PRIVATE ${ICU_LIBRARY_DIR})
