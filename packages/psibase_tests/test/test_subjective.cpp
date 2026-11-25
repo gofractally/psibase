@@ -38,8 +38,9 @@ TEST_CASE("subjective db")
    {
       for (int i = 0; i < 4; ++i)
       {
-         CHECK(subjective.testRFail1("a", b, i).failed(
-             "subjectiveCheckout is required to access the subjective database"));
+         // Reading needs no section: outside one it is a read of what is
+         // published (gofractally/psibase#2276).
+         CHECK(subjective.testRFail1("a", b, i).succeeded());
       }
    }
    for (int i = 0; i < 4; ++i)
@@ -48,7 +49,7 @@ TEST_CASE("subjective db")
                 .failed("key prefix must match service"));
    }
    CHECK(subjective.testWFail1("a", "b").failed(
-       "subjectiveCheckout is required to access the subjective database"));
+       "subjectiveCheckout is required to write the subjective database"));
 
    for (bool b : {false, true})
    {

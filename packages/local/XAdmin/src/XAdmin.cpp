@@ -116,13 +116,11 @@ namespace LocalService
 
       std::optional<std::string> getEnv(const std::string& name)
       {
-         auto                  native   = Native::session(KvMode::read);
-         auto                  envTable = native.open<EnvTable>();
-         std::optional<EnvRow> env;
-         PSIBASE_SUBJECTIVE_TX
-         {
-            env = envTable.get(name);
-         }
+         // A read needs no section: outside one it is a read of what was
+         // published last and takes no lock (gofractally/psibase#2276).
+         auto native   = Native::session(KvMode::read);
+         auto envTable = native.open<EnvTable>();
+         auto env      = envTable.get(name);
          if (env)
             return std::move(env->value);
          else
@@ -169,12 +167,8 @@ namespace LocalService
 
       SocketEndpoint getEndpoint(std::int32_t socket)
       {
-         std::optional<SocketRow> row;
-         auto                     native = Native::session(KvMode::read);
-         PSIBASE_SUBJECTIVE_TX
-         {
-            row = native.open<SocketTable>().get(socket);
-         }
+         auto native = Native::session(KvMode::read);
+         auto row    = native.open<SocketTable>().get(socket);
          check(row.has_value(), "Missing socket row");
          check(std::holds_alternative<HttpSocketInfo>(row->info), "Wrong socket type");
          const auto& info = std::get<HttpSocketInfo>(row.value().info);
@@ -586,13 +580,9 @@ namespace LocalService
             }
             else
             {
-               bool hasAccounts;
-               PSIBASE_SUBJECTIVE_TX
+               if (!XAdmin{}.open<AdminAccountTable>().getIndex<0>().empty())
                {
-                  if (!XAdmin{}.open<AdminAccountTable>().getIndex<0>().empty())
-                  {
-                     return Auth::Unauthenticated{{"Bearer realm=\"psibase\""}};
-                  }
+                  return Auth::Unauthenticated{{"Bearer realm=\"psibase\""}};
                }
             }
          }
@@ -606,12 +596,7 @@ namespace LocalService
          bool                    operator()(Auth::Account&& account)
          {
             hasUser = true;
-            bool result;
-            PSIBASE_SUBJECTIVE_TX
-            {
-               result = XAdmin{}.open<AdminAccountTable>().get(account.value).has_value();
-            }
-            return result;
+            return XAdmin{}.open<AdminAccountTable>().get(account.value).has_value();
          }
          bool operator()(Auth::LocalUsername&& username)
          {
@@ -744,12 +729,7 @@ namespace LocalService
    {
       auto sender = getSender();
       check(sender == XHttp::service || sender == XPeers::service, "Wrong sender");
-      std::optional<AdminOptionsRow> result;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         result = open<AdminOptionsTable>().get({});
-      }
-      return result.value_or(AdminOptionsRow{});
+      return open<AdminOptionsTable>().get({}).value_or(AdminOptionsRow{});
    }
 
    // Returns nullopt on success, an appropriate error on failure
@@ -782,11 +762,8 @@ namespace LocalService
       {
          if (*account == XAdmin::service)
             return true;
-         PSIBASE_SUBJECTIVE_TX
-         {
-            if (open<AdminAccountTable>().get(*account).has_value())
-               return true;
-         }
+         if (open<AdminAccountTable>().get(*account).has_value())
+            return true;
       }
       return isAdminSocket(socket, forwarded);
    }
@@ -1049,6 +1026,7 @@ namespace LocalService
             std::vector<AccountNumber> result;
             PSIBASE_SUBJECTIVE_TX
             {
+               result.clear();
                for (auto row : adminAccounts.getIndex<0>())
                {
                   result.push_back(row.account);
