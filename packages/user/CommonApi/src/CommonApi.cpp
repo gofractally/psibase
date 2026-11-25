@@ -81,6 +81,49 @@ namespace SystemService
          return HttpHeader{"Set-Cookie", cookieValue};
       }
 
+      // application/x-www-form-urlencoded value
+      std::string formDecode(std::string_view in)
+      {
+         auto hex = [](char c) -> int
+         {
+            if (c >= '0' && c <= '9')
+               return c - '0';
+            if (c >= 'a' && c <= 'f')
+               return c - 'a' + 10;
+            if (c >= 'A' && c <= 'F')
+               return c - 'A' + 10;
+            return -1;
+         };
+         std::string out;
+         for (std::size_t i = 0; i < in.size(); ++i)
+         {
+            if (in[i] == '+')
+               out += ' ';
+            else if (in[i] == '%' && i + 2 < in.size() && hex(in[i + 1]) >= 0 &&
+                     hex(in[i + 2]) >= 0)
+            {
+               out += static_cast<char>(hex(in[i + 1]) * 16 + hex(in[i + 2]));
+               i += 2;
+            }
+            else
+               out += in[i];
+         }
+         return out;
+      }
+
+      std::optional<std::string> formField(std::string_view body, std::string_view name)
+      {
+         while (!body.empty())
+         {
+            auto item = body.substr(0, body.find('&'));
+            body.remove_prefix(std::min(body.size(), item.size() + 1));
+            auto eq = item.find('=');
+            if (eq != std::string_view::npos && item.substr(0, eq) == name)
+               return formDecode(item.substr(eq + 1));
+         }
+         return std::nullopt;
+      }
+
       HttpHeader allowCredentials()
       {
          return HttpHeader{"Access-Control-Allow-Credentials", "true"};
@@ -212,6 +255,87 @@ namespace SystemService
                 .body        = psio::to_pssz(extractData<SignedTransaction>(request)),
                 .headers     = allowCors(),
             };
+         }
+         // The last step of sign-in. The supervisor's sign-in page sends the
+         // browser here with a top-level form post, so the session cookie is
+         // set first-party and every browser keeps it; the reply returns the
+         // browser to the page it asked for.
+         //
+         // Only the supervisor origin may do this. Any other page posting
+         // here could plant its own session in the visitor's browser.
+         if (request.target == "/common/accept-session")
+         {
+            auto plain = [](HttpStatus status, std::string_view msg)
+            {
+               return HttpReply{.status      = status,
+                                .contentType = "text/plain",
+                                .body        = std::vector(msg.begin(), msg.end()),
+                                .headers     = {{"Cache-Control", "no-store"}}};
+            };
+            if (allowCorsFrom(request, "supervisor"_a).empty())
+               return plain(HttpStatus::forbidden, "Sign-in must come from the supervisor");
+            if (request.contentType != "application/x-www-form-urlencoded")
+               return plain(HttpStatus::unsupportedMediaType, "Expected a form post");
+
+            std::string_view body{request.body.data(), request.body.size()};
+            auto             token  = formField(body, "token");
+            auto             path   = formField(body, "path").value_or("/");
+            auto             maxAge = formField(body, "maxAge").value_or("0");
+            int              age    = 0;
+            for (char c : maxAge)
+            {
+               if (c < '0' || c > '9' || age > 100'000'000)
+                  return plain(HttpStatus::badRequest, "Bad maxAge");
+               age = age * 10 + (c - '0');
+            }
+            // The destination stays on this host.
+            if (!token || !isValidCookieValue(*token) || path.empty() || path[0] != '/' ||
+                path.starts_with("//") || path.find('\\') != std::string::npos ||
+                path.find_first_of("\r\n") != std::string::npos)
+               return plain(HttpStatus::badRequest, "Bad sign-in request");
+
+            // Not a redirect: the cookie is SameSite=Strict, so it is only
+            // sent on a navigation this host starts itself. This page is
+            // served by this host and continues to the destination.
+            std::string escaped;
+            for (char c : path)
+            {
+               switch (c)
+               {
+                  case '&':
+                     escaped += "&amp;";
+                     break;
+                  case '"':
+                     escaped += "&quot;";
+                     break;
+                  case '\'':
+                     escaped += "&#39;";
+                     break;
+                  case '<':
+                     escaped += "&lt;";
+                     break;
+                  case '>':
+                     escaped += "&gt;";
+                     break;
+                  default:
+                     escaped += c;
+               }
+            }
+            std::string page =
+                "<!doctype html><html><head><meta charset=\"utf-8\">"
+                "<meta name=\"referrer\" content=\"no-referrer\">"
+                "<meta http-equiv=\"refresh\" content=\"0;url=" +
+                escaped +
+                "\"><title>Signing in</title></head><body><a href=\"" + escaped +
+                "\">Continue</a></body></html>";
+            return HttpReply{
+                .status      = HttpStatus::ok,
+                .contentType = "text/html",
+                .body        = std::vector(page.begin(), page.end()),
+                .headers     = {setCookieHeader("SESSION", *token, age, true),
+                                {"Cache-Control", "no-store"},
+                                {"Content-Security-Policy",
+                                 "default-src 'none'; base-uri 'none'; form-action 'none'"}}};
          }
          if (request.target == "/common/set-host-cookie")
          {

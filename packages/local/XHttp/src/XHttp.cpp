@@ -698,6 +698,33 @@ auto XHttp::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
       return reply;
    }
 
+   if (target == "/transport_policy")
+   {
+      auto headers = allowCors(request, {XAdmin::service});
+      if (request.method == "PUT")
+      {
+         if (request.contentType != "application/json")
+            return error(HttpStatus::unsupportedMediaType,
+                         "Content-Type must be application/json");
+         auto body = psio::from_ijson<TransportPolicyRow>(request.body);
+         PSIBASE_SUBJECTIVE_TX
+         {
+            open<TransportPolicyTable>().put(body);
+         }
+         return HttpReply{.headers = std::move(headers)};
+      }
+      if (request.method != "GET")
+         return HttpReply::methodNotAllowed(request);
+      TransportPolicyRow row;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         row = open<TransportPolicyTable>().get({}).value_or(TransportPolicyRow{});
+      }
+      HttpReply reply{.contentType = "application/json", .headers = std::move(headers)};
+      psio::to_ijson(row, reply.body);
+      return reply;
+   }
+
    if (target == "/unregister_server")
    {
       if (request.method != "POST")
@@ -722,6 +749,77 @@ auto XHttp::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
 
 #ifndef PSIBASE_GENERATE_SCHEMA
 
+namespace
+{
+   // True when a request must be refused because it did not come over TLS.
+   //
+   // A request is acceptable when any of these holds:
+   // - the connection is TLS;
+   // - a proxy says the client used https (X-Forwarded-Proto / Forwarded);
+   // - a proxy forwarded it without saying which: the node cannot tell, and
+   //   refusing would lock out a correctly secured site whose proxy omits
+   //   the header, so the proxy is trusted to enforce https itself;
+   // - it is a direct local connection (loopback, a Unix socket or an admin
+   //   address): node administration and tools on the same machine;
+   // - the node's host is a localhost name, where browsers treat plain http
+   //   as a secure context.
+   bool insecureTransport(std::int32_t sock, const HttpRequestRef& req, std::string_view rootHost)
+   {
+      bool required = true;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         required = XHttp{}
+                        .open<TransportPolicyTable>()
+                        .get({})
+                        .value_or(TransportPolicyRow{})
+                        .requireHttps;
+      }
+      if (!required)
+         return false;
+      // Read directly: isSecure() is for services that own the socket, and
+      // nobody owns it yet.
+      {
+         std::optional<SocketRow> row;
+         PSIBASE_SUBJECTIVE_TX
+         {
+            row = Native::session(KvMode::read).open<SocketTable>().get(sock);
+         }
+         if (row && hasTls(row->info))
+            return false;
+      }
+
+      auto bare = rootHost.substr(0, rootHost.find(':'));
+      if (bare == "localhost" || bare.ends_with(".localhost"))
+         return false;
+
+      bool forwarded = false;
+      for (const auto& header : req.headers)
+      {
+         if (header.matches("x-forwarded-proto"))
+            return !iequal(header.value, "https");
+         if (header.matches("forwarded"))
+         {
+            std::string lower;
+            for (char c : header.value)
+               lower += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            if (lower.find("proto=https") != std::string::npos)
+               return false;
+            if (lower.find("proto=http") != std::string::npos)
+               return true;
+            forwarded = true;
+         }
+         else if (header.matches("x-forwarded-for"))
+            forwarded = true;
+      }
+      if (forwarded)
+         return false;
+
+      return !to<XAdmin>().isAdmin(std::optional<AccountNumber>{},
+                                   std::optional<std::int32_t>{sock},
+                                   std::vector<std::optional<IPAddress>>{});
+   }
+}  // namespace
+
 extern "C" [[clang::export_name("serve")]] void serve()
 {
    auto act                    = getCurrentActionView();
@@ -735,6 +833,22 @@ extern "C" [[clang::export_name("serve")]] void serve()
    if (rootHost.empty())
    {
       sendNotFound(sock, req);
+      return;
+   }
+
+   if (insecureTransport(sock, req, rootHost))
+   {
+      // The redirect goes to the default https port: the request's host
+      // carries no port, and the node cannot know where a proxy listens.
+      bool canRedirect = req.method == "GET" || req.method == "HEAD";
+      auto reply = canRedirect
+                       ? redirect(HttpStatus::permanentRedirect,
+                                  R"(<html><body>This server requires a secure connection: {}</body></html>)",
+                                  "https://" + req.host + req.target)
+                       : error(HttpStatus::forbidden,
+                               "<html><body>This server requires a secure (https) "
+                               "connection.</body></html>");
+      psibase::socketSend(sock, psio::to_pssz(std::move(reply)));
       return;
    }
 

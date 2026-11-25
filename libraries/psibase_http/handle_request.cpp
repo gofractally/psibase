@@ -150,12 +150,25 @@ namespace psibase::http
       const http_config& config;
       unsigned           req_version;
       bool               req_keep_alive;
+      // Whether replies tell the browser to use https for this host from
+      // now on: the connection is TLS and the host is not a localhost name.
+      // (The rule ignores ports, so on localhost it would break every other
+      // plain-http development server under the same name.)
+      bool strict_transport = false;
 
-      HttpReplyBuilder(server_state& server, const http_session_base::request_type& req)
+      HttpReplyBuilder(server_state&                          server,
+                       const http_session_base::request_type& req,
+                       bool                                   secure = false)
           : config(*server.http_config),
             req_version(req.version()),
             req_keep_alive(req.keep_alive())
       {
+         if (secure)
+         {
+            std::string_view host = req[bhttp::field::host];
+            host                  = host.substr(0, host.find(':'));
+            strict_transport = host != "localhost" && !host.ends_with(".localhost");
+         }
       }
 
       void setCors(auto& res, bool allow_cors) const
@@ -170,6 +183,9 @@ namespace psibase::http
 
       void setKeepAlive(auto& res) const
       {
+         if (strict_transport)
+            res.set(bhttp::field::strict_transport_security,
+                    "max-age=31536000; includeSubDomains");
          bool keep_alive = req_keep_alive && !config.status.load().shutdown;
          res.keep_alive(keep_alive);
          if (keep_alive)
@@ -491,7 +507,7 @@ namespace psibase::http
       {
          runNativeHandler(
              request_handler,
-             [builder = HttpReplyBuilder{session->server, req}](auto&& result)
+             [builder = HttpReplyBuilder{session->server, req, session->is_secure()}](auto&& result)
              {
                 return std::visit(
                     [&](auto& body)
@@ -519,7 +535,7 @@ namespace psibase::http
       {
          runNativeHandler(
              request_handler,
-             [builder = HttpReplyBuilder{session->server, req}](auto&& result)
+             [builder = HttpReplyBuilder{session->server, req, session->is_secure()}](auto&& result)
              {
                 std::vector<char> data;
                 if (auto status = psio::encode_json_checked(psio::ijson{}, result, data);
@@ -534,7 +550,7 @@ namespace psibase::http
       void runNativeHandlerNoContent(auto&& request_handler)
       {
          runNativeHandler(request_handler,
-                          [builder = HttpReplyBuilder{session->server, req}](auto&& result)
+                          [builder = HttpReplyBuilder{session->server, req, session->is_secure()}](auto&& result)
                           {
                              if (result)
                              {
@@ -552,7 +568,7 @@ namespace psibase::http
       {
          runNativeHandler(
              request_handler,
-             [builder = HttpReplyBuilder{session->server, req}, content_type](auto&& result)
+             [builder = HttpReplyBuilder{session->server, req, session->is_secure()}, content_type](auto&& result)
              {
                 return std::visit(
                     [&](auto& body)
@@ -572,7 +588,7 @@ namespace psibase::http
 
       void runNativeHandlerGenericNoFail(auto& request_handler, const char* content_type)
       {
-         runNativeHandler(request_handler, [builder = HttpReplyBuilder{session->server, req},
+         runNativeHandler(request_handler, [builder = HttpReplyBuilder{session->server, req, session->is_secure()},
                                             content_type](auto&& result)
                           { return builder.ok(result(), content_type); });
       };
@@ -581,7 +597,7 @@ namespace psibase::http
       {
          server_state&      server = session->server;
          http_session_base& send   = *session;
-         HttpReplyBuilder   builder{server, req};
+         HttpReplyBuilder   builder{server, req, send.is_secure()};
          auto [req_host, req_target] = parse_request_target(req);
 
          session->pause_read = false;
@@ -766,7 +782,7 @@ namespace psibase::http
                        http_session_base&                send)
    {
       auto [req_host, req_target] = parse_request_target(req);
-      HttpReplyBuilder builder{server, req};
+      HttpReplyBuilder builder{server, req, send.is_secure()};
 
       try
       {

@@ -64,7 +64,6 @@ const readDestination = (): Destination => {
 };
 
 const destination = readDestination();
-const destinationUrl = siblingOrigin(destination.app) + destination.path;
 
 // ------------------------------------------------------------------ views
 
@@ -282,24 +281,32 @@ const guestLogin = async (prf: PrfResult): Promise<GuestSession> => {
     };
 };
 
-/** Gives the destination app its session cookie. */
-const installCookie = async (session: GuestSession) => {
+/**
+ * Hands the session to the destination app and goes there.
+ *
+ * This is a top-level form post, not a background request: the app's host
+ * sets its own cookie as the page the visitor is navigating to, which every
+ * browser keeps, and then redirects to the page that was asked for. The
+ * token travels in the request body, never in a URL.
+ */
+const submitSession = (session: GuestSession) => {
     const maxAge = Math.max(0, session.exp - Math.floor(Date.now() / 1000));
-    const res = await fetch(
-        `${siblingOrigin(destination.app)}/common/set-host-cookie`,
-        {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                name: "SESSION",
-                value: session.token,
-                maxAge,
-                httpOnly: true,
-            }),
-        },
-    );
-    if (!res.ok) throw new Error("Could not start a session for this app.");
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = `${siblingOrigin(destination.app)}/common/accept-session`;
+    form.hidden = true;
+    const field = (name: string, value: string) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = name;
+        input.value = value;
+        form.append(input);
+    };
+    field("token", session.token);
+    field("path", destination.path);
+    field("maxAge", String(maxAge));
+    document.body.append(form);
+    form.submit();
 };
 
 // ------------------------------------------------------------ return leg
@@ -315,7 +322,6 @@ const returnedRecently = (): boolean => {
 };
 
 const goToDestination = async (session: GuestSession, celebrate: boolean) => {
-    await installCookie(session);
     window.sessionStorage.setItem(BOUNCE_KEY, String(Date.now()));
     if (celebrate) {
         $("done-detail").textContent = destination.explicit
@@ -324,7 +330,7 @@ const goToDestination = async (session: GuestSession, celebrate: boolean) => {
         show("done");
         await new Promise((r) => setTimeout(r, 900));
     }
-    window.location.replace(destinationUrl);
+    submitSession(session);
 };
 
 // ------------------------------------------------------------------ flow

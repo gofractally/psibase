@@ -42,6 +42,17 @@ namespace LocalService
    using IdentityGateTable = psibase::Table<IdentityGateRow, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(IdentityGateTable)
 
+   /// Node policy: whether a request that arrives without TLS is refused.
+   /// On unless an operator turns it off. See `insecureTransport` in
+   /// XHttp.cpp for exactly which requests count.
+   struct TransportPolicyRow
+   {
+      bool requireHttps = true;
+      PSIO_REFLECT(TransportPolicyRow, requireHttps)
+   };
+   using TransportPolicyTable = psibase::Table<TransportPolicyRow, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(TransportPolicyTable)
+
    /// Entry point for sockets
    struct XHttp : psibase::Service
    {
@@ -50,7 +61,7 @@ namespace LocalService
       static constexpr auto commonService = psibase::AccountNumber("x-common");
       static constexpr auto commonPrefix  = "/common/";
 
-      using Subjective = psibase::SubjectiveTables<RegServTable, IdentityGateTable>;
+      using Subjective = psibase::SubjectiveTables<RegServTable, IdentityGateTable, TransportPolicyTable>;
 
       /// A request from a local connection (loopback, a Unix socket or an
       /// admin address) that carries this header and no forwarding header
