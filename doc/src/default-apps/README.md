@@ -16,7 +16,8 @@ System apps are the applications responsible for the core functionality of the n
 - [setcode](setcode.md)
 - [staged-tx](staged-tx.md)
 - [transact](transact.md)
-- [verify-sig]()
+- [verify-k1]()
+- [verify-r1]()
 
 ## Additional apps
 

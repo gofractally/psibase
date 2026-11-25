@@ -70,14 +70,16 @@ TaPoS must be attached to every transaction submitted to a psibase network. In a
 ```json
 {
   "service": "...",     // The service which verifies the proof meets
-                        // the claim, e.g. "verify-sig"
+                        // the claim, e.g. "verify-k1"
   "rawData": "..."      // Hex string containing the claim data.
-                        // e.g. `verify-sig` expects a public key
+                        // e.g. `verify-k1` expects a public key
                         // (the DER bytes of a SubjectPublicKeyInfo).
 }
 ```
 
-`Proof` is a hex string containing data which proves the claim. e.g. `verify-sig` expects a signature. See [Signing (js)](#signing-js) to fill claims and proofs.
+Each kind of key has its own verifier service, and a claim for a key must name the verifier for that key's kind: `verify-k1` for secp256k1 keys and `verify-r1` for secp256r1 (P-256) keys. `signTransaction` and the `verifierFor` function of the common library choose it from the key.
+
+`Proof` is a hex string containing data which proves the claim. e.g. `verify-k1` expects a signature (64 bytes, `r || s`, low-S). See [Signing (js)](#signing-js) to fill claims and proofs.
 
 ### Pack signed transaction
 
