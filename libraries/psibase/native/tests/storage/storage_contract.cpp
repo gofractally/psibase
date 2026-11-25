@@ -111,6 +111,40 @@ int main(int argc, char** argv)
    };
    try
    {
+      test("more threads read one database than the engine has session slots",
+           [&]
+           {
+              // gofractally/psibase#2273: the engine has 64 session slots per
+              // database and ends the process when asked for a 65th. Every
+              // thread that reads counts, also one that has since exited.
+              database db(base / "many-readers", config, open_mode::create_new);
+              shared_root top;
+              {
+                 auto w = db.start_write_session();
+                 top    = w->get_top_root();
+                 put(*w, top, "key", "value");
+                 w->set_top_root(top);
+              }
+              auto read = [&]
+              {
+                 auto r = db.start_read_session();
+                 require(get(*r, top, "key") == "value", "a reader missed the value");
+              };
+              // 100 threads, one after another: each leaves its reader behind.
+              for (unsigned i = 0; i < 100; ++i)
+                 std::thread(read).join();
+              // 100 threads at once, each reading repeatedly.
+              std::vector<std::thread> threads;
+              for (unsigned i = 0; i < 100; ++i)
+                 threads.emplace_back(
+                     [&]
+                     {
+                        for (unsigned n = 0; n < 50; ++n)
+                           read();
+                     });
+              for (auto& thread : threads)
+                 thread.join();
+           });
       test("temporary stores never adopt a stale same-process name",
            [&]
            {
