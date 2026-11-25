@@ -209,6 +209,9 @@ namespace psibase::vm_wasmtime
       std::shared_ptr<NativeAotCache>              artifacts;
       std::atomic<std::uint64_t>                   compiled{0};
       std::atomic<std::uint64_t>                   loaded{0};
+      // Of those, the modules that went to the engine without a pool.
+      std::atomic<std::uint64_t>                   compiledPoolless{0};
+      std::atomic<std::uint64_t>                   loadedPoolless{0};
       // Whether the services of this cache run with debugging support. Fixed
       // for the cache's lifetime: its modules belong to that mode's engines.
       const bool                                   debug = vm::serviceDebugging();
@@ -280,6 +283,8 @@ namespace psibase::vm_wasmtime
                      }
                   }();
                   ++loaded;
+                  if (module.poolless)
+                     ++loadedPoolless;
                   PSIBASE_LOG(loggers::generic::get(), debug)
                       << "Service code " << loggers::to_string(hash) << " (vmVersion "
                       << unsigned(vmVersion) << ") loaded from the compiled-module cache";
@@ -315,6 +320,8 @@ namespace psibase::vm_wasmtime
          }();
          auto& module = result.module;
          ++compiled;
+         if (result.poolless)
+            ++compiledPoolless;
          std::size_t stored = 0;
          if (artifacts)
          {
@@ -431,7 +438,8 @@ namespace psibase::vm_wasmtime
 
       WasmCacheStats stats() const override
       {
-         return {compiled.load(), loaded.load(), artifacts ? artifacts->discarded() : 0};
+         return {compiled.load(), loaded.load(), artifacts ? artifacts->discarded() : 0,
+                 compiledPoolless.load(), loadedPoolless.load()};
       }
 
       void add(const Checksum256& hash,

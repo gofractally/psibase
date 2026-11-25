@@ -29,6 +29,11 @@ namespace psibase
       std::uint64_t compiled  = 0;  ///< modules compiled from wasm
       std::uint64_t loaded    = 0;  ///< modules taken from the artifact store
       std::uint64_t discarded = 0;  ///< stored artifacts that failed verification
+      /// Of `compiled` and of `loaded`, the modules that do not fit a slot of
+      /// the engine's instance pool and were taken by the engine without one
+      /// (wasmtime; gofractally/psibase#2272).
+      std::uint64_t compiledPoolless = 0;
+      std::uint64_t loadedPoolless   = 0;
    };
 
    class NativeAotCache;

@@ -840,3 +840,61 @@ TEST_CASE("A module at the ceilings that size an instance at once is stored and 
    setLimits(fixture, limits);
    storeAndRun(fixture, m.build());
 }
+
+TEST_CASE("A module too large for an instance-pool slot is loaded from the artifact store "
+          "after a restart",
+          "[limits]")
+{
+   if (!isWasmtime())
+      SKIP("counts compiles and loads, which only the wasmtime engine reports");
+   // A table of 1,048,576 elements against the 65,536 of a pool slot: the
+   // pooled engine takes this module neither from wasm nor from a stored
+   // artifact (gofractally/psibase#2272).
+   const auto limits = psibase::vmOptionsAtCeiling();
+   const auto code   = [&]
+   {
+      for (const auto& probe : limitProbes())
+         if (probe.member == "max_table_elements")
+            return probe.module(limits.max_table_elements);
+      throw std::runtime_error("no probe");
+   }();
+   TempDirectory artifacts;
+   // A node that is started over the same artifact store: nothing compiled
+   // is in memory. The code is stored as a write of its row does, which asks
+   // for the module, made the code of a new account and called there. What is
+   // counted is what the cache did for this module alone: the fixture's own
+   // services were compiled or loaded before.
+   auto run = [&]
+   {
+      NativeService fixture{artifacts.path / "modules"};
+      setLimits(fixture, limits);
+      const psibase::AccountNumber account{"vm-limit"};
+      CodeWriter                   writer{fixture};
+      REQUIRE_NOTHROW(writer.put(psibase::DbId::native, code));
+      REQUIRE(writer.stored(psibase::DbId::native, code));
+      psibase::CodeRow row{.codeNum = account, .codeHash = CodeWriter::row(code).codeHash};
+      fixture.block.db.kvPut(row.db, row.key(), row);
+      // Its start returns: the instance was created and ran.
+      CHECK_NOTHROW(fixture.called(writer.transaction, account));
+      auto stats = fixture.cache.stats();
+      stats.compiled -= writer.before.compiled;
+      stats.loaded -= writer.before.loaded;
+      stats.compiledPoolless -= writer.before.compiledPoolless;
+      stats.loadedPoolless -= writer.before.loadedPoolless;
+      stats.discarded -= writer.before.discarded;
+      return stats;
+   };
+   auto stats = run();
+   CHECK(stats.compiled == 1);
+   CHECK(stats.compiledPoolless == 1);
+   CHECK(stats.loaded == 0);
+   CHECK(stats.loadedPoolless == 0);
+   // Restarted: the artifact is loaded, by the engine without a pool, and
+   // the service runs there. Nothing is compiled.
+   stats = run();
+   CHECK(stats.compiled == 0);
+   CHECK(stats.compiledPoolless == 0);
+   CHECK(stats.loaded == 1);
+   CHECK(stats.loadedPoolless == 1);
+   CHECK(stats.discarded == 0);
+}
