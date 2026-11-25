@@ -68,8 +68,12 @@ target_compile_definitions(PsizamTests PRIVATE
     PSIBASE_PSIZAM_SERVICE_WASM="${PSIZAM_SERVICE_WASM}")
 target_link_directories(PsizamTests PRIVATE ${ICU_LIBRARY_DIR})
 target_link_libraries(PsizamTests psibase Catch2::Catch2WithMain Threads::Threads)
-add_test(NAME PsizamTests COMMAND PsizamTests)
+add_test(NAME PsizamTests COMMAND PsizamTests "~[limits]")
 set_tests_properties(PsizamTests PROPERTIES TIMEOUT 30)
+# The wasm limits (VmLimitsTests.inc): modules at the ceilings take seconds
+# to build and compile, and up to a few GB while they do.
+add_test(NAME VmLimitsTests COMMAND PsizamTests "[limits]")
+set_tests_properties(VmLimitsTests PROPERTIES TIMEOUT 600 PROCESSORS 4)
 
 # Service debugging (psinode --debug-services) is the default engine's to
 # provide, and that engine is wasmtime. The test links the debugger interface

@@ -149,7 +149,7 @@ namespace psibase
           std::uint8_t(checked_kind),
           gas_metering, limit_table_growth, defer_start, enable_exception_handling,
           enable_atomics, enable_relaxed_simd, enable_tail_calls, enable_simd,
-          enable_bulk_memory, max_memory_section_elements, stack_usage_for_call,
+          enable_bulk_memory, stack_usage_for_call,
           backtrace, byteStack, std::uint32_t(sizeof(void*)), std::uint64_t(::sysconf(_SC_PAGESIZE)),
           std::string(psizam::native_aot_build_identity()), std::string(PSIBASE_NATIVE_AOT_HOST_ID)});
 #else
@@ -171,8 +171,38 @@ namespace psibase
       if (nativeArtifacts) nativeArtifacts->store(identity, artifact);
    }
 
+   void checkVMOptionCeilings(const VMOptions& options)
+   {
+      for (const auto& entry : vmOptionCeilings)
+         if (options.*entry.member > entry.ceiling)
+            throw std::runtime_error("wasm configuration: " + std::string(entry.name) + " is " +
+                                     std::to_string(options.*entry.member) +
+                                     ", above its ceiling of " + std::to_string(entry.ceiling));
+   }
+
+   VMOptions vmOptionsAtCeiling()
+   {
+      VMOptions result;
+      for (const auto& entry : vmOptionCeilings)
+         result.*entry.member = entry.ceiling;
+      return result;
+   }
+
    namespace
    {
+      [[noreturn]] void exceeds(std::string_view member, std::uint64_t actual, std::uint64_t limit)
+      {
+         throw std::runtime_error("native WASM exceeds " + std::string(member) + ": " +
+                                  std::to_string(actual) + " is more than " +
+                                  std::to_string(limit));
+      }
+#define PSIBASE_VM_LIMIT(options, member, actual)                                    \
+   do                                                                                \
+   {                                                                                 \
+      if (const std::uint64_t value = (actual); value > (options).member) \
+         exceeds(#member, value, (options).member);                                  \
+   } while (false)
+
       struct Reader
       {
          std::span<const std::uint8_t> bytes;
@@ -199,36 +229,162 @@ namespace psibase
             }
             throw std::runtime_error("invalid native WASM integer");
          }
-         void name() { take(u32()); }
+         // A LEB128 integer of any width, not interpreted.
+         void skipInteger()
+         {
+            for (unsigned i = 0; i < 10; ++i)
+               if (!(byte() & 0x80))
+                  return;
+            throw std::runtime_error("invalid native WASM integer");
+         }
+         std::uint32_t name()
+         {
+            auto size = u32();
+            take(size);
+            return size;
+         }
+         // A value type as one byte. The two-byte forms (ref null? heaptype)
+         // belong to the typed function references proposal, which is off:
+         // psizam's parser reads them as funcref or externref, wasmtime
+         // refuses the non-null one.
+         void valueType()
+         {
+            auto type = byte();
+            if (type == 0x63 || type == 0x64)
+               throw std::runtime_error(
+                   "native WASM does not support typed function references");
+         }
+         // A constant expression: one instruction and end. More than one is
+         // the extended constant expressions proposal (i32/i64 add, sub,
+         // mul), which is off: psizam's parser accepts it unconditionally
+         // and wasmtime refuses it (gofractally/psibase#2266).
+         void constantExpression()
+         {
+            switch (byte())
+            {
+               case 0x41:  // i32.const
+               case 0x42:  // i64.const
+               case 0x23:  // global.get
+               case 0xd2:  // ref.func
+                  skipInteger();
+                  break;
+               case 0x43:  // f32.const
+                  take(4);
+                  break;
+               case 0x44:  // f64.const
+                  take(8);
+                  break;
+               case 0xd0:  // ref.null
+                  skipInteger();
+                  break;
+               case 0xfd:  // v128.const
+                  if (u32() != 12)
+                     throw std::runtime_error("invalid native WASM constant expression");
+                  take(16);
+                  break;
+               default:
+                  throw std::runtime_error("invalid native WASM constant expression");
+            }
+            if (byte() != 0x0b)
+               throw std::runtime_error(
+                   "native WASM does not support extended constant expressions");
+         }
+      };
+
+      struct FunctionType
+      {
+         std::uint32_t params  = 0;
+         std::uint32_t results = 0;
       };
    }  // namespace
 
    void validateNativeWasm(std::span<const std::uint8_t> code, const NativeVMOptions& options)
    {
+      PSIBASE_VM_LIMIT(options, max_module_bytes, code.size());
       Reader                 input{code};
       constexpr std::uint8_t header[] = {0, 'a', 's', 'm', 1, 0, 0, 0};
       auto                   actual   = input.take(sizeof(header));
       if (!std::equal(actual.begin(), actual.end(), std::begin(header)))
          throw std::runtime_error("invalid native WASM header");
+      std::vector<FunctionType>  types;
+      // The type index of every function, imported ones first.
+      std::vector<std::uint32_t> functions;
+      std::uint32_t              imported = 0;
+      // wasmparser's "effective type size" of the module's imports and
+      // exports, which wasmtime refuses at 1,000,000.
+      std::uint64_t typeSize = 1;
+      auto          function = [&](std::uint32_t index) -> const FunctionType*
+      {
+         if (index >= functions.size() || functions[index] >= types.size())
+            return nullptr;  // The parser refuses the module.
+         return &types[functions[index]];
+      };
+      auto entity = [&](const FunctionType* type)
+      {
+         typeSize += type ? 2 + std::uint64_t(type->params) + type->results : 1;
+         PSIBASE_VM_LIMIT(options, max_type_size, typeSize);
+      };
       while (!input.bytes.empty())
       {
          auto   id = input.byte();
          Reader section{input.take(input.u32())};
-         if (id == 2)
+         if (id == 0)
+         {
+            PSIBASE_VM_LIMIT(options, max_symbol_bytes, section.name());
+         }
+         else if (id == 1)
          {
             auto count = section.u32();
+            PSIBASE_VM_LIMIT(options, max_type_section_elements, count);
+            types.reserve(std::min<std::size_t>(count, section.bytes.size()));
             while (count--)
             {
-               section.name();
-               section.name();
+               if (section.byte() != 0x60)
+                  throw std::runtime_error("native WASM types must be function types");
+               FunctionType type;
+               type.params = section.u32();
+               PSIBASE_VM_LIMIT(options, max_function_params, type.params);
+               for (auto i = type.params; i--;)
+                  section.valueType();
+               type.results = section.u32();
+               PSIBASE_VM_LIMIT(options, max_function_results, type.results);
+               for (auto i = type.results; i--;)
+                  section.valueType();
+               types.push_back(type);
+            }
+         }
+         else if (id == 2)
+         {
+            auto count = section.u32();
+            PSIBASE_VM_LIMIT(options, max_import_section_elements, count);
+            while (count--)
+            {
+               PSIBASE_VM_LIMIT(options, max_symbol_bytes, section.name());
+               PSIBASE_VM_LIMIT(options, max_symbol_bytes, section.name());
                if (section.byte() != 0)
                   throw std::runtime_error("native WASM permits function imports only");
-               section.u32();
+               functions.push_back(section.u32());
+               ++imported;
+               entity(function(functions.size() - 1));
             }
+         }
+         else if (id == 3)
+         {
+            auto count = section.u32();
+            PSIBASE_VM_LIMIT(options, max_function_section_elements, count);
+            functions.reserve(functions.size() + std::min<std::size_t>(count, section.bytes.size()));
+            while (count--)
+               functions.push_back(section.u32());
          }
          else if (id == 4 || id == 5)
          {
             auto count = section.u32();
+            if (id == 4)
+               PSIBASE_VM_LIMIT(options, max_table_section_elements, count);
+            else
+               PSIBASE_VM_LIMIT(options, max_memory_section_elements, count);
+            // The host interface addresses one table and one memory,
+            // whatever the configuration says.
             if (count > 1)
                throw std::runtime_error("native WASM permits one table and one memory");
             if (count)
@@ -240,14 +396,112 @@ namespace psibase
                   throw std::runtime_error(
                       "native WASM does not support shared or memory64 resources");
                auto initial = section.u32();
-               if (initial > (id == 4 ? options.max_table_elements : options.max_pages))
-                  throw std::runtime_error("native WASM initial resource exceeds chain policy");
+               if (id == 4)
+                  PSIBASE_VM_LIMIT(options, max_table_elements, initial);
+               else
+                  PSIBASE_VM_LIMIT(options, max_pages, initial);
                if (flags)
                {
                   auto maximum = section.u32();
                   if (maximum < initial || (id == 5 && maximum > 65536))
                      throw std::runtime_error("invalid native WASM resource maximum");
                }
+            }
+         }
+         else if (id == 6)
+         {
+            auto count = section.u32();
+            PSIBASE_VM_LIMIT(options, max_global_section_elements, count);
+            while (count--)
+            {
+               section.valueType();
+               section.byte();
+               section.constantExpression();
+            }
+         }
+         else if (id == 7)
+         {
+            auto count = section.u32();
+            PSIBASE_VM_LIMIT(options, max_export_section_elements, count);
+            while (count--)
+            {
+               PSIBASE_VM_LIMIT(options, max_symbol_bytes, section.name());
+               auto kind  = section.byte();
+               auto index = section.u32();
+               entity(kind == 0 ? function(index) : nullptr);
+            }
+         }
+         else if (id == 9)
+         {
+            auto count = section.u32();
+            PSIBASE_VM_LIMIT(options, max_element_section_elements, count);
+            while (count--)
+            {
+               auto flags = section.u32();
+               if (flags > 7)
+                  throw std::runtime_error("invalid native WASM element segment");
+               const bool active      = !(flags & 1);
+               const bool explicitly  = flags & 2;
+               const bool expressions = flags & 4;
+               if (active)
+               {
+                  if (explicitly)
+                     section.u32();  // table index
+                  section.constantExpression();
+               }
+               if (!active || explicitly)
+               {
+                  // An element kind (0) or a reference type.
+                  if (expressions)
+                     section.valueType();
+                  else
+                     section.byte();
+               }
+               auto items = section.u32();
+               PSIBASE_VM_LIMIT(options, max_element_segment_elements, items);
+               while (items--)
+                  if (expressions)
+                     section.constantExpression();
+                  else
+                     section.u32();
+            }
+         }
+         else if (id == 10)
+         {
+            auto count = section.u32();
+            for (std::uint32_t i = 0; i < count; ++i)
+            {
+               auto size = section.u32();
+               PSIBASE_VM_LIMIT(options, max_code_bytes, size);
+               Reader        body{section.take(size)};
+               std::uint64_t locals = 0;
+               if (auto type = function(imported + i))
+                  locals = type->params;
+               for (auto groups = body.u32(); groups--;)
+               {
+                  locals += body.u32();
+                  body.valueType();
+                  PSIBASE_VM_LIMIT(options, max_function_locals, locals);
+               }
+               PSIBASE_VM_LIMIT(options, max_function_locals, locals);
+            }
+         }
+         else if (id == 11)
+         {
+            auto count = section.u32();
+            PSIBASE_VM_LIMIT(options, max_data_section_elements, count);
+            while (count--)
+            {
+               auto flags = section.u32();
+               if (flags > 2)
+                  throw std::runtime_error("invalid native WASM data segment");
+               if (flags == 2)
+                  section.u32();  // memory index
+               if (flags != 1)
+                  section.constantExpression();
+               auto size = section.u32();
+               PSIBASE_VM_LIMIT(options, max_data_segment_bytes, size);
+               section.take(size);
             }
          }
          else if (id == 13)
@@ -389,34 +643,113 @@ namespace psibase
       return result;
    }
 
+   namespace
+   {
+      // psizam's validating parser with a code writer that emits nothing
+      // and checks what the parser has no option for: the parameters of a
+      // block, loop or if.
+      struct AdmissionWriter : psizam::detail::null_writer
+      {
+         using null_writer::null_writer;
+         static inline thread_local std::uint32_t maxBlockParams = 0;
+         static void check(std::uint32_t params)
+         {
+            if (params > maxBlockParams)
+               exceeds("max_block_params", params, maxBlockParams);
+         }
+         void emit_block(std::uint8_t = 0x40, std::uint32_t = 0, std::uint32_t params = 0)
+         {
+            check(params);
+         }
+         label_t emit_loop(std::uint8_t = 0x40, std::uint32_t = 0, std::uint32_t params = 0)
+         {
+            check(params);
+            return {};
+         }
+         branch_t emit_if(std::uint8_t = 0x40, std::uint32_t = 0, std::uint32_t params = 0)
+         {
+            check(params);
+            return {};
+         }
+      };
+
+      // The parser's refusals for the limits validateNativeWasm leaves to
+      // it, by the member of VMOptions they enforce.
+      std::string limitOf(std::string_view detail)
+      {
+         static constexpr std::pair<std::string_view, std::string_view> known[] = {
+             {"mutable globals exceeded limit", "max_mutable_global_bytes"},
+             {"local variable limit exceeded", "max_func_local_bytes"},
+             {"nested structures validation failure", "max_nested_structures"},
+             {"Too many labels in br_table", "max_br_table_elements"},
+         };
+         for (const auto& [message, member] : known)
+            if (detail == message)
+               return "native WASM exceeds " + std::string(member) + ": ";
+         return {};
+      }
+
+      // Both passes of admission; `use` gets the parsed module.
+      template <typename F>
+      void admit(std::span<const std::uint8_t> code, const NativeVMOptions& policy, F&& use)
+      {
+         validateNativeWasm(code, policy);
+         try
+         {
+            // The parser takes the module by mutable reference.
+            psizam::wasm_code              bytes(code.begin(), code.end());
+            psizam::module                 module;
+            psizam::detail::null_debug_info debug;
+            module.allocator.use_default_memory();
+            AdmissionWriter::maxBlockParams = policy.max_block_params;
+            psizam::detail::binary_parser<AdmissionWriter, NativeVMOptions,
+                                          psizam::detail::null_debug_info>{
+                module.allocator, policy, false,
+                psizam::detail::has_max_stack_bytes<NativeVMOptions>}
+                .parse_module(bytes, module, debug);
+            use(module);
+         }
+         catch (const psizam::exception& e)
+         {
+            // psizam reports the reason separately from the kind of error.
+            throw std::runtime_error(limitOf(e.detail()) + std::string(e.what()) + ": " +
+                                     e.detail());
+         }
+      }
+
+      std::vector<std::uint32_t> costsOf(const psizam::module& module)
+      {
+         std::vector<std::uint32_t> result;
+         result.reserve(module.code.size());
+         for (const auto& body : module.code)
+            result.push_back(body.byte_stack_usage);
+         return result;
+      }
+   }  // namespace
+
+   std::vector<std::uint32_t> admitNativeModule(std::span<const std::uint8_t> code,
+                                                const VMOptions&              options,
+                                                std::uint8_t                  vmVersion)
+   {
+      std::vector<std::uint32_t> result;
+      admit(code, NativeVMOptions{options, {}, vmVersion},
+            [&](const psizam::module& module) { result = costsOf(module); });
+      return result;
+   }
+
    NativeAdmission admitNativeWasm(std::span<const std::uint8_t> code,
                                    const VMOptions&              options,
                                    std::uint8_t                  vmVersion)
    {
-      NativeVMOptions policy{options, {}, vmVersion};
-      validateNativeWasm(code, policy);
-      try
-      {
-         // The parser takes the module by mutable reference. This is
-         // psizam::wasmtime::validate_and_cost, keeping the parsed module
-         // long enough to check its imports.
-         psizam::wasm_code bytes(code.begin(), code.end());
-         psizam::backend<std::nullptr_t, psizam::null_backend, NativeVMOptions> validator(
-             bytes, nullptr, policy);
-         const auto& module = validator.get_module();
-         checkImports(module);
-         NativeAdmission result;
-         result.entryPoints = nativeEntryPoints(module);
-         result.costs.reserve(module.code.size());
-         for (const auto& body : module.code)
-            result.costs.push_back(body.byte_stack_usage);
-         return result;
-      }
-      catch (const psizam::exception& e)
-      {
-         // psizam reports the reason separately from the kind of error.
-         throw std::runtime_error(std::string(e.what()) + ": " + e.detail());
-      }
+      NativeAdmission result;
+      admit(code, NativeVMOptions{options, {}, vmVersion},
+            [&](const psizam::module& module)
+            {
+               checkImports(module);
+               result.entryPoints = nativeEntryPoints(module);
+               result.costs       = costsOf(module);
+            });
+      return result;
    }
 
 }  // namespace psibase

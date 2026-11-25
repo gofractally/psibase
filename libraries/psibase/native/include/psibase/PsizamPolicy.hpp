@@ -6,6 +6,7 @@
 #include <psizam/config.hpp>
 #include <psizam/options.hpp>
 #include <span>
+#include <string_view>
 #include <array>
 #include <memory>
 #include <optional>
@@ -41,8 +42,154 @@ namespace psibase
    /// know has none and its code is refused, never run under another policy.
    std::optional<psizam::float_profile> nativeFloatProfile(std::uint8_t vmVersion);
 
-   // Keep chain VMOptions and its wire reflection unchanged. These native-only
-   // choices are explicit instead of inheriting the general runtime defaults.
+   /// The hard ceiling of one member of VMOptions: the lowest absolute limit
+   /// of any supported engine for it (gofractally/psibase#2262). A
+   /// configuration row with a member above its ceiling is refused
+   /// (checkVMOptionCeilings, from verifyWasmConfigRow).
+   struct VMOptionCeiling
+   {
+      std::string_view          name;
+      std::uint32_t VMOptions::*member;
+      std::uint32_t             ceiling;
+      /// Set below a defect that is to be fixed; the string names the
+      /// issue, and what the ceiling becomes afterwards. Empty otherwise.
+      std::string_view temporary;
+      /// The engine and source that set the ceiling.
+      std::string_view source;
+   };
+#define PSIBASE_VM_CEILING(member, ceiling, temporary, source) \
+   VMOptionCeiling { #member, &VMOptions::member, ceiling, temporary, source }
+   // Sources: "WP" is the wasmparser crate wasmtime validates with (0.263.0;
+   // its constants are private and not configurable, so each ceiling is at
+   // or below the stock constant); "WT" the wasmtime fork; "PZ" psizam
+   // (external/psizam/include/psizam); "survey" the measurements recorded on
+   // gofractally/psibase#2262.
+   inline constexpr std::array<VMOptionCeiling, vmOptionCount> vmOptionCeilings = {{
+       PSIBASE_VM_CEILING(max_mutable_global_bytes, 262'144, "",
+           "no engine limit below 2^32; 16 bytes for each of the 16,384 globals allowed"),
+       PSIBASE_VM_CEILING(max_pages, 65'536, "",
+           "wasm32 itself; PZ detail/parser.hpp:752, WP validator/core.rs:803"),
+       PSIBASE_VM_CEILING(max_table_elements, 65'536, "",
+           "the wasmtime adapter: a slot of its instance pool holds a table of 65,536 elements "
+           "(ExecutionContextWasmtime.cpp pool_table_elements), and wasmtime checks a module "
+           "against the pool when it compiles it, so a module with a larger table cannot be "
+           "compiled there (measured: 1,048,576; gofractally/psibase#2272). wasmtime itself has "
+           "no limit below 2^32"),
+       PSIBASE_VM_CEILING(max_stack_bytes, 16 * 1024 * 1024, "",
+           "the wasmtime adapter: 16 native bytes per budget byte in a 256 MiB native stack, "
+           "ExecutionContextWasmtime.cpp nativeStackBytes / nativeBytesPerBudget"),
+       PSIBASE_VM_CEILING(max_module_bytes, 15 * 1024 * 1024, "",
+           "storage: the largest value a row may have, verifyConfigRow maxValueSize"),
+       PSIBASE_VM_CEILING(max_type_section_elements, 60'000,
+           "gofractally/psizam#4: JIT2 packs a call_indirect type index in 16 bits (PZ "
+           "detail/ir_writer.hpp:1666); 60,002 types measured good, 70,002 bad. Then 1,000,000 (WP)",
+           "psizam JIT2; otherwise WP MAX_WASM_TYPES 1,000,000, validator.rs:739"),
+       PSIBASE_VM_CEILING(max_import_section_elements, 10'000, "",
+           "WP MAX_WASM_IMPORTS 1,000,000, validator.rs:767; kept low so that max_type_size is "
+           "the only bound on the size of imports and exports, and for the 4 MiB instance of the "
+           "adapter's pool, see max_global_section_elements"),
+       PSIBASE_VM_CEILING(max_function_section_elements, 100'000, "",
+           "WP MAX_WASM_FUNCTIONS 1,000,000, validator.rs:796; wasmtime needed 5.97 GB to "
+           "compile 1,000,000 empty functions (survey B5), 0.75 GB at this ceiling; and the 4 MiB "
+           "instance of the adapter's pool, see max_global_section_elements"),
+       PSIBASE_VM_CEILING(max_table_section_elements, 1, "",
+           "the node gives a service one table: wasmtime StoreLimits tables = 1, PZ shim "
+           "lib.rs:669; the host interface addresses one table"),
+       PSIBASE_VM_CEILING(max_memory_section_elements, 1, "",
+           "multi-memory is off on wasmtime; the host interface addresses one memory"),
+       PSIBASE_VM_CEILING(max_global_section_elements, 16'384, "",
+           "the wasmtime adapter: a slot of its instance pool holds an instance of 4 MiB (PZ "
+           "wasmtime/shim/src/lib.rs max_core_instance_size) and a module that needs more cannot "
+           "be compiled there. Measured: 32 bytes per function, 32 more per import, 16 per global; "
+           "the 100,000 functions and 10,000 imports allowed take 3.84 MB and leave room for "
+           "these (4.10 MB in all; gofractally/psibase#2272). WP "
+           "MAX_WASM_GLOBALS is 1,000,000, validator.rs:889"),
+       PSIBASE_VM_CEILING(max_export_section_elements, 10'000, "",
+           "WP MAX_WASM_EXPORTS 1,000,000, validator.rs:911; see max_import_section_elements"),
+       PSIBASE_VM_CEILING(max_element_section_elements, 100'000, "",
+           "WP MAX_WASM_ELEMENT_SEGMENTS 100,000, validator.rs:953"),
+       PSIBASE_VM_CEILING(max_data_section_elements, 100'000, "",
+           "WP MAX_WASM_DATA_SEGMENTS 100,000, validator.rs:984"),
+       PSIBASE_VM_CEILING(max_element_segment_elements, 10'000'000, "",
+           "WP MAX_WASM_TABLE_ENTRIES 10,000,000, validator/core.rs:157"),
+       PSIBASE_VM_CEILING(max_data_segment_bytes, 15 * 1024 * 1024, "",
+           "no engine limit; a segment is inside the module (max_module_bytes)"),
+       PSIBASE_VM_CEILING(max_symbol_bytes, 100'000, "",
+           "WP MAX_WASM_STRING_SIZE 100,000, binary_reader.rs:465; for a custom section's name "
+           "applied by the shim's own pass, PZ wasmtime/shim/src/stack_meter.rs:43"),
+       PSIBASE_VM_CEILING(max_type_size, 999'999, "",
+           "WP MAX_WASM_TYPE_SIZE: the size must stay below 1,000,000, validator.rs:88"),
+       PSIBASE_VM_CEILING(max_function_params, 1'000, "",
+           "WP MAX_WASM_FUNCTION_PARAMS 1,000, readers/core/types.rs:2207"),
+       PSIBASE_VM_CEILING(max_function_results, 16, "",
+           "psizam's fixed arrays of 16 results, PZ detail/parser.hpp:827"),
+       PSIBASE_VM_CEILING(max_function_locals, 50'000, "",
+           "WP MAX_WASM_FUNCTION_LOCALS 50,000, parameters included, validator/operators.rs:4803; "
+           "Cranelift block parameters are 16-bit, WT cranelift/codegen/src/ir/dfg.rs:695"),
+       PSIBASE_VM_CEILING(max_func_local_bytes, 128'000,
+           "gofractally/psizam#3: JIT2 miscompiles a function with more than 32,767 spill slots "
+           "(PZ detail/jit_ir.hpp:455); 32,000 values live at once measured good, 33,000 bad, and "
+           "a value is at least 4 bytes. This bounds values live at once only: see the note on "
+           "the issue. Then the ceiling of max_stack_bytes",
+           "psizam JIT2; otherwise a function costing more than max_stack_bytes cannot be called"),
+       PSIBASE_VM_CEILING(max_code_bytes, 7'654'321, "",
+           "WP MAX_WASM_FUNCTION_SIZE 7,654,321, validator.rs:1033"),
+       PSIBASE_VM_CEILING(max_br_table_elements, 65'520, "",
+           "Cranelift translator MAX_BR_TABLE_TARGETS 65,520, WT crates/cranelift/src/lib.rs:64. "
+           "Also below gofractally/psizam#5 (JIT1 aarch64 refuses a br_table between 100,000 and "
+           "1,000,000 targets)"),
+       PSIBASE_VM_CEILING(max_nested_structures, 100'000, "",
+           "no engine limit found; 1,000,000 nested blocks cost 0.3 to 1.25 GB to compile "
+           "(survey row 25)"),
+       PSIBASE_VM_CEILING(max_block_params, 16,
+           "gofractally/psizam#5: JIT2 holds 16 block parameters (PZ detail/jit_ir.hpp:491); an "
+           "if with 17 is refused by its compiler. Then 1,000 (WP, as max_function_params)",
+           "psizam JIT2; otherwise WP MAX_WASM_FUNCTION_PARAMS 1,000"),
+   }};
+#undef PSIBASE_VM_CEILING
+   // Every member of VMOptions has exactly one entry: the table has one
+   // entry per member (its size is vmOptionCount) and no two entries name
+   // the same member. Adding a member without a ceiling does not compile.
+   static_assert([] {
+      for (std::size_t i = 0; i < vmOptionCeilings.size(); ++i)
+         for (std::size_t j = i + 1; j < vmOptionCeilings.size(); ++j)
+            if (vmOptionCeilings[i].member == vmOptionCeilings[j].member)
+               return false;
+      return true;
+   }(), "two ceilings name the same member of VMOptions, so a member has none");
+   // No default is above its ceiling.
+   static_assert([] {
+      for (const auto& entry : vmOptionCeilings)
+         if (VMOptions{}.*entry.member > entry.ceiling)
+            return false;
+      return true;
+   }(), "a default of VMOptions is above its ceiling");
+
+   /// Throws std::runtime_error naming the member and its ceiling if a member
+   /// of `options` is above its ceiling.
+   void checkVMOptionCeilings(const VMOptions& options);
+   /// Every member at its ceiling.
+   VMOptions vmOptionsAtCeiling();
+
+   // The proposal set, in one place. Admission accepts exactly this, and the
+   // wasmtime adapter enables exactly this (ExecutionContextWasmtime.cpp,
+   // engineOptions: simd, relaxed_simd, bulk_memory, sign_extension,
+   // saturating_float_to_int, reference_types, multi_value, threads; mutable
+   // globals, floats and wide arithmetic come with the engine's base set).
+   //
+   //   on:  mutable globals, sign extension, saturating float-to-int,
+   //        multi-value (results and block parameters limited by VMOptions),
+   //        bulk memory, reference types (funcref and externref values, one
+   //        funcref table), SIMD, relaxed SIMD (deterministic; multiply-add
+   //        per the float profile), atomics instructions (no shared memory),
+   //        wide arithmetic
+   //   off: extended constant expressions (gofractally/psibase#2266), tail
+   //        calls, exception handling, multi-memory, memory64, typed function
+   //        references, GC, stack switching, custom page sizes, components
+   //
+   // psizam's parser has a switch for most of these; the constants below are
+   // those switches. It has none for extended constant expressions and typed
+   // references in declarations: validateNativeWasm refuses them.
    struct NativeVMOptions : VMOptions
    {
       static constexpr auto          fp                          = psizam::fp_mode::softfloat;
@@ -55,13 +202,16 @@ namespace psibase
       static constexpr bool          enable_atomics              = true;
       static constexpr bool          enable_relaxed_simd         = true;
       static constexpr bool          enable_tail_calls           = false;
+      static constexpr bool          enable_sign_ext             = true;
+      static constexpr bool          enable_nontrapping_fptoint  = true;
+      // Not a parser switch: enforced by validateNativeWasm.
+      static constexpr bool          enable_extended_const       = false;
       // Incoming arguments remain live across normal and tail calls. Count
       // their storage in the same deterministic logical budget on every engine.
       static constexpr auto max_func_local_bytes_flags =
           psizam::max_func_local_bytes_flags_t::params |
           psizam::max_func_local_bytes_flags_t::locals |
           psizam::max_func_local_bytes_flags_t::stack;
-      static constexpr std::uint32_t max_memory_section_elements = 1;
 
       // Set from the executing code's version; every engine and the artifact
       // identity take it from here.
@@ -83,8 +233,15 @@ namespace psibase
                             std::span<const char> artifact) const noexcept;
    };
 
-   // Reject resource/import models that the node's single-memory host ABI does
-   // not implement before the general parser allocates or compiles the module.
+   // The first pass of admission, over the module's declarations: every limit
+   // of VMOptions that can be decided without decoding instructions, the
+   // resource and import models the node's host interface does not implement,
+   // and the proposals that are off and that psizam's parser has no switch
+   // for. It runs before the general parser allocates or compiles anything.
+   // Each refusal names the member of VMOptions that was exceeded.
+   // What it leaves to the parser pass of admitNativeWasm:
+   // max_mutable_global_bytes, max_func_local_bytes, max_br_table_elements,
+   // max_nested_structures and max_block_params.
    void validateNativeWasm(std::span<const std::uint8_t> code, const NativeVMOptions& options);
 
    /// The functions the node calls a service through, as the module exports
@@ -120,6 +277,14 @@ namespace psibase
       std::vector<std::uint32_t> costs;
       NativeEntryPoints          entryPoints;
    };
+
+   /// Admission without the rules for a service (imports, entry points):
+   /// validateNativeWasm and psizam's parser and validator under
+   /// NativeVMOptions, with every limit of VMOptions. Returns the stack byte
+   /// cost of each defined function. What tools that probe the limits use.
+   std::vector<std::uint32_t> admitNativeModule(std::span<const std::uint8_t> code,
+                                                const VMOptions&              options,
+                                                std::uint8_t                  vmVersion = 0);
 
    /// The entry points of a module psizam has parsed, checked as above.
    /// admitNativeWasm does this; an engine that parses the module itself

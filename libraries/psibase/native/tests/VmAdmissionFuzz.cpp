@@ -40,9 +40,9 @@ int main(int argc, char** argv)
       std::vector<std::uint32_t> costs;
       try
       {
-         psibase::NativeVMOptions policy{psibase::VMOptions{}};
-         psibase::validateNativeWasm(code, policy);
-         costs = wt::validate_and_cost(code, policy);
+         // The chain's admission under its default limits, without the
+         // rules for a service (imports, entry points).
+         costs = psibase::admitNativeModule(code, psibase::VMOptions{});
       }
       catch (const psizam::exception& e)
       {

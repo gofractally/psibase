@@ -1029,7 +1029,7 @@ TEST_CASE("Service code is admitted when its row is written, in every execution 
        // Syntactically valid, against the chain policy: an imported memory,
        // and a memory larger than max_pages (513 pages against 512).
        {wasmModule({2, 7, 1, 0, 0, 2, 0, 1, 0}), "native WASM permits function imports only"},
-       {wasmModule({5, 4, 1, 0, 0x81, 0x04}), "native WASM initial resource exceeds chain policy"},
+       {wasmModule({5, 4, 1, 0, 0x81, 0x04}), "native WASM exceeds max_pages"},
        // Passes the declaration check and fails psizam's validator: a
        // function declared to return an i32 that returns nothing.
        {wasmModule({1, 5, 1, 0x60, 0, 1, 0x7f, 3, 2, 1, 0, 10, 4, 1, 2, 0, 0x0b}), ""},
@@ -1138,10 +1138,15 @@ TEST_CASE("The first execution of stored code finds it compiled")
 
 TEST_CASE("Code the engine's compiler refuses after admission is stored, not a transaction error")
 {
-   // wasmtime caps a function at 50000 locals; the chain policy bounds
-   // locals by bytes and admits this module (gofractally/psibase#2256). Such
-   // a refusal must not decide the transaction: another engine compiles it.
-   // start and called (empty), and a third function with 50001 i32 locals.
+   // A module the chain admits and wasmtime's compiler refuses. With every
+   // limit a chain value below the engines' own (gofractally/psibase#2262)
+   // the known ones are gone; this is one that is left, a defect
+   // (gofractally/psizam#6): a block whose type is the non-null typed
+   // reference (ref func), which psizam's parser reads as funcref and
+   // wasmtime refuses without the function-references proposal. When that
+   // is fixed this test needs another example. Such a refusal must not
+   // decide the transaction: another engine compiles it.
+   // start and called (empty), and a third function with that block.
    const EntryPoints         entry{0, 0};
    std::vector<std::uint8_t> types{3}, declared{3}, exported{2}, bodies{3};
    types.insert(types.end(), entry.types.begin(), entry.types.end());
@@ -1150,7 +1155,7 @@ TEST_CASE("Code the engine's compiler refuses after admission is stored, not a t
    declared.push_back(2);
    exported.insert(exported.end(), entry.exports.begin(), entry.exports.end());
    bodies.insert(bodies.end(), entry.bodies.begin(), entry.bodies.end());
-   bodies.insert(bodies.end(), {6, 1, 0xd1, 0x86, 0x03, 0x7f, 0x0b});
+   bodies.insert(bodies.end(), {8, 0, 0x02, 0x64, 0x70, 0x00, 0x0b, 0x1a, 0x0b});
    auto code = wasmModule({});
    section(code, 1, types);
    section(code, 3, declared);
@@ -1172,7 +1177,7 @@ TEST_CASE("Code the engine's compiler refuses after admission is stored, not a t
       psibase::CodeRow row{.codeNum = account, .codeHash = CodeWriter::row(code).codeHash};
       fixture.block.db.kvPut(row.db, row.key(), row);
       CHECK_THROWS_WITH(fixture.called(writer.transaction, account),
-                        Catch::Matchers::ContainsSubstring("too many locals"));
+                        Catch::Matchers::ContainsSubstring("function references required"));
    }
 }
 
@@ -1905,7 +1910,7 @@ TEST_CASE("Code this node's compiler refuses does not keep a producer deferring"
    declared.push_back(2);
    exported.insert(exported.end(), entry.exports.begin(), entry.exports.end());
    bodies.insert(bodies.end(), entry.bodies.begin(), entry.bodies.end());
-   bodies.insert(bodies.end(), {6, 1, 0xd1, 0x86, 0x03, 0x7f, 0x0b});
+   bodies.insert(bodies.end(), {8, 0, 0x02, 0x64, 0x70, 0x00, 0x0b, 0x1a, 0x0b});
    auto code = wasmModule({});
    section(code, 1, types);
    section(code, 3, declared);
@@ -2321,3 +2326,5 @@ TEST_CASE("A speculative run's limit measures its execution, not the compiles it
    CHECK(writer.compiled() == 0);
    CHECK(writer.transaction.startedCompileTime == nanoseconds(0));
 }
+
+#include "VmLimitsTests.inc"
