@@ -1,9 +1,10 @@
 #pragma once
 
-#include <boost/beast/http/fields.hpp>
 #include <optional>
 #include <psibase/HttpHeaders.hpp>
 #include <string_view>
+#include <unordered_set>
+#include <vector>
 
 namespace psibase::http
 {
@@ -25,23 +26,32 @@ namespace psibase::http
    }
 
    // One Set-Cookie field per cookie name. A later value replaces the earlier
-   // one and is not comma-joined.
-   inline void mergeSetCookie(boost::beast::http::fields& fields, const HttpHeader& header)
+   // one and is not comma-joined. Headers with no parseable name are kept.
+   inline void dedupeSetCookie(HttpHeaders& headers)
    {
-      if (auto name = cookieName(header.value))
+      std::unordered_set<std::string_view> seen;
+      std::vector<std::uint8_t>            keep(headers.size(), 1);
+      for (std::size_t i = headers.size(); i-- > 0;)
       {
-         for (auto it = fields.begin(); it != fields.end();)
+         const auto& h = headers[i];
+         if (!h.matches("set-cookie"))
+            continue;
+         if (auto name = cookieName(h.value))
          {
-            if (iequal(it->name_string(), "set-cookie") && cookieName(it->value()) == name)
-            {
-               it = fields.erase(it);
-               continue;
-            }
-            ++it;
+            if (!seen.insert(*name).second)
+               keep[i] = 0;
          }
       }
-      // No cookie-name: RFC 6265 §5.2 ignores the pair. Still emit the field;
-      // nothing identifies an earlier field to replace.
-      fields.insert(header.name, header.value);
+
+      std::size_t write = 0;
+      for (std::size_t i = 0; i < headers.size(); ++i)
+      {
+         if (!keep[i])
+            continue;
+         if (write != i)
+            headers[write] = std::move(headers[i]);
+         ++write;
+      }
+      headers.resize(write);
    }
 }  // namespace psibase::http
