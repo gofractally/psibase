@@ -428,9 +428,7 @@ TEST_CASE("a section holds the write lock: the next writer waits and sees what i
    {
       Database reader(shared, shared.emptyRevision());
       auto     s3 = reader.startRead();
-      reader.checkoutSubjectiveRead();
       REQUIRE(value(reader, DbId::subjective, "a") == "<missing>");
-      reader.abortSubjective();
    }
    REQUIRE(called == 0);
    REQUIRE(first.commitSubjective(sockets, closing));
@@ -448,16 +446,26 @@ TEST_CASE("a section holds the write lock: the next writer waits and sees what i
    REQUIRE(std::string(b->begin(), b->end()) == "second");
 }
 
-TEST_CASE("a read-only section cannot write", "[storage][psitri]")
+TEST_CASE("outside a section reads see what is published and writes are refused",
+          "[storage][psitri]")
 {
-   SharedDatabase shared(directory("readonly-section"), config,
-                         psibase::storage::open_mode::create_new);
-   Database       db(shared, shared.emptyRevision());
-   auto           session = db.startWrite(shared.createWriter());
-   db.checkoutSubjectiveRead();
+   SharedDatabase     shared(directory("no-section"), config,
+                             psibase::storage::open_mode::create_new);
+   Sockets            sockets(shared);
+   SocketAutoCloseSet closing;
+   Database           db(shared, shared.emptyRevision());
+   auto               session = db.startWrite(shared.createWriter());
    REQUIRE(value(db, DbId::subjective, "a") == "<missing>");
    REQUIRE_THROWS(put(db, DbId::subjective, "x", "a"));
-   db.abortSubjective();
+   db.checkoutSubjective();
+   put(db, DbId::subjective, "one", "a");
+   REQUIRE(db.commitSubjective(sockets, closing));
+   REQUIRE(value(db, DbId::subjective, "a") == "one");
+   // A row put natively is seen by the next read: there is no snapshot to
+   // go stale.
+   auto writer = shared.createWriter();
+   shared.kvPutSubjective(*writer, DbId::subjective, span("a"), span("two"));
+   REQUIRE(value(db, DbId::subjective, "a") == "two");
 }
 
 TEST_CASE("sections on several threads lose no update and readers are not held",
@@ -501,9 +509,7 @@ TEST_CASE("sections on several threads lose no update and readers are not held",
           auto     session = db.startRead();
           while (!done)
           {
-             db.checkoutSubjectiveRead();
              (void)value(db, DbId::subjective, "count");
-             db.abortSubjective();
              ++reads;
           }
        });
@@ -759,7 +765,8 @@ TEST_CASE("accepted subjective effects finish before deferred cancellation is re
    auto committed = shared.kvGetSubjective(*writer, DbId::subjective, span("contract"));
    REQUIRE(committed);
    REQUIRE(std::string(committed->begin(), committed->end()) == "accepted");
-   db.abortSubjective();
+   // The section ended when it was published: nothing is left to abandon.
+   REQUIRE_THROWS(db.abortSubjective());
    shared.setCallbacks(nullptr);
 }
 

@@ -1292,7 +1292,6 @@ namespace psibase
          }
          Database database{systemContext->sharedDatabase, systemContext->sharedDatabase.getHead()};
          auto     session = database.startRead();
-         database.checkoutSubjectiveRead();
          auto prefixLen = psio::key_size(consensusChangePrefix());
          auto key       = psio::encode(psio::key{}, consensusChangeKey(prev + 1));
          if (auto row = database.kvLessThanRaw(ConsensusChangeRow::db, key, prefixLen))
@@ -1413,7 +1412,6 @@ namespace psibase
       {
          Database db(systemContext->sharedDatabase, systemContext->sharedDatabase.getHead());
          auto     session = db.startRead();
-         db.checkoutSubjectiveRead();
          auto key       = psio::encode(psio::key{}, snapshotPrefix());
          auto prefixLen = key.size();
          for (auto row = db.kvMaxRaw(DbId::nativeSubjective, key); row;

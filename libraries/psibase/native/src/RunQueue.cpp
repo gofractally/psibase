@@ -157,7 +157,6 @@ namespace psibase
                Database db{systemContext.sharedDatabase,
                            systemContext.sharedDatabase.emptyRevision()};
                auto     session = db.startWrite(writer);
-               db.checkoutSubjectiveRead();
                if (auto result = popTimer(l, db, nextExpiration))
                {
                   return result;

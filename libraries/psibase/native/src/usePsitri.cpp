@@ -104,9 +104,9 @@ namespace psibase
       // its commit or abort, native code for the one row it puts or
       // removes. So there is one writer at a time, what it publishes is
       // built on what was published last, nothing is compared or merged,
-      // and a section never has to be run a second time. Reading without a
-      // section's right to write (Database::checkoutSubjectiveRead) never
-      // takes it: such a reader works on the roots it took when it started.
+      // and a section never has to be run a second time. Reading never takes
+      // it: a read made outside a section is a read of what was published
+      // last, as a query reads the head block.
       //
       // Not a std::mutex: a section runs service code while it holds the
       // lock, and native code reached from that service code on the same
@@ -559,13 +559,14 @@ namespace psibase
 
       DbPtr                           temporaryDb;
       // A section's hold on the write lock of the node-local databases
-      // (SharedDatabaseImpl::subjectiveMutex). A section that may write
-      // (checkoutSubjective, which is what a service gets) takes the lock
-      // when it starts and keeps it until it has committed or is abandoned:
-      // it works on the published state, nobody else can publish meanwhile,
-      // and it is never run a second time because of another writer. A
-      // read-only section (checkoutSubjectiveRead, for native code that
-      // only looks something up) takes no lock and may not write.
+      // (SharedDatabaseImpl::subjectiveMutex). A section is how these
+      // databases are written: it takes the lock when it starts and keeps
+      // it until it has committed or is abandoned, so it works on the
+      // published state, nobody else can publish meanwhile, and it is never
+      // run a second time because of another writer. Reading needs no
+      // section: outside one, every read is of what was published last
+      // and takes no lock. (Reads inside a section see the section's own
+      // changes.)
       //
       // The lock is held while the section's service code runs. If that
       // code has to wait for another service to be compiled, the other
@@ -573,7 +574,8 @@ namespace psibase
       // again in that case is possible, but it is rare and was judged not
       // worth the complexity.
       bool subjectiveLocked   = false;
-      bool subjectiveReadOnly = false;
+      // The published roots, for reads outside a section.
+      IndependentRevision subjectiveHead;
       // Something was written, so there is something to publish.
       bool subjectiveDirty    = false;
       // checkoutEmptySubjective: a section on empty databases that is never
@@ -581,10 +583,8 @@ namespace psibase
       bool subjectiveIsolated = false;
       void subjectiveWrite()
       {
-         if (subjectiveRevisions.empty())
-            return;
-         check(!subjectiveReadOnly,
-               "the node-local database cannot be written in a read-only section");
+         check(!subjectiveRevisions.empty(),
+               "subjectiveCheckout is required to write the subjective database");
          subjectiveDirty = true;
       }
       void releaseSubjective()
@@ -592,7 +592,6 @@ namespace psibase
          if (subjectiveLocked)
             shared.unlockSubjective();
          subjectiveLocked   = false;
-         subjectiveReadOnly = false;
          subjectiveDirty    = false;
          subjectiveIsolated = false;
       }
@@ -605,8 +604,13 @@ namespace psibase
       {
          if (isIndependent(db))
          {
-            check(!subjectiveRevisions.empty(),
-                  "subjectiveCheckout is required to access the subjective database");
+            if (subjectiveRevisions.empty())
+            {
+               // Not in a section: what is published now. (A write is
+               // refused before it gets here, see subjectiveWrite.)
+               subjectiveHead = shared.getSubjective();
+               return subjectiveHead[independentIndex(db)];
+            }
             return subjectiveRevisions.back().db[independentIndex(db)];
          }
          else if (db == DbId::temporary)
@@ -830,25 +834,21 @@ namespace psibase
          callbackFlags      = 0;
       }
 
-      void checkoutSubjective(bool readOnly = false)
+      void checkoutSubjective()
       {
          check(subjectiveRevisions.size() <= maxSubjectiveTransactionDepth,
                "checkoutSubjective nesting exceeded limit");
          if (subjectiveRevisions.empty())
          {
             // Without a write session nothing can be published.
-            if (!readOnly && writeSession)
+            if (writeSession)
             {
                shared.lockSubjective();
                subjectiveLocked = true;
             }
-            subjectiveReadOnly = readOnly;
             subjectiveRevisions.push_back({0, shared.getSubjective(), temporaryDb});
             callbackFlags = 0;
          }
-         else
-            check(readOnly || !subjectiveReadOnly,
-                  "a section that may write cannot start inside a read-only section");
          subjectiveRevisions.push_back({socketChanges.size(), subjectiveRevisions.back().db,
                                         subjectiveRevisions.back().temporaryDb});
       }
@@ -870,8 +870,6 @@ namespace psibase
          DatabaseCallbacks::Flags flags = {};
          if (writeSession && !subjectiveIsolated)
          {
-            check(subjectiveLocked || socketChanges.empty(),
-                  "sockets cannot be changed in a read-only section");
             if (subjectiveLocked && (subjectiveDirty || !socketChanges.empty()))
             {
                if (!shared.publishSubjective(*writeSession, subjectiveRevisions.back().db,
@@ -1080,10 +1078,6 @@ namespace psibase
    void Database::checkoutSubjective()
    {
       impl->checkoutSubjective();
-   }
-   void Database::checkoutSubjectiveRead()
-   {
-      impl->checkoutSubjective(true);
    }
    bool Database::commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing)
    {

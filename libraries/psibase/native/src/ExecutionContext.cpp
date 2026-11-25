@@ -409,8 +409,6 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
             vmOptions{vmOptions, wasmCache.nativeArtifacts},
             wa{memory.wa}
       {
-         database.checkoutSubjectiveRead();
-         psibase::finally _{[&] { database.abortSubjective(); }};
          auto [ca, db] = getCode(service);
 
          code   = std::move(ca);

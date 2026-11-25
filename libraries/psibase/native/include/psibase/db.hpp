@@ -213,12 +213,10 @@ namespace psibase
 
       // Manage access to subjective database
       void checkoutEmptySubjective();
-      // A section on the node-local databases that may write them: it holds
-      // their write lock from here to its commit or abort.
+      // A section on the node-local databases: the way to write them. It
+      // holds their write lock from here to its commit or abort. Reading
+      // needs no section: outside one, a read is of what was published last.
       void checkoutSubjective();
-      // A section that only reads: no lock, and writing in it is an error.
-      // For native code that looks something up.
-      void checkoutSubjectiveRead();
       bool commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing);
       void abortSubjective();
       // sockets options are linked to subjective checkouts. Eventually the state might
