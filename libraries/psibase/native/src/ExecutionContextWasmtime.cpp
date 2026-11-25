@@ -563,7 +563,7 @@ namespace psibase::vm_wasmtime
          }
          instance->set_stack_remaining(stack);
          instance->run_start();
-         instance->call_discarding_results("start", currentActContext->action.service.value);
+         instance->enter(wt::entry_point::start, currentActContext->action.service.value);
          initialized = true;
       }
 
@@ -758,7 +758,7 @@ namespace psibase::vm_wasmtime
    void ExecutionContextImpl::execProcessTransaction(ActionContext& actionContext)
    {
       run(actionContext,
-                 [&] { instance->call_discarding_results("processTransaction"); });
+                 [&] { instance->enter(wt::entry_point::process_transaction); });
    }
 
    void ExecutionContextImpl::execCalled(uint64_t callerFlags, ActionContext& actionContext)
@@ -777,20 +777,25 @@ namespace psibase::vm_wasmtime
       run(actionContext,
                  [&]
                  {
-                    instance->call_discarding_results(
-                        "called", actionContext.action.service.value,
-                        actionContext.action.sender.value);
+                    // The entry points were found, and their signatures
+                    // checked, when the module was compiled: entering one
+                    // looks nothing up by name.
+                    instance->enter(wt::entry_point::called,
+                                    actionContext.action.service.value,
+                                    actionContext.action.sender.value);
                  });
    }
 
    void ExecutionContextImpl::execServe(ActionContext& actionContext)
    {
-      run(actionContext, [&] { instance->call_discarding_results("serve"); });
+      run(actionContext, [&] { instance->enter(wt::entry_point::serve); });
    }
 
    void ExecutionContextImpl::exec(ActionContext& actionContext, std::string_view fn)
    {
-      run(actionContext, [&] { instance->call_discarding_results(fn); });
+      // A callback named by the caller: rare, and looked up by name. Like an
+      // entry point it takes nothing and returns nothing.
+      run(actionContext, [&] { instance->call<void>(fn); });
    }
 
    void ExecutionContextImpl::asyncTimeout()
