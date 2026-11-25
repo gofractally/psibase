@@ -273,7 +273,20 @@ namespace SystemService
                                 .headers     = {{"Cache-Control", "no-store"}}};
             };
             if (allowCorsFrom(request, "supervisor"_a).empty())
-               return plain(HttpStatus::forbidden, "Sign-in must come from the supervisor");
+            {
+               // Never a dead end: the visitor can carry on from the app.
+               std::string_view page =
+                   "<!doctype html><html><head><meta charset=\"utf-8\">"
+                   "<title>Sign-in not completed</title></head>"
+                   "<body style=\"font:16px system-ui;max-width:28em;margin:15vh auto;"
+                   "padding:0 20px\"><h2>Sign-in wasn't completed</h2>"
+                   "<p>This step has to come straight from the sign-in page.</p>"
+                   "<p><a href=\"/\">Continue to the app</a></p></body></html>";
+               return HttpReply{.status      = HttpStatus::forbidden,
+                                .contentType = "text/html",
+                                .body        = std::vector(page.begin(), page.end()),
+                                .headers     = {{"Cache-Control", "no-store"}}};
+            }
             if (request.contentType != "application/x-www-form-urlencoded")
                return plain(HttpStatus::unsupportedMediaType, "Expected a form post");
 
@@ -328,11 +341,21 @@ namespace SystemService
                 escaped +
                 "\"><title>Signing in</title></head><body><a href=\"" + escaped +
                 "\">Continue</a></body></html>";
+            // A second cookie, for the whole network's hosts, says who to
+            // bill when a page of this app queries another app's host. Apps
+            // never see it and nothing treats it as the user speaking.
+            std::string root{to<XHttp>().rootHost(request.host)};
+            root = root.substr(0, root.find(':'));
+            HttpHeader visitor{"Set-Cookie",
+                               "__Secure-VISITOR=" + *token + "; Domain=" + root +
+                                   "; Path=/; SameSite=Lax; Secure; HttpOnly; Max-Age=" +
+                                   std::to_string(age)};
             return HttpReply{
                 .status      = HttpStatus::ok,
                 .contentType = "text/html",
                 .body        = std::vector(page.begin(), page.end()),
                 .headers     = {setCookieHeader("SESSION", *token, age, true),
+                                std::move(visitor),
                                 {"Cache-Control", "no-store"},
                                 {"Content-Security-Policy",
                                  "default-src 'none'; base-uri 'none'; form-action 'none'"}}};

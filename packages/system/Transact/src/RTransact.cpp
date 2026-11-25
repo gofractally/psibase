@@ -1427,14 +1427,31 @@ std::string RTransact::login(std::string rootHost)
 
 namespace
 {
-   std::optional<LoginTokenData> findSessionToken(const HttpRequest& request)
+   struct FoundSession
    {
-      std::vector<char>             key = getJWTKey();
-      std::optional<LoginTokenData> result;
-      auto                          rootHost = to<HttpServer>().rootHost(request.host);
+      std::optional<LoginTokenData> session;
+      bool                          bearer = false;
+      std::optional<LoginTokenData> visitor;
+   };
+
+   FoundSession findSessionToken(const HttpRequest& request)
+   {
+      std::vector<char> key = getJWTKey();
+      FoundSession      result;
+      auto              rootHost = to<HttpServer>().rootHost(request.host);
 
       auto isValidJwt = [&](const LoginTokenData& decoded)
       { return decoded.aud == rootHost && checkExp(decoded.exp); };
+
+      for (const auto& token : request.getCookie("__Secure-VISITOR"))
+      {
+         auto decoded = decodeJWT<LoginTokenData>(key, token);
+         if (decoded && isValidJwt(*decoded))
+         {
+            result.visitor = std::move(decoded);
+            break;
+         }
+      }
 
       for (const auto& header : request.headers)
       {
@@ -1450,24 +1467,35 @@ namespace
                               auto decoded = decodeJWT<LoginTokenData>(key, token);
                               if (decoded && isValidJwt(*decoded))
                               {
-                                 result = std::move(*decoded);
+                                 result.session = std::move(*decoded);
+                                 result.bearer  = true;
                               }
                            }
                         });
-            if (result)
+            if (result.session)
                return result;
          }
       }
 
-      std::string_view cookieName = "__Host-SESSION";
-
-      auto tokens = request.getCookie(cookieName);
-      for (const auto& token : tokens)
+      for (const auto& token : request.getCookie("__Host-SESSION"))
       {
          auto decoded = decodeJWT<LoginTokenData>(key, token);
          if (decoded && isValidJwt(*decoded))
-            return decoded;
+         {
+            result.session = std::move(decoded);
+            break;
+         }
       }
+      return result;
+   }
+
+   // The guest id or account name a token stands for.
+   std::string subjectOf(const LoginTokenData& token)
+   {
+      if (!token.gst.empty())
+         return token.gst;
+      if (token.sub != AccountNumber{})
+         return token.sub.str();
       return {};
    }
 }  // namespace
@@ -1475,13 +1503,17 @@ namespace
 SessionInfo RTransact::getSession(HttpRequest request)
 {
    SessionInfo result;
-   if (auto token = findSessionToken(request))
+   auto        found = findSessionToken(request);
+   if (auto& token = found.session)
    {
+      result.bearer = found.bearer;
       if (!token->gst.empty())
-         result.guest = std::move(token->gst);
+         result.guest = token->gst;
       else if (token->sub != AccountNumber{})
          result.user = token->sub;
    }
+   if (found.visitor)
+      result.visitor = subjectOf(*found.visitor);
    return result;
 }
 

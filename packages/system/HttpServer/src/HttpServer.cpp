@@ -309,6 +309,22 @@ namespace SystemService
          return false;
       }
 
+      // True when the request names an origin other than its own host.
+      bool crossOrigin(const HttpRequest& req)
+      {
+         auto origin = req.getHeader("origin");
+         if (!origin)
+            return false;
+         auto pos = origin->find("://");
+         if (pos == std::string_view::npos)
+            return true;
+         auto host = origin->substr(pos + 3);
+         host      = host.substr(0, host.find(':'));
+         std::string_view own = req.host;
+         own                  = own.substr(0, own.find(':'));
+         return !iequal(host, own);
+      }
+
       std::string percentEncode(std::string_view in)
       {
          static const char digits[] = "0123456789ABCDEF";
@@ -328,12 +344,28 @@ namespace SystemService
       }
    }  // namespace
 
-   void HttpServer::serve(std::int32_t sock, HttpRequest req, bool requireIdentity)
+   void HttpServer::serve(std::int32_t sock, HttpRequest req)
    {
       check(getSender() == XHttp::service, "Wrong sender");
 
+      // x-http, the only caller, decides whether this request must be
+      // attributable and says so in a header it lets no client set. A
+      // header keeps the two services upgradable one at a time: an older
+      // x-http sends none (gate off), an older http service ignores it.
+      bool requireIdentity = req.getHeader(XHttp::gateHeader).has_value();
+      std::erase_if(req.headers,
+                    [](const auto& header) { return header.matches(XHttp::gateHeader); });
+
       auto session = recurse().to<RTransact>().getSession(req);
       auto user    = session.user;
+
+      // A page of one app asking another app's host. Browsers send this
+      // host's cookies along when the page asks them to, so the app must
+      // not take the cookie as the user speaking: it answers as it would
+      // an anonymous caller, and the request is only billed. A caller that
+      // attaches a token itself (the supervisor does) means it.
+      if (!session.bearer && crossOrigin(req))
+         user.reset();
 
       // Remove sensitive headers
       http_detail::stripAuthenticationHeaders(req);
@@ -387,7 +419,7 @@ namespace SystemService
                                                                : service_opt.value());
 
       // No app code runs for a request that nobody can be billed for.
-      if (requireIdentity && !session.identified() && !gateExempt(service, req))
+      if (requireIdentity && !session.billable() && !gateExempt(service, req))
       {
          if (isNavigation(req))
          {

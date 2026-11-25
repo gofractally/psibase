@@ -155,6 +155,13 @@ namespace psibase::http
       // (The rule ignores ports, so on localhost it would break every other
       // plain-http development server under the same name.)
       bool strict_transport = false;
+      // Set when the request comes from a page on another host of this
+      // network (same parent domain). Such a page asks the browser to send
+      // the visitor's cookie so the request can be billed, and a browser
+      // only lets it read the reply if the reply names that page's origin
+      // rather than "any origin". See fixSiblingCors.
+      std::string sibling_origin;
+      std::string requested_headers;
 
       HttpReplyBuilder(server_state&                          server,
                        const http_session_base::request_type& req,
@@ -169,6 +176,48 @@ namespace psibase::http
             host                  = host.substr(0, host.find(':'));
             strict_transport = host != "localhost" && !host.ends_with(".localhost");
          }
+         std::string_view origin = req[bhttp::field::origin];
+         if (auto pos = origin.find("://"); pos != std::string_view::npos)
+         {
+            auto from = origin.substr(pos + 3);
+            from      = from.substr(0, from.find(':'));
+            std::string_view to = req[bhttp::field::host];
+            to                  = to.substr(0, to.find(':'));
+            auto parent = [](std::string_view h)
+            {
+               auto dot = h.find('.');
+               return dot == std::string_view::npos ? std::string_view{} : h.substr(dot + 1);
+            };
+            // Node-local x- services answer for themselves and are left alone.
+            if (from != to && !parent(from).empty() && parent(from) == parent(to) &&
+                !to.starts_with("x-"))
+            {
+               sibling_origin    = std::string(origin);
+               requested_headers = std::string(req[bhttp::field::access_control_request_headers]);
+            }
+         }
+      }
+
+      // Turns "any origin may read this" into "this sibling page may read
+      // this, with the visitor's cookie attached". The app that produced
+      // the reply was told nothing about the user for such a request (the
+      // chain's HTTP service withholds it), so the reply is what an
+      // anonymous caller would get and is as public as before.
+      void fixSiblingCors(auto& res) const
+      {
+         if (sibling_origin.empty())
+            return;
+         auto allow = res.find(bhttp::field::access_control_allow_origin);
+         if (allow == res.end() || allow->value() != "*")
+            return;
+         res.set(bhttp::field::access_control_allow_origin, sibling_origin);
+         res.set(bhttp::field::access_control_allow_credentials, "true");
+         res.insert(bhttp::field::vary, "Origin");
+         // With credentials a browser reads "*" in these as a literal name.
+         if (auto h = res.find(bhttp::field::access_control_allow_headers);
+             h != res.end() && h->value().find('*') != std::string_view::npos &&
+             !requested_headers.empty())
+            res.set(bhttp::field::access_control_allow_headers, requested_headers);
       }
 
       void setCors(auto& res, bool allow_cors) const
@@ -860,8 +909,16 @@ namespace psibase::http
                        builder.req_version};
                    res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
                    for (auto& h : reply.headers)
-                      res.set(h.name, h.value);
+                   {
+                      // A reply may set several cookies; any other header
+                      // appears once.
+                      if (boost::beast::iequals(h.name, "set-cookie"))
+                         res.insert(h.name, h.value);
+                      else
+                         res.set(h.name, h.value);
+                   }
                    res.set(bhttp::field::content_type, reply.contentType);
+                   builder.fixSiblingCors(res);
                    builder.setKeepAlive(res);
                    res.body() = std::move(reply.body);
                    res.prepare_payload();

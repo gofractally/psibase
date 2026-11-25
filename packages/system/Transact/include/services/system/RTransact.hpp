@@ -263,13 +263,24 @@ namespace SystemService
    /// has no account yet) has `guest` set to the lowercase hex of the first
    /// 16 bytes of the SHA-256 of its public key. Neither is set when the
    /// request carries no valid token.
+   ///
+   /// `visitor` answers a different question: not who the request acts as,
+   /// but who to bill for it. It comes from a cookie the whole network's
+   /// hosts receive, so a page of one app querying another app's host is
+   /// attributable. It is never an identity an app may act on: it is the
+   /// guest id or account name of whoever signed in on this browser, or
+   /// empty. `bearer` is set when `user`/`guest` came from an Authorization
+   /// header, which a caller attaches deliberately, rather than a cookie.
    struct SessionInfo
    {
       std::optional<psibase::AccountNumber> user;
       std::string                           guest;
+      std::string                           visitor;
+      bool                                  bearer = false;
       bool identified() const { return user.has_value() || !guest.empty(); }
+      bool billable() const { return identified() || !visitor.empty(); }
    };
-   PSIO_REFLECT(SessionInfo, user, attr(guest, utf8))
+   PSIO_REFLECT(SessionInfo, user, attr(guest, utf8), attr(visitor, utf8), bearer)
 
    // Transactions enter this service through the push_transaction endpoint
    // or over p2p (recv). Speculative execution and signature verification

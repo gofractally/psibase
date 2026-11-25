@@ -104,11 +104,12 @@ namespace SystemService
 
       // Entry point for HTTP requests
       //
-      // When requireIdentity is set, a request with no session (neither an
-      // account nor a guest) is not passed to any app: page navigations are
-      // redirected to the sign-in page and other requests get 401. The
-      // sign-in page, /common/ and the login endpoints are exempt.
-      void serve(std::int32_t socket, psibase::HttpRequest req, bool requireIdentity);
+      // When x-http marks the request with the gate header (see
+      // XHttp::gateHeader), a request with no session and no billing
+      // identity is not passed to any app: page navigations are redirected
+      // to the sign-in page and other requests get 401. The sign-in page,
+      // /common/ and the login endpoints are exempt.
+      void serve(std::int32_t socket, psibase::HttpRequest req);
 
       /// Returns the root host for a given host
       std::string rootHost(psio::pssz_view<std::string> host);
@@ -146,7 +147,7 @@ namespace SystemService
                 method(registerServer, server),
                 method(getServer, service),
                 method(recv, socket, data, flags),
-                method(serve, socket, req, requireIdentity),
+                method(serve, socket, req),
                 method(rootHost, attr(host, utf8)),
                 method(getSiblingUrl, req, socket, destination, keepTarget),
                 method(setRedirect, destination),

@@ -98,7 +98,12 @@ export const runAccountStep = async (ctx: AccountContext) => {
         el.textContent = message ?? "";
     };
 
-    const steps = (current: 2 | 3 | 4) => {
+    // The progress strip belongs to creating an account; someone who
+    // already has one is not partway through anything.
+    const steps = (current: 2 | 3 | "none") => {
+        const strip = $("acct-step-1").parentElement as HTMLElement;
+        strip.hidden = current === "none";
+        if (current === "none") return;
         for (const n of [1, 2, 3]) {
             const el = $(`acct-step-${n}`);
             el.classList.toggle("si-done", n < current);
@@ -175,16 +180,18 @@ export const runAccountStep = async (ctx: AccountContext) => {
     };
 
     const showContinue = (account: string) => {
-        steps(4);
-        $("acct-title").textContent = `Welcome, ${account}`;
-        $("acct-lede").textContent =
-            "Your account is ready to use here.";
+        steps("none");
+        $("acct-title").textContent = `Welcome back, ${account}`;
+        $("acct-lede").textContent = `Use ${account} on ${ctx.app}.${ctx.rootName}.`;
         $("acct-providers").hidden = true;
         $("acct-name-form").hidden = true;
         const button = $("acct-continue");
         button.textContent = `Continue as ${account}`;
         button.hidden = false;
         button.onclick = () => void adopt(account);
+        // Importing some other account is a different task from this one.
+        $("acct-later").textContent = "Stay a guest for now";
+        $("acct-classic").textContent = "Use a different account";
         ctx.show("account");
     };
 
@@ -410,7 +417,10 @@ export const runAccountStep = async (ctx: AccountContext) => {
     // Shows whatever comes next for this guest.
     const refresh = async () => {
         const status = await api<Status>("/status");
-        if (status.link?.account) return showContinue(status.link.account);
+        if (status.link?.account) {
+            showContinue(status.link.account);
+            return;
+        }
         if (!status.open) return showClosed();
         if (status.link) return showName(status.link);
         if (status.providers.length === 0) return showClosed();
@@ -440,6 +450,13 @@ export const runAccountStep = async (ctx: AccountContext) => {
         const state = params.get("state");
         const providerError = params.get("provider_error");
         if (state) await finishProvider(state);
+        // Someone who already has an account, on a browser that remembers
+        // their key, asked to connect: there is nothing to decide.
+        const first = await api<Status>("/status");
+        if (first.link?.account && !state && (await ctx.storedKey())) {
+            await adopt(first.link.account);
+            return;
+        }
         await refresh();
         if (providerError) {
             notice(

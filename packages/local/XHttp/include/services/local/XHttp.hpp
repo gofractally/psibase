@@ -69,6 +69,11 @@ namespace LocalService
       /// before it reaches a chain service.
       static constexpr auto localBypassHeader = "x-psibase-local";
 
+      /// Set by this service, and only by it, on a request the chain's
+      /// HTTP service must not pass to an app without a session. Removed
+      /// from every incoming request first.
+      static constexpr auto gateHeader = "x-psibase-require-identity";
+
       using Session = psibase::SessionTables<PendingRequestTable, ResponseHandlerTable>;
 
       static psibase::AccountNumber getService(std::string_view host, std::string_view rootHost)

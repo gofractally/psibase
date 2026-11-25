@@ -67,6 +67,57 @@ export function siblingUrl(
     return currentUrl.origin + computedPath;
 }
 
+/**
+ * Fetch options for a request to another host of this network.
+ *
+ * A node may require every request to be attributable. The visitor's
+ * billing cookie is only sent to another host when asked for, so requests
+ * to sibling hosts ask. The app that answers is not told who the visitor
+ * is; the cookie only says who to bill.
+ */
+export function networkFetchOptions(
+    url: string,
+    options: RequestInit = {},
+): RequestInit {
+    if (options.credentials !== undefined) return options;
+    try {
+        const target = new URL(url, window.location.href);
+        if (target.origin === window.location.origin) return options;
+        const parent = (host: string) => host.split(".").slice(1).join(".");
+        if (
+            parent(target.hostname) !== "" &&
+            parent(target.hostname) === parent(window.location.hostname)
+        ) {
+            return { ...options, credentials: "include" };
+        }
+    } catch {
+        // Not a URL this page can resolve; leave the request as it is.
+    }
+    return options;
+}
+
+// Pages make cross-app requests in many places, most of them plain fetch
+// calls. Rather than depend on each one remembering, every fetch from a
+// page that loads this library gets the same treatment.
+if (
+    typeof window !== "undefined" &&
+    typeof window.fetch === "function" &&
+    !(window as unknown as { __psibaseFetch?: boolean }).__psibaseFetch
+) {
+    (window as unknown as { __psibaseFetch?: boolean }).__psibaseFetch = true;
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+        // A Request object carries its own credentials mode; leave it.
+        if (typeof input === "string" || input instanceof URL) {
+            return nativeFetch(
+                input,
+                networkFetchOptions(String(input), init ?? {}),
+            );
+        }
+        return nativeFetch(input, init);
+    };
+}
+
 export async function throwIfError(response: Response) {
     if (!response.ok) {
         throw new RPCError(await response.text());
@@ -75,7 +126,10 @@ export async function throwIfError(response: Response) {
 }
 
 export async function get(url: string, options = {}) {
-    const res = await fetch(url, { ...options, method: "GET" });
+    const res = await fetch(
+        url,
+        networkFetchOptions(url, { ...options, method: "GET" }),
+    );
     return throwIfError(res);
 }
 
@@ -102,13 +156,16 @@ export async function getArrayBuffer(url: string) {
 
 export async function postText(url: string, text: string) {
     return throwIfError(
-        await fetch(url, {
+        await fetch(
+            url,
+            networkFetchOptions(url, {
             method: "POST",
             headers: {
                 "Content-Type": "text",
             },
             body: text,
-        }),
+            }),
+        ),
     );
 }
 
@@ -118,7 +175,9 @@ export async function postGraphQL(
     options?: RequestInit,
 ) {
     return throwIfError(
-        await fetch(url, {
+        await fetch(
+            url,
+            networkFetchOptions(url, {
             method: "POST",
             body: graphql,
             ...options,
@@ -126,13 +185,16 @@ export async function postGraphQL(
                 "Content-Type": "application/graphql",
                 ...options?.headers,
             },
-        }),
+            }),
+        ),
     );
 }
 
 export async function postJson(url: string, json: any, options?: RequestInit) {
     return throwIfError(
-        await fetch(url, {
+        await fetch(
+            url,
+            networkFetchOptions(url, {
             method: "POST",
             body: JSON.stringify(json),
             ...options,
@@ -140,19 +202,23 @@ export async function postJson(url: string, json: any, options?: RequestInit) {
                 "Content-Type": "application/json",
                 ...options?.headers,
             },
-        }),
+            }),
+        ),
     );
 }
 
 export async function postArrayBuffer(url: string, arrayBuffer: any) {
     return throwIfError(
-        await fetch(url, {
+        await fetch(
+            url,
+            networkFetchOptions(url, {
             method: "POST",
             headers: {
                 "Content-Type": "application/octet-stream",
             },
             body: arrayBuffer,
-        }),
+            }),
+        ),
     );
 }
 

@@ -16,7 +16,8 @@ namespace SystemService::http_detail
          // authentication without parsing the Cookie field.
          auto last = name.find_last_not_of(" \t");
          name = last == std::string_view::npos ? std::string_view{} : name.substr(0, last + 1);
-         return name == "__Host-SESSION" || name == "__HOST-SESSION" || name == "SESSION";
+         return name == "__Host-SESSION" || name == "__HOST-SESSION" || name == "SESSION" ||
+                name == "__Secure-VISITOR";
       });
       std::erase_if(request.headers,
                     [](const auto& header) { return header.matches("authorization"); });

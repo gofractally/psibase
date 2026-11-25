@@ -129,7 +129,15 @@ namespace
          {
             if (header.matches("set-cookie"))
             {
-               check(header.value.starts_with("__Host-"), "Only __Host- cookies are allowed");
+               // A chain service may set cookies for its own host only, with
+               // one exception: the network-wide cookie that says who to
+               // bill. It is no use to an app that sets it: it is honoured
+               // only if it holds a session token this node issued, apps
+               // never see such tokens, and nothing treats it as the user
+               // speaking.
+               check(header.value.starts_with("__Host-") ||
+                         header.value.starts_with("__Secure-VISITOR="),
+                     "Only __Host- cookies are allowed");
             }
          }
       }
@@ -958,7 +966,10 @@ extern "C" [[clang::export_name("serve")]] void serve()
    }
 
    // Forward other requests to HttpServer
-   req.removeCookies([](std::string_view name) { return !name.starts_with("__Host-"); });
+   // __Secure-VISITOR says who to bill; the chain's HTTP service reads it
+   // and removes it before any app sees the request.
+   req.removeCookies([](std::string_view name)
+                     { return !name.starts_with("__Host-") && name != "__Secure-VISITOR"; });
 
    // Decide whether this request must be identified before app code runs.
    // Only this service can see the connection, so it makes the decision and
@@ -992,8 +1003,13 @@ extern "C" [[clang::export_name("serve")]] void serve()
          requireIdentity = false;
    }
 
+   std::erase_if(req.headers,
+                 [](const auto& header) { return header.matches(XHttp::gateHeader); });
+   if (requireIdentity)
+      req.headers.push_back({XHttp::gateHeader, "1"});
+
    owned.put({.socket = sock, .owner = HttpServer::service});
-   to<HttpServer>().serve(sock, req, requireIdentity);
+   to<HttpServer>().serve(sock, req);
 }  // serve()
 
 #endif

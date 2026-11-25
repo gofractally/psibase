@@ -332,12 +332,34 @@ const signOutEverywhere = async () => {
     clearGuestSession();
 };
 
-const submitSession = (session: GuestSession) => {
+// The origin that actually serves an app. Some names are aliases that the
+// node redirects (the home page is one), and a browser strips the origin
+// from a form post that gets redirected to another host, which the app
+// would then refuse. So the redirect is followed here first.
+const resolveAppOrigin = async (app: string): Promise<string> => {
+    const direct = siblingOrigin(app);
+    try {
+        const res = await fetch(`${direct}/common/rootdomain`, {
+            redirect: "follow",
+        });
+        const landed = new URL(res.url);
+        const parent = (host: string) => host.split(".").slice(1).join(".");
+        if (parent(landed.host) === parent(new URL(direct).host)) {
+            return landed.origin;
+        }
+    } catch {
+        // Fall through to the name as given.
+    }
+    return direct;
+};
+
+const submitSession = async (session: GuestSession) => {
     rememberApp(destination.app);
+    const appOrigin = await resolveAppOrigin(destination.app);
     const maxAge = Math.max(0, session.exp - Math.floor(Date.now() / 1000));
     const form = document.createElement("form");
     form.method = "POST";
-    form.action = `${siblingOrigin(destination.app)}/common/accept-session`;
+    form.action = `${appOrigin}/common/accept-session`;
     form.hidden = true;
     const field = (name: string, value: string) => {
         const input = document.createElement("input");
@@ -391,7 +413,7 @@ const goToDestination = async (session: GuestSession, celebrate: boolean) => {
         show("done");
         await new Promise((r) => setTimeout(r, 900));
     }
-    submitSession(session);
+    await submitSession(session);
 };
 
 // ------------------------------------------------------------------ flow
@@ -566,7 +588,7 @@ const start = async () => {
                 fetchChainId,
                 storedKey: () => stashedKey(session.publicKey),
                 forgetStoredKey: clearStash,
-                leaveAsGuest: () => submitSession(session),
+                leaveAsGuest: () => void submitSession(session),
                 isCancelled: (e) => e instanceof Cancelled,
             });
             return;
