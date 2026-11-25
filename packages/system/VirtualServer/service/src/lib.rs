@@ -173,7 +173,7 @@ mod service {
 
     fn status_row_bytes() -> u64 {
         let native = KvHandle::open_direct(DbId::Native, &[], KvMode::Read);
-        let key = status_key().to_key();
+        let key = psio::to_key(&status_key());
         kv_get_bytes(&native, &key)
             .map(|value| key.len() as u64 + value.len() as u64)
             .unwrap_or(0)
@@ -188,9 +188,9 @@ mod service {
 
     /// Exact on-disk footprint (`key + value`) of a single fixed-width table row.
     fn row_size<R: TableRecord, T: Table<R>>(table: &T, sample: &R) -> u64 {
-        let prefix = (T::SERVICE, T::TABLE_INDEX).to_key();
+        let prefix = psio::to_key(&(T::SERVICE, T::TABLE_INDEX));
         let key = table.serialize_key(0, &sample.get_primary_key());
-        (prefix.len() + key.data.len() + sample.packed().len()) as u64
+        (prefix.len() + key.data.len() + psio::to_pssz(&sample).len()) as u64
     }
 
     #[action]
@@ -344,6 +344,7 @@ mod service {
         Tokens::call().debit(sys, buyer, amount, "".into());
         Tokens::call().toSub(sys, for_user.to_string(), amount);
         balance_cache::update_balance(for_user, None, amount.value as i128);
+        refresh_cpu_limit(for_user, None);
 
         if buyer != for_user {
             // No need for a subsidy event if user == buyer because it's not a subsidy and the purchase
@@ -378,7 +379,8 @@ mod service {
             UserSettings::to_sub_account_key(buyer, Some(sub_account.clone())),
             amount,
         );
-        balance_cache::update_balance(buyer, Some(sub_account), amount.value as i128);
+        balance_cache::update_balance(buyer, Some(sub_account.clone()), amount.value as i128);
+        refresh_cpu_limit(buyer, Some(sub_account));
     }
 
     /// Deletes the resource subaccount, returning the resources back to the caller's primary
@@ -411,6 +413,7 @@ mod service {
             Tokens::call().toSub(sys, sender.to_string(), balance);
             balance_cache::update_balance(sender, Some(sub_account), -(balance.value as i128));
             balance_cache::update_balance(sender, None, balance.value as i128);
+            refresh_cpu_limit(sender, None);
         }
     }
 
@@ -472,7 +475,7 @@ mod service {
         }
 
         let cpu_time = CpuLimit::rpc().getCpuTime();
-        psibase::write_console(&format!("CPU time at limit change: {} ns\n", cpu_time));
+        psibase::write_console(&format!("CPU time at limit change: {} ns\n", cpu_time.ticks()));
     }
 
     /// Allows the sender to manage the behavior of client-side tooling with respect to the
@@ -789,7 +792,6 @@ mod service {
                 return
             }
 
-            DbId::NumChainDatabases => abort_message("NumChainDatabases is not a valid database"),
         };
 
         // Avoiding a flood of events for writing individual records. Accumulate in the tx_cache and emit
@@ -833,6 +835,19 @@ mod service {
     // Gets the CPU limit (in ns) for the specified account
     //
     // Returns None if there is no limit for the specified account
+    /// A transaction's CPU limit is what the balance it is billed to can
+    /// afford. The limit is set when the transaction starts; when that balance
+    /// changes while the transaction runs, the limit has to follow, or a
+    /// transaction that funds itself part-way is still stopped at what it
+    /// could afford before. Does nothing unless `account`/`sub_account` is the
+    /// balance the running transaction is billed to.
+    fn refresh_cpu_limit(account: AccountNumber, sub_account: Option<String>) {
+        if !tx_cache::billable::is_billed(account, &sub_account) {
+            return;
+        }
+        CpuLimit::rpc().setCpuLimit(get_cpu_limit(account, sub_account));
+    }
+
     fn get_cpu_limit(account: AccountNumber, sub_account: Option<String>) -> Option<u64> {
         if !is_billing_enabled() {
             return None;
@@ -900,9 +915,10 @@ mod service {
     }
 
     #[action]
+    #[allow(unused_variables)]
     fn serveSys(
         request: HttpRequest,
-        _socket: Option<i32>,
+        socket: Option<i32>,
         user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
         assert_eq!(

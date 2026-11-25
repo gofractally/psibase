@@ -1,20 +1,19 @@
 #include <psibase/Watchdog.hpp>
 
+#include <algorithm>
 #include <cassert>
-#include <system_error>
 
 namespace psibase
 {
-
-   CpuClock::time_point CpuClock::now(clockid_t clock)
+   namespace
    {
-      struct timespec result;
-      if (::clock_gettime(clock, &result) < 0)
+      auto toSteady(RunClock::time_point time)
       {
-         throw std::system_error(errno, std::system_category());
+         return std::chrono::steady_clock::time_point(
+             std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                 time.time_since_epoch()));
       }
-      return time_point(duration(static_cast<rep>(result.tv_sec) * 1000000000 + result.tv_nsec));
-   }
+   }  // namespace
 
    WatchdogManager::WatchdogManager() : worker{[this] { run(); }} {}
    WatchdogManager::~WatchdogManager()
@@ -26,14 +25,21 @@ namespace psibase
       cond.notify_one();
       worker.join();
    }
+   void WatchdogManager::deadlineChanged(const std::optional<RunClock::time_point>& deadline)
+   {
+      if (deadline && *deadline < nextLook)
+         cond.notify_one();
+   }
    void WatchdogManager::add(Watchdog* wd)
    {
       std::lock_guard l{mutex};
       children.push_back(wd);
-      cond.notify_one();
+      deadlineChanged(wd->deadline());
    }
    void WatchdogManager::remove(Watchdog* wd)
    {
+      // Taking the mutex waits for a cancellation of this watchdog that is in
+      // progress: the worker cancels with the mutex held.
       std::lock_guard l{mutex};
       auto            pos = std::find(children.begin(), children.end(), wd);
       if (pos != children.end())
@@ -44,102 +50,92 @@ namespace psibase
       std::unique_lock l{mutex};
       while (!done)
       {
-         auto iter = children.begin();
-         // Limit the maximum wait to avoid integer overflow in wait_for
-         CpuClock::duration earliest = std::chrono::days(1);
+         const auto now  = RunClock::now();
+         auto       look = now + idlePeriod;
+         auto       keep = children.begin();
          for (Watchdog* child : children)
          {
-            auto remaining = child->wait_duration();
-            if (remaining.count() < 0)
+            // The deadline is read here, under the mutex, so it reflects every
+            // setLimit that has returned. A deadline that has moved later since
+            // the worker went to sleep simply is not due yet.
+            const auto deadline = child->deadline();
+            if (deadline && *deadline <= now)
             {
                child->interrupt();
             }
             else
             {
-               earliest = std::min(earliest, remaining);
-               *iter++  = child;
+               if (deadline && *deadline < look)
+                  look = *deadline;
+               *keep++ = child;
             }
          }
-         children.erase(iter, children.end());
-         cond.wait_for(l, earliest);
+         children.erase(keep, children.end());
+         nextLook = look;
+         cond.wait_until(l, toSteady(look));
       }
    }
 
    Watchdog::Watchdog(WatchdogManager& m, std::function<void()> handler)
-       : manager(&m),
-         paused(false),
-         elapsedOrStart(CpuClock::now().time_since_epoch()),
-         handler(handler)
+       : manager(&m), runningSince(RunClock::now()), handler(std::move(handler))
    {
-#ifdef __APPLE__
-      cpuclock = CLOCK_MONOTONIC;
-#else
-      if (int err = pthread_getcpuclockid(pthread_self(), &cpuclock))
-      {
-         throw std::system_error(err, std::system_category());
-      }
-#endif
+      // The request is cancelled by the manager's worker, never by the thread
+      // that checks it.
+      request = std::make_shared<accounting::Request>([] { return true; });
       manager->add(this);
    }
    Watchdog::~Watchdog()
    {
       manager->remove(this);
+      request->close();
    }
-   void Watchdog::setLimit(CpuClock::duration dur)
+   void Watchdog::setLimit(RunClock::duration dur)
    {
       assert(dur.count() >= 0);
-      bool notify = dur < limit;
-      {
-         std::lock_guard l{manager->mutex};
-         limit = dur;
-      }
-      if (notify)
-      {
-         manager->cond.notify_one();
-      }
+      std::lock_guard l{manager->mutex};
+      limit = dur;
+      manager->deadlineChanged(deadline());
    }
    void Watchdog::pause()
    {
-      assert(!paused);
       std::lock_guard l{manager->mutex};
-      paused         = true;
-      elapsedOrStart = CpuClock::now().time_since_epoch() - elapsedOrStart;
+      assert(!paused);
+      accumulated = elapsedAt(RunClock::now());
+      paused      = true;
    }
    void Watchdog::resume()
    {
+      std::lock_guard l{manager->mutex};
       assert(paused);
-      {
-         std::lock_guard l{manager->mutex};
-         paused         = false;
-         elapsedOrStart = CpuClock::now().time_since_epoch() - elapsedOrStart;
-      }
-      manager->cond.notify_one();
+      paused       = false;
+      runningSince = RunClock::now();
+      manager->deadlineChanged(deadline());
    }
-   CpuClock::duration Watchdog::elapsed()
+   RunClock::duration Watchdog::elapsed()
    {
-      if (paused)
-      {
-         return elapsedOrStart;
-      }
-      else
-      {
-         return CpuClock::now().time_since_epoch() - elapsedOrStart;
-      }
+      std::lock_guard l{manager->mutex};
+      return elapsedAt(RunClock::now());
    }
    void Watchdog::interrupt()
    {
+      request->cancel();
       handler();
    }
-   CpuClock::duration Watchdog::wait_duration()
+   RunClock::duration Watchdog::elapsedAt(RunClock::time_point now) const
    {
+      return paused ? accumulated : accumulated + (now - runningSince);
+   }
+   std::optional<RunClock::time_point> Watchdog::deadline() const
+   {
+      // A paused run has no deadline. Neither does one whose limit is beyond
+      // any time that can be reached (which also keeps the sum from wrapping).
+      constexpr RunClock::duration unreachable = std::chrono::hours(24 * 365 * 100);
       if (paused)
-      {
-         return CpuClock::duration::max();
-      }
-      else
-      {
-         return limit - (CpuClock::now(cpuclock).time_since_epoch() - elapsedOrStart);
-      }
+         return std::nullopt;
+      const auto remaining = limit - accumulated;
+      if (remaining >= unreachable)
+         return std::nullopt;
+      return runningSince + remaining;
    }
 
 }  // namespace psibase
