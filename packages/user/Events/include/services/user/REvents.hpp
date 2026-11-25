@@ -16,11 +16,11 @@ namespace UserService
       std::vector<char> sqlQuery(const std::string& query, const std::vector<std::string>& params);
 
       // Standard HTTP API
-      std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest&,
+      std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest&          request,
                                                  std::optional<std::int32_t>           socket,
                                                  std::optional<psibase::AccountNumber> user);
    };
-   PSIO_REFLECT(REvents, method(sqlQuery, query, params), method(serveSys, request))
+   PSIO_REFLECT(REvents, method(sqlQuery, attr(query, utf8), params), method(serveSys, request, socket, user))
    PSIBASE_REFLECT_TABLES(REvents)
 
 }  // namespace UserService

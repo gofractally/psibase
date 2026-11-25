@@ -14,7 +14,6 @@
 using namespace psibase;
 using namespace SystemService;
 using namespace UserService;
-using namespace psio::schema_types;
 
 HttpRequest makeQuery(std::string_view s)
 {
@@ -33,9 +32,7 @@ std::vector<R> query(TestChain& chain, std::string_view s)
         << " " << std::string(response.body.begin(), response.body.end()));
    CHECK(response.status == HttpStatus::ok);
    CHECK(response.contentType == "application/json");
-   response.body.push_back('\0');
-   psio::json_token_stream stream(response.body.data());
-   return psio::from_json<std::vector<R>>(stream);
+   return psio::from_ijson<std::vector<R>>(response.body);
 }
 
 struct ExplainQueryPlan
@@ -64,7 +61,7 @@ template <typename T>
    requires requires { typename T::json_stream_operator; }
 std::ostream& operator<<(std::ostream& os, const T& value)
 {
-   os << psio::convert_to_json(value) << std::endl;
+   os << psio::to_ijson(value) << std::endl;
    return os;
 }
 
@@ -80,6 +77,21 @@ struct TestEvent
    std::vector<std::int32_t> v;
    std::string               s;
    REFLECT_EVENT(TestEvent, i, d, v, s)
+};
+
+// The rows of queries that select some of the columns of `testevent`: a row
+// is read as a record of exactly the selected columns.
+struct TestEventNumbers
+{
+   int    i = 0;
+   double d = 0;
+   REFLECT_EVENT(TestEventNumbers, i, d)
+};
+
+struct TestEventInt
+{
+   int i = 0;
+   REFLECT_EVENT(TestEventInt, i)
 };
 
 struct Opt
@@ -113,7 +125,7 @@ TEST_CASE("events")
    auto mallory     = chain.from(chain.addAccount("mallory"));
 
    auto schema = ServiceSchema::make<TestService>();
-   std::cout << psio::format_json(schema) << std::endl;
+   std::cout << psio::format_json(psio::to_ijson(schema)) << std::endl;
    expect(testService.to<Packages>().setSchema(schema).trace());
    expect(testService.to<TestService>().send(42, 1.414, std::vector{1}, "a").trace());
    expect(testService.to<TestService>().send(72, 3.14159, std::vector{2}, "b").trace());
@@ -149,17 +161,18 @@ TEST_CASE("events")
              R"""(SELECT i,d,v,s FROM "history.test-svc.testevent" WHERE d > 2 ORDER BY d)""") ==
          std::vector<TestEvent>{{42, 2.718, {3}, "c"}, {72, 3.14159, {2}, "b"}});
 
-   CHECK(query<TestEvent>(
+   CHECK(query<TestEventNumbers>(
              chain, R"""(SELECT i,d FROM "history.test-svc.testevent" WHERE d > 2 ORDER BY d)""") ==
-         std::vector<TestEvent>{{42, 2.718}, {72, 3.14159}});
+         std::vector<TestEventNumbers>{{42, 2.718}, {72, 3.14159}});
 
-   CHECK(query<TestEvent>(chain,
-                          R"""(SELECT i FROM "history.test-svc.testevent" ORDER BY ROWID)""") ==
-         std::vector<TestEvent>{{42}, {72}, {42}, {91}});
+   CHECK(query<TestEventInt>(chain,
+                             R"""(SELECT i FROM "history.test-svc.testevent" ORDER BY ROWID)""") ==
+         std::vector<TestEventInt>{{42}, {72}, {42}, {91}});
 
    constexpr std::string_view descendingSql =
        R"""(SELECT i FROM "history.test-svc.testevent" ORDER BY ROWID DESC)""";
-   CHECK(query<TestEvent>(chain, descendingSql) == std::vector<TestEvent>{{91}, {42}, {72}, {42}});
+   CHECK(query<TestEventInt>(chain, descendingSql) ==
+         std::vector<TestEventInt>{{91}, {42}, {72}, {42}});
 
    {
       std::string plan;
@@ -176,10 +189,10 @@ TEST_CASE("events")
    }
 
    CHECK(
-       query<TestEvent>(
+       query<TestEventInt>(
            chain,
            R"""(SELECT i FROM "history.test-svc.testevent" WHERE i = '"history.unknown.unknown"')""") ==
-       std::vector<TestEvent>{});
+       std::vector<TestEventInt>{});
 
    // optional
    expect(testService.to<TestService>().sendOptional(std::nullopt).trace());

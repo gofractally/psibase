@@ -5,26 +5,21 @@
 #include <psibase/AccountNumber.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/db.hpp>
-#include <psio/to_key.hpp>
+#include <psio/key.hpp>
 #include <services/user/EventsTables.hpp>
 #include <vector>
 
 namespace UserService
 {
 
+   // The key of an event's index table: its members, in order.
    struct EventIndexTable
    {
       EventDb                db;
       psibase::AccountNumber service;
       psibase::MethodNumber  event;
+      PSIO_REFLECT(EventIndexTable, db, service, event)
    };
-
-   void to_key(const EventIndexTable& obj, auto& stream)
-   {
-      psio::to_key(obj.db, stream);
-      psio::to_key(obj.service, stream);
-      psio::to_key(obj.event, stream);
-   }
 
    std::uint64_t keyToEventId(const std::vector<char>& key, std::size_t prefixLen = 0);
 

@@ -1,14 +1,14 @@
 use crate::Wrapper;
 use psibase::{
     AccountNumber, ChainEmptyResult, Push, account,
-    services::{http_server, tokens},
+    services::tokens,
     tester::PRODUCER_ACCOUNT,
 };
 
 use super::query::get_user_resources;
 
 pub(super) fn assert_error(result: ChainEmptyResult, message: &str) {
-    let err = result.trace.error.unwrap();
+    let err = result.trace.error_text().unwrap();
     let contains_error = err.contains(message);
     assert!(
         contains_error,
@@ -31,19 +31,25 @@ pub(super) fn check_balance(
 }
 
 pub(super) fn enable_billing(chain: &psibase::Chain) -> Result<(), psibase::Error> {
+    enable_billing_with_receiver(chain, tokens::Wrapper::SERVICE)
+}
+
+pub(super) fn enable_billing_with_receiver(
+    chain: &psibase::Chain,
+    fee_receiver: AccountNumber,
+) -> Result<(), psibase::Error> {
     Wrapper::push(&chain).init().get()?;
 
     let sys: tokens::TID = 1;
     let alice = account!("alice");
     let vserver = Wrapper::SERVICE;
-    let tokens = tokens::Wrapper::SERVICE;
     let auth_prod = chain.login(PRODUCER_ACCOUNT, Wrapper::SERVICE)?;
 
     chain.finish_block();
 
     chain
         .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
-        .init_billing(tokens)
+        .init_billing(fee_receiver)
         .get()?;
 
     let min_resource_buffer = get_user_resources(&chain, PRODUCER_ACCOUNT, &auth_prod)?
