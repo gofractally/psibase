@@ -1,6 +1,11 @@
 #include <psibase/api.hpp>
 #include <psibase/testerApi.hpp>
 
+#include <unistd.h>
+#include <algorithm>
+#include <cstring>
+#include <vector>
+
 using namespace psibase;
 using std::uint32_t;
 
@@ -14,9 +19,20 @@ uint32_t psibase::raw::getResult(const char* dest, uint32_t destSize, uint32_t o
    return psibase::tester::raw::getResult(dest, destSize, offset);
 }
 
+// The size of the prefix of the handle that the last key was found through.
+// A key is reported as the handle sees it: without that prefix.
+static std::uint32_t keyPrefixSize = 0;
+
 uint32_t psibase::raw::getKey(const char* dest, uint32_t destSize)
 {
-   return psibase::tester::raw::getKey(dest, destSize);
+   auto size = psibase::tester::raw::getKey(nullptr, 0);
+   if (size < keyPrefixSize)
+      return 0;
+   std::vector<char> key(size);
+   psibase::tester::raw::getKey(key.data(), key.size());
+   size -= keyPrefixSize;
+   std::memcpy(const_cast<char*>(dest), key.data() + keyPrefixSize, std::min(size, destSize));
+   return size;
 }
 
 void psibase::raw::abortMessage(const char* message, uint32_t len)
@@ -94,6 +110,7 @@ uint32_t psibase::raw::kvGreaterEqual(KvHandle    db,
                                       uint32_t    matchKeySize)
 {
    const auto* bucket  = KvBucket::from(db);
+   keyPrefixSize        = bucket->prefix.size();
    auto        fullKey = bucket->key(key, keyLen);
    return psibase::tester::raw::kvGreaterEqual(psibase::tester::raw::getSelectedChain(), bucket->db,
                                                fullKey.data(), fullKey.size(),
@@ -106,6 +123,7 @@ uint32_t psibase::raw::kvLessThan(KvHandle    db,
                                   uint32_t    matchKeySize)
 {
    const auto* bucket  = KvBucket::from(db);
+   keyPrefixSize        = bucket->prefix.size();
    auto        fullKey = bucket->key(key, keyLen);
    return psibase::tester::raw::kvLessThan(psibase::tester::raw::getSelectedChain(), bucket->db,
                                            fullKey.data(), fullKey.size(),
@@ -115,6 +133,7 @@ uint32_t psibase::raw::kvLessThan(KvHandle    db,
 uint32_t psibase::raw::kvMax(KvHandle db, const char* key, uint32_t keyLen)
 {
    const auto* bucket  = KvBucket::from(db);
+   keyPrefixSize        = bucket->prefix.size();
    auto        fullKey = bucket->key(key, keyLen);
    return psibase::tester::raw::kvMax(psibase::tester::raw::getSelectedChain(), bucket->db,
                                       fullKey.data(), fullKey.size());

@@ -9,6 +9,7 @@
 #include <boost/type_erasure/callable.hpp>
 #include <chrono>
 #include <filesystem>
+#include <optional>
 #include <psibase/SystemContext.hpp>
 #include <psibase/trace.hpp>
 #include <shared_mutex>
@@ -56,49 +57,28 @@ namespace psibase::http
 
    struct http_status
    {
-      unsigned    slow : 1;
+      std::optional<bool> slow;
       unsigned    startup : 1;
       unsigned    shutdown : 1;
       unsigned    needgenesis : 1;
       friend bool operator==(const http_status&, const http_status&) = default;
    };
-   template <typename S>
-   void to_json(http_status obj, S& stream)
+   /// The JSON of an `http_status` is the list of the names of the states
+   /// that are set: `["startup","needgenesis"]`.
+   inline std::vector<std::string_view> statusNames(http_status obj)
    {
-      stream.write('[');
-      bool first       = true;
-      auto maybe_comma = [&]()
-      {
-         if (first)
-         {
-            first = false;
-         }
-         else
-         {
-            stream.write(',');
-         }
-      };
-      if (obj.slow)
-      {
-         maybe_comma();
-         to_json("slow", stream);
-      }
+      std::vector<std::string_view> result;
+      if (!obj.slow.has_value())
+         result.push_back("storage-pressure-unavailable");
+      else if (*obj.slow)
+         result.push_back("slow");
       if (obj.startup)
-      {
-         maybe_comma();
-         to_json("startup", stream);
-      }
+         result.push_back("startup");
       if (obj.shutdown)
-      {
-         maybe_comma();
-         to_json("shutdown", stream);
-      }
+         result.push_back("shutdown");
       if (obj.needgenesis)
-      {
-         maybe_comma();
-         to_json("needgenesis", stream);
-      }
-      stream.write(']');
+         result.push_back("needgenesis");
+      return result;
    }
    inline http_status atomic_set_field(std::atomic<http_status>& status, auto&& f)
    {
@@ -136,73 +116,13 @@ namespace psibase::http
    };
    PSIO_REFLECT(any_listen_spec, protocol, path, address, port)
 
-   template <bool Secure, typename S>
-   void to_json(const tcp_listen_spec<Secure>& obj, S& stream)
-   {
-      stream.write('{');
-      if constexpr (Secure)
-      {
-         to_json("protocol", stream);
-         stream.write(':');
-         to_json("https", stream);
-      }
-      else
-      {
-         to_json("protocol", stream);
-         stream.write(':');
-         to_json("http", stream);
-      }
-      stream.write(',');
-      to_json("address", stream);
-      stream.write(':');
-      to_json(obj.endpoint.address().to_string(), stream);
-      stream.write(',');
-      to_json("port", stream);
-      stream.write(':');
-      to_json(obj.endpoint.port(), stream);
-      stream.write('}');
-   }
-
-   void to_json(const local_listen_spec& obj, auto& stream)
-   {
-      stream.write('{');
-      to_json("protocol", stream);
-      stream.write(':');
-      to_json("local", stream);
-      stream.write(',');
-      to_json("path", stream);
-      stream.write(':');
-      to_json(obj.path(), stream);
-      stream.write('}');
-   }
-
-   void to_json(const listen_spec& obj, auto& stream)
-   {
-      std::visit([&](const auto& obj) { to_json(obj, stream); }, obj);
-   }
-
-   void from_json(listen_spec& obj, auto& stream)
-   {
-      any_listen_spec tmp;
-      from_json(tmp, stream);
-      if (tmp.protocol == "http")
-      {
-         check(!!tmp.address, "Address expected");
-         check(!!tmp.port, "Port expected");
-         obj = tcp_listen_spec<false>{{boost::asio::ip::make_address(*tmp.address), *tmp.port}};
-      }
-      else if (tmp.protocol == "https")
-      {
-         check(!!tmp.address, "Address expected");
-         check(!!tmp.port, "Port expected");
-         obj = tcp_listen_spec<true>{{boost::asio::ip::make_address(*tmp.address), *tmp.port}};
-      }
-      else if (tmp.protocol == "local")
-      {
-         check(!!tmp.path, "Address expected");
-         obj = local_listen_spec{*tmp.path};
-      }
-   }
+   /// The JSON of a `listen_spec` is that of an `any_listen_spec`:
+   /// `{"protocol":"http"|"https","address":…,"port":…}` or
+   /// `{"protocol":"local","path":…}`.
+   any_listen_spec to_any_listen_spec(const listen_spec&);
+   /// Throws `std::runtime_error` when the protocol is unknown, a member the
+   /// protocol needs is missing, or the address does not parse.
+   listen_spec from_any_listen_spec(const any_listen_spec&);
 
    std::string to_string(const listen_spec&);
 

@@ -4,13 +4,11 @@ pub mod tables {
     use psibase::services::auth_dyn::int_wrapper;
     use psibase::services::transact::ServiceMethod;
     use psibase::{
-        services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Pack, ServiceWrapper, Table,
-        ToSchema, Unpack,
-    };
-    use serde::{Deserialize, Serialize};
+        services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, ServiceWrapper, Table,
+        };
 
     #[table(name = "ManagementTable", index = 0)]
-    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Management {
         #[primary_key]
         pub account: AccountNumber,
@@ -87,7 +85,7 @@ pub mod service {
         Accounts::call().newAccount(
             account,
             Wrapper::SERVICE,
-            services::accounts::NewAccountMode::MATCH_EXISTING,
+            services::accounts::NewAccountMode::MatchExisting,
         );
     }
 
@@ -119,11 +117,12 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    #[allow(unused_variables)]
     fn checkAuthSys(
-        _flags: u32,
+        flags: u32,
         sender: AccountNumber,
-        _action: ServiceMethod,
-        _claims: Vec<Claim>,
+        action: ServiceMethod,
+        claims: Vec<Claim>,
     ) -> bool {
         abort_message(&format!(
             "Account {} can only be exercised through staged transactions.",

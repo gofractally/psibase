@@ -13,7 +13,6 @@
 
 using namespace psibase;
 using namespace psibase::net;
-using namespace psio;
 using namespace psibase::test;
 
 struct Network;

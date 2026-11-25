@@ -14,8 +14,8 @@ use crate::{
     Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
     DirectoryRegistry, Error, EssentialServices, HostConfigRow, HttpBody, HttpHeader, HttpReply,
     HttpRequest, InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
-    RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, ServiceWrapper, SignedTransaction,
-    StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction,
+    RunMode, SchemaFetcher, ServiceSchema, SchemaMap, Seconds, ServiceWrapper, SignedTransaction,
+    StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, Transaction,
     TransactionBuilder, TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
@@ -23,7 +23,7 @@ use crate::{MicroSeconds, PackageList};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::Utc;
-use fracpack::{Pack, Unpack, UnpackOwned};
+
 use futures::executor::block_on;
 use psibase_macros::account_raw;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -82,6 +82,9 @@ impl Chain {
     pub fn new() -> Chain {
         unimplemented!();
     }
+    pub fn fork(&self) -> Chain {
+        unimplemented!();
+    }
     pub fn push(&self, _transaction: &SignedTransaction) -> TransactionTrace {
         unimplemented!();
     }
@@ -101,7 +104,11 @@ impl Chain {
 
     fn make_test_chain_prototype() -> Chain {
         let result = Chain::create_impl(1 << 27, 1 << 27, 1 << 27, 1 << 27, false);
-        result.boot().unwrap();
+        // A package under test may also belong to TestDefault. Select its local
+        // build during boot; installing the same version afterward is a no-op.
+        result
+            .boot_with(&Self::test_registry(), &["TestDefault".to_string()])
+            .unwrap();
         result
     }
 
@@ -118,6 +125,30 @@ impl Chain {
             is_auto_block_start: proto.is_auto_block_start,
             public: true,
         });
+        result.auto_select_chain();
+        result.start_session();
+        result.start_block();
+        result
+    }
+
+    /// Fork a completed fixture for independent deterministic scenarios.
+    ///
+    /// Finishes the parent's current block, clones its committed native
+    /// database, and starts a new session/block in the child. Transactions in
+    /// one child never modify the parent or a sibling. Repeated children have
+    /// identical chain state and time, allowing transaction-time measurements
+    /// without repeatedly booting an unrelated baseline.
+    pub fn fork(&self) -> Chain {
+        if self.producing.get() {
+            self.finish_block();
+        }
+        let mut result = Chain {
+            chain_handle: unsafe { tester_raw::cloneChain(self.chain_handle) },
+            status: self.status.clone(),
+            producing: Cell::new(false),
+            is_auto_block_start: self.is_auto_block_start,
+            public: true,
+        };
         result.auto_select_chain();
         result.start_session();
         result.start_block();
@@ -158,7 +189,7 @@ impl Chain {
             &None,
             PRODUCER_ACCOUNT,
             false,
-            TimePointSec { seconds: 120 },
+            TimePointSec::from_ticks(120),
             &mut services[..],
             &essential,
             COMPRESSION_LEVEL,
@@ -228,7 +259,7 @@ impl Chain {
 
     fn load_local_services(&mut self) {
         use crate::{CODE_TABLE, NATIVE_TABLE_PRIMARY_INDEX};
-        let prefix = (CODE_TABLE, NATIVE_TABLE_PRIMARY_INDEX).to_key();
+        let prefix = psio::to_key(&(CODE_TABLE, NATIVE_TABLE_PRIMARY_INDEX));
         if unsafe {
             tester_raw::kvGreaterEqual(
                 self.chain_handle,
@@ -280,17 +311,15 @@ impl Chain {
                 self.kv_put(DbId::NativeSubjective, &key, &code_by_hash_row);
 
                 if let Some(server) = &info.server {
-                    let body: Vec<u8> =
-                        serde_json::to_string(&services::x_http::RegisterServerRequest {
-                            service: *account,
-                            server: *server,
-                        })
-                        .unwrap()
-                        .into();
+                    let body: Vec<u8> = psio::to_ijson(&services::x_http::RegisterServerRequest {
+                        service: *account,
+                        server: *server,
+                    })
+                    .into();
                     let req = HttpRequest {
                         host: services::x_http::SERVICE.to_string() + "." + root_host,
                         method: "POST".to_string(),
-                        target: "/register_server".to_string(),
+                        target: "/register_server".to_string().into(),
                         contentType: "application/json".to_string(),
                         headers: vec![],
                         body: body.into(),
@@ -310,7 +339,7 @@ impl Chain {
                 requests.push(HttpRequest {
                     host: account.to_string() + "." + root_host,
                     method: "PUT".to_string(),
-                    target: path,
+                    target: path.into(),
                     contentType: mime_type.to_string(),
                     headers: Vec::new(),
                     body: file.into(),
@@ -319,26 +348,18 @@ impl Chain {
             requests.push(HttpRequest {
                 host: services::x_packages::SERVICE.to_string() + "." + root_host,
                 method: "PUT".to_string(),
-                target: format!("/manifest/{}", package.hash()),
+                target: format!("/manifest/{}", psio::to_hex(package.hash())).into(),
                 contentType: "application/json".to_string(),
                 headers: vec![],
-                body: serde_json::to_string(&package.manifest())
-                    .unwrap()
-                    .into_bytes()
-                    .into(),
+                body: psio::to_ijson(&package.manifest()).into_bytes(),
             });
             requests.push(HttpRequest {
                 host: services::x_packages::SERVICE.to_string() + "." + root_host,
                 method: "POST".to_string(),
-                target: "/postinstall".to_string(),
+                target: "/postinstall".to_string().into(),
                 contentType: "application/json".to_string(),
                 headers: vec![],
-                body: serde_json::to_string(
-                    &package.meta().info(package.hash().clone(), String::new()),
-                )
-                .unwrap()
-                .into_bytes()
-                .into(),
+                body: psio::to_ijson(&crate::LocalPackageInfo::from(&package)).into_bytes(),
             });
         }
         assert!(
@@ -351,7 +372,7 @@ impl Chain {
                 panic!(
                     "{} {} failed: {}",
                     request.method,
-                    request.target,
+                    request.target.to_string_lossy(),
                     reply.text().unwrap()
                 );
             }
@@ -397,7 +418,7 @@ impl Chain {
             status
                 .as_ref()
                 .map(|s| s.current.time)
-                .unwrap_or(TimePointUSec { microseconds: 0 })
+                .unwrap_or(TimePointUSec::from_ticks(0))
         };
         self.start_block_at(current_time + micro_seconds);
     }
@@ -405,7 +426,7 @@ impl Chain {
     fn push_start_block(&self, expiration: TimePointUSec) {
         let trx = Transaction {
             tapos: Tapos {
-                expiration: expiration.ceil_seconds(),
+                expiration: expiration.ceil::<psio::time::Seconds>(),
                 refBlockSuffix: 0,
                 flags: 0,
                 refBlockIndex: 0,
@@ -415,23 +436,22 @@ impl Chain {
             ],
             claims: vec![],
         };
-        let strx = SignedTransaction {
-            transaction: trx.packed().into(),
+        let strx = psio::to_pssz(&SignedTransaction {
+            transaction: psio::pssz::Nested::new(&trx).unwrap(),
             proofs: vec![],
             subjectiveData: None,
-        }
-        .packed();
+        });
         let size =
             unsafe { tester_raw::pushTransaction(self.chain_handle, strx.as_ptr(), strx.len()) };
-        let trace = TransactionTrace::unpacked(&get_result_bytes(size)).unwrap();
-        if let Some(error) = &trace.error {
+        let trace = psio::from_pssz::<TransactionTrace>(&get_result_bytes(size)).unwrap();
+        if let Some(error) = trace.error_text() {
             panic!("startBlock failed: {error}");
         }
     }
 
     /// Start a new block
     ///
-    /// Starts a new block at `time`. If `time.seconds` is 0,
+    /// Starts a new block at `time`. If `time` is the epoch,
     /// then starts a new block 1 second after the most recent.
     pub fn start_block_at(&self, time: BlockTime) {
         let status = &mut *self.status.borrow_mut();
@@ -461,11 +481,11 @@ impl Chain {
 
         // Guarantee that there is a recent block for fillTapos to use.
         if let Some(status) = status {
-            if status.current.time + Seconds::new(1) < time {
+            if status.current.time + MicroSeconds::from_ticks(1_000_000) < time {
                 unsafe {
                     tester_raw::startBlock(
                         self.chain_handle,
-                        (time - Seconds::new(1)).microseconds,
+                        (time - MicroSeconds::from_ticks(1_000_000)).ticks(),
                         producer.value,
                         term,
                         commit_num,
@@ -478,14 +498,14 @@ impl Chain {
         unsafe {
             tester_raw::startBlock(
                 self.chain_handle,
-                time.microseconds,
+                time.ticks(),
                 producer.value,
                 term,
                 commit_num,
             )
         }
         if status.is_some() {
-            self.push_start_block(time + Seconds::new(1));
+            self.push_start_block(time + MicroSeconds::from_ticks(1_000_000));
         }
         *status = self
             .kv_get::<StatusRow, _>(StatusRow::DB, &status_key())
@@ -497,7 +517,7 @@ impl Chain {
     ///
     /// Starts a new block 1 second after the most recent.
     pub fn start_block(&self) {
-        self.start_block_after(Seconds::new(1).into())
+        self.start_block_after(MicroSeconds::from_ticks(1_000_000))
     }
 
     /// Finish a block
@@ -524,19 +544,19 @@ impl Chain {
             self.start_block();
         }
 
-        let transaction = transaction.packed();
+        let transaction = psio::to_pssz(&transaction);
         let size = unsafe {
             tester_raw::pushTransaction(self.chain_handle, transaction.as_ptr(), transaction.len())
         };
-        TransactionTrace::unpacked(&get_result_bytes(size)).unwrap()
+        psio::from_pssz::<TransactionTrace>(&get_result_bytes(size)).unwrap()
     }
 
     pub fn run_action(&self, mode: RunMode, head: bool, action: Action) -> TransactionTrace {
-        let packed = action.packed();
+        let packed = psio::to_pssz(&action);
         let size = unsafe {
             tester_raw::runAction(self.chain_handle, mode, head, packed.as_ptr(), packed.len())
         };
-        TransactionTrace::unpacked(&get_result_bytes(size)).unwrap()
+        psio::from_pssz::<TransactionTrace>(&get_result_bytes(size)).unwrap()
     }
 
     /// Select chain for database native functions
@@ -553,7 +573,7 @@ impl Chain {
     }
 
     pub fn open<R: TableRecord, T: Table<R>>(&self) -> T {
-        let prefix = (T::SERVICE, T::TABLE_INDEX).to_key();
+        let prefix = psio::to_key(&(T::SERVICE, T::TABLE_INDEX));
         let handle = unsafe {
             KvHandle::from_raw(polyfill::open_in_chain(
                 self.chain_handle,
@@ -571,13 +591,13 @@ impl Chain {
         get_optional_result_bytes(size)
     }
 
-    pub fn kv_get<V: UnpackOwned, K: ToKey>(
+    pub fn kv_get<V: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, K: psio::key::KeyPack>(
         &self,
         db: DbId,
         key: &K,
-    ) -> Result<Option<V>, fracpack::Error> {
-        if let Some(v) = self.kv_get_bytes(db, &key.to_key()) {
-            Ok(Some(V::unpacked(&v)?))
+    ) -> psio::pssz::PsszResult<Option<V>> {
+        if let Some(v) = self.kv_get_bytes(db, &psio::to_key(key)) {
+            Ok(Some(psio::from_pssz::<V>(&v)?))
         } else {
             Ok(None)
         }
@@ -602,8 +622,13 @@ impl Chain {
     /// Set a key-value pair
     ///
     /// If key already exists, then replace the existing value.
-    pub fn kv_put<K: ToKey, V: Pack>(&mut self, db: DbId, key: &K, value: &V) {
-        self.kv_put_bytes(db, &key.to_key(), &value.packed())
+    pub fn kv_put<K: psio::key::KeyPack, V: psio::pssz::PsszPack<psio::Pssz>>(
+        &mut self,
+        db: DbId,
+        key: &K,
+        value: &V,
+    ) {
+        self.kv_put_bytes(db, &psio::to_key(key), &psio::to_pssz(value))
     }
 
     /// Create a new account
@@ -615,7 +640,7 @@ impl Chain {
             .newAccount(
                 account,
                 AccountNumber::new(account_raw!("auth-any")),
-                services::accounts::NewAccountMode::KEEP_EXISTING,
+                services::accounts::NewAccountMode::KeepExisting,
             )
             .get()?;
         Ok(())
@@ -656,7 +681,7 @@ impl Chain {
         };
         self.fill_tapos(&mut trx, 2);
         let trace = self.push(&SignedTransaction {
-            transaction: trx.packed().into(),
+            transaction: psio::pssz::Nested::new(&trx).unwrap(),
             proofs: Default::default(),
             subjectiveData: None,
         });
@@ -700,7 +725,7 @@ impl Chain {
                 };
                 self.fill_tapos(&mut trx, 2);
                 let trace = self.push(&SignedTransaction {
-                    transaction: trx.packed().into(),
+                    transaction: psio::pssz::Nested::new(&trx).unwrap(),
                     proofs: Default::default(),
                     subjectiveData: None,
                 });
@@ -772,7 +797,7 @@ impl Chain {
     }
 
     pub fn http(&self, request: &HttpRequest) -> Result<HttpReply, anyhow::Error> {
-        let packed_request = request.packed();
+        let packed_request = psio::to_pssz(&request);
         let fd = unsafe {
             tester_raw::httpRequest(
                 self.chain_handle,
@@ -786,7 +811,7 @@ impl Chain {
             Err(anyhow!("Could not read response: {}", err))?;
         }
 
-        Ok(HttpReply::unpacked(&get_result_bytes(size))?)
+        Ok(psio::from_pssz::<HttpReply>(&get_result_bytes(size))?)
     }
 
     pub fn get(&self, account: AccountNumber, target: &str) -> Result<HttpReply, anyhow::Error> {
@@ -872,7 +897,8 @@ impl Chain {
         user: AccountNumber,
         service: AccountNumber,
     ) -> Result<String, anyhow::Error> {
-        let expiration = TimePointSec::from(Utc::now()) + Seconds::new(10);
+        let expiration =
+            TimePointSec::from_chrono_floor(Utc::now()).unwrap() + Seconds::from_ticks(10);
 
         let tapos = Tapos {
             expiration,
@@ -888,7 +914,7 @@ impl Chain {
         };
 
         let strx = SignedTransaction {
-            transaction: trx.packed().into(),
+            transaction: psio::pssz::Nested::new(&trx).unwrap(),
             proofs: vec![],
             subjectiveData: None,
         };
@@ -898,7 +924,7 @@ impl Chain {
             "/login",
             HttpBody {
                 contentType: "application/octet-stream".into(),
-                body: strx.packed().into(),
+                body: psio::to_pssz(&strx).into(),
             },
         )?;
 
@@ -933,12 +959,12 @@ impl Chain {
     ///
     /// `expire_seconds` is relative to the most-recent block.
     pub fn fill_tapos(&self, trx: &mut Transaction, expire_seconds: u32) {
-        trx.tapos.expiration.seconds = expire_seconds as i64;
+        trx.tapos.expiration = TimePointSec::from_ticks(expire_seconds as i64);
         trx.tapos.refBlockIndex = 0;
         trx.tapos.refBlockSuffix = 0;
         if let Some(status) = &*self.status.borrow() {
             trx.tapos.expiration =
-                status.current.time.seconds() + Seconds::new(expire_seconds as i64);
+                status.current.time.floor::<psio::time::Seconds>() + Seconds::from_ticks(expire_seconds as i64);
             if let Some(head) = &status.head {
                 let mut suffix = [0; 4];
                 suffix.copy_from_slice(&head.blockId[head.blockId.len() - 4..]);
@@ -1012,7 +1038,7 @@ struct ChainSchemaFetcher<'a> {
 #[cfg(target_family = "wasm")]
 #[async_trait(?Send)]
 impl<'a> SchemaFetcher for ChainSchemaFetcher<'a> {
-    async fn fetch_schema(&self, service: AccountNumber) -> Result<Schema, anyhow::Error> {
+    async fn fetch_schema(&self, service: AccountNumber) -> Result<ServiceSchema, anyhow::Error> {
         let index = self
             .chain
             .open::<services::packages::InstalledSchema, services::packages::InstalledSchemaTable>()
@@ -1031,7 +1057,7 @@ pub struct ChainEmptyResult {
 impl ChainEmptyResult {
     #[track_caller]
     pub fn get(&self) -> Result<(), anyhow::Error> {
-        if let Some(e) = &self.trace.error {
+        if let Some(e) = self.trace.error_text() {
             let loc = std::panic::Location::caller();
             Err(anyhow!("{} (at {}:{})", e, loc.file(), loc.line()))
         } else {
@@ -1045,12 +1071,14 @@ impl ChainEmptyResult {
     }
 }
 
-pub struct ChainResult<T: fracpack::UnpackOwned> {
+pub struct ChainResult<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> {
     pub trace: TransactionTrace,
-    _marker: PhantomData<T>,
+    /// Reads the result as the called method declares it
+    /// (`Method::result_from_pssz`: validated, `returns(...)` applied)
+    decode: fn(&[u8]) -> psio::pssz::PsszResult<T>,
 }
 
-impl<T: fracpack::UnpackOwned> ChainResult<T> {
+impl<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> ChainResult<T> {
     #[track_caller]
     pub fn get(&self) -> Result<T, anyhow::Error> {
         self.get_with_debug(false)
@@ -1073,7 +1101,7 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
 
     #[track_caller]
     pub fn get_with_debug(&self, debug: bool) -> Result<T, anyhow::Error> {
-        if let Some(e) = &self.trace.error {
+        if let Some(e) = self.trace.error_text() {
             let loc = std::panic::Location::caller();
             return Err(anyhow!("{} (at {}:{})", e, loc.file(), loc.line()));
         }
@@ -1097,11 +1125,11 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
                 if debug {
                     println!(
                         ">>> ChainResult::get - Inner action trace: {} (raw_retval={})",
-                        at.action.method, at.raw_retval
+                        at.action.method, psio::to_hex(&at.raw_retval)
                     );
-                    println!(">>> ChainResult::get - Unpacking ret: `{}`", ret);
+                    println!(">>> ChainResult::get - Unpacking ret: `{}`", psio::to_hex(&ret));
                 }
-                let unpacked_ret = T::unpacked(ret)?;
+                let unpacked_ret = (self.decode)(ret)?;
                 return Ok(unpacked_ret);
             }
         }
@@ -1128,9 +1156,9 @@ pub struct ChainPusher<'a> {
 
 impl<'a> Caller for ChainPusher<'a> {
     type ReturnsNothing = ChainEmptyResult;
-    type ReturnType<T: fracpack::UnpackOwned> = ChainResult<T>;
+    type ReturnType<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> = ChainResult<T>;
 
-    fn call_returns_nothing<Args: fracpack::Pack>(
+    fn call_returns_nothing<Args: psio::interface::Method>(
         &self,
         method: crate::MethodNumber,
         args: Args,
@@ -1141,13 +1169,13 @@ impl<'a> Caller for ChainPusher<'a> {
                 sender: self.sender,
                 service: self.service,
                 method,
-                rawData: args.packed().into(),
+                rawData: psio::to_pssz(&args).into(),
             }],
             claims: vec![],
         };
         self.chain.fill_tapos(&mut trx, 2);
         let trace = self.chain.push(&SignedTransaction {
-            transaction: trx.packed().into(),
+            transaction: psio::pssz::Nested::new(&trx).unwrap(),
             proofs: Default::default(),
             subjectiveData: None,
         });
@@ -1159,7 +1187,7 @@ impl<'a> Caller for ChainPusher<'a> {
         ChainEmptyResult { trace }
     }
 
-    fn call<Ret: fracpack::UnpackOwned, Args: fracpack::Pack>(
+    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: psio::interface::Method<Result = Ret>>(
         &self,
         method: crate::MethodNumber,
         args: Args,
@@ -1170,19 +1198,19 @@ impl<'a> Caller for ChainPusher<'a> {
                 sender: self.sender,
                 service: self.service,
                 method,
-                rawData: args.packed().into(),
+                rawData: psio::to_pssz(&args).into(),
             }],
             claims: vec![],
         };
         self.chain.fill_tapos(&mut trx, 2);
         let trace = self.chain.push(&SignedTransaction {
-            transaction: trx.packed().into(),
+            transaction: psio::pssz::Nested::new(&trx).unwrap(),
             proofs: Default::default(),
             subjectiveData: None,
         });
         let ret = ChainResult::<Ret> {
             trace,
-            _marker: Default::default(),
+            decode: Args::result_from_pssz,
         };
 
         if self.chain.is_auto_block_start {
@@ -1267,9 +1295,9 @@ pub struct ProposalPusher<'a> {
 
 impl<'a> Caller for ProposalPusher<'a> {
     type ReturnsNothing = ChainEmptyResult;
-    type ReturnType<T: fracpack::UnpackOwned> = ChainEmptyResult;
+    type ReturnType<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> = ChainEmptyResult;
 
-    fn call_returns_nothing<Args: fracpack::Pack>(
+    fn call_returns_nothing<Args: psio::interface::Method>(
         &self,
         method: crate::MethodNumber,
         args: Args,
@@ -1278,7 +1306,7 @@ impl<'a> Caller for ProposalPusher<'a> {
             sender: self.sender,
             service: self.service,
             method,
-            rawData: args.packed().into(),
+            rawData: psio::to_pssz(&args).into(),
         };
         let result = crate::services::staged_tx::Wrapper::push_from(self.chain, self.proposer)
             .propose(vec![action], true);
@@ -1287,7 +1315,7 @@ impl<'a> Caller for ProposalPusher<'a> {
         }
     }
 
-    fn call<Ret: fracpack::UnpackOwned, Args: fracpack::Pack>(
+    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: psio::interface::Method<Result = Ret>>(
         &self,
         method: crate::MethodNumber,
         args: Args,

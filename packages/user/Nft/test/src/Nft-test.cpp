@@ -3,7 +3,8 @@
 #include <format>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/checkSchema.hpp>
-#include <psio/fracpack.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/commonErrors.hpp>
 #include <string>
@@ -63,7 +64,7 @@ namespace
       auto res   = t.post(Nft::service, "/graphql", GraphQLBody{query});
       auto body  = std::string(res.body.begin(), res.body.end());
       UNSCOPED_INFO(body);
-      return psio::convert_from_json<FirstIdRoot>(body).data.firstAvailableId;
+      return psio::from_ijson<FirstIdRoot>(body).data.firstAvailableId;
    }
 
    StatusData nftStatus(DefaultTestChain& t, NID id)
@@ -72,7 +73,7 @@ namespace
       auto res   = t.post(Nft::service, "/graphql", GraphQLBody{query});
       auto body  = std::string(res.body.begin(), res.body.end());
       UNSCOPED_INFO(body);
-      return psio::convert_from_json<StatusRoot>(body).data.nftStatus;
+      return psio::from_ijson<StatusRoot>(body).data.nftStatus;
    }
 }  // namespace
 

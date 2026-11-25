@@ -29,7 +29,6 @@ use invite::plugin::{
     redemption::Guest as Redemption,
 };
 use psibase::{
-    fracpack::Pack,
     services::{
         credentials::CREDENTIAL_SENDER,
         invite::{self as Invite, InvPayload},
@@ -45,6 +44,7 @@ use psibase_plugin::{
     trust::{self, *},
     *,
 };
+use psibase_plugin::Error;
 
 struct InvitePlugin;
 
@@ -103,7 +103,7 @@ fn prepare_new_invite_impl(
     };
 
     let fingerprint = psibase::sha256(&host::crypto::to_der(&keypair.public_key)?)
-        .0
+
         .to_vec();
 
     let min_cost_u64 = Decimal::from_str(&min_cost).unwrap().quantity.value;
@@ -111,11 +111,10 @@ fn prepare_new_invite_impl(
         tokens::user::credit(sys.unwrap(), &service_name, &min_cost, "Create an invite")?;
     }
 
-    let payload = InvPayload {
+    let payload = psio::to_pssz(&InvPayload {
         fingerprint,
         secret,
-    }
-    .packed();
+    });
 
     Ok(InviteDetailsInternal {
         details: InviteDetails {
@@ -263,7 +262,7 @@ impl Inviter for InvitePlugin {
 impl HookActionsSender for InvitePlugin {
     fn on_actions_sender(service: String, method: String) -> Result<Option<String>, Error> {
         let create_account_method =
-            MethodNumber::from(Invite::action_structs::createAccount::ACTION_NAME);
+            MethodNumber::from(<Invite::action_structs::createAccount as psio::interface::Method>::NAME);
         if service == Invite::SERVICE.to_string()
             && MethodNumber::from(method.as_str()) == create_account_method
         {
@@ -274,7 +273,7 @@ impl HookActionsSender for InvitePlugin {
                 method,
                 service,
                 Invite::SERVICE.to_string(),
-                Invite::action_structs::createAccount::ACTION_NAME
+                <Invite::action_structs::createAccount as psio::interface::Method>::NAME
             );
         }
 

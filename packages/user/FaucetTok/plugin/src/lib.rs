@@ -4,18 +4,17 @@ mod bindings;
 use bindings::exports::faucet_tok::plugin::faucet::Guest as Faucet;
 use bindings::transact::plugin::api::add_action_to_transaction;
 use faucet_tok::action_structs as Actions;
-use psibase::fracpack::Pack;
+
 
 struct FaucetPlugin;
 
 impl Faucet for FaucetPlugin {
     fn dispense(account: String) {
         add_action_to_transaction(
-            Actions::dispense::ACTION_NAME,
-            &Actions::dispense {
+            <Actions::dispense as psio::interface::Method>::NAME,
+            &psio::to_pssz(&Actions::dispense {
                 account: account.parse().unwrap(),
-            }
-            .packed(),
+            }),
         )
         .unwrap();
     }

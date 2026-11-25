@@ -2,19 +2,38 @@
 
 #include <psibase/nativeTables.hpp>
 #include <psibase/schema.hpp>
-#include <psio/to_json.hpp>
+#include <psio/to_hex.hpp>
 
 namespace psibase
 {
    namespace
    {
-      psio::schema_types::CustomTypes trace_types(const GetSchemaFn* schemas);
+      namespace ir = psio::pssz_ir;
 
-      template <typename S>
+      // \pre s is valid UTF-8
+      // \post result is valid UTF-8
+      // \post result.size() <= 20
+      std::string_view prune_string(std::string_view s)
+      {
+         if (s.size() <= 20)
+         {
+            return s;
+         }
+         for (std::size_t i = 20; i > 0; --i)
+         {
+            if ((static_cast<unsigned char>(s[i]) & 0xC0) != 0x80)
+            {
+               return s.substr(0, i);
+            }
+         }
+         return s.substr(0, 0);
+      }
+
+      // Writes a JSON value with long strings and lists cut short
       struct PruneFormatter
       {
-         S    base;
-         void format_list(const auto& l, auto&& f)
+         std::string& dest;
+         void         format_list(const auto& l, auto&& f)
          {
             std::size_t           i   = 0;
             constexpr std::size_t len = 5;
@@ -22,88 +41,65 @@ namespace psibase
             {
                if (i != 0)
                {
-                  base.write(',');
+                  dest += ',';
                }
                if (i >= len)
                {
-                  std::string_view s{"…"};
-                  base.write(s.data(), s.size());
+                  dest += "…";
                   break;
                }
                f(item);
                ++i;
             }
          }
-         // \pre s is valid UTF-8
-         // \post result is valud UTF-8
-         // \post result.size() <= 20
-         std::string_view prune_string(std::string_view s)
-         {
-            if (s.size() <= 20)
-            {
-               return s;
-            }
-            for (std::size_t i = 20; i > 0; --i)
-            {
-               if ((static_cast<unsigned char>(s[i]) & 0xC0) != 0x80)
-               {
-                  return s.substr(0, i);
-               }
-            }
-            return s.substr(0, 0);
-         }
          void operator()(const std::string& s)
          {
             auto pruned = prune_string(s);
             if (s.size() == pruned.size())
-            {
-               to_json(pruned, base);
-            }
+               dest += psio::to_json(s);
             else
-            {
-               to_json(std::string(pruned) + "…", base);
-            }
+               dest += psio::to_json(std::string(pruned) + "…");
          }
-         void operator()(const psio::json::any_array& a)
+         void operator()(const psio::json_value::array& a)
          {
-            base.write('[');
-            format_list(a, *this);
-            base.write(']');
+            dest += '[';
+            format_list(a, [this](const auto& item) { (*this)(item); });
+            dest += ']';
          }
-         void operator()(const psio::json::any_object& o)
+         void operator()(const psio::json_value::object& o)
          {
-            base.write('{');
+            dest += '{';
             format_list(o,
                         [this](const auto& entry)
                         {
-                           to_json(entry.key, base);
-                           write_colon(base);
-                           (*this)(entry.value);
+                           dest += psio::to_json(entry.first);
+                           dest += ':';
+                           (*this)(entry.second);
                         });
-            base.write('}');
+            dest += '}';
          }
-         void operator()(const psio::json::null_t&) { base.write("null", 4); }
-         void operator()(const auto& value) { to_json(value, base); }
-         void operator()(const psio::json::any& value) { std::visit(*this, value.value()); }
+         void operator()(std::monostate) { dest += "null"; }
+         void operator()(bool b) { dest += b ? "true" : "false"; }
+         void operator()(const psio::json_numeral& n) { dest += n.text; }
+         void operator()(const psio::json_value& value) { std::visit(*this, value.value); }
       };
-      void prettyValue(std::string& dest, const psio::json::any& value)
+
+      void prettyValue(std::string& dest, const psio::json_value& value)
       {
-         PruneFormatter{psio::string_stream{dest}}(value);
+         PruneFormatter{dest}(value);
       }
 
       const std::string& prettyMethod(const GetSchemaFn& schemas,
                                       AccountNumber      service,
-                                      const std::string& method)
+                                      MethodNumber       method,
+                                      std::string&       storage)
       {
-         if (auto* schema = schemas(service))
-         {
-            auto pos = schema->actions.find(method);
-            if (pos != schema->actions.end())
-            {
-               return pos->first;
-            }
-         }
-         return method;
+         if (schemas)
+            if (auto* schema = schemas(service))
+               if (auto* action = schema->findAction(method))
+                  return action->first;
+         storage = method.str();
+         return storage;
       }
 
       bool hideAction(const Action& action)
@@ -122,136 +118,217 @@ namespace psibase
          return false;
       }
 
-      struct PrettyServiceMethod
+      psio::codec_status handlerError(std::string message, std::string_view type)
       {
-         AccountNumber service;
-         std::string   method;
-         PSIO_REFLECT(PrettyServiceMethod, service, method)
-      };
-
-      struct ServiceMethodFormatter
-      {
-         static bool match(const psio::schema_types::CompiledType* ty)
-         {
-            return psio::schema_types::matchCustomType(ty, (ServiceMethod*)nullptr);
-         }
-         static bool frac2json(const GetSchemaFn* schemas,
-                               const psio::schema_types::CompiledType*,
-                               psio::FracStream& in,
-                               psio::StreamBase& out)
-         {
-            ServiceMethod act;
-            if (!in.unpack<true, true>(&act))
-               return false;
-            to_json(PrettyServiceMethod{.service = act.service,
-                                        .method =
-                                            prettyMethod(*schemas, act.service, act.method.str())},
-                    out);
-            return true;
-         }
-         static void json2frac(const psio::schema_types::CompiledType*,
-                               const psio::json::any& in,
-                               psio::StreamBase&      out)
-         {
-            abortMessage("not implemented");
-         }
-         static bool is_empty_container(const psio::schema_types::CompiledType*,
-                                        const psio::json::any& in)
-         {
-            return false;
-         }
-      };
-
-      struct ActionFormatter
-      {
-         static bool match(const psio::schema_types::CompiledType* ty)
-         {
-            return psio::schema_types::matchCustomType(ty, (Action*)nullptr);
-         }
-         static bool frac2json(const GetSchemaFn* schemas,
-                               const psio::schema_types::CompiledType*,
-                               psio::FracStream& in,
-                               psio::StreamBase& out)
-         {
-            Action act;
-            if (!in.unpack<true, true>(&act))
-               return false;
-
-            const psio::Schema*                     types        = nullptr;
-            ServiceSchema::ActionMap::const_pointer actionSchema = nullptr;
-            if (schemas)
-            {
-               if (auto* schema = (*schemas)(act.service))
-               {
-                  types    = &schema->types;
-                  auto pos = schema->actions.find(act.method.str());
-                  if (pos != schema->actions.end())
-                  {
-                     actionSchema = &*pos;
-                  }
-               }
-            }
-
-            out.write('{');
-            to_json("sender", out);
-            write_colon(out);
-            to_json(act.sender, out);
-            out.write(',');
-            to_json("service", out);
-            write_colon(out);
-            to_json(act.service, out);
-            out.write(',');
-            to_json("method", out);
-            write_colon(out);
-            if (actionSchema)
-               to_json(actionSchema->first, out);
-            else
-               to_json(act.method, out);
-            out.write(',');
-            if (actionSchema)
-            {
-               auto& ty = actionSchema->second.params;
-               auto  cschema =
-                   psio::schema_types::CompiledSchema{*types, trace_types(schemas), {&ty}};
-               auto* cty = cschema.get(ty.resolve(*types));
-               to_json("data", out);
-               write_colon(out);
-               auto parser = psio::schema_types::FracParser{psio::FracStream{act.rawData}, cty,
-                                                            cschema.builtin};
-               to_json(parser, out);
-            }
-            else
-            {
-               to_json("rawData", out);
-               write_colon(out);
-               to_json(act.rawData, out);
-            }
-            out.write('}');
-            return true;
-         }
-         static void json2frac(const psio::schema_types::CompiledType*,
-                               const psio::json::any& in,
-                               psio::StreamBase&      out)
-         {
-            abortMessage("not implemented");
-         }
-         static bool is_empty_container(const psio::schema_types::CompiledType*,
-                                        const psio::json::any& in)
-         {
-            return false;
-         }
-      };
-
-      psio::schema_types::CustomTypes trace_types(const GetSchemaFn* schemas)
-      {
-         auto result = psibase_types();
-         result.insert("ServiceMethod",
-                       psio::schema_types::CustomHandler{ServiceMethodFormatter{}, schemas});
-         result.insert("Action", psio::schema_types::CustomHandler{ActionFormatter{}, schemas});
-         return result;
+         return psio::codec_fail_owned(message, 0, type);
       }
 
+      // The text of `value` in the format of the walk
+      template <typename T>
+      std::string jsonText(const T& value, const ir::JsonContext& ctx)
+      {
+         return ctx.ijson ? psio::to_ijson(value) : psio::to_json(value);
+      }
+
+      // The arguments of an action as JSON, by the schema of the service
+      psio::codec_status argsToJson(const ServiceSchema&              schema,
+                                    const psio::schema_types::AnyType& params,
+                                    std::span<const char>             rawData,
+                                    const ir::JsonContext&            ctx,
+                                    std::string&                      out)
+      {
+         if (ctx.ijson)
+            return ir::pssz_to_json(schema.types, params, psio::ijson{}, rawData, out, nullptr,
+                                    ctx.handlers);
+         else
+            return ir::pssz_to_json(schema.types, params, psio::json{}, rawData, out, nullptr,
+                                    ctx.handlers);
+      }
+
+      psio::codec_status argsFromJson(const ServiceSchema&               schema,
+                                      const psio::schema_types::AnyType& params,
+                                      std::string_view                   text,
+                                      bool                               ijson,
+                                      const ir::CustomHandlers*          handlers,
+                                      std::vector<char>&                 out)
+      {
+         std::span<const char> span{text.data(), text.size()};
+         if (ijson)
+            return ir::json_to_pssz(schema.types, params, psio::ijson{}, span, out, nullptr,
+                                    psio::json_parser::automatic, handlers);
+         else
+            return ir::json_to_pssz(schema.types, params, psio::json{}, span, out, nullptr,
+                                    psio::json_parser::automatic, handlers);
+      }
+
+      psio::codec_status accountFromText(const std::string& name, AccountNumber& out)
+      {
+         out = AccountNumber{};
+         if (!name.empty())
+         {
+            out = AccountNumber{std::string_view{name}};
+            if (out == AccountNumber{})
+               return handlerError("invalid account: " + name, "Action");
+         }
+         return psio::codec_ok();
+      }
+
+      psio::codec_status toActionImpl(PrettyAction&&            in,
+                                      const GetSchemaFn&        schemas,
+                                      const ir::CustomHandlers* handlers,
+                                      bool                      ijson,
+                                      bool                      defaultData,
+                                      Action&                   out)
+      {
+         if (auto status = accountFromText(in.sender, out.sender); !status.ok())
+            return status;
+         if (auto status = accountFromText(in.service, out.service); !status.ok())
+            return status;
+         if (out.service == AccountNumber{})
+            return handlerError("Invalid service account " + in.service, "Action");
+         out.method = MethodNumber{in.method};
+         if (in.rawData && !in.data)
+         {
+            out.rawData = std::move(*in.rawData);
+            return psio::codec_ok();
+         }
+         if (!in.data)
+         {
+            if (!defaultData)
+               return handlerError("Missing field rawData", "Action");
+            in.data.emplace(psio::json_value::object{});
+         }
+         const ServiceSchema* schema = schemas ? schemas(out.service) : nullptr;
+         if (!schema)
+            return handlerError("Cannot find schema for " + in.service, "Action");
+         auto* action = schema->findAction(out.method);
+         if (!action)
+            return handlerError("Action not found: " + in.service + "::" + in.method, "Action");
+         out.rawData.clear();
+         auto text = ijson ? psio::to_ijson(*in.data) : psio::to_json(*in.data);
+         if (auto status =
+                 argsFromJson(*schema, *action->second.params, text, ijson, handlers, out.rawData);
+             !status.ok())
+            return handlerError(in.service + "::" + in.method + ": " +
+                                    std::string(status.error().what),
+                                "Action");
+         return psio::codec_ok();
+      }
+
+      struct PrettyServiceMethod
+      {
+         std::string service;
+         std::string method;
+      };
+      PSIO_REFLECT(PrettyServiceMethod, service, method)
    }  // namespace
+
+   psio::pssz_ir::CustomHandlers action_types(
+       GetSchemaFn                                                     schemas,
+       std::function<void(AccountNumber sender, AccountNumber service)> onAction)
+   {
+      auto result = psibase_types();
+      result.add(
+          "ServiceMethod",
+          {.to_json =
+               [schemas](std::span<const char> pssz, const ir::JsonContext& ctx, std::string& json)
+           {
+              auto        value = psio::from_pssz<ServiceMethod>(psio::trusted{pssz});
+              std::string storage;
+              json += jsonText(
+                  PrettyServiceMethod{.service = value.service.str(),
+                                      .method =
+                                          prettyMethod(schemas, value.service, value.method, storage)},
+                  ctx);
+              return psio::codec_ok();
+           },
+           .from_json =
+               [](std::string_view json, const ir::JsonContext& ctx, std::vector<char>& pssz)
+           {
+              PrettyServiceMethod   in;
+              std::span<const char> text{json.data(), json.size()};
+              if (auto status = ctx.ijson ? psio::decode_json_checked(psio::ijson{}, text, in)
+                                          : psio::decode_json_checked(psio::json{}, text, in);
+                  !status.ok())
+                 return status;
+              ServiceMethod value;
+              if (auto status = accountFromText(in.service, value.service); !status.ok())
+                 return status;
+              value.method = MethodNumber{in.method};
+              psio::to_pssz(value, pssz);
+              return psio::codec_ok();
+           }});
+      result.add(
+          "Action",
+          {.to_json =
+               [schemas](std::span<const char> pssz, const ir::JsonContext& ctx, std::string& json)
+           {
+              auto        act = psio::from_pssz<Action>(psio::trusted{pssz});
+              std::string storage;
+              std::string data;
+              bool        decoded = false;
+              std::string method  = act.method.str();
+              if (schemas)
+                 if (auto* schema = schemas(act.service))
+                    if (auto* action = schema->findAction(act.method))
+                    {
+                       method  = action->first;
+                       decoded = argsToJson(*schema, *action->second.params, act.rawData, ctx, data)
+                                     .ok();
+                    }
+              json += "{\"sender\":";
+              json += jsonText(act.sender.str(), ctx);
+              json += ",\"service\":";
+              json += jsonText(act.service.str(), ctx);
+              json += ",\"method\":";
+              json += jsonText(method, ctx);
+              if (decoded)
+              {
+                 json += ",\"data\":";
+                 json += data;
+              }
+              else
+              {
+                 json += ",\"rawData\":\"";
+                 json += psio::to_hex(act.rawData);
+                 json += '"';
+              }
+              json += '}';
+              return psio::codec_ok();
+           },
+           .from_json =
+               [schemas, onAction](std::string_view json, const ir::JsonContext& ctx,
+                                   std::vector<char>& pssz)
+           {
+              PrettyAction          in;
+              std::span<const char> text{json.data(), json.size()};
+              if (auto status = ctx.ijson ? psio::decode_json_checked(psio::ijson{}, text, in)
+                                          : psio::decode_json_checked(psio::json{}, text, in);
+                  !status.ok())
+                 return status;
+              Action act;
+              if (auto status =
+                      toActionImpl(std::move(in), schemas, ctx.handlers, ctx.ijson, false, act);
+                  !status.ok())
+                 return status;
+              if (onAction)
+                 onAction(act.sender, act.service);
+              psio::to_pssz(act, pssz);
+              return psio::codec_ok();
+           }});
+      return result;
+   }
+
+   Action toAction(PrettyAction&&                       action,
+                   const GetSchemaFn&                   schemas,
+                   const psio::pssz_ir::CustomHandlers& handlers)
+   {
+      Action result;
+      if (auto status = toActionImpl(std::move(action), schemas, &handlers, true, true, result);
+          !status.ok())
+         abortMessage(std::string(status.error().what));
+      return result;
+   }
 
    void trimRawData(ActionTrace& t, size_t max)
    {
@@ -305,30 +382,30 @@ namespace psibase
                     const std::string& indent)
    {
       dest += indent + "action:\n";
+      std::string methodStorage;
       dest += indent + "    " + atrace.action.sender.str() + " => " + atrace.action.service.str() +
-              "::" + prettyMethod(schemas, atrace.action.service, atrace.action.method.str()) +
+              "::" +
+              prettyMethod(schemas, atrace.action.service, atrace.action.method, methodStorage) +
               "\n";
-      if (auto schema = schemas(atrace.action.service))
+      const ServiceSchema* schema = schemas ? schemas(atrace.action.service) : nullptr;
+      if (auto* action = schema ? schema->findAction(atrace.action.method) : nullptr)
       {
-         auto pos = schema->actions.find(atrace.action.method.str());
-         if (pos != schema->actions.end())
+         auto handlers = action_types(schemas);
+         // The text of a packed value, or nothing if the bytes are not one
+         auto decode = [&](const psio::schema_types::AnyType& type,
+                           std::span<const char>              bytes) -> std::optional<psio::json_value>
          {
-            const auto& ty         = pos->second.params;
-            const auto& rty        = pos->second.result;
-            auto        extraTypes = std::vector{&ty};
-            if (rty)
-               extraTypes.push_back(&*rty);
-            psio::schema_types::CompiledSchema cschema{schema->types, trace_types(&schemas),
-                                                       extraTypes};
-            psio::schema_types::FracParser     parser{psio::FracStream{atrace.action.rawData},
-                                                      cschema.get(ty.resolve(schema->types)),
-                                                      cschema.builtin};
-            std::string                        tmp;
-            auto                               stream = psio::string_stream{tmp};
-            to_json(parser, stream);
-            auto args = psio::convert_from_json<psio::json::any>(std::move(tmp));
-
-            if (auto* args_obj = args.get_if<psio::json::any_object>())
+            std::string      text;
+            psio::json_value value;
+            if (ir::pssz_to_json(schema->types, type, psio::ijson{}, bytes, text, nullptr, &handlers)
+                    .ok() &&
+                psio::decode_json_checked(psio::ijson{}, std::span<const char>{text}, value).ok())
+               return value;
+            return {};
+         };
+         if (auto args = decode(*action->second.params, atrace.action.rawData))
+         {
+            if (auto* args_obj = args->as_object())
             {
                for (const auto& [name, value] : *args_obj)
                {
@@ -344,21 +421,17 @@ namespace psibase
             {
                dest += indent;
                dest += "    args: ";
-               prettyValue(dest, args);
+               prettyValue(dest, *args);
                dest += "\n";
             }
-            if (!atrace.rawRetval.empty() && rty)
+         }
+         if (!atrace.rawRetval.empty() && action->second.result)
+         {
+            if (auto retval = decode(**action->second.result, atrace.rawRetval))
             {
                dest += indent;
                dest += "    retval: ";
-               psio::schema_types::FracParser parser{psio::FracStream{atrace.rawRetval},
-                                                     cschema.get(rty->resolve(schema->types)),
-                                                     cschema.builtin};
-               std::string                    tmp;
-               auto                           stream = psio::string_stream{tmp};
-               to_json(parser, stream);
-               auto retval = psio::convert_from_json<psio::json::any>(std::move(tmp));
-               prettyValue(dest, retval);
+               prettyValue(dest, *retval);
                dest += "\n";
             }
          }

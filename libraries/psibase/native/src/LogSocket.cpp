@@ -16,7 +16,7 @@ namespace
       }
       void send(Writer&, std::span<const char> data, std::uint32_t flags) override
       {
-         auto record = psio::from_frac<LogMessage>(data);
+         auto record = psio::from_pssz<LogMessage>(data);
          check(record.severity <= LogMessage::Severity::critical, "Unknown severity");
          auto _ = record.service
                       ? std::optional{boost::log::add_scoped_logger_attribute(

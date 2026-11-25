@@ -9,7 +9,7 @@ void VerifyWithCall::verifySys(Checksum256 transactionHash, Claim claim, std::ve
 {
    if (!proof.empty())
    {
-      auto nested = psio::from_frac<std::vector<Action>>(proof);
+      auto nested = psio::from_pssz<std::vector<Action>>(proof);
       for (const auto& action : nested)
       {
          call(action);

@@ -1,6 +1,6 @@
 #[psibase::service(name = "subgroups")]
 pub mod service {
-    pub use psibase::fracpack;
+
 
     /// Function that determines which subgrouping solution is preferred based on specific criteria.
     /// Returns true if the new solution is preferred over the old solution.

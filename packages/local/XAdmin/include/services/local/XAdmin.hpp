@@ -23,7 +23,7 @@ namespace LocalService
       bool                     p2p = false;
       std::vector<std::string> hosts;
       std::vector<std::string> peers;
-      PSIO_REFLECT(AdminOptionsRow, p2p, hosts, peers)
+      PSIO_REFLECT(AdminOptionsRow, p2p, attr(hosts, element(utf8)), attr(peers, element(utf8)))
    };
    using AdminOptionsTable = psibase::Table<AdminOptionsRow, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(AdminOptionsTable)
@@ -33,30 +33,14 @@ namespace LocalService
       struct Account
       {
          psibase::AccountNumber value;
+         PSIO_REFLECT(Account, transparent(), value)
       };
-      PSIO_REFLECT_TYPENAME(Account)
-      inline auto& psio_unwrap_packable(Account& obj)
-      {
-         return obj.value;
-      }
-      inline const auto& psio_unwrap_packable(const Account& obj)
-      {
-         return obj.value;
-      }
 
       struct LocalUsername
       {
          std::string value;
+         PSIO_REFLECT(LocalUsername, transparent(), value)
       };
-      PSIO_REFLECT_TYPENAME(LocalUsername)
-      inline auto& psio_unwrap_packable(LocalUsername& obj)
-      {
-         return obj.value;
-      }
-      inline const auto& psio_unwrap_packable(const LocalUsername& obj)
-      {
-         return obj.value;
-      }
       struct Unauthenticated
       {
          std::vector<std::string> challenges;
@@ -93,7 +77,7 @@ namespace LocalService
       AdminOptionsRow options();
    };
    PSIO_REFLECT(XAdmin,
-                method(isAdmin, account, socket),
+                method(isAdmin, account, socket, forwardedFor),
                 method(checkAuth, req, socket),
                 method(serveSys, req, socket),
                 method(startSession),

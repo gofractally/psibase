@@ -1,9 +1,18 @@
-use fracpack::{Pack, ToSchema, Unpack};
-use serde::{Deserialize, Serialize};
+
 
 use crate as psibase;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::ToPsszSchema,
+    psio::JsonText,
+    psio::Serde,
+)]
+#[psio(transparent)]
 pub struct EventDb(u8);
 
 #[allow(non_upper_case_globals)]
@@ -24,13 +33,13 @@ mod service {
     }
 
     #[action]
-    fn addIndex(db_id: EventDb, service: AccountNumber, event: MethodNumber, column: u8) {
+    fn addIndex(db: EventDb, service: AccountNumber, event: MethodNumber, column: u8) {
         unimplemented!()
     }
 
     /// Writes an event to the event log
     #[action]
-    fn event(db: EventDb, type_: MethodNumber, rawData: Vec<u8>) -> u64 {
+    fn event(db: EventDb, r#type: MethodNumber, rawData: Vec<u8>) -> u64 {
         unimplemented!()
     }
 

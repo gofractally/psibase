@@ -5,14 +5,84 @@
 #include <psibase/db.hpp>
 #include <psibase/export.hpp>
 #include <psibase/serviceState.hpp>
-#include <psio/fracpack.hpp>
+#include <psio/reflect.hpp>
+#include <psio/buffer.hpp>
+#include <psio/mutable_view.hpp>
 #include <psio/nested.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
+#include <psio/wire_type.hpp>
+
+#include <cstddef>
+#include <span>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace psibase
 {
    template <typename T>
    concept DefinesService =
        std::same_as<std::decay_t<decltype(T::service)>, psibase::AccountNumber>;
+
+   /// The number of a reflected method
+   ///
+   /// `I` and `MemberPtr` are what `psio::reflect<T>::proxy` hands to a call
+   /// proxy: the index of the method in its class's reflection, and the
+   /// pointer to it.
+   template <std::size_t I, auto MemberPtr>
+   inline constexpr MethodNumber methodNumber{psio::reflect<
+       typename psio::method_traits<decltype(MemberPtr)>::class_type>::template method_name<I>};
+
+   /// The class whose reflection lists the method `MemberPtr` points to
+   template <auto MemberPtr>
+   using MethodClass = typename psio::method_traits<decltype(MemberPtr)>::class_type;
+
+   /// An [Action] whose arguments are not packed yet
+   ///
+   /// `rawData` is a source of the packed arguments
+   /// (`psio::method_args_packed<T, I>(args...)`, `psio::packed(value)`)
+   /// in place of the bytes. Packing a `LazyAction` writes the bytes of
+   /// the [Action] it stands for, with the arguments written directly into
+   /// them, and it is accepted wherever a packed [Action] is expected: as
+   /// an argument of a call, so that a call inside a call is packed into
+   /// one buffer.
+   ///
+   /// The arguments that were passed as lvalues are referred to, not
+   /// copied: they must outlive the packing. It is a source for the PSSZ
+   /// encoder only: the type of an action in a schema, and what has a JSON
+   /// form, is [Action].
+   template <typename Args>
+   struct LazyAction
+   {
+      AccountNumber sender;   ///< Account sending the action
+      AccountNumber service;  ///< Service to execute the action
+      MethodNumber  method;   ///< Service method to execute
+      Args          rawData;  ///< Source of the data for the method
+      PSIO_REFLECT(LazyAction, sender, service, method, rawData)
+   };
+   template <typename Args>
+   LazyAction(AccountNumber, AccountNumber, MethodNumber, Args) -> LazyAction<Args>;
+
+   /// Builds an action without packing it: the result is a [LazyAction]
+   /// that holds the arguments.
+   struct LazyActionProxy
+   {
+      LazyActionProxy(AccountNumber s, AccountNumber r) : sender(s), receiver(r) {}
+
+      AccountNumber sender;
+      AccountNumber receiver;
+
+      template <std::size_t I, auto MemberPtr, typename... Args>
+      auto call(Args&&... args) const
+      {
+         return LazyAction{sender, receiver, methodNumber<I, MemberPtr>,
+                           psio::method_args_packed<MethodClass<MemberPtr>, I>(
+                               std::forward<Args>(args)...)};
+      }
+   };
 
    /**
     *  When an action is called it returns
@@ -32,77 +102,126 @@ namespace psibase
       AccountNumber sender;
       AccountNumber receiver;
 
-      template <uint32_t idx, auto MemberPtr, typename... Args>
+      template <std::size_t I, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
-         using member_class = decltype(psio::class_of_member(MemberPtr));
-         using param_tuple  = typename psio::make_param_value_tuple<decltype(MemberPtr)>::type;
-
-         static_assert(std::tuple_size<param_tuple>() <= sizeof...(Args),
-                       "too few arguments passed to method");
-         static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
-                       "too many arguments passed to method");
-
-         return psibase::Action{
-             sender, receiver,
-             MethodNumber(*psio::reflect<member_class>::member_function_names[idx].begin()),
-             psio::convert_to_frac(param_tuple(std::forward<Args>(args)...))};
+         return psibase::Action{sender, receiver, methodNumber<I, MemberPtr>,
+                                psio::method_args_to_pssz<MethodClass<MemberPtr>, I>(
+                                    std::forward<Args>(args)...)};
       }
    };
 
    template <typename T>
    struct ImportView
    {
-      psio::shared_view_ptr<exportType<T>>         raw;
-      psio::shared_view_ptr<std::vector<KvHandle>> handles;
-      T unpack() const { return psibaseImport((T*)nullptr, *raw, *handles); }
+      psio::shared_pssz<exportType<T>>         raw;
+      psio::shared_pssz<std::vector<KvHandle>> handles;
+      T unpack() const { return psibaseImport((T*)nullptr, raw.unpack(), handles.unpack()); }
    };
 
+   namespace detail
+   {
+      [[noreturn]] inline void badResult(std::span<const char> packed_action)
+      {
+         psio::pssz_view<Action> action{packed_action};
+         auto                    method_name = action.method().unpack().str();
+         abortMessage(std::string("value returned from ") + method_name +
+                      " was not serialized as expected");
+      }
+   }  // namespace detail
+
+   /// Calls a service with a packed [Action] and returns its packed result
+   ///
+   /// `R` is the type of the result as it is packed. The bytes the callee
+   /// returned are validated as an `R`. This is the call for an action that
+   /// has no declaration here; a call of a reflected method goes through
+   /// `callPacked<T, I>`, which reads the result as the method declares it.
    template <typename R>
-   auto fraccall(std::span<const char> packed_action, CallFlags flags = CallFlags::none)
+   auto callPacked(std::span<const char> packed_action, CallFlags flags = CallFlags::none)
    {
       auto result_size = raw::call(packed_action.data(), packed_action.size(), flags);
       if constexpr (not std::is_same_v<void, R>)
       {
+         auto bytes = getResult(result_size);
+         if (!psio::validate_pssz<R>(bytes).ok())
+            detail::badResult(packed_action);
+         return psio::shared_pssz<R>::unchecked(std::move(bytes));
+      }
+   }
+
+   /// Calls method `I` of the service `T` with a packed [Action] and returns
+   /// its packed result
+   ///
+   /// The bytes the callee returned are validated as the result of the
+   /// method: the type its `returns(...)` describes
+   /// (`psio::validate_method_result`), so a bound or a string kind declared
+   /// for the result is enforced here. What is returned holds those bytes
+   /// and views them as that type: `psio::shared_pssz<R>` unless
+   /// `returns(...)` narrows an offset width of `R`, in which case the view
+   /// reads the result's own widths. A result that carries table handles
+   /// (`psibaseExport`) is what it exports, with the handles beside it.
+   template <typename T, std::size_t I>
+   auto callPacked(std::span<const char> packed_action, CallFlags flags = CallFlags::none)
+   {
+      using R          = psio::method_result_t<T, I>;
+      auto result_size = raw::call(packed_action.data(), packed_action.size(), flags);
+      if constexpr (not std::is_void_v<R>)
+      {
+         auto bytes = getResult(result_size);
          if constexpr (hasExport<R>)
          {
-            psio::shared_view_ptr<exportType<R>> result(psio::size_tag{result_size});
-            raw::getResult(result.data(), result_size, 0);
-            if (!result.validate())
-            {
-               psio::view<const Action> action(
-                   psio::prevalidated<std::span<const char>>{packed_action});
-               auto method_name = action.method().unpack().str();
-               check(false, std::string("value returned from ") + method_name +
-                                " was not serialized as expected");
-            }
-            auto                                         handles_size = raw::importHandles();
-            psio::shared_view_ptr<std::vector<KvHandle>> handles(psio::size_tag{handles_size});
-            raw::getResult(handles.data(), handles_size, 0);
-            return ImportView<R>{std::move(result), std::move(handles)};
+            if (!psio::validate_pssz<exportType<R>>(bytes).ok())
+               detail::badResult(packed_action);
+            auto handles_size = raw::importHandles();
+            // The host wrote the handles
+            auto handles =
+                psio::shared_pssz<std::vector<KvHandle>>::unchecked(getResult(handles_size));
+            return ImportView<R>{psio::shared_pssz<exportType<R>>::unchecked(std::move(bytes)),
+                                 std::move(handles)};
          }
          else
          {
-            psio::shared_view_ptr<R> result(psio::size_tag{result_size});
-            raw::getResult(result.data(), result_size, 0);
-            if (!result.validate())
-            {
-               psio::view<const Action> action(
-                   psio::prevalidated<std::span<const char>>{packed_action});
-               auto method_name = action.method().unpack().str();
-               check(false, std::string("value returned from ") + method_name +
-                                " was not serialized as expected");
-            }
-            return result;
+            if (!psio::validate_method_result<T, I>(bytes).ok())
+               detail::badResult(packed_action);
+            using Format = typename psio::method_result_view<T, I>::format_type;
+            return psio::buffer<R, Format, psio::storage::shared>::unchecked(std::move(bytes));
          }
       }
    }
 
-   template <typename T>
-   auto fraccall(const Action& a, CallFlags flags = CallFlags::none)
+   /// Calls method `I` of the service `T` with a packed [Action] and returns
+   /// its result
+   ///
+   /// The bytes the callee returned are validated and decoded as the result
+   /// of the method, with everything its `returns(...)` states
+   /// (`psio::decode_method_result`).
+   template <typename T, std::size_t I>
+   psio::method_result_t<T, I> callUnpacked(std::span<const char> packed_action,
+                                            CallFlags             flags = CallFlags::none)
    {
-      auto packed_action = psio::convert_to_frac(a);
-      return fraccall<T>(psio::convert_to_frac(a), flags);
+      using R = psio::method_result_t<T, I>;
+      if constexpr (std::is_void_v<R>)
+      {
+         raw::call(packed_action.data(), packed_action.size(), flags);
+      }
+      else if constexpr (hasExport<R>)
+      {
+         return callPacked<T, I>(packed_action, flags).unpack();
+      }
+      else
+      {
+         auto bytes = getResult(raw::call(packed_action.data(), packed_action.size(), flags));
+         R    result{};
+         if (!psio::decode_method_result<T, I>(bytes, result).ok())
+            detail::badResult(packed_action);
+         return result;
+      }
+   }
+
+   template <typename T>
+   auto callPacked(const Action& a, CallFlags flags = CallFlags::none)
+   {
+      return callPacked<T>(psio::to_pssz(a), flags);
    }
 
    template <typename T>
@@ -115,6 +234,10 @@ namespace psibase
       PSIO_REFLECT(TypedAction, sender, service, method, rawData)
    };
 
+   /// Packs an action: the result is a packed [Action] whose `rawData`
+   /// is typed as the method's argument tuple. The caller owns the bytes
+   /// and may overwrite a fixed-size argument in place
+   /// (`psio::as_mutable_view`) to send the action again.
    struct ActionViewProxy
    {
       ActionViewProxy(AccountNumber s, AccountNumber r) : sender(s), receiver(r) {}
@@ -122,39 +245,16 @@ namespace psibase
       AccountNumber sender;
       AccountNumber receiver;
 
-      template <typename... T, typename... U>
-      auto packImpl(std::tuple<T...>*,
-                    std::tuple<U...>*,
-                    MethodNumber method,
-                    const std::conditional_t<psio::PackableAs<U, T>, U, T>&... args) const
-      {
-         using Args = std::tuple<decltype(args)...>;
-         TypedAction<Args> action{sender, receiver, method, {Args(args...)}};
-         psio::size_stream ss;
-         psio::to_frac(action, ss);
-         check(ss.size <= std::numeric_limits<uint32_t>::max(), "packImpl: size overflow");
-         psio::shared_view_ptr<TypedAction<std::tuple<T...>>> result(
-             psio::size_tag{static_cast<uint32_t>(ss.size)});
-         psio::fast_buf_stream stream(result.data(), result.size());
-         psio::to_frac(action, stream);
-         return result;
-      }
-
-      template <uint32_t idx, auto MemberPtr, typename... Args>
+      template <std::size_t I, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
-         using member_class = decltype(psio::class_of_member(MemberPtr));
-         using param_tuple  = typename psio::make_param_value_tuple<decltype(MemberPtr)>::type;
-
-         static_assert(std::tuple_size<param_tuple>() <= sizeof...(Args),
-                       "too few arguments passed to method");
-         static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
-                       "too many arguments passed to method");
-
-         return packImpl(
-             (param_tuple*)nullptr, (std::tuple<std::remove_cvref_t<Args>...>*)nullptr,
-             MethodNumber(*psio::reflect<member_class>::member_function_names[idx].begin()),
-             std::forward<Args>(args)...);
+         using Class = MethodClass<MemberPtr>;
+         using Tuple = typename psio::reflect<Class>::template method_arg_tuple<I>;
+         // One buffer: the arguments are written into the action.
+         return psio::pssz_buffer<TypedAction<Tuple>>::unchecked(
+             psio::to_pssz(LazyAction{sender, receiver, methodNumber<I, MemberPtr>,
+                                      psio::method_args_packed<Class, I>(
+                                          std::forward<Args>(args)...)}));
       }
    };
 
@@ -172,14 +272,12 @@ namespace psibase
       AccountNumber receiver;
       CallFlags     flags;
 
-      template <uint32_t idx, auto MemberPtr, typename... Args>
+      template <std::size_t I, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
-         auto act          = ActionViewProxy(sender, receiver)
-                                 .call<idx, MemberPtr, Args...>(std::forward<Args>(args)...);
-         using result_type = decltype(psio::result_of(MemberPtr));
-         return psibase::fraccall<std::remove_cv_t<psio::remove_view_t<result_type>>>(
-             act.data_without_size_prefix(), flags);
+         auto act = ActionViewProxy(sender, receiver)
+                        .call<I, MemberPtr, Args...>(std::forward<Args>(args)...);
+         return psibase::callPacked<MethodClass<MemberPtr>, I>(act.bytes(), flags);
       }
    };
 
@@ -194,18 +292,12 @@ namespace psibase
       AccountNumber receiver;
       CallFlags     flags;
 
-      template <uint32_t idx, auto MemberPtr, typename... Args>
+      template <std::size_t I, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
          auto act          = ActionViewProxy(sender, receiver)
-                                 .call<idx, MemberPtr, Args...>(std::forward<Args>(args)...);
-         using result_type = decltype(psio::result_of(MemberPtr));
-         if constexpr (not std::is_same_v<void, result_type>)
-            return psibase::fraccall<std::remove_cv_t<psio::remove_view_t<result_type>>>(
-                       act.data_without_size_prefix(), flags)
-                .unpack();
-         else
-            psibase::fraccall<void>(act.data_without_size_prefix(), flags);
+                                 .call<I, MemberPtr, Args...>(std::forward<Args>(args)...);
+         return psibase::callUnpacked<MethodClass<MemberPtr>, I>(act.bytes(), flags);
       }
    };
 
@@ -222,23 +314,24 @@ namespace psibase
       AccountNumber sender;
       EventDb       event_log;
 
-      template <uint32_t idx, auto MemberPtr, typename... Args>
+      // The packed action that emits an event. The payload of an event is
+      // the packed argument tuple of its method; payload, arguments and
+      // action are written into one buffer.
+      template <std::size_t I, auto MemberPtr, typename... Args>
+      std::vector<char> pack(Args&&... args) const
+      {
+         return psio::to_pssz(LazyAction{
+             sender, AccountNumber{"events"}, MethodNumber{"event"},
+             psio::packed(std::tuple{event_log, methodNumber<I, MemberPtr>,
+                                     psio::method_args_packed<MethodClass<MemberPtr>, I>(
+                                         std::forward<Args>(args)...)})});
+      }
+
+      template <std::size_t I, auto MemberPtr, typename... Args>
       EventNumber call(Args&&... args) const
       {
-         using member_class = decltype(psio::class_of_member(MemberPtr));
-         using param_tuple  = psio::make_param_value_tuple<decltype(MemberPtr)>::type;
-         static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
-                       "insufficient arguments passed to method");
-
-         auto type = MethodNumber{*psio::reflect<member_class>::member_function_names[idx].begin()};
-         auto action = TypedAction{
-             .sender  = sender,
-             .service = AccountNumber{"events"},
-             .method  = MethodNumber{"event"},
-             .rawData =
-                 psio::nested{std::tuple(event_log, type, psio::nested{param_tuple(args...)})},
-         };
-         return fraccall<EventNumber>(psio::to_frac(action)).unpack();
+         auto action = pack<I, MemberPtr, Args...>(std::forward<Args>(args)...);
+         return callPacked<EventNumber>(std::span<const char>{action}).unpack();
       }
    };
 
@@ -312,7 +405,10 @@ namespace psibase
       using Base = typename psio::reflect<T>::template proxy<sync_call_unpack_proxy>;
       using Base::Base;
 
-      auto from(AccountNumber other) const { return Actor(other, Base::receiver, Base::flags); }
+      auto from(AccountNumber other) const
+      {
+         return Actor(other, Base::psio_get_proxy().receiver, Base::psio_get_proxy().flags);
+      }
 
       template <typename Other>
       auto to(AccountNumber otherReceiver = Other::service) const
@@ -548,6 +644,19 @@ namespace psibase
    struct ActionViewBuilder : public psio::reflect<T>::template proxy<ActionViewProxy>
    {
       using base = typename psio::reflect<T>::template proxy<ActionViewProxy>;
+      using base::base;
+   };
+
+   /// Builds actions that are not packed yet
+   ///
+   /// Each method returns a [LazyAction]: the action with its arguments
+   /// held, not packed. Pass it where an [Action] is an argument of a call
+   /// (`to<XRun>().post(mode, lazy.someMethod(args...), ...)`) and the
+   /// whole call is packed into one buffer.
+   template <typename T>
+   struct LazyActionBuilder : public psio::reflect<T>::template proxy<LazyActionProxy>
+   {
+      using base = typename psio::reflect<T>::template proxy<LazyActionProxy>;
       using base::base;
    };
 

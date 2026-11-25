@@ -149,7 +149,7 @@ mod tests {
         }
 
         fn pass_time(&self, seconds: i64) {
-            self.chain.start_block_after(Seconds::new(seconds).into());
+            self.chain.start_block_after(Seconds::from_ticks(seconds).into());
         }
     }
 
@@ -172,7 +172,7 @@ mod tests {
 
     fn reset_clock(chain: &psibase::Chain) {
         let time: i64 = 1000;
-        chain.start_block_at(TimePointSec { seconds: time }.microseconds());
+        chain.start_block_at(TimePointSec::from_ticks(time).to_unit::<psibase::psio::time::Micros>().unwrap());
     }
 
     fn create_stream(

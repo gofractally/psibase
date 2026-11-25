@@ -2,7 +2,7 @@
 #include <boost/log/attributes/function.hpp>
 #include "test_util.hpp"
 
-#include <triedent/database.hpp>
+#include <psibase/storage.hpp>
 
 using namespace psibase;
 using namespace psibase::test;
@@ -134,7 +134,8 @@ PSIO_REFLECT(Loggers, stderr);
 
 void init_logging(const Loggers& logConfig)
 {
-   loggers::configure(psio::convert_from_json<loggers::Config>(psio::convert_to_json(logConfig)));
+   loggers::configure(
+       loggers::Config::fromJson(psio::from_ijson<psio::json_value>(psio::to_ijson(logConfig))));
 
    // Replace timestamp with mock clock
    {
@@ -222,7 +223,7 @@ namespace
       TempDatabase                   db;
       std::unique_ptr<SystemContext> systemContext;
       ConstRevisionPtr               initialHead;
-      triedent::shared_root          initialState;
+      storage::shared_root           initialState;
       mock_clock::time_point         initialClock;
       static StaticDatabaseImpl&     instance(const psibase::ConsensusData* init = nullptr)
       {

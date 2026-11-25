@@ -7,7 +7,7 @@ use bindings::tokens::plugin::helpers::decimal_to_u64;
 use bindings::transact::plugin::api::add_action_to_transaction;
 
 use psibase::define_trust;
-use psibase::fracpack::Pack;
+
 
 mod errors;
 
@@ -30,13 +30,12 @@ impl Api for TokenStreamPlugin {
     fn create(half_life_seconds: u32, token_id: u32) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::create)?;
 
-        let packed_args = token_stream::action_structs::create {
+        let packed_args = psio::to_pssz(&token_stream::action_structs::create {
             half_life_seconds,
             token_id,
-        }
-        .packed();
+        });
         add_action_to_transaction(
-            token_stream::action_structs::create::ACTION_NAME,
+            <token_stream::action_structs::create as psio::interface::Method>::NAME,
             &packed_args,
         )
     }
@@ -51,14 +50,13 @@ impl Api for TokenStreamPlugin {
             &memo,
         )?;
 
-        let packed_args = token_stream::action_structs::deposit {
+        let packed_args = psio::to_pssz(&token_stream::action_structs::deposit {
             nft_id,
             amount: decimal_to_u64(token_id, &amount)?.into(),
-        }
-        .packed();
+        });
 
         add_action_to_transaction(
-            token_stream::action_structs::deposit::ACTION_NAME,
+            <token_stream::action_structs::deposit as psio::interface::Method>::NAME,
             &packed_args,
         )
     }
@@ -66,10 +64,10 @@ impl Api for TokenStreamPlugin {
     fn claim(nft_id: u32) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::claim)?;
 
-        let packed_args = token_stream::action_structs::claim { nft_id }.packed();
+        let packed_args = psio::to_pssz(&token_stream::action_structs::claim { nft_id });
 
         add_action_to_transaction(
-            token_stream::action_structs::claim::ACTION_NAME,
+            <token_stream::action_structs::claim as psio::interface::Method>::NAME,
             &packed_args,
         )
     }
@@ -77,10 +75,10 @@ impl Api for TokenStreamPlugin {
     fn delete(nft_id: u32) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::delete)?;
 
-        let packed_args = token_stream::action_structs::delete { nft_id }.packed();
+        let packed_args = psio::to_pssz(&token_stream::action_structs::delete { nft_id });
 
         add_action_to_transaction(
-            token_stream::action_structs::delete::ACTION_NAME,
+            <token_stream::action_structs::delete as psio::interface::Method>::NAME,
             &packed_args,
         )
     }

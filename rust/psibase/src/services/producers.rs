@@ -10,11 +10,18 @@ pub const PRODUCER_ACCOUNT_STRONG: AccountNumber = account!("producers+3");
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::{services::transact::ServiceMethod, AccountNumber, Claim, ConsensusData, Producer};
-    use crate::{Pack, ToSchema, Unpack};
-    use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
-    #[fracpack(fracpack_mod = "fracpack")]
+
+    #[derive(
+        Debug,
+        Clone,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
+    )]
     pub struct CandidateInfo {
         pub account: AccountNumber,
         pub endpoint: String,
@@ -27,12 +34,12 @@ mod service {
     }
 
     #[action]
-    fn setConsensus(prods: ConsensusData) {
+    fn setConsensus(consensus: ConsensusData) {
         unimplemented!();
     }
 
     #[action]
-    fn setProducers(prods: Vec<Producer>) {
+    fn setProducers(producers: Vec<Producer>) {
         unimplemented!();
     }
 
@@ -57,7 +64,7 @@ mod service {
     }
 
     #[action]
-    fn setMaxProds(max_prods: u8) {
+    fn setMaxProds(maxProds: u8) {
         unimplemented!()
     }
 

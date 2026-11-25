@@ -120,7 +120,7 @@ mod chain {
     const FRACTAL: AccountNumber = account!("testfrac");
 
     fn assert_error(result: ChainEmptyResult, message: &str) {
-        let err = result.trace.error.unwrap();
+        let err = result.trace.error_text().unwrap();
         assert!(
             err.contains(message),
             "Error \"{err}\" does not contain: \"{message}\"",
@@ -128,7 +128,7 @@ mod chain {
     }
 
     fn pass_time(chain: &Chain, seconds: i64) {
-        chain.start_block_after(Seconds::new(seconds).into());
+        chain.start_block_after(Seconds::from_ticks(seconds).into());
     }
 
     fn token_id(chain: &Chain) -> u32 {

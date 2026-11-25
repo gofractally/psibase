@@ -7,7 +7,7 @@ using namespace TestService;
 
 std::optional<HttpReply> XSudo::serveSys(HttpRequest req)
 {
-   call(psio::from_frac<Action>(req.body));
+   call(psio::from_pssz<Action>(req.body));
    return HttpReply{.headers = allowCors()};
 }
 

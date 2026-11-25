@@ -4,7 +4,7 @@ pub mod tables;
 
 macro_rules! ban {
     ($svc:ident, $action:ident) => {
-        (&$svc::SERVICE, $svc::action_structs::$action::ACTION_NAME)
+        (&$svc::SERVICE, <$svc::action_structs::$action as psio::interface::Method>::NAME)
     };
 }
 
@@ -27,14 +27,14 @@ pub mod service {
     use FractalRole::*;
 
     const ROLE_METHODS: &[(FractalRole, &str)] = &[
-        (Recruitment, Actns::add_mem::ACTION_NAME),
-        (Judiciary, Actns::exile_member::ACTION_NAME),
-        (Legislature, Actns::set_r_occ::ACTION_NAME),
-        (Legislature, Actns::set_dist_int::ACTION_NAME),
-        (Legislature, Actns::set_gen_time::ACTION_NAME),
-        (Legislature, Actns::set_dstrat::ACTION_NAME),
-        (Legislature, Actns::set_paid_occ::ACTION_NAME),
-        (Legislature, Actns::init_token::ACTION_NAME),
+        (Recruitment, <Actns::add_mem as psio::interface::Method>::NAME),
+        (Judiciary, <Actns::exile_member as psio::interface::Method>::NAME),
+        (Legislature, <Actns::set_r_occ as psio::interface::Method>::NAME),
+        (Legislature, <Actns::set_dist_int as psio::interface::Method>::NAME),
+        (Legislature, <Actns::set_gen_time as psio::interface::Method>::NAME),
+        (Legislature, <Actns::set_dstrat as psio::interface::Method>::NAME),
+        (Legislature, <Actns::set_paid_occ as psio::interface::Method>::NAME),
+        (Legislature, <Actns::init_token as psio::interface::Method>::NAME),
     ];
 
     const BANNED: &[(&AccountNumber, &str)] = &[
@@ -115,7 +115,7 @@ pub mod service {
     /// * `genesis_time` - New genesis time for the fractal.
     #[action]
     fn set_gen_time(genesis_time: u64) {
-        Fractal::by_sender().set_genesis_time(TimePointSec::from(genesis_time as i64));
+        Fractal::by_sender().set_genesis_time(TimePointSec::from_ticks(genesis_time as i64));
     }
 
     /// Set distribution strategy

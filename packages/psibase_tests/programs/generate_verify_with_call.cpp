@@ -54,7 +54,7 @@ int main(int argc, const char* const* argv)
       sigdata.push_back({.sender = VerifyWithCall::service, .service = account});
    }
 
-   auto sign = [result = psio::to_frac(sigdata)](std::span<const char>) { return result; };
+   auto sign = [result = psio::to_pssz(sigdata)](std::span<const char>) { return result; };
 
    chain.setAutoBlockStart(false);
    chain.startBlock();

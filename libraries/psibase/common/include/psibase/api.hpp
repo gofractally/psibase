@@ -5,8 +5,12 @@
 #include <psibase/block.hpp>
 #include <psibase/check.hpp>
 #include <psibase/db.hpp>
-#include <psio/fracpack.hpp>
-#include <psio/to_key.hpp>
+#include <psio/key.hpp>
+#include <psio/shapes.hpp>
+#include <psio/buffer.hpp>
+#include <psio/mutable_view.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 #include <span>
 
 #ifdef COMPILING_WASM
@@ -20,7 +24,7 @@ namespace psibase
    using EventNumber = uint64_t;
 
    template <typename T>
-   concept NotOptional = std::is_base_of<std::false_type, psio::is_std_optional<T>>::value;
+   concept NotOptional = !psio::is_optional<T>::value;
 
    enum class CallFlags : std::uint64_t
    {
@@ -110,7 +114,7 @@ namespace psibase
 
       /// Store the currently-executing action into result and return the result size
       ///
-      /// The result contains a fracpacked [Action]; use [getResult] to get it.
+      /// The result contains a packed [Action]; use [getResult] to get it.
       ///
       /// If the service, while handling action A, calls itself with action B:
       /// * Before the call to B, `getCurrentAction()` returns A.
@@ -122,7 +126,7 @@ namespace psibase
 
       /// Call a service, store the return value into result, and return the result size
       ///
-      /// `action` must contain a fracpacked [Action].
+      /// `action` must contain a packed [Action].
       ///
       /// Use [getResult] to get result.
       PSIBASE_NATIVE(call) uint32_t call(const char* action, uint32_t len, CallFlags flags);
@@ -175,12 +179,12 @@ namespace psibase
       ///
       /// Handles cannot be exported across a boundary that changes the run mode.
       ///
-      /// `handles` must contain a fracpacked `vector<KvHandle>`.
+      /// `handles` must contain a PSSZ-packed `vector<KvHandle>`.
       PSIBASE_NATIVE(exportHandles) void exportHandles(const char* handles, uint32_t len);
 
       /// Loads handles from the caller or the last callee.
       ///
-      /// The result is a fracpacked `vector<KvHandle>`. Handles are
+      /// The result is a PSSZ-packed `vector<KvHandle>`. Handles are
       /// scoped to a single service, and their representation in this
       /// service is not the same as the representation in the service
       /// that provided them.
@@ -388,33 +392,40 @@ namespace psibase
    /// * After B returns, `getCurrentAction()` returns A.
    ///
    /// Note: The above only applies if the service uses [call]. [Actor] uses [call].
-   psio::shared_view_ptr<Action> getCurrentActionView();
+   psio::shared_pssz<Action> getCurrentActionView();
+
+   /// Get the currently-executing action, packed, in a buffer of the caller
+   ///
+   /// Like [getCurrentActionView], but the caller owns the bytes: a service
+   /// that forwards the action may overwrite its fixed-size members in place
+   /// (`psio::as_mutable_view`) instead of packing it again.
+   psio::pssz_buffer<Action> getCurrentActionPacked();
 
    /// Call a service and return its result
    std::vector<char> call(const Action& action, CallFlags flags = CallFlags::none);
 
    /// Call a service and return its result
    ///
-   /// `action` must contain a fracpacked [Action].
+   /// `action` must contain a packed [Action].
    std::vector<char> call(const char* action, uint32_t len, CallFlags flags = CallFlags::none);
 
    /// Call a service and return its result
    ///
-   /// `action` must contain a fracpacked [Action].
-   std::vector<char> call(psio::input_stream action, CallFlags flags = CallFlags::none);
+   /// `action` must contain a packed [Action].
+   std::vector<char> call(std::span<const char> action, CallFlags flags = CallFlags::none);
 
    /// Set the return value of the currently-executing action
    template <typename T>
    void setRetval(const T& retval)
    {
-      auto data = psio::convert_to_frac(retval);
+      auto data = psio::to_pssz(retval);
       raw::setRetval(data.data(), data.size());
    }
 
    /// Set the return value of the currently-executing action
-   inline void setRetvalBytes(psio::input_stream s)
+   inline void setRetvalBytes(std::span<const char> s)
    {
-      raw::setRetval(s.pos, s.remaining());
+      raw::setRetval(s.data(), s.size());
    }
 
    /// Opens a key-value database
@@ -433,9 +444,9 @@ namespace psibase
    ///
    /// The handle is only usable by the current service. Use `exportHandles`
    /// to pass it to another service.
-   inline KvHandle kvOpen(DbId db, psio::input_stream prefix, KvMode mode)
+   inline KvHandle kvOpen(DbId db, std::span<const char> prefix, KvMode mode)
    {
-      return raw::kvOpen(db, prefix.pos, prefix.remaining(), mode);
+      return raw::kvOpen(db, prefix.data(), prefix.size(), mode);
    }
 
    /// Opens a subtree of a key-value database
@@ -446,9 +457,9 @@ namespace psibase
    /// The maximum number of handles that a service can have open
    /// simultaneously is `WasmConfigRow::maxHandles`. If the limit
    /// is exceeded, this function will abort.
-   inline KvHandle kvOpen(KvHandle handle, psio::input_stream prefix, KvMode mode)
+   inline KvHandle kvOpen(KvHandle handle, std::span<const char> prefix, KvMode mode)
    {
-      return raw::kvOpenAt(handle, prefix.pos, prefix.remaining(), mode);
+      return raw::kvOpenAt(handle, prefix.data(), prefix.size(), mode);
    }
 
    /// Closes a key-value database
@@ -467,7 +478,7 @@ namespace psibase
    /// Handles cannot be exported across a boundary that changes the run mode.
    inline void exportHandles(std::span<const KvHandle> handles)
    {
-      auto packed = psio::to_frac(handles);
+      auto packed = psio::to_pssz(handles);
       raw::exportHandles(packed.data(), packed.size());
    }
 
@@ -488,15 +499,15 @@ namespace psibase
       auto size = raw::importHandles();
       if (size == -1)
          return {};
-      return psio::from_frac<std::vector<KvHandle>>(getResult(size));
+      return psio::from_pssz<std::vector<KvHandle>>(getResult(size));
    }
 
    /// Set a key-value pair
    ///
    /// If key already exists, then replace the existing value.
-   inline void kvPutRaw(KvHandle db, psio::input_stream key, psio::input_stream value)
+   inline void kvPutRaw(KvHandle db, std::span<const char> key, std::span<const char> value)
    {
-      raw::kvPut(db, key.pos, key.remaining(), value.pos, value.remaining());
+      raw::kvPut(db, key.data(), key.size(), value.data(), value.size());
    }
 
    /// Set a key-value pair
@@ -505,26 +516,26 @@ namespace psibase
    template <typename K, NotOptional V>
    void kvPut(KvHandle db, const K& key, const V& value)
    {
-      kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
+      kvPutRaw(db, psio::encode(psio::key{}, key), psio::to_pssz(value));
    }
 
    /// Remove a key-value pair if it exists
-   inline void kvRemoveRaw(KvHandle db, psio::input_stream key)
+   inline void kvRemoveRaw(KvHandle db, std::span<const char> key)
    {
-      raw::kvRemove(db, key.pos, key.remaining());
+      raw::kvRemove(db, key.data(), key.size());
    }
 
    /// Remove a key-value pair if it exists
    template <typename K>
    void kvRemove(KvHandle db, const K& key)
    {
-      kvRemoveRaw(db, psio::convert_to_key(key));
+      kvRemoveRaw(db, psio::encode(psio::key{}, key));
    }
 
    /// Get size of stored value, if any
-   inline std::optional<uint32_t> kvGetSizeRaw(KvHandle db, psio::input_stream key)
+   inline std::optional<uint32_t> kvGetSizeRaw(KvHandle db, std::span<const char> key)
    {
-      auto size = raw::kvGet(db, key.pos, key.remaining());
+      auto size = raw::kvGet(db, key.data(), key.size());
       if (size == -1)
          return std::nullopt;
       return size;
@@ -534,13 +545,13 @@ namespace psibase
    template <typename K>
    inline std::optional<uint32_t> kvGetSize(KvHandle db, const K& key)
    {
-      return kvGetSizeRaw(db, psio::convert_to_key(key));
+      return kvGetSizeRaw(db, psio::encode(psio::key{}, key));
    }
 
    /// Get a key-value pair, if any
-   inline std::optional<std::vector<char>> kvGetRaw(KvHandle db, psio::input_stream key)
+   inline std::optional<std::vector<char>> kvGetRaw(KvHandle db, std::span<const char> key)
    {
-      auto size = raw::kvGet(db, key.pos, key.remaining());
+      auto size = raw::kvGet(db, key.data(), key.size());
       if (size == -1)
          return std::nullopt;
       return getResult(size);
@@ -550,11 +561,11 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvGet(KvHandle db, const K& key)
    {
-      auto v = kvGetRaw(db, psio::convert_to_key(key));
+      auto v = kvGetRaw(db, psio::encode(psio::key{}, key));
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
-      return psio::from_frac<V>(psio::prevalidated{*v});
+      return psio::from_pssz<V>(psio::trusted{*v});
    }
 
    /// Get a value, or the default if not found
@@ -573,10 +584,10 @@ namespace psibase
    /// matches the provided key, then returns the value. Use [getKey] to
    /// get the found key.
    inline std::optional<std::vector<char>> kvGreaterEqualRaw(KvHandle           db,
-                                                             psio::input_stream key,
+                                                             std::span<const char> key,
                                                              uint32_t           matchKeySize)
    {
-      auto size = raw::kvGreaterEqual(db, key.pos, key.remaining(), matchKeySize);
+      auto size = raw::kvGreaterEqual(db, key.data(), key.size(), matchKeySize);
       if (size == -1)
          return std::nullopt;
       return getResult(size);
@@ -590,11 +601,11 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvGreaterEqual(KvHandle db, const K& key, uint32_t matchKeySize)
    {
-      auto v = kvGreaterEqualRaw(db, psio::convert_to_key(key), matchKeySize);
+      auto v = kvGreaterEqualRaw(db, psio::encode(psio::key{}, key), matchKeySize);
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
-      return psio::from_frac<V>(psio::prevalidated{*v});
+      return psio::from_pssz<V>(psio::trusted{*v});
    }
 
    /// Get the key-value pair immediately-before provided key
@@ -603,10 +614,10 @@ namespace psibase
    /// matches the provided key, then returns the value. Use [getKey] to
    /// get the found key.
    inline std::optional<std::vector<char>> kvLessThanRaw(KvHandle           db,
-                                                         psio::input_stream key,
+                                                         std::span<const char> key,
                                                          uint32_t           matchKeySize)
    {
-      auto size = raw::kvLessThan(db, key.pos, key.remaining(), matchKeySize);
+      auto size = raw::kvLessThan(db, key.data(), key.size(), matchKeySize);
       if (size == -1)
          return std::nullopt;
       return getResult(size);
@@ -620,20 +631,20 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvLessThan(KvHandle db, const K& key, uint32_t matchKeySize)
    {
-      auto v = kvLessThanRaw(db, psio::convert_to_key(key), matchKeySize);
+      auto v = kvLessThanRaw(db, psio::encode(psio::key{}, key), matchKeySize);
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
-      return psio::from_frac<V>(psio::prevalidated{*v});
+      return psio::from_pssz<V>(psio::trusted{*v});
    }
 
    /// Get the maximum key-value pair which has key as a prefix
    ///
    /// If one is found, then returns the value. Use [getKey] to
    /// get the found key.
-   inline std::optional<std::vector<char>> kvMaxRaw(KvHandle db, psio::input_stream key)
+   inline std::optional<std::vector<char>> kvMaxRaw(KvHandle db, std::span<const char> key)
    {
-      auto size = raw::kvMax(db, key.pos, key.remaining());
+      auto size = raw::kvMax(db, key.data(), key.size());
       if (size == -1)
          return std::nullopt;
       return getResult(size);
@@ -646,11 +657,11 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvMax(KvHandle db, const K& key)
    {
-      auto v = kvMaxRaw(db, psio::convert_to_key(key));
+      auto v = kvMaxRaw(db, psio::encode(psio::key{}, key));
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
-      return psio::from_frac<V>(psio::prevalidated{*v});
+      return psio::from_pssz<V>(psio::trusted{*v});
    }
 
    /// Write `message` to console

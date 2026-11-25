@@ -182,7 +182,7 @@ fn write_package(args: &Args, reserved: &[String]) -> Result<(), anyhow::Error> 
         File::create(path).with_context(|| format!("Failed to create {}", path.display()))?;
     let mut out = ZipWriter::new(file);
     out.start_file("meta.json", SimpleFileOptions::DEFAULT)?;
-    write!(out, "{}", serde_json::to_string(&meta)?)?;
+    write!(out, "{}", psio::to_ijson(&meta))?;
     out.finish()?;
     Ok(())
 }

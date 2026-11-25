@@ -19,7 +19,7 @@ namespace UserService
          std::vector<uint8_t> fingerprint;
          std::string          secret;
       };
-      PSIO_REFLECT(InvPayload, fingerprint, secret);
+      PSIO_REFLECT(InvPayload, fingerprint, attr(secret, utf8));
 
       /// This interface should be implemented by a service that wants to handle hooks from the invite service
       /// to be notified when an event occurs related to an invite.
@@ -42,7 +42,7 @@ namespace UserService
 
          static constexpr auto service = SystemService::Accounts::inviteService;
 
-         Invite(psio::shared_view_ptr<psibase::Action> action);
+         Invite(psio::shared_pssz<psibase::Action> action);
 
          void init();
 
@@ -118,7 +118,7 @@ namespace UserService
          method(getExpDate, inviteId),
       );
       PSIBASE_REFLECT_HISTORY_EVENTS(Invite,
-         method(updated, inviteId, actor, event),
+         method(updated, inviteId, actor, attr(event, utf8)),
       );
       PSIBASE_REFLECT_TABLES(Invite, Invite::Tables)
       // clang-format on

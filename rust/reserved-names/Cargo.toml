@@ -13,6 +13,7 @@ license.workspace = true
 anyhow = { workspace = true }
 clap = { workspace = true }
 psibase = { workspace = true }
+psio.workspace = true
 serde_json = { workspace = true }
 zip.workspace = true
 psibase-rust-workspace-hack.workspace = true

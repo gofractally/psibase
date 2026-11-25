@@ -18,7 +18,7 @@ use bindings::host::accounts as HostAccounts;
 use bindings::transact::plugin::api as Transact;
 use chrono::DateTime;
 use errors::ErrorType;
-use psibase::fracpack::Pack;
+
 use queries::{get_msg_by_id, query_messages_endpoint};
 use serde_structs::TempMessageForDeserGqlResponse;
 
@@ -58,12 +58,11 @@ impl Api for ChainmailPlugin {
 
         Transact::add_action_to_transaction(
             "send",
-            &chainmail::action_structs::send {
+            &psio::to_pssz(&chainmail::action_structs::send {
                 receiver: receiver.parse().unwrap(),
                 subject,
                 body,
-            }
-            .packed(),
+            }),
         )?;
         Ok(())
     }
@@ -76,7 +75,7 @@ impl Api for ChainmailPlugin {
 
         Transact::add_action_to_transaction(
             "archive",
-            &chainmail::action_structs::archive { msg_id }.packed(),
+            &psio::to_pssz(&chainmail::action_structs::archive { msg_id }),
         )?;
         Ok(())
     }
@@ -91,15 +90,14 @@ impl Api for ChainmailPlugin {
 
         Transact::add_action_to_transaction(
             "save",
-            &chainmail::action_structs::save {
+            &psio::to_pssz(&chainmail::action_structs::save {
                 subject: msg.subject,
                 body: msg.body,
                 receiver: msg.receiver.parse().unwrap(),
                 msg_id: msg.msg_id,
                 sender: msg.sender.parse().unwrap(),
                 datetime: get_unix_time_from_iso8601_str(msg.datetime)?,
-            }
-            .packed(),
+            }),
         )?;
         Ok(())
     }

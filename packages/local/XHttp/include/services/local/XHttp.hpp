@@ -55,12 +55,12 @@ namespace LocalService
          return {};
       }
       static psibase::AccountNumber getService(const psibase::HttpRequest& req);
-      static psibase::AccountNumber getService(psio::view<const psibase::HttpRequest> req);
+      static psibase::AccountNumber getService(psio::pssz_view<psibase::HttpRequest> req);
 
       /// Sends a message to a socket
       ///
       /// HTTP sockets should use sendReply, instead.
-      void send(std::int32_t socket, psio::view<const std::vector<char>> data, std::uint32_t flags);
+      void send(std::int32_t socket, psio::pssz_view<std::vector<char>> data, std::uint32_t flags);
 
       /// Sends an HTTP request and returns the new socket
       ///
@@ -98,7 +98,7 @@ namespace LocalService
       /// Auto-close must be enabled and the current owner of the
       /// socket must be the sender. If local is false, then the
       /// reply is expected to come through http-server.
-      void giveSocket(std::int32_t socket, psibase::AccountNumber account, bool local);
+      void giveSocket(std::int32_t socket, psibase::AccountNumber service, bool local);
 
       /// Take back ownership of a socket
       ///
@@ -127,6 +127,12 @@ namespace LocalService
       /// The sender must be the owner of the socket.
       ///
       /// Can be called inside `PSIBASE_SUBJECTIVE_TX`
+      ///
+      /// `err` of a request or of a websocket handshake is called with
+      /// `(socket, optional<HttpReply>)` and must be declared
+      /// `method(err, socket, reply, maxDynamicData(0xffffffff))`; `err` of
+      /// an established websocket is called with `(socket)` and is declared
+      /// without a cap.
       void setCallback(std::int32_t          socket,
                        psibase::MethodNumber callback,
                        psibase::MethodNumber err);
@@ -142,10 +148,10 @@ namespace LocalService
       void log(psibase::LogMessage::Severity severity, std::string msg);
 
       /// Returns the root host for a given host
-      std::string rootHost(psio::view<const std::string> host);
+      std::string rootHost(psio::pssz_view<std::string> host);
 
       /// handles requests to the x-http subdomain
-      auto serveSys(psibase::HttpRequest req, std::optional<std::int32_t> socket)
+      auto serveSys(psibase::HttpRequest request, std::optional<std::int32_t> socket)
           -> std::optional<psibase::HttpReply>;
 
       /// Called by the host at the beginning of a session
@@ -163,11 +169,11 @@ namespace LocalService
                 method(giveSocket, socket, service, local),
                 method(takeSocket, socket, local),
                 method(sendReply, socket, response),
-                method(accept, socket, reply, callback, err),
+                method(accept, socket, reply),
                 method(setCallback, socket, callback, err),
                 method(asyncClose, socket),
-                method(log, severity, msg),
-                method(rootHost, host),
+                method(log, severity, attr(msg, utf8)),
+                method(rootHost, attr(host, utf8)),
                 method(serveSys, request, socket),
                 method(startSession),
                 method(isSecure, socket))
@@ -178,7 +184,7 @@ namespace LocalService
    {
       return getService(req.host, psibase::to<XHttp>().rootHost(req.host));
    }
-   inline psibase::AccountNumber XHttp::getService(psio::view<const psibase::HttpRequest> req)
+   inline psibase::AccountNumber XHttp::getService(psio::pssz_view<psibase::HttpRequest> req)
    {
       return getService(req.host(), psibase::to<XHttp>().rootHost(req.host()));
    }

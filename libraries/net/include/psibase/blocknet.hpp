@@ -3,8 +3,8 @@
 #include <psibase/ForkDb.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/net_base.hpp>
-#include <psio/finally.hpp>
 #include <psio/reflect.hpp>
+#include <psibase/finally.hpp>
 #include <psio/to_hex.hpp>
 
 #include <algorithm>
@@ -60,13 +60,17 @@ namespace psibase::net
 
    struct BlockMessage
    {
-      static constexpr unsigned          type = 34;
-      psio::shared_view_ptr<SignedBlock> block;
+      static constexpr unsigned type = 34;
+      BlockMessage()                 = default;
+      BlockMessage(psio::shared_pssz<SignedBlock> block) : block(std::move(block)) {}
+      // Packs the block
+      BlockMessage(const SignedBlock& block) : block(block) {}
+      psio::shared_pssz<SignedBlock> block;
       std::string                        to_string() const
       {
-         BlockInfo info{block->block()};
+         BlockInfo info{block->block().header().unpack()};
          return "block: term=" + std::to_string(TermNum{block->block().header().term()}) +
-                " leader=" + AccountNumber{block->block().header().producer()}.str() +
+                " leader=" + block->block().header().producer().unpack().str() +
                 " id=" + loggers::to_string(info.blockId) +
                 " blocknum=" + std::to_string(BlockNum{block->block().header().blockNum()}) +
                 " irreversible=" + std::to_string(BlockNum{block->block().header().commitNum()}) +
@@ -93,13 +97,15 @@ namespace psibase::net
 
    struct BlockHeaderMessage
    {
-      static constexpr unsigned          type = 44;
-      psio::shared_view_ptr<SignedBlock> block;
+      static constexpr unsigned type = 44;
+      BlockHeaderMessage()           = default;
+      BlockHeaderMessage(psio::shared_pssz<SignedBlock> block) : block(std::move(block)) {}
+      psio::shared_pssz<SignedBlock> block;
       std::string                        to_string() const
       {
-         BlockInfo info{block->block()};
+         BlockInfo info{block->block().header().unpack()};
          return "block header: term=" + std::to_string(TermNum{block->block().header().term()}) +
-                " leader=" + AccountNumber{block->block().header().producer()}.str() +
+                " leader=" + block->block().header().producer().unpack().str() +
                 " id=" + loggers::to_string(info.blockId) +
                 " blocknum=" + std::to_string(BlockNum{block->block().header().blockNum()}) +
                 " irreversible=" + std::to_string(BlockNum{block->block().header().commitNum()}) +
@@ -282,6 +288,11 @@ namespace psibase::net
       std::chrono::milliseconds _block_interval = std::chrono::seconds(1);
 
       bool _trx_loop_running = false;
+
+      // A transaction taken from the queue that did not fit in the block
+      // that was open (ConfigRow::maxBlockSize). It goes first in the next
+      // block this node produces.
+      std::optional<SignedTransaction> _held_transaction;
 
       std::vector<std::unique_ptr<peer_connection>> _peers;
 
@@ -511,10 +522,10 @@ namespace psibase::net
             {
                throw std::runtime_error("Missing block header " + std::to_string(*headerNum));
             }
-            auto header           = blockptr->block().header().unpack();
-            auto signature        = blockptr->signature().unpack();
-            auto auxConsensusData = blockptr->auxConsensusData().unpack();
-            auto headerptr        = psio::shared_view_ptr<SignedBlock>(SignedBlock{
+            auto header           = (*blockptr)->block().header().unpack();
+            auto signature        = (*blockptr)->signature().unpack();
+            auto auxConsensusData = (*blockptr)->auxConsensusData().unpack();
+            auto headerptr        = psio::shared_pssz<SignedBlock>(SignedBlock{
                 Block{std::move(header)}, std::move(signature), std::move(auxConsensusData)});
             state.blockNum        = *headerNum;
             network().async_send(connection.id, BlockHeaderMessage{std::move(headerptr)},
@@ -800,7 +811,7 @@ namespace psibase::net
             chain().start_block(
                 TimePointSec{duration_cast<Seconds>(block_start.time_since_epoch())}, self,
                 current_term, commit_index);
-            auto  cleanup = psio::finally{[&]
+            auto  cleanup = psibase::finally{[&]
                                          {
                                             if (!result)
                                             {
@@ -866,14 +877,25 @@ namespace psibase::net
       {
          if (_state == producer_state::leader)
          {
-            if (auto trx = chain().nextTransaction())
+            auto trx = std::move(_held_transaction);
+            _held_transaction.reset();
+            if (!trx)
+               trx = chain().nextTransaction();
+            if (!trx)
             {
-               chain().pushTransaction(std::move(*trx));
-               boost::asio::post(_ioctx, [this] { process_transactions(); });
+               _trx_loop_running = false;
+            }
+            else if (!chain().fitsInBlock(*trx))
+            {
+               // The block is full. start_leader resumes this loop when the
+               // next block opens.
+               _held_transaction = std::move(trx);
+               _trx_loop_running = false;
             }
             else
             {
-               _trx_loop_running = false;
+               chain().pushTransaction(std::move(*trx));
+               boost::asio::post(_ioctx, [this] { process_transactions(); });
             }
          }
          else
@@ -881,7 +903,6 @@ namespace psibase::net
             _trx_loop_running = false;
          }
       }
-
       void schedule_process_transactions()
       {
          if (!_trx_loop_running && _state == producer_state::leader)
@@ -916,7 +937,7 @@ namespace psibase::net
             state.last_sent = {next_block_id, state.last_sent.num() + 1};
             auto next_block = chain().get(next_block_id);
 
-            network().async_send(peer.id, BlockMessage{next_block}, send_handler(peer));
+            network().async_send(peer.id, BlockMessage{*next_block}, send_handler(peer));
             peer.sending = true;
             consensus().post_send_block(peer.id, state.last_sent.id());
          }
@@ -1315,7 +1336,7 @@ namespace psibase::net
       void     on_key_update() {}
       BlockNum light_verify(const LightHeaderState&                   state,
                             const BlockInfo&                          info,
-                            const psio::shared_view_ptr<SignedBlock>& block)
+                            const psio::shared_pssz<SignedBlock>& block)
       {
          throw std::runtime_error("light verify: Unknown consensus algorithm");
       }

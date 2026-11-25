@@ -18,6 +18,7 @@ AuthDyn = "0.29.0"
 TokenStream = "0.29.0"
 
 [dependencies]
+psio.workspace = true
 psibase.workspace = true
 psibase_service.workspace = true
 psibase_macros.workspace = true

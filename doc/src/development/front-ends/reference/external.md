@@ -33,8 +33,9 @@ try {
     const transaction = {
         tapos: {
             ...await getTaposForHeadBlock(baseUrl),
-            // expire after 10 seconds
-            expiration: new Date(Date.now() + 10000),
+            // expire after 10 seconds (the expiration is in whole seconds)
+            expiration: new Date(Math.floor(Date.now() / 1000) * 1000 + 10000),
+            flags: 0,
         },
         actions: [
             {

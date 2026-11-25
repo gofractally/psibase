@@ -163,7 +163,7 @@ TEST_CASE("bft latency", "[bft]")
       CHECK(final_time >= mock_clock::now() - 2s - latency);
       auto irreversible = node->chain().get_block_by_num(final_state->info.header.commitNum);
       mock_clock::time_point irreversible_time{
-          irreversible->block().header().time().unpack().time_since_epoch()};
+          (*irreversible)->block().header().time().unpack().time_since_epoch()};
       CHECK(final_time - irreversible_time >= 3 * latency);
       CHECK(final_time - irreversible_time <= 3 * latency + 2s);
    }

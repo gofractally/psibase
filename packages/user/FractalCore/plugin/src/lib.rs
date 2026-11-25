@@ -12,7 +12,7 @@ use bindings::exports::fractal_core::plugin::user_guild::Guest as UserGuild;
 use bindings::host::types::types::Error;
 use bindings::profiles::plugin::types::Contact;
 
-use psibase::{define_trust, fracpack::Pack};
+use psibase::{define_trust, };
 mod errors;
 mod propose;
 
@@ -297,7 +297,7 @@ impl UserGuild for FractalCorePlugin {
 
     fn draft_application(guild_account: String, description: String) -> Result<(), Error> {
         assert_authorized(FunctionName::apply_guild)?;
-        Self::draft_bucket().set(&guild_account, &description.packed());
+        Self::draft_bucket().set(&guild_account, &psio::to_pssz(&description));
         Ok(())
     }
 

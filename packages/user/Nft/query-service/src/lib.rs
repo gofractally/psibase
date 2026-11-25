@@ -16,7 +16,7 @@ mod service {
 
     use crate::events::OwnerChangeEvent;
 
-    #[derive(Pack, Unpack, ToSchema, Debug, Clone, SimpleObject)]
+    #[derive(Debug, Clone, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
     struct UserDetail {
         account: AccountNumber,
         authService: AccountNumber,
@@ -31,7 +31,7 @@ mod service {
         }
     }
 
-    #[derive(Pack, Unpack, ToSchema, Debug, Clone, SimpleObject)]
+    #[derive(Debug, Clone, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
     struct NftDetail {
         id: NID,
         owner: UserDetail,
@@ -307,9 +307,10 @@ mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    #[allow(unused_variables)]
     fn serveSys(
         request: HttpRequest,
-        _socket: Option<i32>,
+        socket: Option<i32>,
         user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
         assert_eq!(

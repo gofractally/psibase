@@ -43,16 +43,18 @@ namespace psibase
           std::memcmp(signature.data(), mac.data(), mac.size()) != 0)
          return std::nullopt;
 
-      auto header = psio::convert_from_json<token_header>(fromBase64Url(encoded_header));
-      if (header != token_header{})
+      token_header header;
+      auto         headerText = fromBase64Url(encoded_header);
+      if (!psio::decode_json_checked(psio::ijson{}, std::span<const char>{headerText}, header)
+               .ok() ||
+          header != token_header{})
          return std::nullopt;
 
       return fromBase64Url(encoded_payload);
    }
    std::string encodeJWT(const JWTKey& key, std::string_view token)
    {
-      std::string result =
-          toBase64Url(psio::convert_to_json(token_header{})) + "." + toBase64Url(token);
+      std::string result = toBase64Url(psio::to_ijson(token_header{})) + "." + toBase64Url(token);
       auto mac = hmacSha256(key, result);
       return result + "." + toBase64Url(mac.data(), mac.size());
    }

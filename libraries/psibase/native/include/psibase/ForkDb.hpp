@@ -564,10 +564,10 @@ namespace psibase
       template <typename Consensus>
       void push(SystemContext*                            systemContext,
                 const WriterPtr&                          writer,
-                const psio::shared_view_ptr<SignedBlock>& block,
+                const psio::shared_pssz<SignedBlock>& block,
                 Consensus&                                consensus)
       {
-         BlockInfo info{block->block().header()};
+         BlockInfo info{block->block().header().unpack()};
          // The initial state used to contruct the light validator
          // might be ahead of the point that the peer starts sending.
          if (info.header.blockNum <= prevBlockNum)
@@ -594,24 +594,24 @@ namespace psibase
             consensusChangeReady = true;
             ConsensusChangeRow changeRow{start, commit, info.header.blockNum};
             systemContext->sharedDatabase.kvPutSubjective(*writer, ConsensusChangeRow::db,
-                                                          psio::convert_to_key(changeRow.key()),
-                                                          psio::to_frac(changeRow));
+                                                          psio::to_key(changeRow.key()),
+                                                          psio::to_pssz(changeRow));
          }
          prevBlockNum         = info.header.blockNum;
-         auto     blockNumKey = psio::convert_to_key(info.header.blockNum);
+         auto     blockNumKey = psio::encode(psio::key{}, info.header.blockNum);
          Database database(systemContext->sharedDatabase, revision);
          auto     session = database.startWrite(writer);
-         database.kvPutRaw(DbId::blockLog, blockNumKey, psio::to_frac(block->block().unpack()));
+         database.kvPutRaw(DbId::blockLog, blockNumKey, psio::to_pssz(block->block().unpack()));
          if (!block->signature().empty())
          {
             database.kvPutRaw(DbId::blockProof, blockNumKey,
-                              psio::to_frac(block->signature().unpack()));
+                              psio::to_pssz(block->signature().unpack()));
          }
          if (block->auxConsensusData())
          {
-            BlockDataRow row{info.blockId, *block->auxConsensusData()};
+            BlockDataRow row{info.blockId, *block->auxConsensusData().unpack()};
             systemContext->sharedDatabase.kvPutSubjective(
-                *writer, BlockDataRow::db, psio::convert_to_key(row.key()), psio::to_frac(row));
+                *writer, BlockDataRow::db, psio::to_key(row.key()), psio::to_pssz(row));
          }
          revision = database.getModifiedRevision();
       }
@@ -781,8 +781,8 @@ namespace psibase
             {
                if (auto row = database.kvGreaterEqualRaw(currentDb, currentKey, 0))
                {
-                  auto key   = std::vector<char>{row->key.pos, row->key.end};
-                  auto value = std::vector<char>{row->value.pos, row->value.end};
+                  auto key   = std::vector<char>(row->key.begin(), row->key.end());
+                  auto value = std::vector<char>(row->value.begin(), row->value.end());
                   currentKey = key;
                   totalSize += key.size() + value.size() + 16;
                   rows.push_back({std::move(key), std::move(value)});
@@ -825,9 +825,9 @@ namespace psibase
       // \return a pointer to the header state for the block and a bool indicating
       // whether a new block was inserted.
       // \post if the block was successfully inserted, a fork switch is required.
-      std::pair<const BlockHeaderState*, bool> insert(const psio::shared_view_ptr<SignedBlock>& b)
+      std::pair<const BlockHeaderState*, bool> insert(const psio::shared_pssz<SignedBlock>& b)
       {
-         BlockInfo info(b->block());
+         BlockInfo info(b->block().header().unpack());
          PSIBASE_LOG_CONTEXT_BLOCK(blockLogger, info.header, info.blockId);
          if (info.header.blockNum <= commitIndex)
          {
@@ -894,7 +894,7 @@ namespace psibase
       BlockHeader* get_head() const { return &head->info.header; }
       // \pre A fork switch is not required
       const BlockHeaderState*            get_head_state() const { return head; }
-      psio::shared_view_ptr<SignedBlock> get(const id_type& id) const
+      std::optional<psio::shared_pssz<SignedBlock>> get(const id_type& id) const
       {
          auto pos = blocks.find(id);
          if (pos != blocks.end())
@@ -911,11 +911,11 @@ namespace psibase
                if (BlockInfo{*block}.blockId == id)
                {
                   auto proof = db.kvGet<std::vector<char>>(DbId::blockProof, blockNum);
-                  return psio::shared_view_ptr<SignedBlock>(
+                  return psio::shared_pssz<SignedBlock>(
                       SignedBlock{*block, proof ? *proof : std::vector<char>(), getBlockData(id)});
                }
             }
-            return nullptr;
+            return std::nullopt;
          }
       }
       // \pre A fork switch is not required
@@ -945,7 +945,7 @@ namespace psibase
          }
       }
       // \pre A fork switch is not required
-      psio::shared_view_ptr<SignedBlock> get_block_by_num(BlockNum num) const
+      std::optional<psio::shared_pssz<SignedBlock>> get_block_by_num(BlockNum num) const
       {
          auto iter = byBlocknumIndex.find(num);
          if (iter != byBlocknumIndex.end())
@@ -960,19 +960,19 @@ namespace psibase
             {
                auto proof = db.kvGet<std::vector<char>>(DbId::blockProof, num);
                auto id    = BlockInfo{*block}.blockId;
-               return psio::shared_view_ptr<SignedBlock>(
+               return psio::shared_pssz<SignedBlock>(
                    SignedBlock{*block, proof ? *proof : std::vector<char>(), getBlockData(id)});
             }
             else
             {
-               return nullptr;
+               return std::nullopt;
             }
          }
       }
       // \pre id represents a known block
       auto get_prev_id(const id_type& id)
       {
-         return Checksum256(get(id)->block().header().previous());
+         return (*get(id))->block().header().previous().unpack();
       }
 
       void setTerm(TermNum term) { currentTerm = term; }
@@ -1151,7 +1151,7 @@ namespace psibase
       Claim validateBlockSignature(BlockHeaderState* prev, const BlockInfo& info, const auto& sig)
       {
          BlockContext verifyBc(*systemContext, prev->getNextAuthRevision());
-         VerifyProver prover{verifyBc, sig};
+         VerifyProver prover{verifyBc, psio::value_of(sig)};
          auto         claim = prev->getNextProducerClaim(info.header.producer);
          if (!claim)
          {
@@ -1189,16 +1189,35 @@ namespace psibase
          if (!state->revision)
          {
             BlockContext ctx(*systemContext, prev->revision, writer, false);
-            auto         blockPtr = get(state->blockId());
+            auto         blockPtr = *get(state->blockId());
             PSIBASE_LOG_CONTEXT_BLOCK(blockLogger, state->info.header, state->blockId());
             try
             {
+               using clock    = std::chrono::steady_clock;
+               const auto t0  = clock::now();
                auto claim = validateBlockSignature(prev, state->info, blockPtr->signature());
-               ctx.start(Block(blockPtr->block()));
+               ctx.start(blockPtr->block().unpack());
+               const auto t1 = clock::now();
                validateTransactionSignatures(ctx, ctx.current, prev->revision);
+               const auto t2 = clock::now();
                ctx.execAllInBlock();
-               auto [newRevision, id] = ctx.writeRevision(FixedProver(blockPtr->signature()), claim,
+               const auto t3 = clock::now();
+               auto [newRevision, id] = ctx.writeRevision(FixedProver(blockPtr->signature().unpack()), claim,
                                                           state->getProdsAuthRevision());
+               // Where validating a block spends its time. Checking the
+               // transactions' signatures and executing them are separate
+               // passes; a node that trusts a block's signatures already
+               // (replaying its own log, say) would need only the second.
+               if (!ctx.current.transactions.empty())
+               {
+                  auto ms = [](auto d)
+                  { return std::chrono::duration<double, std::milli>(d).count(); };
+                  PSIBASE_LOG(blockLogger, info)
+                      << "Validated block: " << ctx.current.transactions.size() << " transactions, "
+                      << ctx.transactionBytes << " bytes; block signature " << ms(t1 - t0)
+                      << " ms, transaction signatures " << ms(t2 - t1) << " ms, execution "
+                      << ms(t3 - t2) << " ms, commit " << ms(clock::now() - t3) << " ms";
+               }
                // TODO: diff header fields
                check(id == state->blockId(), "blockId does not match");
                state->revision = newRevision;
@@ -1252,7 +1271,7 @@ namespace psibase
          return LightHeaderState{systemContext, get_state(get_block_id(commitIndex))};
       }
       void push_light_header(LightHeaderState&                         state,
-                             const psio::shared_view_ptr<SignedBlock>& block,
+                             const psio::shared_pssz<SignedBlock>& block,
                              auto&                                     consensus)
       {
          state.push(systemContext, writer, block, consensus);
@@ -1273,12 +1292,11 @@ namespace psibase
          Database database{systemContext->sharedDatabase, systemContext->sharedDatabase.getHead()};
          auto     session = database.startRead();
          database.checkoutSubjective();
-         psio::size_stream prefixLen;
-         psio::to_key(consensusChangePrefix(), prefixLen);
-         auto key = psio::convert_to_key(consensusChangeKey(prev + 1));
-         if (auto row = database.kvLessThanRaw(ConsensusChangeRow::db, key, prefixLen.size))
+         auto prefixLen = psio::key_size(consensusChangePrefix());
+         auto key       = psio::encode(psio::key{}, consensusChangeKey(prev + 1));
+         if (auto row = database.kvLessThanRaw(ConsensusChangeRow::db, key, prefixLen))
          {
-            auto value = psio::from_frac<ConsensusChangeRow>(row->value);
+            auto value = psio::from_pssz<ConsensusChangeRow>(row->value);
             if (value.start > prev)
                return value.start;
             if (value.commit > prev)
@@ -1286,9 +1304,9 @@ namespace psibase
             if (value.end > prev)
                return value.end;
          }
-         if (auto row = database.kvGreaterEqualRaw(ConsensusChangeRow::db, key, prefixLen.size))
+         if (auto row = database.kvGreaterEqualRaw(ConsensusChangeRow::db, key, prefixLen))
          {
-            auto value = psio::from_frac<ConsensusChangeRow>(row->value);
+            auto value = psio::from_pssz<ConsensusChangeRow>(row->value);
             return value.start;
          }
          return {};
@@ -1381,13 +1399,13 @@ namespace psibase
          // Record the snapshot
          SnapshotRow snapshotRow{id, SnapshotRow::Item{hash, signatures}};
          systemContext->sharedDatabase.kvPutSubjective(*writer, SnapshotRow::db,
-                                                       psio::convert_to_key(snapshotRow.key()),
-                                                       psio::to_frac(snapshotRow));
+                                                       psio::to_key(snapshotRow.key()),
+                                                       psio::to_pssz(snapshotRow));
          logStart = head->blockNum();
          LogTruncateRow logTruncateRow{logStart};
          systemContext->sharedDatabase.kvPutSubjective(*writer, LogTruncateRow::db,
-                                                       psio::convert_to_key(logTruncateRow.key()),
-                                                       psio::to_frac(logTruncateRow));
+                                                       psio::to_key(logTruncateRow.key()),
+                                                       psio::to_pssz(logTruncateRow));
          return head;
       }
       Checksum256 get_last_snapshot_id()
@@ -1395,12 +1413,15 @@ namespace psibase
          Database db(systemContext->sharedDatabase, systemContext->sharedDatabase.getHead());
          auto     session = db.startRead();
          db.checkoutSubjective();
-         auto key       = psio::convert_to_key(snapshotPrefix());
+         auto key       = psio::encode(psio::key{}, snapshotPrefix());
          auto prefixLen = key.size();
          for (auto row = db.kvMaxRaw(DbId::nativeSubjective, key); row;
               row      = db.kvLessThanRaw(DbId::nativeSubjective, key, prefixLen))
          {
-            auto value = psio::view<const SnapshotRow>(std::span{row->value.pos, row->value.end});
+            std::span<const char> bytes = row->value;
+            if (!psio::validate_pssz<SnapshotRow>(bytes).ok())
+               throw std::runtime_error("SnapshotRow has invalid format");
+            auto value = psio::pssz_view<SnapshotRow>(bytes);
             if (value.state())
             {
                auto        id       = value.id().unpack();
@@ -1414,7 +1435,7 @@ namespace psibase
                else
                {
                   PSIBASE_LOG(logger, debug)
-                      << "Snapshot " << loggers::to_string(value.id())
+                      << "Snapshot " << loggers::to_string(value.id().unpack())
                       << " cannot be sent because it does not have enough producer signatures "
                       << value.state()->signatures().size() << "/" << producers.size();
                }
@@ -1422,10 +1443,10 @@ namespace psibase
             else
             {
                PSIBASE_LOG(logger, debug)
-                   << "Snapshot " << loggers::to_string(value.id())
+                   << "Snapshot " << loggers::to_string(value.id().unpack())
                    << " cannot be sent, because its checksum is not available";
             }
-            key.assign(row->key.pos, row->key.end);
+            key.assign(row->key.begin(), row->key.end());
          }
          return Checksum256{};
       }
@@ -1436,11 +1457,11 @@ namespace psibase
       }
       SnapshotRow get_snapshot_info(const Checksum256& id)
       {
-         auto row = systemContext->sharedDatabase.kvGetSubjective(
-             *writer, SnapshotRow::db, psio::convert_to_key(snapshotKey(id)));
+         auto row = systemContext->sharedDatabase.kvGetSubjective(*writer, SnapshotRow::db,
+                                                                  psio::to_key(snapshotKey(id)));
          if (!row)
             return SnapshotRow{id};
-         return psio::from_frac<SnapshotRow>(*row);
+         return psio::from_pssz<SnapshotRow>(*row);
       }
       BlockHeaderState* get_state(const id_type& id)
       {
@@ -1484,7 +1505,7 @@ namespace psibase
                assert(pos != blocks.end());
                if (pos->second->auxConsensusData())
                {
-                  setBlockData(id, *pos->second->auxConsensusData());
+                  setBlockData(id, *pos->second->auxConsensusData().unpack());
                }
             }
             onCommitFn(state);
@@ -1507,15 +1528,15 @@ namespace psibase
       {
          BlockDataRow row{id, std::move(data)};
          systemContext->sharedDatabase.kvPutSubjective(
-             *writer, BlockDataRow::db, psio::convert_to_key(row.key()), psio::to_frac(row));
+             *writer, BlockDataRow::db, psio::to_key(row.key()), psio::to_pssz(row));
       }
 
       std::optional<std::vector<char>> getBlockData(const Checksum256& id) const
       {
          if (auto data = systemContext->sharedDatabase.kvGetSubjective(
-                 *writer, BlockDataRow::db, psio::convert_to_key(blockDataKey(id))))
+                 *writer, BlockDataRow::db, psio::to_key(blockDataKey(id))))
          {
-            auto row = psio::from_frac<BlockDataRow>(*data);
+            auto row = psio::from_pssz<BlockDataRow>(*data);
             if (row.auxConsensusData)
                return std::move(*row.auxConsensusData);
          }
@@ -1545,7 +1566,7 @@ namespace psibase
             }
             if (remove)
             {
-               PSIBASE_LOG_CONTEXT_BLOCK(blockLogger, iter->second->block().header(), iter->first);
+               PSIBASE_LOG_CONTEXT_BLOCK(blockLogger, iter->second->block().header().unpack(), iter->first);
                PSIBASE_LOG(blockLogger, debug) << "GC " << msg;
                f(iter->first);
                auto state_iter = states.find(iter->first);
@@ -1649,7 +1670,7 @@ namespace psibase
             }
             if (auto current_block = get(tmp))
             {
-               tmp = current_block->block().header().previous();
+               tmp = (*current_block)->block().header().previous();
             }
             else
             {
@@ -1723,11 +1744,12 @@ namespace psibase
          ProducerSet producers(status.consensus.current.data);
          bool        inserted = false;
          SnapshotRow row{.id = id};
-         auto        key = psio::convert_to_key(row.key());
+         auto        key = psio::to_key(row.key());
          if (auto bytes =
                  systemContext->sharedDatabase.kvGetSubjective(*writer, SnapshotRow::db, key))
          {
-            check(psio::from_frac(row, *bytes), "Invalid snapshot row");
+            check(psio::validate_pssz<SnapshotRow>(*bytes).ok(), "Invalid snapshot row");
+            row = psio::from_pssz<SnapshotRow>(psio::trusted{*bytes});
          }
          // Check whether there are existing signatures for the same state
          if (row.state)
@@ -1736,9 +1758,9 @@ namespace psibase
             {
                PSIBASE_LOG_CONTEXT_BLOCK(logger, status.head->header, id);
                PSIBASE_LOG(logger, error)
-                   << "The recorded state checksum (" << psio::convert_to_json(row.state->state)
-                   << ") does not match the newly computed checksum ("
-                   << psio::convert_to_json(checksum) << ")";
+                   << "The recorded state checksum (" << psio::to_ijson(row.state->state)
+                   << ") does not match the newly computed checksum (" << psio::to_ijson(checksum)
+                   << ")";
                row.state = {.state = checksum};
             }
          }
@@ -1767,7 +1789,7 @@ namespace psibase
             }
          }
          systemContext->sharedDatabase.kvPutSubjective(*writer, SnapshotRow::db, key,
-                                                       psio::to_frac(row));
+                                                       psio::to_pssz(row));
          PSIBASE_LOG_CONTEXT_BLOCK(logger, status.head->header, id);
          verify_state_checksum(row, producers, ChecksumLog::always);
          if (inserted)
@@ -1821,11 +1843,12 @@ namespace psibase
          bool        inserted = false;
          auto        log      = ChecksumLog::never;
          SnapshotRow row{.id = id};
-         auto        key = psio::convert_to_key(row.key());
+         auto        key = psio::to_key(row.key());
          if (auto bytes =
                  systemContext->sharedDatabase.kvGetSubjective(*writer, SnapshotRow::db, key))
          {
-            check(psio::from_frac(row, *bytes), "Invalid snapshot row");
+            check(psio::validate_pssz<SnapshotRow>(*bytes).ok(), "Invalid snapshot row");
+            row = psio::from_pssz<SnapshotRow>(psio::trusted{*bytes});
          }
          if (row.state && row.state->state == checksum)
          {
@@ -1859,7 +1882,7 @@ namespace psibase
          if (inserted)
          {
             systemContext->sharedDatabase.kvPutSubjective(*writer, SnapshotRow::db, key,
-                                                          psio::to_frac(row));
+                                                          psio::to_pssz(row));
             PSIBASE_LOG_CONTEXT_BLOCK(logger, status.head->header, id);
             verify_state_checksum(row, producers, log);
          }
@@ -1949,6 +1972,10 @@ namespace psibase
          }
       }
 
+      // Whether the block being produced may take this transaction as well
+      // (ConfigRow::maxBlockSize). False means it belongs in the next block.
+      bool fitsInBlock(const SignedTransaction& trx) { return getBlockContext()->fits(trx); }
+
       void pushTransaction(SignedTransaction&& trx)
       {
          auto bc = getBlockContext();
@@ -2013,7 +2040,7 @@ namespace psibase
       void recvMessage(const Socket& sock, const std::vector<char>& data)
       {
          Action action{.service = proxyServiceNum,
-                       .rawData = psio::to_frac(std::tuple(sock.id, data, std::uint32_t{0}))};
+                       .rawData = psio::to_pssz(std::tuple(sock.id, data, std::uint32_t{0}))};
 
          // TODO: This can run concurrently
          BlockContext     bc{*systemContext, systemContext->sharedDatabase.getHead(),
@@ -2055,6 +2082,14 @@ namespace psibase
       void onCommit(std::function<void(BlockHeaderState*)> fn) { onCommitFn = std::move(fn); }
 
       bool isProducing() const { return !!blockContext; }
+
+      // Admission policy only; never changes consensus proof verification.
+      void setProofWatchdogLimit(std::chrono::microseconds limit)
+      {
+         check(limit.count() > 0, "proof watchdog limit must be positive");
+         proofWatchdogLimit = limit;
+      }
+
 
       auto& getLogger() { return logger; }
       auto& getBlockLogger() { return blockLogger; }
@@ -2149,9 +2184,9 @@ namespace psibase
 
          // If the block log is truncated, find where it starts
          if (auto row = sc->sharedDatabase.kvGetSubjective(*writer, LogTruncateRow::db,
-                                                           psio::convert_to_key(logTruncateKey())))
+                                                           psio::to_key(logTruncateKey())))
          {
-            logStart = psio::from_frac<LogTruncateRow>(*row).start;
+            logStart = psio::from_pssz<LogTruncateRow>(*row).start;
          }
 
          systemContext->sharedDatabase.setCallbacks(&dbCallbacks);
@@ -2229,7 +2264,7 @@ namespace psibase
       BlockNum                                                  logStart    = 0;
       TermNum                                                   currentTerm = 1;
       BlockHeaderState*                                         head        = nullptr;
-      std::map<Checksum256, psio::shared_view_ptr<SignedBlock>> blocks;
+      std::map<Checksum256, psio::shared_pssz<SignedBlock>> blocks;
       std::map<Checksum256, BlockHeaderState>                   states;
 
       std::map<decltype(std::declval<BlockHeaderState>().order()), Checksum256> byOrderIndex;

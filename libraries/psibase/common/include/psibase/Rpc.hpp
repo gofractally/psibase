@@ -13,7 +13,7 @@ namespace psibase
    {
       std::string name;
       std::string value;
-      PSIO_REFLECT(HttpHeader, definitionWillNotChange(), name, value)
+      PSIO_REFLECT(HttpHeader, definitionWillNotChange(), attr(name, utf8), value)
 
       bool matches(std::string_view h) const;
 
@@ -47,7 +47,8 @@ namespace psibase
             while (!query.empty())
             {
                auto [key, value] = readQueryItem(query);
-               psio::get_data_member<T>(key, [&](auto m) { result.*m = std::move(value); });
+               psio::reflect<T>::visit_field_by_name(
+                   result, std::string_view{key}, [&](auto& member) { member = std::move(value); });
             }
          }
          return result;
@@ -67,7 +68,13 @@ namespace psibase
       std::string             contentType;  ///< "application/json", "text/html", ...
       std::vector<HttpHeader> headers;      ///< HTTP Headers
       Body                    body;         ///< Request body, e.g. POST data
-      PSIO_REFLECT(BasicHttpRequest, host, method, target, contentType, headers, body)
+      PSIO_REFLECT(BasicHttpRequest,
+                   attr(host, utf8),
+                   attr(method, utf8),
+                   target,
+                   attr(contentType, utf8),
+                   headers,
+                   body)
 
       /// Parses the query component
       ///
@@ -203,18 +210,6 @@ namespace psibase
       httpVersionNotSupported     = 505
    };
 
-   void from_json(HttpStatus& status, auto& stream)
-   {
-      std::uint16_t value;
-      from_json(value, stream);
-      status = static_cast<HttpStatus>(value);
-   }
-
-   void to_json(const HttpStatus& status, auto& stream)
-   {
-      to_json(static_cast<std::uint16_t>(status), stream);
-   }
-
    /// An HTTP reply
    ///
    /// Services return this from their `serveSys` action.
@@ -242,7 +237,7 @@ namespace psibase
 
       static BasicHttpReply methodNotAllowed(const HttpRequest& req);
 
-      PSIO_REFLECT(BasicHttpReply, status, contentType, body, headers)
+      PSIO_REFLECT(BasicHttpReply, status, attr(contentType, utf8), body, headers)
    };
 
    std::vector<HttpHeader> allowCors(std::string_view origin = "*");
@@ -255,12 +250,6 @@ namespace psibase
    std::vector<HttpHeader> allowCorsSubdomains(const HttpRequest& req, bool hostIsSubdomain = true);
 
    using HttpReply = BasicHttpReply<std::vector<char>>;
-
-   template <typename T>
-   using FracpackHttpReply = BasicHttpReply<psio::nested<T>>;
-
-   template <typename T>
-   using JsonHttpReply = BasicHttpReply<psio::nested_json<T>>;
 
    using HttpReplyRef = BasicHttpReply<std::span<const char>>;
 }  // namespace psibase

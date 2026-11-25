@@ -1,27 +1,26 @@
 #include <services/test/TestMemo.hpp>
 
 #include <psibase/dispatch.hpp>
-#include <psio/from_json.hpp>
+#include <psio/json.hpp>
 
 using namespace psibase;
 using namespace TestService;
-using namespace psio;
 
 std::string TestMemo::testValue(Memo memo)
 {
    return memo.contents;
 }
-std::string TestMemo::testView(view<const Memo> memo)
+std::string TestMemo::testView(psio::pssz_view<Memo> memo)
 {
-   return memo.contents();
+   return memo.unpack().contents;
 }
-void TestMemo::testJson(const std::string& data)
+void TestMemo::testJson(const std::string& memo)
 {
-   psio::convert_from_json<Memo>(data);
+   (void)psio::from_ijson<Memo>(memo);
 }
-void TestMemo::testConstruct(const std::string& data)
+void TestMemo::testConstruct(const std::string& memo)
 {
-   Memo{data};
+   Memo{memo};
 }
 
 PSIBASE_DISPATCH(TestMemo)

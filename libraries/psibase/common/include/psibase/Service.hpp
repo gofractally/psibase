@@ -3,6 +3,7 @@
 #include <psibase/AccountNumber.hpp>
 #include <psibase/Actor.hpp>
 #include <psibase/Table.hpp>
+#include <psio/reflect.hpp>
 
 namespace psibase
 {

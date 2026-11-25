@@ -13,9 +13,9 @@
 #include <psibase/Socket.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/WebSocket.hpp>
+#include <psibase/finally.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio/finally.hpp>
-#include <psio/to_json.hpp>
+#include <psio/json.hpp>
 #include <unordered_set>
 
 namespace beast     = boost::beast;
@@ -341,7 +341,7 @@ namespace psibase::http
             abortMessage("Invalid flags for HttpSocket: " + std::to_string(flags));
          if (replySent.exchange(true))
             return;
-         auto result = psio::from_frac<HttpReply>(data);
+         auto result = psio::from_pssz<HttpReply>(data);
          if (result.status == HttpStatus::switchingProtocols)
          {
             if (isWebsocketUpgrade(req, result))
@@ -498,9 +498,11 @@ namespace psibase::http
                     {
                        if constexpr (!std::is_same_v<std::decay_t<decltype(body)>, std::string>)
                        {
-                          std::vector<char>   data;
-                          psio::vector_stream stream{data};
-                          psio::to_json(body, stream);
+                          std::vector<char> data;
+                          if (auto status = psio::encode_json_checked(psio::ijson{}, body, data);
+                              !status.ok())
+                             return builder.error(bhttp::status::internal_server_error,
+                                                  std::string(status.error().what));
                           return builder.ok(std::move(data), "application/json");
                        }
                        else
@@ -515,14 +517,17 @@ namespace psibase::http
       // Anything that can serialized as json
       void runNativeHandlerJsonNoFail(auto&& request_handler)
       {
-         runNativeHandler(request_handler,
-                          [builder = HttpReplyBuilder{session->server, req}](auto&& result)
-                          {
-                             std::vector<char>   data;
-                             psio::vector_stream stream{data};
-                             psio::to_json(result, stream);
-                             return builder.ok(std::move(data), "application/json");
-                          });
+         runNativeHandler(
+             request_handler,
+             [builder = HttpReplyBuilder{session->server, req}](auto&& result)
+             {
+                std::vector<char> data;
+                if (auto status = psio::encode_json_checked(psio::ijson{}, result, data);
+                    !status.ok())
+                   return builder.error(bhttp::status::internal_server_error,
+                                        std::string(status.error().what));
+                return builder.ok(std::move(data), "application/json");
+             });
       }
 
       // optional<string>
@@ -632,9 +637,8 @@ namespace psibase::http
                                                [](auto& tmp) { tmp.needgenesis = false; });
                   }
                }
-               std::vector<char>   body;
-               psio::vector_stream stream{body};
-               to_json(status, stream);
+               std::vector<char> body;
+               psio::to_ijson(statusNames(status), body);
                send(builder.ok(std::move(body), "application/json"));
             }
             else
@@ -810,6 +814,14 @@ namespace psibase::http
             data.host        = {host.begin(), host.size()};
             data.target      = std::string(req_target);
             data.contentType = (std::string)req[bhttp::field::content_type];
+            // host and contentType are declared UTF-8 (HttpRequest in Rpc.hpp), and a
+            // header value may hold any byte above 0x7F. Refuse such a request here:
+            // packing it would throw. (The method is one of the literals above, and a
+            // header name is a token, which the parser has already limited to ASCII.)
+            if (!psio::utf8_spec::validate(data.host).ok())
+               return send(builder.badRequest("The Host header is not valid UTF-8"));
+            if (!psio::utf8_spec::validate(data.contentType).ok())
+               return send(builder.badRequest("The Content-Type header is not valid UTF-8"));
             data.body        = req.body();
 
             // Do not use any reconfigurable members of server.http_config after this point
@@ -818,7 +830,7 @@ namespace psibase::http
             // TODO: time limit
             auto system = server.sharedState->getSystemContext();
 
-            psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
+            psibase::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
             BlockContext  bc{*system, system->sharedDatabase.getHead(),
                             system->sharedDatabase.createWriter(), true};
             bc.start();
@@ -851,7 +863,7 @@ namespace psibase::http
                system->sockets->add(*bc.writer, socket, &tc.ownedSockets);
                // these can't throw and should run iff sockets->add succeeds
                send.pause_read = true;
-               auto setStatus  = psio::finally(
+               auto setStatus  = psibase::finally(
                    [&]
                    {
                       auto endExecTime = steady_clock::now();
@@ -875,7 +887,7 @@ namespace psibase::http
                   Action action{
                       .sender  = AccountNumber(),
                       .service = proxyServiceNum,
-                      .rawData = psio::convert_to_frac(std::tuple(socket->id, std::move(data))),
+                      .rawData = psio::to_pssz(std::tuple(socket->id, std::move(data))),
                   };
                   tc.execServe(action, atrace);
                }

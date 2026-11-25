@@ -13,8 +13,6 @@ use bindings::{
     transact::plugin::api::add_action_to_transaction,
 };
 
-use psibase::fracpack::Pack;
-
 mod errors;
 use errors::ErrorType;
 
@@ -93,14 +91,13 @@ impl Api for ProfilesPlugin {
     fn set_profile(profile: PluginProfile) -> Result<(), Error> {
         assert_authorized_with_whitelist(FunctionName::set_profile, vec!["homepage".into()])?;
 
-        let packed_profile_args = profiles::action_structs::setProfile {
+        let packed_profile_args = psio::to_pssz(&profiles::action_structs::setProfile {
             display_name: profile.display_name.unwrap_or_default(),
             bio: profile.bio.unwrap_or_default(),
-        }
-        .packed();
+        });
 
         add_action_to_transaction(
-            profiles::action_structs::setProfile::ACTION_NAME,
+            <profiles::action_structs::setProfile as psio::interface::Method>::NAME,
             &packed_profile_args,
         )
     }
@@ -116,21 +113,20 @@ impl Api for ProfilesPlugin {
             return Err(ErrorType::InvalidAvatarContentType(avatar.content_type).into());
         };
 
-        let packed = profiles::action_structs::uploadAvatar {
+        let packed = psio::to_pssz(&profiles::action_structs::uploadAvatar {
             image: avatar.content,
             contentType: content_type,
-        }
-        .packed();
+        });
 
-        add_action_to_transaction(profiles::action_structs::uploadAvatar::ACTION_NAME, &packed)
+        add_action_to_transaction(<profiles::action_structs::uploadAvatar as psio::interface::Method>::NAME, &packed)
     }
 
     fn remove_avatar() -> Result<(), Error> {
         assert_authorized_with_whitelist(FunctionName::remove_avatar, vec!["homepage".into()])?;
 
         add_action_to_transaction(
-            profiles::action_structs::removeAvatar::ACTION_NAME,
-            &profiles::action_structs::removeAvatar {}.packed(),
+            <profiles::action_structs::removeAvatar as psio::interface::Method>::NAME,
+            &psio::to_pssz(&profiles::action_structs::removeAvatar {}),
         )
     }
 

@@ -22,6 +22,7 @@ namespace psibase
       bool                       timerRunning = false;
 
       std::shared_ptr<SharedState> sharedState;
+      std::optional<std::chrono::microseconds> proofTimeout;
 
       struct Item
       {
@@ -64,21 +65,21 @@ namespace psibase
             }
          }
          explicit                 operator bool() const { return self != nullptr; }
-         psio::view<const RunRow> getRun() const
+         psio::pssz_view<RunRow> getRun() const
          {
             assert(kind == Kind::run);
-            return psio::view<const RunRow>(psio::prevalidated{entry});
+            return psio::pssz_view<RunRow>(entry);
          }
-         psio::view<const TimerRow> getTimer() const
+         psio::pssz_view<TimerRow> getTimer() const
          {
             assert(kind == Kind::timer);
-            return psio::view<const TimerRow>(psio::prevalidated{entry});
+            return psio::pssz_view<TimerRow>(entry);
          }
       };
       Item pop_impl(std::unique_lock<std::mutex>&, Database& db)
       {
-         auto prefix     = psio::convert_to_key(runPrefix());
-         auto search_key = psio::convert_to_key(runKey(next));
+         auto prefix     = psio::encode(psio::key{}, runPrefix());
+         auto search_key = psio::encode(psio::key{}, runKey(next));
          while (true)
          {
             auto kv = db.kvGreaterEqualRaw(RunRow::db, search_key, prefix.size());
@@ -91,22 +92,22 @@ namespace psibase
                next = 0;
                return {};
             }
-            std::vector<char> key(kv->key.pos, kv->key.end);
-            std::vector<char> runData(kv->value.pos, kv->value.end);
-            if (!psio::fracpack_validate<RunRow>(runData))
+            std::vector<char> key(kv->key.begin(), kv->key.end());
+            std::vector<char> runData(kv->value.begin(), kv->value.end());
+            if (!psio::validate_pssz<RunRow>(runData).ok())
             {
                search_key = std::move(key);
                search_key.push_back(0);
                continue;
             }
-            auto row = psio::view<const RunRow>(psio::prevalidated{runData});
-            if (psio::convert_to_key(runKey(row.id())) != key)
+            auto row = psio::pssz_view<RunRow>(runData);
+            if (psio::encode(psio::key{}, runKey(row.id())) != key)
             {
                search_key = std::move(key);
                search_key.push_back(0);
                continue;
             }
-            if (std::ranges::find(running, row.id().unpack()) != running.end())
+            if (std::ranges::find(running, row.id()) != running.end())
             {
                // TODO: Don't ignore available rows in the middle
                // of the running set.
@@ -124,17 +125,17 @@ namespace psibase
       {
          if (timerRunning)
             return {};
-         if (auto row = db.kvGetRaw(TimerRow::db, psio::convert_to_key(timerKey())))
+         if (auto row = db.kvGetRaw(TimerRow::db, psio::encode(psio::key{}, timerKey())))
          {
-            if (psio::fracpack_validate<TimerRow>(std::span(row->pos, row->end)))
+            if (psio::validate_pssz<TimerRow>(*row).ok())
             {
-               auto view       = psio::view<const TimerRow>(std::span(row->pos, row->end));
+               auto view       = psio::pssz_view<TimerRow>(*row);
                auto expiration = saturatingCast<std::chrono::steady_clock::time_point>(
                    view.expiration().unpack());
                if (expiration < std::chrono::steady_clock::now())
                {
                   timerRunning = true;
-                  return {this, std::vector(row->pos, row->end), Item::Kind::timer};
+                  return {this, std::vector(row->begin(), row->end()), Item::Kind::timer};
                }
                else
                {
@@ -175,8 +176,9 @@ namespace psibase
       }
    };
 
-   RunQueue::RunQueue(std::shared_ptr<SharedState> sharedState)
-       : impl(new Impl{.sharedState = std::move(sharedState)})
+   RunQueue::RunQueue(std::shared_ptr<SharedState> sharedState,
+                      std::optional<std::chrono::microseconds> proofTimeout)
+       : impl(new Impl{.sharedState = std::move(sharedState), .proofTimeout = proofTimeout})
    {
    }
 
@@ -237,7 +239,7 @@ namespace psibase
             switch (item.kind)
             {
                case RunQueue::Impl::Item::Kind::run:
-                  bc.callRun(item.getRun());
+                  bc.callRun(item.getRun(), queue->proofTimeout);
                   break;
                case RunQueue::Impl::Item::Kind::timer:
                   bc.callTimer(item.getTimer());

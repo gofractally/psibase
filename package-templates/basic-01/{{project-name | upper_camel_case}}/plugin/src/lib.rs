@@ -8,7 +8,6 @@ use bindings::host::types::types::Error;
 use bindings::transact::plugin::api::add_action_to_transaction;
 
 use psibase::define_trust;
-use psibase::fracpack::Pack;
 
 mod errors;
 use errors::ErrorType;
@@ -34,7 +33,8 @@ struct {{project-name | upper_camel_case}}Plugin;
 impl Api for {{project-name | upper_camel_case}}Plugin {
     fn set_example_thing(thing: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_example_thing)?;
-        let packed_example_thing_args = {{project-name | snake_case}}::action_structs::setExampleThing { thing }.packed();
+        let packed_example_thing_args =
+            psio::to_pssz(&{{project-name | snake_case}}::action_structs::setExampleThing { thing });
         add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
         Ok(())
     }

@@ -10,7 +10,7 @@ use bindings::host::http::api::post_graphql_get_json;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::api::add_action_to_transaction;
 
-use psibase::fracpack::Pack;
+
 use psibase::define_trust;
 
 use psibase::services::nft as Nft;
@@ -76,8 +76,8 @@ impl Issuer for NftPlugin {
 
         let guess: u32 = rand::rng().random();
         let id = first_available_id(guess)?;
-        let packed_args = Nft::action_structs::mint { nftId: Some(id) }.packed();
-        add_action_to_transaction(Nft::action_structs::mint::ACTION_NAME, &packed_args)?;
+        let packed_args = psio::to_pssz(&Nft::action_structs::mint { nftId: Some(id) });
+        add_action_to_transaction(<Nft::action_structs::mint as psio::interface::Method>::NAME, &packed_args)?;
         Ok(id)
     }
 }
@@ -86,59 +86,55 @@ impl User for NftPlugin {
     fn credit(nft_id: u32, receiver: String, memo: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::credit)?;
 
-        let packed_args = Nft::action_structs::credit {
+        let packed_args = psio::to_pssz(&Nft::action_structs::credit {
             memo: memo.try_into().unwrap(),
-            nftId: nft_id,
+            nft_id,
             debitor: receiver.parse().unwrap(),
-        }
-        .packed();
+        });
 
-        add_action_to_transaction(Nft::action_structs::credit::ACTION_NAME, &packed_args)
+        add_action_to_transaction(<Nft::action_structs::credit as psio::interface::Method>::NAME, &packed_args)
     }
 
     fn transfer(nft_id: u32, receiver: String, memo: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::transfer)?;
 
-        let packed_args = Nft::action_structs::transfer {
+        let packed_args = psio::to_pssz(&Nft::action_structs::transfer {
             memo: memo.try_into().unwrap(),
-            nftId: nft_id,
+            nft_id,
             debitor: receiver.parse().unwrap(),
-        }
-        .packed();
+        });
 
-        add_action_to_transaction(Nft::action_structs::transfer::ACTION_NAME, &packed_args)
+        add_action_to_transaction(<Nft::action_structs::transfer as psio::interface::Method>::NAME, &packed_args)
     }
 
     fn uncredit(nft_id: u32, memo: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::uncredit)?;
 
-        let packed_args = Nft::action_structs::uncredit {
+        let packed_args = psio::to_pssz(&Nft::action_structs::uncredit {
             memo: memo.try_into().unwrap(),
             nftId: nft_id,
-        }
-        .packed();
+        });
 
-        add_action_to_transaction(Nft::action_structs::uncredit::ACTION_NAME, &packed_args)
+        add_action_to_transaction(<Nft::action_structs::uncredit as psio::interface::Method>::NAME, &packed_args)
     }
 
     fn debit(nft_id: u32, memo: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::debit)?;
 
-        let packed_args = Nft::action_structs::debit {
+        let packed_args = psio::to_pssz(&Nft::action_structs::debit {
             memo: memo.try_into().unwrap(),
             nftId: nft_id,
-        }
-        .packed();
+        });
 
-        add_action_to_transaction(Nft::action_structs::debit::ACTION_NAME, &packed_args)
+        add_action_to_transaction(<Nft::action_structs::debit as psio::interface::Method>::NAME, &packed_args)
     }
 
     fn burn(nft_id: u32) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::burn)?;
 
-        let packed_args = Nft::action_structs::burn { nftId: nft_id }.packed();
+        let packed_args = psio::to_pssz(&Nft::action_structs::burn { nftId: nft_id });
 
-        add_action_to_transaction(Nft::action_structs::burn::ACTION_NAME, &packed_args)
+        add_action_to_transaction(<Nft::action_structs::burn as psio::interface::Method>::NAME, &packed_args)
     }
 }
 
@@ -146,13 +142,12 @@ impl UserConfig for NftPlugin {
     fn enable_user_auto_debit(enable: bool) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::enable_user_auto_debit)?;
 
-        let packed_args = Nft::action_structs::setAutoDebit {
+        let packed_args = psio::to_pssz(&Nft::action_structs::setAutoDebit {
             autodebit: Some(enable),
-        }
-        .packed();
+        });
 
         add_action_to_transaction(
-            Nft::action_structs::setAutoDebit::ACTION_NAME,
+            <Nft::action_structs::setAutoDebit as psio::interface::Method>::NAME,
             &packed_args,
         )
     }

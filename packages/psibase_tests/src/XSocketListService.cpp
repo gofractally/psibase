@@ -8,7 +8,7 @@ using namespace psibase;
 
 struct SocketListService : psibase::Service
 {
-   std::optional<HttpReply> serveSys(const HttpRequest& req);
+   std::optional<HttpReply> serveSys(const HttpRequest& request);
 };
 PSIO_REFLECT(SocketListService, method(serveSys, request))
 PSIBASE_REFLECT_TABLES(SocketListService)
@@ -21,18 +21,19 @@ namespace
       auto sockets() const
       {
          checkoutSubjective();
-         auto table =
-             Table<SocketRow, &SocketRow::fd>{SocketRow::db, psio::convert_to_key(socketTable)};
+         auto table = Table<SocketRow, &SocketRow::fd>{SocketRow::db,
+                                                       psio::encode(psio::key{}, socketTable)};
          return table.getIndex<0>();
       }
    };
    PSIO_REFLECT(QueryRoot, method(sockets))
+   PSIO_TYPE_ATTRS(QueryRoot, psio::graphql::name_as{"Query"})
 
 }  // namespace
 
-std::optional<HttpReply> SocketListService::serveSys(const HttpRequest& req)
+std::optional<HttpReply> SocketListService::serveSys(const HttpRequest& request)
 {
-   if (auto reply = serveGraphQL(req, QueryRoot{}))
+   if (auto reply = serveGraphQL(request, QueryRoot{}))
    {
       return reply;
    }

@@ -584,7 +584,7 @@ namespace psibase::net
       }
       BlockNum light_verify(const LightHeaderState&                   state,
                             const BlockInfo&                          info,
-                            const psio::shared_view_ptr<SignedBlock>& block)
+                            const psio::shared_pssz<SignedBlock>& block)
       {
          if (state.producers->algorithm == ConsensusAlgorithm::cft)
          {
@@ -596,7 +596,7 @@ namespace psibase::net
                   abortMessage(info.header.producer.str() + " is not a producer at block " +
                                loggers::to_string(info.blockId));
                chain().verify(state.producers->authState->revision, BlockSignatureInfo(info),
-                              *claim, sig);
+                              *claim, sig.unpack());
             }
             return info.header.commitNum;
          }

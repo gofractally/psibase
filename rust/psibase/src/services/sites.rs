@@ -27,45 +27,82 @@ impl DecompressorInterface {
 #[crate::service(name = "sites", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod service {
-    use crate::fracpack::{Pack, ToSchema, Unpack};
-    use crate::{http::HttpRequest, AccountNumber, Checksum256, Hex};
+
+    use crate::{http::HttpRequest, AccountNumber, Checksum256};
     use async_graphql::SimpleObject;
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "SitesContentTable", index = 0)]
-    #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack)]
-    #[fracpack(fracpack_mod = "fracpack")]
+    #[derive(
+        Debug,
+        Clone,
+        SimpleObject,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
+    )]
+    #[graphql(complex)]
     pub struct SitesContentRow {
         pub account: AccountNumber,
-        pub path: String,
+        pub path: psio::pssz::RawString,
         pub contentType: String,
+        #[graphql(skip)]
         pub contentHash: Checksum256,
         pub contentEncoding: Option<String>,
         pub csp: Option<String>,
     }
 
+    /// In GraphQL the bytes are hex text, as in JSON.
+    #[async_graphql::ComplexObject]
+    impl SitesContentRow {
+        #[allow(non_snake_case)]
+        async fn contentHash(&self) -> String {
+            psio::to_hex(&self.contentHash)
+        }
+    }
+
     impl SitesContentRow {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, String) {
+        fn pk(&self) -> (AccountNumber, psio::pssz::RawString) {
             (self.account, self.path.clone())
         }
     }
 
     #[table(name = "SiteConfigTable", index = 1)]
-    #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack)]
-    #[fracpack(fracpack_mod = "fracpack")]
+    #[derive(
+        Debug,
+        Clone,
+        SimpleObject,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
+    )]
     pub struct SiteConfigRow {
         #[primary_key]
         pub account: AccountNumber,
         pub spa: bool,
+        #[psio(default = true)]
         pub cache: bool,
         pub globalCsp: Option<String>,
         pub proxyAccount: Option<AccountNumber>,
     }
 
     #[table(name = "SitesDataTable", index = 2)]
-    #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Pack, Unpack)]
-    #[fracpack(fracpack_mod = "fracpack")]
+    #[derive(
+        Debug,
+        Clone,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
+    )]
     pub struct SitesDataRow {
         #[primary_key]
         pub hash: Checksum256,
@@ -73,8 +110,16 @@ pub mod service {
     }
 
     #[table(name = "SitesDataRefTable", index = 3)]
-    #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Pack, Unpack)]
-    #[fracpack(fracpack_mod = "fracpack")]
+    #[derive(
+        Debug,
+        Clone,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
+    )]
     pub struct SitesDataRefRow {
         #[primary_key]
         pub hash: Checksum256,
@@ -90,10 +135,10 @@ pub mod service {
     /// Stores content accessible at the caller's subdomain
     #[action]
     fn storeSys(
-        path: String,
+        path: psio::pssz::RawString,
         contentType: String,
         contentEncoding: Option<String>,
-        content: Hex<Vec<u8>>,
+        content: Vec<u8>,
     ) {
         unimplemented!()
     }
@@ -101,7 +146,7 @@ pub mod service {
     /// Stores content accessible at the caller's subdomain
     #[action]
     fn hardlink(
-        path: String,
+        path: psio::pssz::RawString,
         contentType: String,
         contentEncoding: Option<String>,
         contentHash: Checksum256,
@@ -111,7 +156,7 @@ pub mod service {
 
     /// Removes content from the caller's subdomain
     #[action]
-    fn remove(path: String) {
+    fn remove(path: psio::pssz::RawString) {
         unimplemented!()
     }
 
@@ -120,13 +165,13 @@ pub mod service {
     /// Note: For single-page applications, static assets (e.g. 'style.css') can be checked normally. However, all other assets
     /// are routed client-side, so a route like `/page1` is considered a valid route as long as the SPA serves a root document.
     #[action]
-    fn isValidPath(site: AccountNumber, path: String) -> bool {
+    fn isValidPath(site: AccountNumber, path: psio::pssz::RawString) -> bool {
         unimplemented!()
     }
 
     /// Get file properties for a given site and path
     #[action]
-    fn getProps(site: AccountNumber, path: String) -> Option<SitesContentRow> {
+    fn getProps(site: AccountNumber, path: psio::pssz::RawString) -> Option<SitesContentRow> {
         unimplemented!()
     }
 
@@ -138,7 +183,7 @@ pub mod service {
     /// Otherwise, the data is decompressed. This action aborts if no decompressor is available
     /// for the file's encoding.
     #[action]
-    fn getData(site: AccountNumber, path: String, decompress: bool) -> Vec<u8> {
+    fn getData(site: AccountNumber, path: psio::pssz::RawString, decompress: bool) -> Vec<u8> {
         unimplemented!()
     }
 
@@ -160,13 +205,13 @@ pub mod service {
     /// so the same policy works wherever the app is served, without
     /// hardcoding hosts.
     #[action]
-    fn setCsp(path: String, csp: String) {
+    fn setCsp(path: psio::pssz::RawString, csp: String) {
         unimplemented!()
     }
 
     /// Deletes the Content Security Policy for the specified path (or "*" for the global CSP).
     #[action]
-    fn deleteCsp(path: String) {
+    fn deleteCsp(path: psio::pssz::RawString) {
         unimplemented!()
     }
 

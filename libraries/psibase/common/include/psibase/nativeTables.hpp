@@ -51,11 +51,18 @@ namespace psibase
    {
       uint32_t maxKeySize   = 128;
       uint32_t maxValueSize = 8 << 20;
+      // The most bytes of transactions a block may hold: each transaction's
+      // packed size plus its proofs. A block with a single transaction is
+      // exempt, so one large transaction can always be included; the genesis
+      // block is exempt too. Without this, how much a block holds would depend
+      // on how fast its producer executes, and a block too large to send to
+      // peers could be produced.
+      uint32_t maxBlockSize = 4 << 20;
 
       static constexpr auto db = psibase::DbId::native;
 
       static auto key() -> KeyPrefixType;
-      PSIO_REFLECT(ConfigRow, maxKeySize, maxValueSize)
+      PSIO_REFLECT(ConfigRow, maxKeySize, maxValueSize, maxBlockSize)
    };
    using ConfigTable = Table<ConfigRow, SingletonKey{}>;
 
@@ -63,7 +70,11 @@ namespace psibase
    {
       uint32_t  numExecutionMemories = 32;
       VMOptions vmOptions;
-      uint32_t  maxHandles = 64;
+      // A node-side constant, intentionally not serialized: the row is
+      // written from the block header's wasm config (BlockHeaderWasmConfig),
+      // which does not carry it. Making it configurable means adding it to
+      // both, as an appended optional member.
+      uint32_t maxHandles = 64;
 
       static constexpr auto db = psibase::DbId::native;
 
@@ -71,6 +82,19 @@ namespace psibase
       PSIO_REFLECT(WasmConfigRow, numExecutionMemories, vmOptions)
    };
    using WasmConfigTable = Table<WasmConfigRow, SingletonKey{}>;
+
+   // Execution policy versions: CodeRow::vmVersion. A service keeps the
+   // version it was deployed under until it is next deployed, so a chain can
+   // adopt a new policy without changing what existing code computes.
+   //
+   // The two differ only in relaxed SIMD multiply-add: strict rounds the
+   // product and the sum separately (the WebAssembly deterministic profile);
+   // performance rounds once (fused). Both are deterministic on every engine.
+   inline constexpr std::uint8_t vmVersionStrict      = 0;
+   inline constexpr std::uint8_t vmVersionPerformance = 1;
+   // What genesis services get, and what SetCode stamps on a deployment that
+   // does not ask for a version, unless the chain has chosen otherwise.
+   inline constexpr std::uint8_t defaultVmVersion = vmVersionPerformance;
 
    using CodeKeyType = std::tuple<std::uint16_t, std::uint8_t, AccountNumber>;
    auto codePrefix() -> KeyPrefixType;
@@ -256,7 +280,7 @@ namespace psibase
       std::string                  message;
       Severity                     severity = Severity::info;
       std::optional<AccountNumber> service;
-      PSIO_REFLECT(LogMessage, severity, message, service)
+      PSIO_REFLECT(LogMessage, severity, attr(message, utf8), service)
    };
 
    using SocketKeyType = std::tuple<std::uint16_t, std::uint8_t, std::int32_t>;
@@ -334,12 +358,10 @@ namespace psibase
    {
       AccountNumber service;
       MethodNumber  method;
-      PSIO_REFLECT(ServiceMethod, service, method)
+      // A schema names the type (the custom type "ServiceMethod",
+      // presented as {service, method}).
+      PSIO_REFLECT(ServiceMethod, schemaId("ServiceMethod"), service, method)
    };
-   inline constexpr bool psio_custom_schema(ServiceMethod*)
-   {
-      return true;
-   }
 
    using RunKeyType = std::tuple<std::uint16_t, std::uint8_t, std::uint64_t>;
    auto runPrefix() -> KeyPrefixType;
@@ -425,7 +447,7 @@ namespace psibase
       std::string       config;
       static const auto db = psibase::DbId::nativeSession;
       auto              key() const -> HostConfigKeyType;
-      PSIO_REFLECT(HostConfigRow, hostVersion, config)
+      PSIO_REFLECT(HostConfigRow, attr(hostVersion, utf8), attr(config, utf8))
    };
    using HostConfigTable = Table<HostConfigRow, SingletonKey{}>;
 
@@ -450,7 +472,7 @@ namespace psibase
 
       static const auto db = psibase::DbId::nativeSession;
       auto              key() const -> KeyPrefixType;
-      PSIO_REFLECT(PendingShutdownRow, args);
+      PSIO_REFLECT(PendingShutdownRow, attr(args, utf8));
    };
    using PendingShutdownTable = Table<PendingShutdownRow, SingletonKey{}>;
 

@@ -1,8 +1,7 @@
 #pragma once
 
 #include <psibase/check.hpp>
-#include <psio/fracpack.hpp>
-#include <psio/view.hpp>
+#include <psio/reflect.hpp>
 
 #include <string>
 #include <string_view>
@@ -15,6 +14,12 @@ namespace psibase
 
    /// A memo is a human readable string that is passed as an action argument.
    /// A memo must be valid UTF-8 and not longer than 80 bytes.
+   ///
+   /// A memo is its text wherever it is serialized (`transparent()`), and
+   /// that text is a UTF-8 string of at most 80 bytes
+   /// (`attr(contents, utf8 | max<80>)`): the bytes, key, JSON and schema of
+   /// that bounded string. Every reader and writer that checks rejects text
+   /// that is not a memo.
    struct Memo
    {
       static constexpr uint8_t maxBytes = 80;
@@ -24,9 +29,12 @@ namespace psibase
       Memo(const char* s) : contents{s} { validate(s); }
       Memo(const std::string& s) : contents{s} { validate(s); }
       Memo() : Memo("") {}
-      static bool validate(std::string_view str)
+
+      /// Why `str` is not a memo; null if it is one.
+      static const char* invalid(std::string_view str) noexcept
       {
-         psibase::check(str.size() <= maxBytes, "Memo exceeds 80 bytes");
+         if (str.size() > maxBytes)
+            return "Memo exceeds 80 bytes";
          struct NullStream
          {
             char*  PutBegin() { return 0; }
@@ -39,41 +47,18 @@ namespace psibase
          while (in.Tell() != str.size())
          {
             if (!rapidjson::UTF8<>::Validate(in, out))
-               psibase::check(false, "Memo must be valid UTF-8");
+               return "Memo must be valid UTF-8";
          }
+         return nullptr;
+      }
+      /// Aborts unless `str` is a memo.
+      static bool validate(std::string_view str)
+      {
+         if (const char* reason = invalid(str))
+            psibase::check(false, reason);
          return true;
       }
-      PSIO_REFLECT(Memo, contents);
+      PSIO_REFLECT(Memo, transparent(), attr(contents, utf8 | max<maxBytes>))
    };
-
-   void from_json(Memo& s, auto& stream)
-   {
-      from_json(s.contents, stream);
-      Memo::validate(s.contents);
-   }
-
-   void to_json(const Memo& s, auto& stream)
-   {
-      to_json(s.contents, stream);
-   }
-
-   inline std::string& psio_unwrap_packable(Memo& s)
-   {
-      return s.contents;
-   }
-   inline const std::string& psio_unwrap_packable(const Memo& s)
-   {
-      return s.contents;
-   }
-
-   inline bool psio_validate_packable(const Memo& str)
-   {
-      return Memo::validate(str.contents);
-   }
-
-   inline bool psio_validate_packable(psio::view<const Memo> str)
-   {
-      return Memo::validate(str.contents());
-   }
 
 }  // namespace psibase

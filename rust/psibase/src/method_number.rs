@@ -1,6 +1,5 @@
-use crate::{serialize_as_str, Pack, ToKey, ToSchema, Unpack};
 use custom_error::custom_error;
-use psibase_names::{method_number_from_str, method_number_to_string};
+use psio::compress_name::{method_to_number, number_to_method};
 use std::{num::ParseIntError, str::FromStr};
 
 custom_error! { pub MethodNumberError
@@ -23,18 +22,49 @@ custom_error! { pub MethodNumberError
 /// use psibase::MethodNumber;
 /// let hello = MethodNumber::from("hello");
 /// ```
-#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Hash, Pack, Unpack, ToKey, ToSchema)]
-#[fracpack(
-    definition_will_not_change,
-    fracpack_mod = "fracpack",
-    custom = "MethodNumber"
+#[derive(
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Copy,
+    Clone,
+    Hash,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::Key,
+    psio::Serde,
 )]
-#[to_key(psibase_mod = "crate")]
+#[psio(definition_will_not_change, custom = "MethodNumber")]
 pub struct MethodNumber {
     pub value: u64,
 }
 
-serialize_as_str!(MethodNumber, "method number");
+/// The text of a method is its name. Every spelling that names a method is
+/// read: the one [`Display`](std::fmt::Display) writes, an identifier as
+/// written in source (`setCode`), and the `#` form of a name that does not
+/// compress. Text that names no method is not a value.
+impl psio::json::TextForm for MethodNumber {
+    fn to_text(&self, out: &mut String) {
+        out.push_str(&number_to_method(self.value));
+    }
+    fn from_text(text: &str) -> Option<Self> {
+        if text.is_empty() {
+            return Some(MethodNumber { value: 0 });
+        }
+        let value = method_to_number(text);
+        let names_a_method = if text.starts_with('#') {
+            number_to_method(value) == text
+        } else {
+            value != 0
+        };
+        names_a_method.then_some(MethodNumber { value })
+    }
+}
+psio::json_text_form!(MethodNumber);
+psio::async_graphql_scalar!(MethodNumber, "MethodNumber");
 
 impl MethodNumber {
     pub fn new(value: u64) -> Self {
@@ -53,7 +83,7 @@ impl FromStr for MethodNumber {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(MethodNumber {
-            value: method_number_from_str(s),
+            value: method_to_number(s),
         })
     }
 }
@@ -66,7 +96,7 @@ impl From<&str> for MethodNumber {
 
 impl std::fmt::Display for MethodNumber {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(method_number_to_string(self.value).as_str())
+        f.write_str(number_to_method(self.value).as_str())
     }
 }
 

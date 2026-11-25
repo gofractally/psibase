@@ -3,7 +3,9 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <psio/adapter.hpp>
 #include <psio/reflect.hpp>
+#include <span>
 #include <string>
 #include <variant>
 
@@ -32,16 +34,29 @@ namespace psibase
    std::optional<IPV6Address> parseIPV6Address(std::string_view);
    std::optional<IPAddress>   parseIPAddress(std::string_view);
 
-   void to_json(const IPAddress& addr, auto& stream)
+   /// The text form of an `IPAddress`: `"127.0.0.1"`, `"::1"`. It is the
+   /// JSON of the type (one string); the wire form is the variant.
+   struct IPAddressText
    {
-      to_json(to_string(addr), stream);
-   }
-   void from_json(IPAddress& addr, auto& stream)
-   {
-      std::string s;
-      from_json(s, stream);
-      addr = parseIPAddress(s).value();
-   }
+      static constexpr std::string_view schema_id = "IPAddress";
+
+      static std::size_t packsize(const IPAddress& value) { return to_string(value).size(); }
+      static void      encode(const IPAddress& value, std::string& out) { out += to_string(value); }
+      static IPAddress decode(std::span<const char> text)
+      {
+         return parseIPAddress(std::string_view{text.data(), text.size()}).value();
+      }
+      static psio::codec_status validate(std::span<const char> text) noexcept
+      {
+         if (parseIPAddress(std::string_view{text.data(), text.size()}))
+            return psio::codec_ok();
+         return psio::codec_fail("IPAddress: not an IP address", 0, "IPAddress");
+      }
+      static psio::codec_status validate_strict(std::span<const char> text) noexcept
+      {
+         return validate(text);
+      }
+   };
 
    bool isLoopback(const IPV4Address&);
    bool isLoopback(const IPV6Address&);
@@ -69,15 +84,6 @@ namespace psibase
    };
 
    using SocketEndpoint = std::variant<IPV4Endpoint, IPV6Endpoint, LocalEndpoint>;
-   inline auto get_gql_name(SocketEndpoint*)
-   {
-      return "SocketEndpoint";
-   }
-
-   inline constexpr bool use_json_string_for_gql(SocketEndpoint*)
-   {
-      return true;
-   }
 
    std::string to_string(const IPV4Endpoint&);
    std::string to_string(const IPV6Endpoint&);
@@ -88,16 +94,30 @@ namespace psibase
    std::optional<IPV6Endpoint>   parseIPV6Endpoint(std::string_view);
    std::optional<SocketEndpoint> parseSocketEndpoint(std::string_view);
 
-   void to_json(const SocketEndpoint& endpoint, auto& stream)
+   /// The text form of a `SocketEndpoint`: `"127.0.0.1:8080"`,
+   /// `"[::1]:8080"`, or the path of a local socket. It is the JSON of the
+   /// type (one string); the wire form is the variant.
+   struct SocketEndpointText
    {
-      to_json(to_string(endpoint), stream);
-   }
-   void from_json(SocketEndpoint& endpoint, auto& stream)
-   {
-      std::string s;
-      from_json(s, stream);
-      endpoint = parseSocketEndpoint(s).value();
-   }
+      static constexpr std::string_view schema_id = "SocketEndpoint";
+
+      static std::size_t packsize(const SocketEndpoint& value) { return to_string(value).size(); }
+      static void encode(const SocketEndpoint& value, std::string& out) { out += to_string(value); }
+      static SocketEndpoint decode(std::span<const char> text)
+      {
+         return parseSocketEndpoint(std::string_view{text.data(), text.size()}).value();
+      }
+      static psio::codec_status validate(std::span<const char> text) noexcept
+      {
+         if (parseSocketEndpoint(std::string_view{text.data(), text.size()}))
+            return psio::codec_ok();
+         return psio::codec_fail("SocketEndpoint: not a socket endpoint", 0, "SocketEndpoint");
+      }
+      static psio::codec_status validate_strict(std::span<const char> text) noexcept
+      {
+         return validate(text);
+      }
+   };
 
    bool isLoopback(const IPV4Endpoint&);
    bool isLoopback(const IPV6Endpoint&);
@@ -177,9 +197,24 @@ namespace psibase
                                    WebSocketInfo,
                                    P2PSocketInfo>;
 
-   inline auto get_gql_name(SocketInfo*)
-   {
-      return "SocketInfo";
-   }
-
 }  // namespace psibase
+
+// The GraphQL names of the unions
+namespace psio::graphql
+{
+   template <typename T>
+   struct type_name;
+   template <>
+   struct type_name<psibase::SocketEndpoint>
+   {
+      static constexpr std::string_view value = "SocketEndpoint";
+   };
+   template <>
+   struct type_name<psibase::SocketInfo>
+   {
+      static constexpr std::string_view value = "SocketInfo";
+   };
+}  // namespace psio::graphql
+
+PSIO_ADAPTER(psibase::IPAddress, psio::text_category, psibase::IPAddressText)
+PSIO_ADAPTER(psibase::SocketEndpoint, psio::text_category, psibase::SocketEndpointText)

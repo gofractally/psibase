@@ -1,76 +1,93 @@
 #pragma once
 #include <psibase/AccountNumber.hpp>
+#include <psibase/MethodNumber.hpp>
 #include <psibase/Service.hpp>
 #include <psibase/api.hpp>
 #include <psibase/export.hpp>
-#include <psio/fracpack.hpp>
+#include <psio/reflect.hpp>
+#include <psio/shapes.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
+
+#include <array>
+#include <optional>
 
 namespace psibase
 {
 
-   template <typename T>
-   std::span<const char> find_view_span(psio::view<T> v)
+   /// Maps a method's name to its [MethodNumber]
+   ///
+   /// The hash `psio::reflect<Service>::index_of_method_hash` looks an
+   /// action up by.
+   struct MethodNumberOf
    {
-      const char*   start       = psio::get_view_data(v);
-      bool          has_unknown = false;
-      bool          known_end;
-      std::uint32_t pos = 0;
-      if (!psio::is_packable<std::remove_cv_t<T>>::template unpack<false, true>(
-              nullptr, has_unknown, known_end, start, pos, 0xffffffffu))
+      constexpr std::uint64_t operator()(std::string_view name) const
       {
-         static_assert(!psio::is_std_optional_v<std::remove_cv_t<T>>,
-                       "Optional members are not stored in contiguous memory");
-         assert(!"View must be valid");
-         __builtin_unreachable();
+         return MethodNumber{name}.value;
       }
-      if (known_end)
-         return {start, pos};
-      else
-         return {};
+   };
+
+   /// The index of the method of `Service` that `method` names, if any
+   ///
+   /// The lookup table is built at compile time. Two reflected methods of
+   /// one service whose names have the same [MethodNumber] are a compile
+   /// error.
+   template <typename Service>
+   constexpr std::optional<std::size_t> findAction(MethodNumber method)
+   {
+      return psio::reflect<Service>::template index_of_method_hash<MethodNumberOf>(method.value);
    }
 
-   template <typename T>
-   constexpr bool is_view_v = false;
-   template <typename T>
-   constexpr bool is_view_v<psio::view<T>> = true;
-
-   template <typename R, typename T, typename MemberPtr, typename... Args>
-   void callMethod(T& service, MemberPtr method, Args&&... args)
+   /// Calls method `I` of `service` with the arguments of `act`
+   ///
+   /// `Action::rawData` is the packed argument tuple of the method
+   /// (`psio::reflect<Service>::method_arg_tuple<I>`). It is validated; the
+   /// method then receives each parameter as it declares it: a view, a
+   /// `std::string_view` or a span into the bytes, anything else unpacked.
+   /// The method's result is set as the return value of the current action.
+   template <typename Service, std::size_t I>
+   void callAction(Service& service, const psio::shared_pssz<Action>& act)
    {
-      if constexpr (is_view_v<R>)
-      {
-         R    v((service.*method)(static_cast<decltype(args)>(args)...));
-         auto s = find_view_span(v);
-         check(s.data() != nullptr, "Cannot handle extensions in returned view");
-         raw::setRetval(s.data(), s.size());
-      }
-      else if constexpr (hasExport<R>)
+      using reflect     = psio::reflect<Service>;
+      using result_type = std::remove_cvref_t<typename reflect::template method_result<I>>;
+
+      std::span<const char> args = act->rawData();
+      if (auto status = psio::validate_method_args<Service, I>(args); !status.ok())
+         abortMessage("invalid argument encoding for " + act->method().unpack().str() + ": " +
+                      std::string(status.error().what));
+
+      if constexpr (hasExport<result_type>)
       {
          std::vector<KvHandle> handles;
-         auto                  result = (service.*method)(static_cast<decltype(args)>(args)...);
-         psio::shared_view_ptr<exportType<R>> p(psibaseExport(result, handles));
-         raw::setRetval(p.data(), p.size());
+         auto result = psio::invoke_method_pssz<Service, I>(service, psio::trusted{args});
+         auto packed = psio::to_pssz(psibaseExport(result, handles));
+         raw::setRetval(packed.data(), packed.size());
          exportHandles(handles);
       }
       else
       {
-         psio::shared_view_ptr<R> p((service.*method)(static_cast<decltype(args)>(args)...));
-         raw::setRetval(p.data(), p.size());
+         std::vector<char> result;
+         if (auto status = psio::call_method_pssz<Service, I>(service, psio::trusted{args}, result);
+             !status.ok())
+            abortMessage("cannot encode the value returned from " +
+                         act->method().unpack().str() + ": " + std::string(status.error().what));
+         if constexpr (!std::is_void_v<result_type>)
+            raw::setRetval(result.data(), result.size());
       }
    }
 
-   template <typename F, typename T, std::size_t... I>
-   decltype(auto) tuple_call(F&& f, T&& t, std::index_sequence<I...>)
+   namespace detail
    {
-      return f(psio::get<I>(t)...);
-   }
-
-   template <typename F, typename T>
-   decltype(auto) tuple_call(F&& f, T&& t)
-   {
-      return tuple_call(f, t,
-                        std::make_index_sequence<std::tuple_size_v<std::remove_cvref_t<T>>>());
-   }
+      template <typename Service,
+                typename = std::make_index_sequence<psio::reflect<Service>::method_count>>
+      struct ActionTable;
+      template <typename Service, std::size_t... I>
+      struct ActionTable<Service, std::index_sequence<I...>>
+      {
+         using Call = void (*)(Service&, const psio::shared_pssz<Action>&);
+         static constexpr std::array<Call, sizeof...(I)> calls = {&callAction<Service, I>...};
+      };
+   }  // namespace detail
 
    /**
     *  This method is called when a service receives a call and will
@@ -89,7 +106,7 @@ namespace psibase
 
       auto makeService = [&]()
       {
-         if constexpr (std::is_constructible<Service, psio::shared_view_ptr<psibase::Action>>{})
+         if constexpr (std::is_constructible<Service, psio::shared_pssz<psibase::Action>>{})
          {
             return Service{act};
          }
@@ -100,39 +117,11 @@ namespace psibase
       };
       auto service{makeService()};
 
-      bool called = psio::get_member_function<Service>(
-          act->method().value(),
-          [&](auto member, auto /*names*/)
-          {
-             using result_type = decltype(psio::result_of(member));
-             using param_tuple = typename psio::make_param_value_tuple<decltype(member)>::type;
-
-             auto param_data = std::span<const char>{act->rawData().data(), act->rawData().size()};
-             psibase::check(psio::fracpack_validate<param_tuple>(param_data),
-                            "invalid argument encoding for " + act->method().unpack().str());
-
-             psio::view<const param_tuple> param_view(
-                 psio::prevalidated<std::span<const char>>{param_data});
-
-             tuple_call(
-                 [&](auto... args)
-                 {
-                    if constexpr (std::is_same_v<void, result_type>)
-                    {
-                       (service.*member)(std::forward<decltype(args)>(args)...);
-                    }
-                    else
-                    {
-                       callMethod<result_type, Service, decltype(member), decltype(args)...>(
-                           service, member, std::forward<decltype(args)>(args)...);
-                    }
-                 },
-                 param_view);
-          });  // reflect::get
-      if (!called)
+      if (auto index = findAction<Service>(act->method()))
+         detail::ActionTable<Service>::calls[*index](service, act);
+      else
          abortMessage("unknown service action: " + act->method().unpack().str());
       internal::sender = prevSender;
-      // psio::member_proxy
    }  // dispatch
 
 }  // namespace psibase
@@ -181,7 +170,25 @@ namespace psibase
          {
             service = Service::service;
          }
-         std::cout << psio::convert_to_json(ServiceSchema::make<Service>(service));
+         std::vector<ServiceSchema::Collision> collisions;
+         auto schema = ServiceSchema::make<Service>(service, &collisions);
+         if (!collisions.empty())
+         {
+            // Two different types of the service have one unqualified
+            // name: the schema would name each by its qualified C++
+            // spelling. Refused: give one of them another name.
+            for (const auto& collision : collisions)
+            {
+               std::cerr << "schema of " << service.str() << ": the name " << collision.name
+                         << " is used by more than one type:";
+               for (const auto& type : collision.types)
+                  std::cerr << " " << type;
+               std::cerr << std::endl;
+            }
+            return 1;
+         }
+         schema.checkValid();
+         std::cout << psio::to_ijson(schema);
       }
       else
       {

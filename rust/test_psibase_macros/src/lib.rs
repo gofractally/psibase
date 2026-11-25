@@ -19,6 +19,22 @@ mod tests {
 
         assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
 
+        // `mincallrecvr` asks for `psio = true`: its actions are also
+        // declared as a PSIO interface.
+        {
+            use mincallrecvr::psio_actions;
+            use psibase::psio::interface::{Interface, Method};
+            assert_eq!(psio_actions::Tag::NAME, "minrecvr");
+            assert_eq!(psio_actions::Tag::METHODS[0].name, "add2");
+            assert_eq!(psio_actions::Tag::METHODS[0].params, ["a", "b"]);
+            assert_eq!(<psio_actions::args::add2 as Method>::NAME, "add2");
+            // The argument record is the tuple of the parameters.
+            assert_eq!(
+                psibase::psio::to_pssz(&psio_actions::args::add2 { a: 3, b: 5 }),
+                psibase::psio::to_pssz(&(3i32, 5i32))
+            );
+        }
+
         chain.finish_block();
         let reply: Value = chain.graphql(Wrapper::SERVICE, r#"query { queryFn1 }"#)?;
         assert_eq!(reply, json!({ "data": { "queryFn1": "Return value" }}));

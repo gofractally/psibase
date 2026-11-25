@@ -3,10 +3,9 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::services::tokens::TID;
     use psibase::*;
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, Default)]
+    #[derive(Debug, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct InitRow {
         /// Bytes already in db at boot (`Native` + `Service`),
         pub used_bytes: u64,
@@ -40,7 +39,7 @@ pub mod tables {
     }
 
     #[table(name = "BillingConfigTable", index = 1)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone)]
+    #[derive(Debug, SimpleObject, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[serde(rename_all = "camelCase")]
     #[graphql(complex)]
     pub struct BillingConfig {
@@ -61,7 +60,7 @@ pub mod tables {
     /// The specs of the virtual server and the specs required by each node
     /// and are used to configure the network specs.
     #[table(name = "ServerSpecsTable", index = 2)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone)]
+    #[derive(Debug, SimpleObject, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct ServerSpecs {
         /// Amount of bandwidth capacity per second per server
         pub net_bps: u64,
@@ -83,7 +82,7 @@ pub mod tables {
     }
 
     #[table(name = "NetworkVariablesTable", index = 3)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone)]
+    #[derive(Debug, SimpleObject, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     /// Variables that are used to derive the specs of the network from the server specs.
     pub struct NetworkVariables {
         /// How much faster a node replays blocks compared to the live network
@@ -116,7 +115,16 @@ pub mod tables {
     /// across network peers.
     #[table(name = "NetworkSpecsTable", index = 4)]
     #[derive(
-        Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone, Default,
+        Debug,
+        SimpleObject,
+        Clone,
+        Default,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
     )]
     pub struct NetworkSpecs {
         /// Amount of network bandwidth capacity per second in bits per second
@@ -137,7 +145,7 @@ pub mod tables {
     /// Settings related to the automatic management of an account resource buffer.
     /// If an account has not configured these settings, a default configuration will be used.
     #[table(name = "UserSettingsTable", index = 5)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone)]
+    #[derive(Debug, SimpleObject, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct UserSettings {
         #[primary_key]
         pub user: AccountNumber,
@@ -152,7 +160,7 @@ pub mod tables {
     }
 
     /// Parameters related to the automatic management of an account resource buffer.
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    #[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct BufferConfig {
         /// A threshold (specified in integer percentage values) at or below which the client should
         /// attempt to automatically refill the account's resource buffer. A threshold of 0 means
@@ -168,7 +176,7 @@ pub mod tables {
     /// A rate-limited resource is one that has a max capacity per unit time and uses
     /// a "difficulty adjustment" algorithm to adjust price based on congestion.
     #[table(name = "RateLimitPricingTable", index = 6)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone)]
+    #[derive(Debug, SimpleObject, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct RateLimitPricing {
         #[primary_key]
@@ -203,7 +211,16 @@ pub mod tables {
     /// Capacity-limited pricing state
     #[table(name = "CapacityPricingTable", index = 7)]
     #[derive(
-        Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone, Default,
+        Debug,
+        SimpleObject,
+        Clone,
+        Default,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
     )]
     #[graphql(complex)]
     pub struct CapacityPricing {
@@ -225,7 +242,7 @@ pub mod tables {
 
     /// A producer that accepts payment for resources through a node-local app.
     #[table(name = "ResourceProviderTable", index = 8)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone)]
+    #[derive(Debug, SimpleObject, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[serde(rename_all = "camelCase")]
     #[graphql(complex)]
     pub struct ResourceProvider {

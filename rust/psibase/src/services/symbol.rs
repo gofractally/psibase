@@ -1,7 +1,6 @@
 #![allow(non_snake_case)]
 use async_graphql::{InputObject, SimpleObject};
-use fracpack::{Pack, ToSchema, Unpack};
-use serde::{Deserialize, Serialize};
+
 
 use crate::services::nft;
 use crate::services::tokens::TID;
@@ -11,27 +10,53 @@ use nft::NID;
 pub type SID = AccountNumber;
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug,
+    Copy,
+    Clone,
+    SimpleObject,
+    InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::ToPsszSchema,
+    psio::JsonText,
+    psio::Serde,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
-struct SymbolLength {
+pub struct SymbolLength {
     symbolLength: u8,
     nftId: u32,
 }
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug,
+    Copy,
+    Clone,
+    SimpleObject,
+    InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::JsonText,
+    psio::Serde,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 pub struct SymbolRecord {
     pub symbolId: SID,
     pub ownerNft: NID,
 }
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug,
+    Copy,
+    Clone,
+    SimpleObject,
+    InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::JsonText,
+    psio::Serde,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 pub struct Mapping {
     pub tokenId: TID,
     pub symbolId: AccountNumber,

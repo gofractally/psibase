@@ -2,7 +2,7 @@
 use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 
 use anyhow::{anyhow, Context};
-use psibase::fracpack::Pack;
+
 use psibase::services::tokens::{Quantity, Wrapper as Tokens};
 use psibase::{
     new_account_action, preapprove_action, ActionFormatter, AnyPrivateKey, HttpSchemaFetcher,
@@ -66,7 +66,8 @@ struct Args {
 
     /// Token symbol
     #[clap(required = true)]
-    symbol: psibase::ExactAccountNumber,
+    #[arg(value_parser = psibase::AccountNumber::from_exact)]
+    symbol: psibase::AccountNumber,
 
     /// Number of random accounts to create and use as transfer participants
     #[clap(required = true)]
@@ -136,7 +137,7 @@ fn build_transaction(
     actions: Vec<psibase::Action>,
     ref_block: &psibase::TaposRefBlock,
 ) -> psibase::Transaction {
-    let expiration = psibase::TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
+    let expiration = psibase::TimePointSec::from_chrono_floor(chrono::Utc::now() + chrono::Duration::seconds(3)).unwrap();
     psibase::Transaction {
         tapos: psibase::Tapos {
             expiration,
@@ -173,7 +174,7 @@ async fn push_setup(
     psibase::push_transaction(
         &args.api,
         client.clone(),
-        psibase::sign_transaction(trx, &args.sign)?.packed(),
+        psio::to_pssz(&psibase::sign_transaction(trx, &args.sign)?),
         args.trace,
         args.console,
         None,
@@ -214,7 +215,7 @@ async fn transfer_impl(
     psibase::push_transaction_optimistic(
         &args.api,
         client.clone(),
-        psibase::sign_transaction(trx, &args.sign)?.packed(),
+        psio::to_pssz(&psibase::sign_transaction(trx, &args.sign)?),
         args.trace,
         args.console,
         None,

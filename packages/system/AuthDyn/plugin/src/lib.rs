@@ -9,7 +9,7 @@ use bindings::host::types::types::Error;
 use bindings::transact::plugin::api::add_action_to_transaction;
 
 use psibase::define_trust;
-use psibase::fracpack::Pack;
+
 use psibase::{plugin_error, AccountNumber};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -85,14 +85,13 @@ impl Api for AuthDynPlugin {
     fn set_management(account: String, manager: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_management)?;
 
-        let packed_args = auth_dyn::action_structs::set_mgmt {
+        let packed_args = psio::to_pssz(&auth_dyn::action_structs::set_mgmt {
             account: account.parse().unwrap(),
             manager: manager.parse().unwrap(),
-        }
-        .packed();
+        });
 
         add_action_to_transaction(
-            auth_dyn::action_structs::set_mgmt::ACTION_NAME,
+            <auth_dyn::action_structs::set_mgmt as psio::interface::Method>::NAME,
             &packed_args,
         )
     }

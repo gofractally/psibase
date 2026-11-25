@@ -7,7 +7,7 @@ from threading import Event
 import testutil
 import unittest
 import io
-from fracpack import Int, unpack
+import psio
 
 def is_user_action(action):
     if action['service'] == 'db' and action['method'] == 'open':
@@ -36,7 +36,7 @@ def get_raw_retval(trace):
                 expect_auth = not expect_auth
 
 def get_retval(trace, type):
-    return unpack(bytes.fromhex(get_raw_retval(trace)), type)
+    return psio.from_pssz(type, bytes.fromhex(get_raw_retval(trace)))
 
 class ThreadErrorHandler:
     def __init__(self):
@@ -137,7 +137,7 @@ class TestSubjective(unittest.TestCase):
 
         for i in range(50):
             trace = a.push_action('counter', 'counter', 'inc', {"key":"", "id":i})
-            self.assertEqual(get_retval(trace, Int(32, False)), i+1)
+            self.assertEqual(get_retval(trace, psio.u32), i+1)
 
         done.set()
 

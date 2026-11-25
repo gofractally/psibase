@@ -12,7 +12,7 @@ use host::http::api::post_graphql_get_json;
 use transact::plugin::api::add_action_to_transaction;
 
 use crate::trust::*;
-use psibase::fracpack::Pack;
+
 use psibase::*;
 use serde::Deserialize;
 
@@ -65,8 +65,8 @@ impl Api for AuthDelegate {
             owner: get_account_number(owner.as_str())?,
         };
         Ok(add_action_to_transaction(
-            set_owner_action::ACTION_NAME,
-            &set_owner.packed(),
+            <set_owner_action as psio::interface::Method>::NAME,
+            &psio::to_pssz(&set_owner),
         )?)
     }
 
@@ -78,11 +78,11 @@ impl Api for AuthDelegate {
         let new_account = new_account_action {
             name: get_account_number(name.as_str())?,
             owner: get_account_number(owner.as_str())?,
-            mode: psibase::services::accounts::NewAccountMode::REQUIRE_NEW,
+            mode: psibase::services::accounts::NewAccountMode::RequireNew,
         };
         Ok(add_action_to_transaction(
-            new_account_action::ACTION_NAME,
-            &new_account.packed(),
+            <new_account_action as psio::interface::Method>::NAME,
+            &psio::to_pssz(&new_account),
         )?)
     }
 }

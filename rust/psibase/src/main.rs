@@ -3,7 +3,7 @@ use chrono::{Duration, Utc};
 use clap::{Args, FromArgMatches, Parser, Subcommand};
 use dialoguer::{console::Term, Confirm};
 use flate2::write::GzEncoder;
-use fracpack::Pack;
+
 use futures::{
     future::{join_all, pending, try_join_all, LocalBoxFuture, Shared},
     stream::FuturesUnordered,
@@ -20,9 +20,9 @@ use psibase::{
     new_account_owned_action, preapprove_action, push_transaction, push_transaction_optimistic,
     push_transactions, reg_server, set_auth_service_action, set_code_action, set_key_action,
     set_owner_action, sign_transaction, AccountNumber, Action, ActionFormatter, AnyPrivateKey,
-    AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, EssentialServices, ExactAccountNumber,
+    AnyPublicKey, ChainUrl, DirectoryRegistry, EssentialServices, LocalPackageInfo,
     FileSetRegistry, FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta,
-    NullSchemaFetcher, PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull,
+    NullSchemaFetcher, PackageDataFile, PackageList, PackageOp, PackageOpFull,
     PackageOrigin, PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction,
     SchemaFetcher, SchemaMap, Seconds, ServiceInfo, ServiceWrapper, SignedTransaction,
     StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
@@ -30,7 +30,7 @@ use psibase::{
 };
 use regex::Regex;
 use reqwest::Url;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
@@ -102,7 +102,8 @@ struct SigArgs {
 
     /// Stages transactions instead of executing them immediately
     #[clap(long, value_name = "ACCOUNT")]
-    proposer: Option<ExactAccountNumber>,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    proposer: Option<AccountNumber>,
 }
 
 /// account-related Args
@@ -112,7 +113,8 @@ struct SigArgs {
 struct AccountArgs {
     /// Set the owner of the account
     #[clap(short = 'o', long, value_name = "ACCOUNT")]
-    owner: Option<ExactAccountNumber>,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    owner: Option<AccountNumber>,
 
     /// Set the account to authenticate using this key
     #[clap(short = 'k', long, value_name = "KEY")]
@@ -144,7 +146,8 @@ struct BootArgs {
 
     /// Sets the name of the block producer
     #[clap(short = 'p', long, value_name = "PRODUCER")]
-    producer: ExactAccountNumber,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    producer: AccountNumber,
 
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
@@ -188,11 +191,13 @@ struct CreateArgs {
     account_args: AccountArgs,
 
     /// Account to create
-    account: ExactAccountNumber,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    account: AccountNumber,
 
     /// Sender to use when creating the account.
     #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
-    sender: ExactAccountNumber,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    sender: AccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -210,7 +215,8 @@ struct ModifyArgs {
     account_args: AccountArgs,
 
     /// Account to modify
-    account: ExactAccountNumber,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    account: AccountNumber,
 
     /// Create the account if it doesn't already exist
     #[clap(short = 'c', long)]
@@ -224,7 +230,8 @@ struct ModifyArgs {
         default_value = "root",
         requires = "create"
     )]
-    sender: ExactAccountNumber,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    sender: AccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -242,7 +249,8 @@ struct DeployArgs {
     account_args: AccountArgs,
 
     /// Account to deploy service on
-    account: ExactAccountNumber,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    account: AccountNumber,
 
     /// Filename containing the service
     filename: String,
@@ -267,7 +275,8 @@ struct DeployArgs {
         default_value = "root",
         requires = "create"
     )]
-    sender: ExactAccountNumber,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    sender: AccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -297,7 +306,8 @@ struct UploadArgs {
 
     /// Sender to use (required). Files are uploaded to this account's subdomain.
     #[clap(short = 'S', long, value_name = "SENDER", required = true)]
-    sender: ExactAccountNumber,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    sender: AccountNumber,
 
     /// Configure compression level
     /// (1=fastest, 11=most compression)
@@ -321,7 +331,8 @@ struct PublishArgs {
 
     /// Sender to use (required). Files are uploaded to this account's subdomain.
     #[clap(short = 'S', long, value_name = "SENDER", required = true)]
-    sender: ExactAccountNumber,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    sender: AccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -346,7 +357,8 @@ struct InstallArgs {
     /// Sender to use for installing. The packages and all accounts
     /// that they create will be owned by this account.
     #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
-    sender: ExactAccountNumber,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    sender: AccountNumber,
 
     /// Install the package even if it is already installed
     #[clap(long)]
@@ -387,7 +399,8 @@ struct UpgradeArgs {
     /// Sender to use for installing. The packages and all accounts
     /// that they create will be owned by this account.
     #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
-    sender: ExactAccountNumber,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    sender: AccountNumber,
 
     /// Install the latest version
     #[clap(long)]
@@ -431,7 +444,8 @@ struct ListArgs {
 
     /// Account that would install the packages
     #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
-    sender: ExactAccountNumber,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    sender: AccountNumber,
 
     /// Search for node-local packages instead of on-chain packages
     #[clap(long)]
@@ -453,7 +467,8 @@ struct SearchArgs {
 
     /// Account that would install the packages
     #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
-    sender: ExactAccountNumber,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    sender: AccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -471,7 +486,8 @@ struct InfoArgs {
 
     /// Account that would install the packages
     #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
-    sender: ExactAccountNumber,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    sender: AccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -484,7 +500,8 @@ struct LoginArgs {
     sign: Vec<AnyPrivateKey>,
 
     /// The account logging in
-    user: ExactAccountNumber,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    user: AccountNumber,
 }
 
 #[derive(Subcommand, Debug)]
@@ -556,7 +573,7 @@ fn store_sys(
     let (content, content_encoding) = compress_content(content, content_type, compression_level);
 
     sites::Wrapper::pack_from_to(sender, sites::SERVICE).storeSys(
-        path.to_string(),
+        path.to_string().into(),
         content_type.to_string(),
         content_encoding,
         content.into(),
@@ -578,7 +595,7 @@ impl<'a> TaposFetcher<'a> {
         TaposFetcher {
             data: Rc::new(RefCell::new(TaposFetcherData {
                 tapos: pending().boxed_local().shared(),
-                refetch_tapos: i64::MIN.into(),
+                refetch_tapos: TimePointSec::MIN,
                 err: None,
             })),
         }
@@ -593,7 +610,7 @@ impl<'a> TaposFetcher<'a> {
         let res = {
             let mut data = self.data.borrow_mut();
             if expiration >= data.refetch_tapos {
-                data.refetch_tapos = now + Seconds::new(120);
+                data.refetch_tapos = now + Seconds::from_ticks(120);
                 let data_ref = self.data.clone();
                 data.tapos = async move {
                     get_tapos_for_head(base_url, client.clone())
@@ -625,14 +642,14 @@ impl<'a> TaposFetcher<'a> {
 
 struct TransactionSigner<'a> {
     tapos: TaposFetcher<'a>,
-    proposer: &'a Option<ExactAccountNumber>,
+    proposer: &'a Option<AccountNumber>,
     auto_exec: bool,
     keys: &'a [AnyPrivateKey],
 }
 
 impl<'a> TransactionSigner<'a> {
     async fn new(
-        proposer: &'a Option<ExactAccountNumber>,
+        proposer: &'a Option<AccountNumber>,
         auto_exec: bool,
         keys: &'a [AnyPrivateKey],
     ) -> Self {
@@ -649,8 +666,8 @@ impl<'a> TransactionSigner<'a> {
         client: &'a reqwest::Client,
         mut actions: Vec<Action>,
     ) -> Result<SignedTransaction, anyhow::Error> {
-        let now: TimePointSec = Utc::now().into();
-        let expiration = now + Seconds::new(10);
+        let now = TimePointSec::now().unwrap();
+        let expiration = now + Seconds::from_ticks(10);
         let tapos = self.tapos.fetch(base_url, client, now, expiration).await?;
         if let Some(proposer) = self.proposer {
             actions =
@@ -676,11 +693,11 @@ impl<'a> TransactionSigner<'a> {
 fn with_tapos(
     tapos: &TaposRefBlock,
     mut actions: Vec<Action>,
-    proposer: &Option<ExactAccountNumber>,
+    proposer: &Option<AccountNumber>,
     auto_exec: bool,
 ) -> Transaction {
     let now_plus_10secs = Utc::now() + Duration::seconds(10);
-    let expiration = TimePointSec::from(now_plus_10secs);
+    let expiration = TimePointSec::from_chrono_floor(now_plus_10secs).unwrap();
     if let Some(proposer) = proposer {
         actions =
             vec![staged_tx::Wrapper::pack_from((*proposer).into()).propose(actions, auto_exec)];
@@ -735,7 +752,7 @@ async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
                 File::open(&file).with_context(|| format!("Cannot open {}", file.display()))?,
             )?
         };
-        let mut new_actions: Vec<PrettyAction> = serde_json::from_str(&contents)?;
+        let mut new_actions: Vec<PrettyAction> = psio::from_ijson(&contents)?;
         actions.append(&mut new_actions);
     }
 
@@ -786,7 +803,7 @@ async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
     push_transaction(
         &args.node_args.api,
         client.clone(),
-        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        psio::to_pssz(&sign_transaction(trx, &args.sig_args.sign)?),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
@@ -845,7 +862,7 @@ async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
     push_transaction(
         &args.node_args.api,
         client.clone(),
-        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        psio::to_pssz(&sign_transaction(trx, &args.sig_args.sign)?),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
@@ -869,7 +886,7 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
             auth_delegate::Wrapper::pack_from(args.sender.into()).newAccount(
                 args.account.into(),
                 args.sender.into(),
-                accounts::NewAccountMode::KEEP_EXISTING,
+                accounts::NewAccountMode::KeepExisting,
             ),
         )
     }
@@ -909,7 +926,7 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
     push_transaction(
         &args.node_args.api,
         client.clone(),
-        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        psio::to_pssz(&sign_transaction(trx, &args.sig_args.sign)?),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
@@ -925,8 +942,8 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
     let client = build_client(&args.node_args.proxy).await?;
     let wasm = std::fs::read(args.filename.clone())
         .with_context(|| format!("Can not read {}", args.filename))?;
-    let schema: psibase::Schema = serde_json::from_slice(
-        &std::fs::read(&args.schema)
+    let schema: psibase::ServiceSchema = psio::from_ijson(
+        &std::fs::read_to_string(&args.schema)
             .with_context(|| format!("Can not read {}", args.schema.display()))?,
     )?;
 
@@ -968,7 +985,7 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
     push_transaction(
         &args.node_args.api,
         client.clone(),
-        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        psio::to_pssz(&sign_transaction(trx, &args.sig_args.sign)?),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
@@ -1032,7 +1049,7 @@ async fn upload(args: &UploadArgs) -> Result<(), anyhow::Error> {
     push_transaction(
         &args.node_args.api,
         client.clone(),
-        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        psio::to_pssz(&sign_transaction(trx, &args.sig_args.sign)?),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
@@ -1108,7 +1125,7 @@ async fn monitor_trx<F: SchemaFetcher>(
     let result = push_transaction(
         &args.node_args.api,
         client.clone(),
-        trx.packed(),
+        psio::to_pssz(&trx),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
@@ -1211,7 +1228,7 @@ async fn get_package_registry(
 async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
     let client = build_client(&args.node_args.proxy).await?;
     let now_plus_120secs = Utc::now() + Duration::seconds(120);
-    let expiration = TimePointSec::from(now_plus_120secs);
+    let expiration = TimePointSec::from_chrono_floor(now_plus_120secs).unwrap();
     let mut package_registry = JointRegistry::new();
     let package_names = if args.services.is_empty() {
         vec!["DevDefault".to_string()]
@@ -1256,7 +1273,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
     push_boot(
         args,
         &client,
-        boot_transactions.packed(),
+        psio::to_pssz(&boot_transactions),
         &progress,
         &mut afmt,
     )
@@ -1268,7 +1285,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
             push_transaction_optimistic(
                 &args.node_args.api,
                 client.clone(),
-                trx.packed(),
+                psio::to_pssz(&trx),
                 args.tx_args.trace,
                 args.tx_args.console,
                 Some(&progress),
@@ -1441,7 +1458,7 @@ async fn push_transactions_parallel<'a, F: SchemaFetcher + 'a>(
                     push_transaction(
                         base_url,
                         client.clone(),
-                        trx.packed(),
+                        psio::to_pssz(&trx),
                         fmt,
                         console,
                         Some(progress),
@@ -1503,13 +1520,18 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
 
     query_existing += " }";
 
-    let existing = psibase::gql_query::<serde_json::Value>(
-        &args.node_args.api,
-        &mut client,
-        packages::SERVICE,
-        query_existing,
-    )
-    .await?;
+    // A query without a field is not a GraphQL document.
+    let existing = if all_meta.is_empty() {
+        serde_json::Value::Object(Default::default())
+    } else {
+        psibase::gql_query::<serde_json::Value>(
+            &args.node_args.api,
+            &mut client,
+            packages::SERVICE,
+            query_existing,
+        )
+        .await?
+    };
     let existing = existing.as_object().unwrap();
     let num_new = existing.values().filter(|p| p.is_null()).count();
 
@@ -1540,7 +1562,7 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
             builder.set_label(format!("Publishing {}-{}", &meta.name, &meta.version));
             builder.push(vec![
                 sites::Wrapper::pack_from(args.sender.into()).storeSys(
-                    dest.clone(),
+                    dest.clone().into(),
                     "application/zip".to_string(),
                     None,
                     content.into(),
@@ -1552,8 +1574,10 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
                 ),
             ])?;
             progress.inc(1);
-        } else if &serde_json::from_value::<Checksum256>(existing_info["sha256"].clone())?.0
-            != &hash
+        } else if existing_info["sha256"]
+            .as_str()
+            .and_then(|text| psio::from_hex_array::<32>(text).ok())
+            != Some(hash)
         {
             progress.suspend(|| {
                 eprintln!(
@@ -1799,7 +1823,7 @@ async fn do_install<T: Read + Seek>(
                     push_transaction(
                         &node_args.api,
                         client.clone(),
-                        trx.packed(),
+                        psio::to_pssz(trx),
                         tx_args.trace,
                         tx_args.console,
                         Some(&progress),
@@ -1938,67 +1962,10 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct LocalPackage<'a> {
-    pub name: &'a String,
-    pub version: &'a String,
-    pub description: &'a String,
-    pub depends: &'a Vec<PackageRef>,
-    pub accounts: &'a Vec<AccountNumber>,
-    pub services: &'a Vec<AccountNumber>,
-    pub sha256: &'a Checksum256,
-}
-
-impl<'a> From<&'a PackageInfo> for LocalPackage<'a> {
-    fn from(other: &'a PackageInfo) -> Self {
-        LocalPackage {
-            name: &other.name,
-            version: &other.version,
-            description: &other.description,
-            depends: &other.depends,
-            accounts: &other.accounts,
-            services: &other.services,
-            sha256: &other.sha256,
-        }
-    }
-}
-
-impl<'a, R: Read + Seek> From<&'a PackagedService<R>> for LocalPackage<'a> {
-    fn from(other: &'a PackagedService<R>) -> Self {
-        let meta = other.meta();
-        LocalPackage {
-            name: &meta.name,
-            version: &meta.version,
-            description: &meta.description,
-            depends: &meta.depends,
-            accounts: &meta.accounts,
-            services: &meta.services,
-            sha256: other.hash(),
-        }
-    }
-}
-
-impl<'a> From<&'a (Meta, PackageOrigin)> for LocalPackage<'a> {
-    fn from(other: &'a (Meta, PackageOrigin)) -> Self {
-        let PackageOrigin::Local { sha256 } = &other.1 else {
-            panic!("Expected a local package")
-        };
-        LocalPackage {
-            name: &other.0.name,
-            version: &other.0.version,
-            description: &other.0.description,
-            depends: &other.0.depends,
-            accounts: &other.0.accounts,
-            services: &other.0.services,
-            sha256: sha256,
-        }
-    }
-}
-
 async fn post_local_info<'a>(
     base_url: &reqwest::Url,
     client: &mut reqwest::Client,
-    info: &LocalPackage<'a>,
+    info: &LocalPackageInfo,
     endpoint: &str,
 ) -> Result<(), anyhow::Error> {
     psibase::as_text(
@@ -2013,18 +1980,18 @@ async fn post_local_info<'a>(
 async fn put_local_manifest<'a, R: Read + Seek>(
     base_url: &reqwest::Url,
     client: &mut reqwest::Client,
-    info: &LocalPackage<'a>,
+    info: &LocalPackageInfo,
     package: &PackagedService<R>,
 ) -> Result<(), anyhow::Error> {
     let manifest = package.manifest();
     let mut manifest_encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
-    serde_json::to_writer(&mut manifest_encoder, &manifest)?;
+    std::io::Write::write_all(&mut manifest_encoder, psio::to_ijson(&manifest).as_bytes())?;
     psibase::as_text(
         client
             .put(
                 x_packages::SERVICE
                     .url(base_url)?
-                    .join(&format!("/manifest/{}", info.sha256))?,
+                    .join(&format!("/manifest/{}", psio::to_hex(&info.sha256)))?,
             )
             .body(manifest_encoder.finish()?)
             .header("Content-Type", "application/json")
@@ -2037,14 +2004,14 @@ async fn put_local_manifest<'a, R: Read + Seek>(
 async fn delete_local_manifest<'a>(
     base_url: &reqwest::Url,
     client: &mut reqwest::Client,
-    info: &LocalPackage<'a>,
+    info: &LocalPackageInfo,
 ) -> Result<(), anyhow::Error> {
     psibase::as_text(
         client
             .delete(
                 x_packages::SERVICE
                     .url(base_url)?
-                    .join(&format!("/manifest/{}", info.sha256))?,
+                    .join(&format!("/manifest/{}", psio::to_hex(&info.sha256)))?,
             )
             .json(&info),
     )
@@ -2099,8 +2066,8 @@ async fn do_install_local<T: Read + Seek>(
                     .await?;
                 }
                 PackageOpFull::Replace(old, mut package) => {
-                    let old_info: LocalPackage = installed.get_by_name(&old.name)?.unwrap().into();
-                    if old_info.sha256 == package.hash() {
+                    let old_info: LocalPackageInfo = installed.get_by_name(&old.name)?.unwrap().into();
+                    if old_info.sha256 == *package.hash() {
                         // The only reason to install a package that is identical
                         // to the currently installed package is to fix corrupted
                         // files. Nothing needs to be removed (in particular, the
@@ -2160,9 +2127,9 @@ async fn do_install_local<T: Read + Seek>(
                     }
                 }
                 PackageOpFull::Remove(meta) => {
-                    let info: LocalPackage = installed.get_by_name(&meta.name)?.unwrap().into();
+                    let info: LocalPackageInfo = installed.get_by_name(&meta.name)?.unwrap().into();
                     let old_manifest =
-                        get_local_manifest(&node_args.api, &mut client, info.sha256).await?;
+                        get_local_manifest(&node_args.api, &mut client, &info.sha256).await?;
                     post_local_info(&node_args.api, &mut client, &info, "/prerm").await?;
                     old_manifest
                         .remove_local(&node_args.api, &mut client)
@@ -2567,7 +2534,7 @@ async fn handle_login(args: &LoginArgs) -> Result<(), anyhow::Error> {
         .expect("api must use a domain name");
     let actions = vec![login_action(args.user.into(), transact::SERVICE, root_host)];
 
-    let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(10));
+    let expiration = TimePointSec::from_chrono_floor(chrono::Utc::now() + chrono::Duration::seconds(10)).unwrap();
     let tapos = Tapos {
         expiration: expiration,
         refBlockSuffix: 0,
@@ -2585,7 +2552,7 @@ async fn handle_login(args: &LoginArgs) -> Result<(), anyhow::Error> {
             .post(transact::SERVICE.url(&args.node_args.api)?.join("/login")?)
             .header("Content-Type", "application/octet-stream")
             .header("Accept", "application/json")
-            .body(sign_transaction(trx, &args.sign)?.packed()),
+            .body(psio::to_pssz(&sign_transaction(trx, &args.sign)?)),
     )
     .await?;
     println!("{} {}", reply.token_type, reply.access_token);

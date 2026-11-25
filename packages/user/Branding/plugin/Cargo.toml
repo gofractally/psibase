@@ -8,6 +8,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+psio.workspace = true
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true

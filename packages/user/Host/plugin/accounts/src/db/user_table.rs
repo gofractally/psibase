@@ -1,5 +1,5 @@
 use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
-use psibase::fracpack::{Pack, Unpack};
+
 
 // Apps each user has connected to; persistent so connections survive sessions
 pub(crate) fn connected_apps_table() -> Bucket {
@@ -12,7 +12,7 @@ pub(crate) fn connected_apps_table() -> Bucket {
     )
 }
 
-#[derive(Pack, Unpack, Default)]
+#[derive(Default, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 struct ConnectedApps {
     apps: Vec<String>,
 }
@@ -49,28 +49,28 @@ impl UserTable {
     pub(crate) fn add_connected_app(&self, app: &str) {
         let connected_apps = connected_apps_table().get(&self.user);
         let mut connected_apps = connected_apps
-            .map(|c| <ConnectedApps>::unpacked(&c).unwrap())
+            .map(|c| psio::from_pssz::<ConnectedApps>(&c).unwrap())
             .unwrap_or_default();
         if connected_apps.apps.contains(&app.to_string()) {
             return;
         }
         connected_apps.add(app);
-        connected_apps_table().set(&self.user, &connected_apps.packed());
+        connected_apps_table().set(&self.user, &psio::to_pssz(&connected_apps));
     }
 
     pub(crate) fn remove_connected_app(&self, app: &str) {
         let connected_apps = connected_apps_table().get(&self.user);
         let mut connected_apps = connected_apps
-            .map(|c| <ConnectedApps>::unpacked(&c).unwrap())
+            .map(|c| psio::from_pssz::<ConnectedApps>(&c).unwrap())
             .unwrap_or_default();
         connected_apps.remove(app);
-        connected_apps_table().set(&self.user, &connected_apps.packed());
+        connected_apps_table().set(&self.user, &psio::to_pssz(&connected_apps));
     }
 
     pub(crate) fn get_connected_apps(&self) -> Vec<String> {
         let connected_apps = connected_apps_table().get(&self.user);
         connected_apps
-            .map(|c| <ConnectedApps>::unpacked(&c).unwrap())
+            .map(|c| psio::from_pssz::<ConnectedApps>(&c).unwrap())
             .unwrap_or_default()
             .apps
     }

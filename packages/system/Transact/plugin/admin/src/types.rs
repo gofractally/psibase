@@ -28,7 +28,7 @@ impl FromExpirationTime for Tapos {
             .expect("Failed to get time")
             .as_secs();
         assert!(expiration <= i64::MAX as u64, "expiration out of range");
-        let expiration_timepoint = TimePointSec::from(expiration as i64);
+        let expiration_timepoint = TimePointSec::from_ticks(expiration as i64);
 
         Tapos {
             expiration: expiration_timepoint,

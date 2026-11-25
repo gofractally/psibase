@@ -25,6 +25,7 @@ path = "src/lib.rs"
 [dependencies]
 psibase_macros.workspace = true
 psibase.workspace = true
+psio.workspace = true
 psibase_service.workspace = true
 psibase-rust-workspace-hack.workspace = true
 serde.workspace = true

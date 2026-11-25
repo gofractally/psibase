@@ -12,6 +12,7 @@ flags = ["isPrivileged"]
 server = "wsauth"
 
 [dependencies]
+psio.workspace = true
 psibase.workspace = true
 psibase_service.workspace = true
 serde.workspace = true

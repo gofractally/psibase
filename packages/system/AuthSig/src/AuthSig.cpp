@@ -53,6 +53,7 @@ namespace SystemService
 
       void AuthSig::setKey(SubjectPublicKeyInfo key)
       {
+         check(SubjectPublicKeyInfo::validate(key.data), "invalid public key");
          auto authTable = open<AuthTable>(KvMode::readWrite);
          authTable.put(AuthRecord{.account = getSender(), .pubkey = std::move(key)});
       }
@@ -76,6 +77,7 @@ namespace SystemService
 
       void AuthSig::newAccount(psibase::AccountNumber name, SubjectPublicKeyInfo key)
       {
+         check(SubjectPublicKeyInfo::validate(key.data), "invalid public key");
          auto authTable = open<AuthTable>(KvMode::readWrite);
          authTable.put(AuthRecord{.account = name, .pubkey = std::move(key)});
 

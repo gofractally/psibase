@@ -1,16 +1,15 @@
 #[psibase::service_tables]
 pub mod tables {
-    use psibase::fracpack::{Pack, Unpack};
+
     use psibase::services::{
         nft::Wrapper as Nft,
         tokens::{BalanceFlags, Wrapper as Tokens},
         transact::Wrapper as Transact,
     };
     use psibase::{Checksum256, *};
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
+    #[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -34,7 +33,7 @@ pub mod tables {
     }
 
     #[table(name = "CredentialIdTable", index = 1)]
-    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Default, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct CredentialId {
         pub id: u32,
     }
@@ -56,7 +55,7 @@ pub mod tables {
     }
 
     #[table(name = "CredentialTable", index = 2)]
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Credential {
         pub id: u32,
         pub pubkey_fingerprint: Checksum256,
@@ -92,7 +91,7 @@ pub mod tables {
             allowed_actions: Vec<MethodNumber>,
         ) -> u32 {
             let id = CredentialId::next_id();
-            let now = Transact::call().currentBlock().time.seconds();
+            let now = Transact::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
 
             let table = CredentialTable::read_write();
             assert!(
@@ -106,7 +105,7 @@ pub mod tables {
                     pubkey_fingerprint,
                     creation_date: now,
                     issuer: get_sender(),
-                    expiry_date: expires.map(|e| now + psibase::Seconds::new(e as i64)),
+                    expiry_date: expires.map(|e| now + psibase::Seconds::from_ticks(e as i64)),
                     allowed_actions,
                 })
                 .unwrap();

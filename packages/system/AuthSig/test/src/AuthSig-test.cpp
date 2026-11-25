@@ -98,7 +98,7 @@ SCENARIO("AuthSig")
       auto mint         = Action{.sender  = alice.id,
                                  .service = Nft::service,
                                  .method  = "mint"_m,
-                                 .rawData = psio::to_frac(std::tuple())
+                                 .rawData = psio::to_pssz(std::tuple())
 
       };
       auto proposedMint = std::vector<Action>{mint};
@@ -109,7 +109,7 @@ SCENARIO("AuthSig")
              .sender  = sender,
              .service = Nft::service,
              .method  = "credit"_m,
-             .rawData = psio::to_frac(std::tuple(nftId, receiver, psibase::Memo{"Memo"}))};
+             .rawData = psio::to_pssz(std::tuple(nftId, receiver, psibase::Memo{"Memo"}))};
       };
 
       auto getNfts = [](DefaultTestChain& t, AccountNumber acc) -> std::vector<uint32_t>
@@ -126,7 +126,7 @@ SCENARIO("AuthSig")
 
          auto body = std::string(res.body.begin(), res.body.end());
          std::cout << "Response: " << body << "\n";
-         auto response_root = psio::convert_from_json<QueryRoot>(body);
+         auto response_root = psio::from_ijson<QueryRoot>(body);
 
          return response_root.data.nfts.edges |
                 std::views::transform([](auto edge) { return edge.node.id; }) |

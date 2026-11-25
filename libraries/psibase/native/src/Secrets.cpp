@@ -8,8 +8,9 @@
 #include <psibase/check.hpp>
 #include <psibase/fileUtil.hpp>
 #include <psibase/openssl.hpp>
-#include <psio/fracpack.hpp>
 #include <psio/reflect.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 #include <vector>
 
 using namespace psibase;
@@ -269,7 +270,7 @@ namespace
    {
       SCryptParams params;
       auto         key = deriveKey<32>(passphrase, params);
-      return {key, params, psio::to_frac(std::vector<KeyValue>())};
+      return {key, params, psio::to_pssz(std::vector<KeyValue>())};
    }
 
    struct EncryptedFileInfo
@@ -289,13 +290,13 @@ struct Secrets::Impl
                .key{std::move(contents.key)},
                .iv_invocation{0},
                .filename{path}}},
-         items(psio::from_frac<std::vector<KeyValue>>(contents.data))
+         items(psio::from_pssz<std::vector<KeyValue>>(contents.data))
    {
    }
    void flush()
    {
       if (file)
-         writeEncryptedFile(file->filename, psio::to_frac(items), file->params, file->key, 0,
+         writeEncryptedFile(file->filename, psio::to_pssz(items), file->params, file->key, 0,
                             file->iv_invocation++);
    }
    std::optional<EncryptedFileInfo> file;

@@ -1,6 +1,7 @@
 use crate::bindings::exports::permissions::plugin::api::TrustLevel;
+use crate::types::{higher_trust, StoredTrustLevel};
 
-use psibase::fracpack::{Pack, Unpack};
+
 use psibase_plugin::host::client::*;
 use psibase_plugin::host::store::{DbMode::*, StorageDuration::*, *};
 
@@ -28,13 +29,13 @@ mod tables {
     }
 }
 
-#[derive(Pack, Unpack, Default)]
+#[derive(Default, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 pub struct Permission {
     pub caller: String,
-    pub trust_level: TrustLevel,
+    pub trust_level: StoredTrustLevel,
 }
 
-#[derive(Pack, Unpack, Default)]
+#[derive(Default, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 pub struct Permissions {
     pub permissions: Vec<Permission>,
 }
@@ -43,7 +44,7 @@ impl Permissions {
     fn get_trust_level(&self, caller: &str) -> Option<TrustLevel> {
         self.get_permission_index(caller)
             .ok()
-            .map(|index| self.permissions[index].trust_level)
+            .map(|index| self.permissions[index].trust_level.into())
     }
 
     fn get_permission_index(&self, caller: &str) -> Result<usize, usize> {
@@ -54,7 +55,7 @@ impl Permissions {
     fn callee_permissions(bucket: &Bucket, key: &str) -> Option<Permissions> {
         bucket
             .get(&key)
-            .map(|p| <Permissions>::unpacked(&p).unwrap())
+            .map(|p| psio::from_pssz::<Permissions>(&p).unwrap())
     }
 
     pub fn set(
@@ -71,20 +72,20 @@ impl Permissions {
 
         match user_app_perms.get_permission_index(caller) {
             Ok(index) => {
-                user_app_perms.permissions[index].trust_level = trust_level;
+                user_app_perms.permissions[index].trust_level = trust_level.into();
             }
             Err(index) => {
                 user_app_perms.permissions.insert(
                     index,
                     Permission {
                         caller: caller.to_string(),
-                        trust_level,
+                        trust_level: trust_level.into(),
                     },
                 );
             }
         }
 
-        table.set(&key, &user_app_perms.packed());
+        table.set(&key, &psio::to_pssz(&user_app_perms));
     }
 
     pub fn get(user: &str, caller: &str, callee: &str) -> Option<TrustLevel> {
@@ -96,7 +97,7 @@ impl Permissions {
             .and_then(|perms| perms.get_trust_level(caller));
 
         match (session_trust, persistent_trust) {
-            (Some(s), Some(p)) => Some(s.max(p)),
+            (Some(s), Some(p)) => Some(higher_trust(s, p)),
             (Some(s), None) => Some(s),
             (None, Some(p)) => Some(p),
             (None, None) => None,
@@ -118,7 +119,7 @@ impl AllowedCallers {
         //   being executed.
 
         if callers.len() > 0 {
-            tables::allowed_callers().set(&get_active_app(), &callers.packed());
+            tables::allowed_callers().set(&get_active_app(), &psio::to_pssz(&callers));
         } else {
             tables::allowed_callers().delete(&get_active_app());
         }
@@ -127,7 +128,7 @@ impl AllowedCallers {
     pub fn get() -> Vec<String> {
         tables::allowed_callers()
             .get(&get_active_app())
-            .map(|p| <Vec<String>>::unpacked(&p).unwrap())
+            .map(|p| psio::from_pssz::<Vec<String>>(&p).unwrap())
             .unwrap_or_default()
     }
 }

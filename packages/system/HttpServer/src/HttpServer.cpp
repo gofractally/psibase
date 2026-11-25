@@ -4,9 +4,11 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/psibase.hpp>
 #include <psibase/webServices.hpp>
-#include <psio/fracpack.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/system/HttpServer.hpp>
+#include <services/system/HttpServerRequest.hpp>
 #include <services/system/RTransact.hpp>
 
 static constexpr bool enable_print = false;
@@ -73,25 +75,26 @@ namespace SystemService
    }
 
    void HttpServer::recv(std::int32_t                        socket,
-                         psio::view<const std::vector<char>> data,
+                         psio::pssz_view<std::vector<char>> data,
                          std::uint32_t                       flags)
    {
       check(getSender() == XHttp::service, "Wrong sender");
       if (socket == producer_multicast)
       {
-         auto act = psio::from_frac<Action>(data);
+         auto act = psio::from_pssz<Action>(data);
          checkRecvAuth(act);
          auto _ = recurse();
          psibase::call(act);
       }
    }
 
-   void HttpServer::sendProds(const Action& act)
+   void HttpServer::sendProds(const Action& action)
    {
-      if (getSender() != act.service)
-         psibase::abortMessage(getSender().str() + " cannot send messages to " + act.service.str());
-      checkRecvAuth(act);
-      to<XHttp>().send(producer_multicast, psio::to_frac(act), 0);
+      if (getSender() != action.service)
+         psibase::abortMessage(getSender().str() + " cannot send messages to " + action.service.str());
+      checkRecvAuth(action);
+      // The message is the packed action, written into the call.
+      to<XHttp>().send(producer_multicast, psio::packed(action), 0);
    }
 
    namespace
@@ -273,9 +276,7 @@ namespace SystemService
       auto user = recurse().to<RTransact>().getUser(req);
 
       // Remove sensitive headers
-      req.removeCookie("__HOST-SESSION");
-      req.removeCookie("SESSION");
-      std::erase_if(req.headers, [](auto& header) { return header.matches("authorization"); });
+      http_detail::stripAuthenticationHeaders(req);
 
       // Extract subdomain
       auto root        = to<XHttp>().rootHost(req.host);
@@ -358,7 +359,9 @@ namespace SystemService
          }
          else if (req.method == "OPTIONS")
          {
-            sendReplyImpl(server, sock, {.status = HttpStatus::ok, .headers = allowCors()});
+            sendReplyImpl(server, sock,
+                          {.status = HttpStatus::ok,
+                           .headers = http_detail::defaultPreflightHeaders()});
          }
          else
          {
@@ -372,7 +375,7 @@ namespace SystemService
       }
    }  // serve()
 
-   std::string HttpServer::rootHost(psio::view<const std::string> host)
+   std::string HttpServer::rootHost(psio::pssz_view<std::string> host)
    {
       return to<XHttp>().rootHost(host);
    }

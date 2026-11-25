@@ -49,7 +49,7 @@ mod service {
             AccountsSvc::call().exists(receiver),
             "receiver account {receiver} doesn't exist"
         );
-        let datetime = TransactSvc::call().currentBlock().time.seconds();
+        let datetime = TransactSvc::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
         Wrapper::emit()
             .history()
             .sent(get_sender(), receiver, subject, body, datetime);
@@ -66,7 +66,7 @@ mod service {
                 rec.sender,
                 rec.subject,
                 rec.body,
-                rec.datetime.seconds,
+                rec.datetime.ticks(),
             );
         }
 
@@ -97,7 +97,7 @@ mod service {
                 sender,
                 subject,
                 body,
-                datetime: TimePointSec::from(datetime),
+                datetime: TimePointSec::from_ticks(datetime),
             })
             .unwrap();
     }
@@ -114,7 +114,7 @@ mod service {
             sender,
             subject,
             body,
-            datetime: TimePointSec::from(datetime),
+            datetime: TimePointSec::from_ticks(datetime),
         });
     }
 

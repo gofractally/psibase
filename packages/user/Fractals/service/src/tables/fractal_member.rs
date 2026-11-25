@@ -22,7 +22,7 @@ impl FractalMember {
 
 impl FractalMember {
     fn new(fractal: AccountNumber, account: AccountNumber) -> Self {
-        let now = TransactSvc::call().currentBlock().time.seconds();
+        let now = TransactSvc::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
 
         Self {
             account,

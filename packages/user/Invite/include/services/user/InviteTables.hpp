@@ -40,7 +40,7 @@ namespace UserService
 
          using ByInviter = psibase::CompositeKey<&InviteRecord::inviter, &InviteRecord::id>;
       };
-      PSIO_REFLECT(InviteRecord, id, cid, inviter, numAccounts, useHooks, secret);
+      PSIO_REFLECT(InviteRecord, id, cid, inviter, numAccounts, useHooks, attr(secret, utf8));
       using InviteTable = psibase::
           Table<InviteRecord, &InviteRecord::id, InviteRecord::ByInviter{}, &InviteRecord::cid>;
       PSIO_REFLECT_TYPENAME(InviteTable)

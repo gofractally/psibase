@@ -15,7 +15,7 @@ use bindings::transact::plugin::api::add_action_to_transaction;
 use bindings::tokens::plugin::helpers::decimal_to_u64;
 use bindings::tokens::plugin::user::credit;
 use psibase::define_trust;
-use psibase::fracpack::Pack;
+
 
 mod graphql;
 
@@ -152,7 +152,7 @@ impl Swap for TokenSwapPlugin {
             return Err(ErrorType::InsufficientPools.into());
         }
 
-        let packed_args = token_swap::action_structs::swap {
+        let packed_args = psio::to_pssz(&token_swap::action_structs::swap {
             token_in: amount_in.token_id,
             amount_in: credit_to_service(amount_in, "Swap start")?,
             min_return: Decimal::from_str(&min_return).unwrap().quantity,
@@ -160,10 +160,9 @@ impl Swap for TokenSwapPlugin {
                 .into_iter()
                 .map(|pool_id| pool_id.parse::<u32>().unwrap())
                 .collect(),
-        }
-        .packed();
+        });
 
-        add_action_to_transaction(token_swap::action_structs::swap::ACTION_NAME, &packed_args)
+        add_action_to_transaction(<token_swap::action_structs::swap as psio::interface::Method>::NAME, &packed_args)
     }
 }
 
@@ -175,17 +174,16 @@ impl Liquidity for TokenSwapPlugin {
     ) -> Result<(), Error> {
         assert_authed(FunctionName::new_pool)?;
 
-        let packed_args = token_swap::action_structs::new_pool {
+        let packed_args = psio::to_pssz(&token_swap::action_structs::new_pool {
             token_a: a_deposit.token_id,
             token_b: b_deposit.token_id,
             token_a_amount: credit_to_service(a_deposit, "Initial liquidity deposit")?,
             token_b_amount: credit_to_service(b_deposit, "Initial liquidity deposit")?,
             nft_id,
-        }
-        .packed();
+        });
 
         add_action_to_transaction(
-            token_swap::action_structs::new_pool::ACTION_NAME,
+            <token_swap::action_structs::new_pool as psio::interface::Method>::NAME,
             &packed_args,
         )
     }
@@ -197,17 +195,16 @@ impl Liquidity for TokenSwapPlugin {
     ) -> Result<(), Error> {
         assert_authed(FunctionName::add_liquidity)?;
 
-        let packed_args = token_swap::action_structs::add_liquidity {
+        let packed_args = psio::to_pssz(&token_swap::action_structs::add_liquidity {
             pool_id,
             token_a: first_deposit.token_id,
             token_b: second_deposit.token_id,
             amount_a: credit_to_service(first_deposit, "Liquidity deposit")?,
             amount_b: credit_to_service(second_deposit, "Liquidity deposit")?,
-        }
-        .packed();
+        });
 
         add_action_to_transaction(
-            token_swap::action_structs::add_liquidity::ACTION_NAME,
+            <token_swap::action_structs::add_liquidity as psio::interface::Method>::NAME,
             &packed_args,
         )
     }
@@ -264,14 +261,13 @@ impl Liquidity for TokenSwapPlugin {
     fn remove_liquidity(amount: TokenAmount) -> Result<(), Error> {
         assert_authed(FunctionName::remove_liquidity)?;
 
-        let packed_args = token_swap::action_structs::remove_liquidity {
+        let packed_args = psio::to_pssz(&token_swap::action_structs::remove_liquidity {
             pool_id: amount.token_id,
             lp_amount: credit_to_service(amount, "Liquidity removal")?,
-        }
-        .packed();
+        });
 
         add_action_to_transaction(
-            token_swap::action_structs::remove_liquidity::ACTION_NAME,
+            <token_swap::action_structs::remove_liquidity as psio::interface::Method>::NAME,
             &packed_args,
         )
     }

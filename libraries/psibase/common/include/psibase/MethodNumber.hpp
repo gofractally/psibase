@@ -1,7 +1,14 @@
 #pragma once
-#include <psio/from_json.hpp>
+#include <psio/adapter.hpp>
+#include <psio/compress_name.hpp>
 #include <psio/reflect.hpp>
-#include <psio/to_json.hpp>
+
+#include <compare>
+#include <cstdint>
+#include <cstdlib>
+#include <span>
+#include <string>
+#include <string_view>
 
 namespace psibase
 {
@@ -25,6 +32,11 @@ namespace psibase
    /// this form, it will round trip with no further changes.
    ///
    /// The empty name `""` is value 0.
+   ///
+   /// In every binary format a method is its 64-bit value: 8 bytes,
+   /// little-endian, in PSSZ; 8 bytes, big-endian, as a key. In JSON it is
+   /// its name, and in a schema it is the custom type `MethodNumber` over
+   /// that record.
    struct MethodNumber
    {
       /// Number form
@@ -61,27 +73,40 @@ namespace psibase
       PSIO_REFLECT(MethodNumber, definitionWillNotChange(), value)
    };
 
-   template <typename S>
-   void to_json(const MethodNumber& n, S& s)
+   /// The text form of a [MethodNumber]: its name.
+   ///
+   /// Writing produces [MethodNumber::str]. Reading accepts every spelling
+   /// that names a method: the written form, and an identifier as it appears
+   /// in source (`setCode`), which compresses, or falls back to its hash,
+   /// exactly as `MethodNumber{"setCode"}` does. It rejects text that names
+   /// no method: a character outside the method alphabet, and a `#` form
+   /// that is not the 16 letters `str()` writes for a hashed name.
+   struct MethodNumberText
    {
-      to_json(n.str(), s);
-   }
+      static constexpr std::string_view schema_id = "MethodNumber";
 
-   template <typename S>
-   void from_json(MethodNumber& result, S& stream)
-   {
-      result = MethodNumber{stream.get_string()};
-   }
-
-   inline constexpr bool use_json_string_for_gql(MethodNumber*)
-   {
-      return true;
-   }
-
-   inline constexpr bool psio_custom_schema(MethodNumber*)
-   {
-      return true;
-   }
+      static std::size_t packsize(const MethodNumber& value) { return value.str().size(); }
+      static void encode(const MethodNumber& value, std::string& out) { out += value.str(); }
+      static MethodNumber decode(std::span<const char> text)
+      {
+         return MethodNumber{std::string_view{text.data(), text.size()}};
+      }
+      static psio::codec_status validate(std::span<const char> text) noexcept
+      {
+         const std::string_view name{text.data(), text.size()};
+         if (name.empty())
+            return psio::codec_ok();
+         const MethodNumber method{name};
+         const bool         ok = name[0] == '#' ? method.str() == name : method.value != 0;
+         if (ok)
+            return psio::codec_ok();
+         return psio::codec_fail("MethodNumber: not a method name", 0, "MethodNumber");
+      }
+      static psio::codec_status validate_strict(std::span<const char> text) noexcept
+      {
+         return validate(text);
+      }
+   };
 
    inline namespace literals
    {
@@ -96,3 +121,5 @@ namespace psibase
       }
    }  // namespace literals
 }  // namespace psibase
+
+PSIO_ADAPTER(psibase::MethodNumber, psio::text_category, psibase::MethodNumberText)

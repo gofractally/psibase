@@ -38,7 +38,7 @@ extern "C" {
     /// Push a transaction
     ///
     /// `chain_handle` identifies the chain to push to. `transaction/transaction_size`
-    /// contains a fracpacked [`SignedTransaction`](crate::SignedTransaction).
+    /// contains a PSSZ-packed [`SignedTransaction`](crate::SignedTransaction).
     ///
     /// Stores the transaction trace into result and returns the result size
     pub fn pushTransaction(

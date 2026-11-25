@@ -1,9 +1,9 @@
 #[crate::service(name = "db", dispatch = false, psibase_mod = "crate")]
 #[allow(unused_variables)]
 mod service {
-    use crate::{DbId, Hex};
+    use crate::{DbId};
     #[action]
-    fn open(db: DbId, prefix: Hex<Vec<u8>>, mode: u8) -> u32 {
+    fn open(db: DbId, prefix: Vec<u8>, mode: u8) -> u32 {
         unimplemented!()
     }
 }

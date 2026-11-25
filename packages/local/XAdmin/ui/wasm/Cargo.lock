@@ -890,20 +890,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fracpack"
-version = "0.29.0"
-dependencies = [
- "custom_error",
- "hex",
- "indexmap",
- "psibase-rust-workspace-hack",
- "psibase_macros",
- "serde",
- "serde-aux",
- "serde_json",
-]
-
-[[package]]
 name = "fs_extra"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1078,12 +1064,6 @@ name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
-
-[[package]]
-name = "hex"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
 
 [[package]]
 name = "hmac"
@@ -1907,7 +1887,6 @@ dependencies = [
  "dialoguer",
  "flate2",
  "form_urlencoded",
- "fracpack",
  "futures",
  "getrandom 0.2.16",
  "hmac",
@@ -1927,6 +1906,7 @@ dependencies = [
  "psibase-rust-workspace-hack",
  "psibase_macros",
  "psibase_names",
+ "psio",
  "rand_core 0.6.4",
  "regex",
  "reqwest",
@@ -1961,6 +1941,7 @@ dependencies = [
  "psibase-macros-lib",
  "psibase-rust-workspace-hack",
  "psibase_names",
+ "psio",
  "quote",
  "syn 1.0.109",
  "toml",
@@ -2000,6 +1981,28 @@ version = "0.29.0"
 dependencies = [
  "psibase-rust-workspace-hack",
  "seahash",
+]
+
+[[package]]
+name = "psio"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "chrono",
+ "paste",
+ "psio-macros",
+ "ryu",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "psio-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -2505,7 +2508,6 @@ version = "1.0.145"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "402a6f66d8c709116cf22f558eab210f5a50187f702eb4d7e5ef38d9a7f1c79c"
 dependencies = [
- "indexmap",
  "itoa 1.0.15",
  "memchr",
  "ryu",
@@ -3655,6 +3657,7 @@ dependencies = [
  "chrono",
  "pem",
  "psibase",
+ "psio",
  "serde_json",
  "spki",
  "wit-bindgen-rt",

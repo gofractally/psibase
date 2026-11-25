@@ -68,13 +68,18 @@ namespace UserService
             return std::optional<InviteDetails>(toInviteDetails(invite.value()));
          }
 
-         auto invitesByInviter(AccountNumber inviter) const
+         auto invitesByInviter(AccountNumber                      inviter,
+                               psio::graphql::key_range<uint32_t> range,
+                               psio::graphql::page_args           page) const
          {
-            return TransformedConnection(Invite::Tables(Invite::service, KvMode::read)
-                                             .open<InviteTable>()
-                                             .getIndex<1>()
-                                             .subindex<uint32_t>(inviter),
-                                         [](auto&& row) { return toInviteDetails(row); });
+            return psio::graphql::paginate(
+                psio::graphql::transform(IndexView{Invite::Tables(Invite::service, KvMode::read)
+                                                       .open<InviteTable>()
+                                                       .getIndex<1>()
+                                                       .subindex<uint32_t>(inviter)},
+                                         [](psio::shared_pssz<InviteRecord> row)
+                                         { return toInviteDetails(row.unpack()); }),
+                range, page, allRows);
          }
 
          /// This query returns the current cost of creating an invite, with a 50% buffer added to account for possible
@@ -91,26 +96,19 @@ namespace UserService
             return Decimal{cost, sys->precision};
          }
 
-         auto history(uint32_t                   inviteId,
-                      std::optional<int32_t>     first,
-                      std::optional<int32_t>     last,
-                      std::optional<std::string> before,
-                      std::optional<std::string> after) const
+         auto history(uint32_t inviteId, psio::graphql::page_args page) const
          {
             return EventQuery<InviteEvent>("history.invite.updated")
                 .condition(std::format("inviteId = {}", inviteId))
-                .first(first)
-                .last(last)
-                .before(before)
-                .after(after)
+                .page(std::move(page))
                 .query();
          }
       };
       PSIO_REFLECT(Query,
                    method(inviteById, inviteId),
-                   method(invitesByInviter, inviter),
+                   method(invitesByInviter, inviter, range, page),
                    method(getInviteCost, numAccounts),
-                   method(history, inviteId, first, last, before, after))
+                   method(history, inviteId, page))
 
       class RInvite : public Service
       {

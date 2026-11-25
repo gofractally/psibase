@@ -9,12 +9,12 @@ CompileFlags:
   CompilationDatabase: build
 ---
 If:
-  PathMatch: ^(.*/)?libraries/(net|psibase_http|triedent|debug_eos_vm)/.*$
+  PathMatch: ^(.*/)?libraries/(net|psibase_http|triedent)/.*$
 CompileFlags:
   CompilationDatabase: build
 ---
 If:
-  PathMatch: ^(.*/)?libraries/(psibase|psio)/.*$
+  PathMatch: ^(.*/)?libraries/psibase/.*$
 CompileFlags:
   CompilationDatabase: build/wasm
 ---

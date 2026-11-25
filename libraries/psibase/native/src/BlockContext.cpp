@@ -1,7 +1,7 @@
 #include <psibase/TransactionContext.hpp>
 #include <psibase/saturating.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio/finally.hpp>
+#include <psibase/finally.hpp>
 
 namespace psibase
 {
@@ -109,8 +109,12 @@ namespace psibase
       status->current = current.header;
       if (!isReadOnly)
          db.kvPut(StatusRow::db, status->key(), *status);
-      started = true;
-      active  = true;
+      // A change to the limit takes effect with the block after the one that
+      // makes it.
+      maxBlockSize = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key()).maxBlockSize;
+      transactionBytes = 0;
+      started          = true;
+      active           = true;
 
       return *status;
    }
@@ -124,6 +128,9 @@ namespace psibase
             "block previous does not match expected");
       check(src.header.blockNum == current.header.blockNum, "block num does not match expected");
       current.transactions = std::move(src.transactions);
+      for (const auto& trx : current.transactions)
+         transactionBytes += blockBytes(trx);
+      checkBlockSize();
       db.kvPut(StatusRow::db, status.key(), status);
       active = true;
    }
@@ -139,7 +146,7 @@ namespace psibase
               .sender  = {},
               .service = transactionServiceNum,
               .method  = MethodNumber("startBlock"),
-              .rawData = psio::to_frac(std::tuple()),
+              .rawData = psio::to_pssz(std::tuple()),
           }},
       }}};
       TransactionTrace  trace;
@@ -155,17 +162,17 @@ namespace psibase
    void BlockContext::callOnBlock()
    {
       auto notifyData =
-          db.kvGetRaw(NotifyRow::db, psio::convert_to_key(notifyKey(NotifyType::acceptBlock)));
+          db.kvGetRaw(NotifyRow::db, psio::encode(psio::key{}, notifyKey(NotifyType::acceptBlock)));
       if (!notifyData)
          return;
-      auto notifySpan = std::span{notifyData->pos, notifyData->end};
-      if (!psio::fracpack_validate<NotifyRow>(notifySpan))
+      auto notifySpan = std::span<const char>{*notifyData};
+      if (!psio::validate_pssz<NotifyRow>(notifySpan).ok())
          return;
 
-      auto actions = psio::view<const NotifyRow>(psio::prevalidated{notifySpan}).actions().unpack();
+      auto actions = psio::pssz_view<NotifyRow>(notifySpan).actions().unpack();
 
       auto oldIsProducing = isProducing;
-      auto restore        = psio::finally{[&] { isProducing = oldIsProducing; }};
+      auto restore        = psibase::finally{[&] { isProducing = oldIsProducing; }};
       isProducing         = true;
 
       for (const Action& action : actions)
@@ -197,20 +204,21 @@ namespace psibase
    void BlockContext::callOnTransaction(const Checksum256& id, const TransactionTrace& trace)
    {
       auto notifyType = trace.error ? NotifyType::rejectTransaction : NotifyType::acceptTransaction;
-      auto notifyData = db.kvGetRaw(NotifyRow::db, psio::convert_to_key(notifyKey(notifyType)));
+      auto notifyData =
+          db.kvGetRaw(NotifyRow::db, psio::encode(psio::key{}, notifyKey(notifyType)));
       if (!notifyData)
          return;
-      auto notifySpan = std::span{notifyData->pos, notifyData->end};
-      if (!psio::fracpack_validate<NotifyRow>(notifySpan))
+      auto notifySpan = std::span<const char>{*notifyData};
+      if (!psio::validate_pssz<NotifyRow>(notifySpan).ok())
          return;
 
-      auto actions = psio::view<const NotifyRow>(psio::prevalidated{notifySpan}).actions().unpack();
+      auto actions = psio::pssz_view<NotifyRow>(notifySpan).actions().unpack();
 
       auto oldIsProducing = isProducing;
-      auto restore        = psio::finally{[&] { isProducing = oldIsProducing; }};
+      auto restore        = psibase::finally{[&] { isProducing = oldIsProducing; }};
       isProducing         = true;
 
-      Action action{.sender = AccountNumber{}, .rawData = psio::to_frac(std::tuple(id, trace))};
+      Action action{.sender = AccountNumber{}, .rawData = psio::to_pssz(std::tuple(id, trace))};
 
       for (const auto& a : actions)
       {
@@ -282,25 +290,25 @@ namespace psibase
    {
       auto notifyType = NotifyType::nextTransaction;
       auto notifyData = systemContext.sharedDatabase.kvGetSubjective(
-          *writer, DbId::nativeSubjective, psio::convert_to_key(notifyKey(notifyType)));
+          *writer, DbId::nativeSubjective, psio::to_key(notifyKey(notifyType)));
       if (!notifyData)
       {
          PSIBASE_LOG(trxLogger, debug) << "nextTransaction not set";
          return {};
       }
-      if (!psio::fracpack_validate<NotifyRow>(*notifyData))
+      if (!psio::validate_pssz<NotifyRow>(*notifyData).ok())
       {
          PSIBASE_LOG(trxLogger, warning) << "invalid nextTransaction row";
          return {};
       }
 
-      auto actions = psio::view<const NotifyRow>(psio::prevalidated{*notifyData}).actions();
+      auto actions = psio::pssz_view<NotifyRow>(*notifyData).actions();
 
       auto oldIsProducing = isProducing;
-      auto restore        = psio::finally{[&] { isProducing = oldIsProducing; }};
+      auto restore        = psibase::finally{[&] { isProducing = oldIsProducing; }};
       isProducing         = true;
 
-      Action action{.sender = AccountNumber{}, .rawData = psio::to_frac(std::tuple())};
+      Action action{.sender = AccountNumber{}, .rawData = psio::to_pssz(std::tuple())};
 
       for (auto a : actions)
       {
@@ -328,7 +336,12 @@ namespace psibase
             session.commit();
 
             std::optional<SignedTransaction> result;
-            if (!psio::from_frac(result, atrace.rawRetval))
+            bool valid =
+                psio::validate_pssz<std::optional<SignedTransaction>>(atrace.rawRetval).ok();
+            if (valid)
+               result = psio::from_pssz<std::optional<SignedTransaction>>(
+                   psio::trusted{atrace.rawRetval});
+            if (!valid)
             {
                BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", std::move(trace));
                PSIBASE_LOG(trxLogger, warning)
@@ -358,19 +371,19 @@ namespace psibase
       std::vector<Checksum256> tokens(trx.proofs.size());
       auto                     notifyType = NotifyType::preverifyTransaction;
       auto                     notifyData = systemContext.sharedDatabase.kvGetSubjective(
-          *writer, DbId::nativeSubjective, psio::convert_to_key(notifyKey(notifyType)));
+          *writer, DbId::nativeSubjective, psio::to_key(notifyKey(notifyType)));
       if (!notifyData)
          return tokens;
-      if (!psio::fracpack_validate<NotifyRow>(*notifyData))
+      if (!psio::validate_pssz<NotifyRow>(*notifyData).ok())
          return tokens;
 
-      auto actions = psio::view<const NotifyRow>(psio::prevalidated{*notifyData}).actions();
+      auto actions = psio::pssz_view<NotifyRow>(*notifyData).actions();
 
       auto oldIsProducing = isProducing;
-      auto restore        = psio::finally{[&] { isProducing = oldIsProducing; }};
+      auto restore        = psibase::finally{[&] { isProducing = oldIsProducing; }};
       isProducing         = true;
 
-      Action action{.sender = AccountNumber{}, .rawData = psio::to_frac(std::tie(trx))};
+      Action action{.sender = AccountNumber{}, .rawData = psio::to_pssz(std::tie(trx))};
 
       for (auto a : actions)
       {
@@ -397,8 +410,12 @@ namespace psibase
             tc.execNonTrxAction(0, action, atrace);
             session.commit();
 
-            std::optional<std::vector<std::optional<RunToken>>> result;
-            if (!psio::from_frac(result, atrace.rawRetval))
+            using Result = std::optional<std::vector<std::optional<RunToken>>>;
+            Result result;
+            bool   valid = psio::validate_pssz<Result>(atrace.rawRetval).ok();
+            if (valid)
+               result = psio::from_pssz<Result>(psio::trusted{atrace.rawRetval});
+            if (!valid)
             {
                BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", std::move(trace));
                PSIBASE_LOG(trxLogger, warning)
@@ -436,7 +453,8 @@ namespace psibase
       return tokens;
    }
 
-   void BlockContext::callRun(psio::view<const RunRow> row)
+   void BlockContext::callRun(psio::pssz_view<RunRow> row,
+                              std::optional<std::chrono::microseconds> proofTimeout)
    {
       auto action = row.action().unpack();
 
@@ -464,12 +482,14 @@ namespace psibase
       try
       {
          auto session = db.startWrite(writer);
-         auto maxTime = saturatingCast<CpuClock::duration>(row.maxTime().unpack());
-         tc.setWatchdog(std::max(maxTime, CpuClock::duration::zero()));
+         auto maxTime = saturatingCast<RunClock::duration>(row.maxTime().unpack());
+         if (row.mode() == RunMode::verify && proofTimeout)
+            maxTime = saturatingCast<RunClock::duration>(*proofTimeout);
+         tc.setWatchdog(std::max(maxTime, RunClock::duration::zero()));
          if (row.mode() == RunMode::speculative)
          {
             db.checkoutEmptySubjective();
-            auto _ = psio::finally{[&] { db.abortSubjective(); }};
+            auto _ = psibase::finally{[&] { db.abortSubjective(); }};
             tc.execNonTrxAction(0, action, atrace);
          }
          else
@@ -499,8 +519,8 @@ namespace psibase
              .sender  = {},
              .service = row.continuation().service(),
              .method  = row.continuation().method(),
-             .rawData = psio::to_frac(std::tuple(
-                 row.id().unpack(), trace, std::optional{std::span(token.data(), token.size())}))};
+             .rawData = psio::to_pssz(std::tuple(
+                 row.id(), trace, std::optional{std::span(token.data(), token.size())}))};
          TransactionTrace   trace;
          TransactionContext tc{*this, trx, trace, DbMode::rpc()};
          auto&              atrace = trace.actionTraces.emplace_back();
@@ -519,7 +539,7 @@ namespace psibase
       }
    }
 
-   void BlockContext::callTimer(psio::view<const TimerRow> row)
+   void BlockContext::callTimer(psio::pssz_view<TimerRow> row)
    {
       SignedTransaction trx;
       TransactionTrace  trace;
@@ -528,7 +548,7 @@ namespace psibase
          auto               session = db.startWrite(writer);
          psibase::Action    action{.service = row.service(),
                                    .method  = row.method(),
-                                   .rawData = psio::to_frac(std::tuple())};
+                                   .rawData = psio::to_pssz(std::tuple())};
          TransactionContext tc{*this, trx, trace, DbMode::rpc()};
          auto&              atrace = trace.actionTraces.emplace_back();
          tc.execNonTrxAction(0, action, atrace);
@@ -710,8 +730,8 @@ namespace psibase
          ConsensusChangeRow changeRow{status->consensus.next->blockNum, current.header.commitNum,
                                       current.header.blockNum};
          systemContext.sharedDatabase.kvPutSubjective(*writer, ConsensusChangeRow::db,
-                                                      psio::convert_to_key(changeRow.key()),
-                                                      psio::to_frac(changeRow));
+                                                      psio::to_key(changeRow.key()),
+                                                      psio::to_pssz(changeRow));
       }
 
       if (status->consensus.next)
@@ -821,7 +841,28 @@ namespace psibase
    {
       check(!trx.subjectiveData, "Subjective data should be set by the block producer");
       trx.subjectiveData = exec(trx, trace, initialWatchdogLimit, enableUndo, commit);
+      transactionBytes += blockBytes(trx);
       current.transactions.push_back(std::move(trx));
+   }
+
+   std::uint64_t BlockContext::blockBytes(const SignedTransaction& trx)
+   {
+      std::uint64_t result = trx.transaction.size();
+      for (const auto& proof : trx.proofs)
+         result += proof.size();
+      return result;
+   }
+
+   void BlockContext::checkBlockSize() const
+   {
+      check(isGenesisBlock || current.transactions.size() <= 1 ||
+                transactionBytes <= maxBlockSize,
+            "block exceeds maxBlockSize");
+   }
+
+   bool BlockContext::fits(const SignedTransaction& trx) const
+   {
+      return current.transactions.empty() || transactionBytes + blockBytes(trx) <= maxBlockSize;
    }
 
    void BlockContext::replayTransaction(SignedTransaction&& trx, TransactionTrace& trace)
@@ -879,7 +920,7 @@ namespace psibase
          checkActive();
          check(enableUndo || commit, "neither enableUndo or commit is set");
 
-         // TODO: fracpack verify, allow new fields. Might be redundant elsewhere?
+         // TODO: verify the PSSZ encoding, allow new fields. Might be redundant elsewhere?
          check(!commit || !(trx.transaction->tapos().flags() & Tapos::do_not_broadcast_flag),
                "cannot commit a do_not_broadcast transaction");
 

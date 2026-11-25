@@ -97,11 +97,10 @@ namespace psibase
       {
          if (!_t.error.has_value())
          {
-            auto actionTrace = getTopAction(t, 0);
-            if (actionTrace.rawRetval.size() != 0)
-            {
-               _return = psio::from_frac<ReturnType>(actionTrace.rawRetval);
-            }
+            // Every value has an encoding, and an empty optional's is no
+            // bytes at all: the size says nothing about whether the action
+            // returned.
+            _return = psio::from_pssz<ReturnType>(getTopAction(t, 0).rawRetval);
          }
       }
 
@@ -162,11 +161,11 @@ namespace psibase
    };
 
    template <typename T>
-   struct FracPackBody
+   struct PsszBody
    {
       static std::string  contentType() { return "application/octet-stream"; }
-      std::vector<char>   body() const { return psio::to_frac(value); }
-      static FracPackBody unpack(std::vector<char> data) { return {psio::from_frac<T>(data)}; }
+      std::vector<char>   body() const { return psio::to_pssz(value); }
+      static PsszBody unpack(std::vector<char> data) { return {psio::from_pssz<T>(data)}; }
       T                   value;
    };
 
@@ -176,16 +175,13 @@ namespace psibase
       static std::string contentType() { return "application/json"; }
       std::vector<char>  body() const
       {
-         std::vector<char>   result;
-         psio::vector_stream stream{result};
-         to_json(value, stream);
+         std::vector<char> result;
+         psio::to_ijson(value, result);
          return result;
       }
       static JsonBody unpack(std::vector<char> data)
       {
-         data.push_back('\0');
-         psio::json_token_stream stream(data.data());
-         return {psio::from_json<T>(stream)};
+         return {psio::from_ijson<T>(std::span<const char>{data})};
       }
       T value;
    };
@@ -669,13 +665,13 @@ namespace psibase
          AccountNumber receiver;
          KeyList       keys;
 
-         template <uint32_t idx, auto MemberPtr, typename... Args>
+         template <std::size_t I, auto MemberPtr, typename... Args>
          auto call(Args&&... args) const
          {
-            using result_type = decltype(psio::result_of(MemberPtr));
+            using result_type = typename psio::method_traits<decltype(MemberPtr)>::result;
 
             auto act = action_builder_proxy(sender, receiver)
-                           .call<idx, MemberPtr, Args...>(std::forward<Args>(args)...);
+                           .call<I, MemberPtr, Args...>(std::forward<Args>(args)...);
 
             if (chain.isAutoBlockStart)
             {
@@ -724,17 +720,17 @@ namespace psibase
       std::uint32_t nativeHandle() const { return id; }
 
       /// Get a key-value pair, if any
-      std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, psio::input_stream key);
+      std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, std::span<const char> key);
 
       /// Get a key-value pair, if any
       template <typename V, typename K>
       std::optional<V> kvGet(psibase::DbId db, const K& key)
       {
-         auto v = kvGetRaw(db, psio::convert_to_key(key));
+         auto v = kvGetRaw(db, psio::encode(psio::key{}, key));
          if (!v)
             return std::nullopt;
          // TODO: validate (allow opt-in or opt-out)
-         return psio::from_frac<V>(psio::prevalidated{*v});
+         return psio::from_pssz<V>(psio::trusted{*v});
       }
 
       /// Get a key-value pair, if any
@@ -745,24 +741,24 @@ namespace psibase
       }
 
       std::optional<std::vector<char>> kvGreaterEqualRaw(DbId               db,
-                                                         psio::input_stream key,
+                                                         std::span<const char> key,
                                                          uint32_t           matchKeySize);
 
       template <typename V, typename K>
       inline std::optional<V> kvGreaterEqual(DbId db, const K& key, uint32_t matchKeySize)
       {
-         auto v = kvGreaterEqualRaw(db, psio::convert_to_key(key), matchKeySize);
+         auto v = kvGreaterEqualRaw(db, psio::encode(psio::key{}, key), matchKeySize);
          if (!v)
             return std::nullopt;
-         return psio::from_frac<V>(*v);
+         return psio::from_pssz<V>(*v);
       }
 
-      void kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value);
+      void kvPutRaw(DbId db, std::span<const char> key, std::span<const char> value);
 
       template <typename K, typename V>
       void kvPut(DbId db, const K& key, const V& value)
       {
-         kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
+         kvPutRaw(db, psio::encode(psio::key{}, key), psio::to_pssz(value));
       }
    };  // TestChain
 
@@ -801,6 +797,6 @@ struct Catch::StringMaker<psibase::Checksum256>
 {
    static std::string convert(const psibase::Checksum256& obj)
    {
-      return psio::hex(obj.begin(), obj.end());
+      return psio::to_hex(obj.begin(), obj.end());
    }
 };
