@@ -1,31 +1,62 @@
 #include <psibase/NativeFunctions.hpp>
 
 #include <atomic>
+#if defined(__APPLE__)
+#include <pthread/qos.h>
+#endif
+#include <condition_variable>
+#include <deque>
+#include <future>
+#include <map>
+#include <thread>
 #include <boost/multi_index/key.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
 #include <boost/multi_index_container.hpp>
-#include <debug_eos_vm/debug_eos_vm.hpp>
-#include <eosio/vm/backend.hpp>
 #include <mutex>
 #include <psibase/ActionContext.hpp>
+#include <psibase/PsizamPolicy.hpp>
+#include <psibase/NativeAotCache.hpp>
 #include <psibase/db.hpp>
-#include <psio/finally.hpp>
+#include <psibase/finally.hpp>
+#include <psibase/NativeVM.hpp>
+#include <psibase/VmEngine.hpp>
+#include <psizam/debug/debug.hpp>
+
+// This file is one engine per psizam profile. A build with several engines
+// compiles it once for each, so everything in it lives in the namespace of the
+// profile it was compiled for.
+#if defined(PSIBASE_VM_ADAPTER_JIT1)
+#define PSIBASE_VM_ENGINE_NS vm_jit1
+#define PSIBASE_VM_ENGINE_NAME "jit1"
+#elif defined(PSIBASE_VM_ADAPTER_JIT2)
+#define PSIBASE_VM_ENGINE_NS vm_jit2
+#define PSIBASE_VM_ENGINE_NAME "jit2"
+#elif defined(PSIBASE_VM_LLVM_AOT)
+#define PSIBASE_VM_ENGINE_NS vm_llvm_aot
+#define PSIBASE_VM_ENGINE_NAME "llvm-aot"
+#elif defined(PSIBASE_VM_JIT2)
+#define PSIBASE_VM_ENGINE_NS vm_jit2
+#define PSIBASE_VM_ENGINE_NAME "jit2"
+#elif defined(PSIBASE_VM_JIT1)
+#define PSIBASE_VM_ENGINE_NS vm_jit1
+#define PSIBASE_VM_ENGINE_NAME "jit1"
+#else
+#error A psizam profile must be selected for this engine
+#endif
 
 namespace bmi = boost::multi_index;
 
-using eosio::vm::span;
+using std::span;
+namespace dwarf = psizam::debug;
 
-namespace psibase
+namespace psibase::PSIBASE_VM_ENGINE_NS
 {
    struct ExecutionContextImpl;
-   using rhf_t = eosio::vm::registered_host_functions<ExecutionContextImpl>;
-#ifdef __x86_64__
-   using impl_t = eosio::vm::jit_profile;
-#else
-   using impl_t = eosio::vm::interpreter;
-#endif
-   using backend_t = eosio::vm::backend<rhf_t, impl_t, VMOptions>;
+   using rhf_t  = psizam::registered_host_functions<ExecutionContextImpl>;
+   using impl_t = NativeVM;
+   using backend_t =
+       psizam::backend<rhf_t, impl_t, NativeVMOptions, psizam::debug::debug_instr_map>;
 
    // Rethrow with detailed info
    template <typename F>
@@ -35,53 +66,22 @@ namespace psibase
       {
          f();
       }
-      catch (const eosio::vm::exception& e)
+      catch (const psizam::exception& e)
       {
          throw std::runtime_error(std::string(e.what()) + ": " + e.detail());
       }
    }
 
-   // Only useful for genesis
-   void setCode(Database&          database,
-                AccountNumber      service,
-                uint8_t            vmType,
-                uint8_t            vmVersion,
-                psio::input_stream code)
-   {
-      check(code.remaining(), "native setCode can't clear code");
-      auto codeHash = sha256(code.pos, code.remaining());
-
-      auto account = database.kvGet<CodeRow>(CodeRow::db, codeKey(service));
-      check(account.has_value(), "setCode: unknown service account");
-      check(account->codeHash == Checksum256{}, "native setCode can't replace code");
-      account->codeHash  = codeHash;
-      account->vmType    = vmType;
-      account->vmVersion = vmVersion;
-      database.kvPut(CodeRow::db, account->key(), *account);
-
-      auto codeObj = database.kvGet<CodeByHashRow>(CodeByHashRow::db,
-                                                   codeByHashKey(codeHash, vmType, vmVersion));
-      if (!codeObj)
-      {
-         codeObj.emplace();
-         codeObj->codeHash  = codeHash;
-         codeObj->vmType    = vmType;
-         codeObj->vmVersion = vmVersion;
-         codeObj->code.assign(code.pos, code.end);
-      }
-      database.kvPut(CodeByHashRow::db, codeObj->key(), *codeObj);
-   }  // setCode
-
    struct BackendEntry
    {
       Checksum256                hash;
       VMOptions                  vmOptions;
-      std::unique_ptr<backend_t> backend;
-#ifdef __x86_64__
+      // Code under different versions compiles differently from the same bytes.
+      std::uint8_t               vmVersion = 0;
+      std::unique_ptr<backend_t>                    backend;
       std::shared_ptr<dwarf::debugger_registration> debug;
-#endif
 
-      auto byHash() const { return std::tie(hash, vmOptions); }
+      auto byHash() const { return std::tie(hash, vmOptions, vmVersion); }
    };
 
    struct ByAge;
@@ -92,13 +92,86 @@ namespace psibase
        bmi::indexed_by<bmi::sequenced<bmi::tag<ByAge>>,
                        bmi::ordered_non_unique<bmi::tag<ByHash>, bmi::key<&BackendEntry::byHash>>>>;
 
-   struct WasmCacheImpl
+   struct WasmCacheImpl : vm::Cache
    {
-      std::mutex       mutex;
-      uint32_t         cacheSize;
-      BackendContainer backends;
+      mutable std::mutex mutex;
+      uint32_t           cacheSize;
+      BackendContainer   backends;
+      std::shared_ptr<NativeAotCache> nativeArtifacts;
 
-      WasmCacheImpl(uint32_t cacheSize) : cacheSize{cacheSize} {}
+      WasmCacheImpl(uint32_t cacheSize, const std::filesystem::path& path)
+          : cacheSize{cacheSize},
+            nativeArtifacts(path.empty() ? nativeAotCacheFromEnvironment()
+                                         : std::make_shared<NativeAotCache>(path)) {}
+
+      // Compiling a service to native code takes seconds. It starts when the
+      // code is stored, on these threads, so it overlaps the rest of the
+      // transaction that installed it and other compiles. The first execution
+      // waits for it; it never runs the service on another engine instead.
+      using PendingKey = std::tuple<Checksum256, VMOptions, std::uint8_t>;
+      struct Job
+      {
+         PendingKey                 key;
+         std::vector<std::uint8_t>  code;
+         std::promise<void>         done;
+      };
+      static constexpr std::size_t           maxQueuedCompiles = 256;
+      std::condition_variable                jobReady;
+      std::condition_variable                compilesIdle;
+      std::deque<Job>                        jobs;
+      std::map<PendingKey, std::shared_future<void>> pending;
+      std::vector<std::thread>               workers;
+      bool                                   stopping = false;
+
+      ~WasmCacheImpl()
+      {
+         {
+            std::lock_guard lock{mutex};
+            stopping = true;
+         }
+         jobReady.notify_all();
+         for (auto& worker : workers)
+            worker.join();
+      }
+
+      void compileAhead(const Checksum256&    hash,
+                        std::span<const char> code,
+                        const VMOptions&      options,
+                        std::uint8_t          vmVersion) override;
+      std::vector<std::span<const char>> span() const override;
+      void                               runCompiles();
+      void                               finishCompiles() override
+      {
+         std::unique_lock lock{mutex};
+         compilesIdle.wait(lock, [&] { return pending.empty(); });
+      }
+
+      // Blocks until a compile started for this code, if any, has finished.
+      void awaitCompile(const Checksum256& hash, const VMOptions& options, std::uint8_t vmVersion)
+      {
+         std::shared_future<void> done;
+         {
+            std::lock_guard lock{mutex};
+            auto            it = pending.find(PendingKey{hash, options, vmVersion});
+            if (it == pending.end())
+               return;
+            // Still queued behind other code: the caller needs it now, and
+            // compiles it itself rather than waiting for a free thread.
+            for (auto job = jobs.begin(); job != jobs.end(); ++job)
+            {
+               if (job->key == it->first)
+               {
+                  job->done.set_value();
+                  jobs.erase(job);
+                  pending.erase(it);
+                  compilesIdle.notify_all();
+                  return;
+               }
+            }
+            done = it->second;
+         }
+         done.wait();
+      }
 
       void add(BackendEntry&& entry)
       {
@@ -109,12 +182,12 @@ namespace psibase
             ind.pop_front();
       }
 
-      BackendEntry get(const Checksum256& hash, const VMOptions& vmOptions)
+      BackendEntry get(const Checksum256& hash, const VMOptions& vmOptions, std::uint8_t vmVersion)
       {
-         BackendEntry                result{hash, vmOptions};
+         BackendEntry                result{hash, vmOptions, vmVersion};
          std::lock_guard<std::mutex> lock{mutex};
          auto&                       ind = backends.get<ByHash>();
-         auto                        it  = ind.find(std::tie(hash, vmOptions));
+         auto                        it  = ind.find(std::tie(hash, vmOptions, vmVersion));
          if (it == ind.end())
             return result;
          ind.modify(it, [&](auto& x) { result = std::move(x); });
@@ -124,80 +197,161 @@ namespace psibase
       }
    };
 
-   WasmCache::WasmCache(uint32_t cacheSize) : impl{std::make_shared<WasmCacheImpl>(cacheSize)} {}
+   void WasmCacheImpl::compileAhead(const Checksum256&    hash,
+                                    std::span<const char> code,
+                                    const VMOptions&      options,
+                                    std::uint8_t          vmVersion)
+   {
+#if defined(PSIBASE_VM_LLVM_AOT)
+      if (!nativeFloatProfile(vmVersion))
+         return;
+      std::lock_guard lock{mutex};
+      PendingKey      key{hash, options, vmVersion};
+      if (stopping || jobs.size() >= maxQueuedCompiles || pending.contains(key) ||
+          backends.get<ByHash>().find(std::tie(hash, options, vmVersion)) !=
+              backends.get<ByHash>().end())
+         return;
+      Job job{key, {code.begin(), code.end()}, {}};
+      pending.emplace(key, job.done.get_future().share());
+      // Smallest first: compile time grows with size, and one large service
+      // would otherwise hold a thread while many small ones wait behind it.
+      auto position = std::find_if(jobs.begin(), jobs.end(), [&](const Job& queued)
+                                   { return queued.code.size() > job.code.size(); });
+      jobs.insert(position, std::move(job));
+      const auto        cores  = std::thread::hardware_concurrency();
+      const std::size_t wanted = std::clamp<std::size_t>(cores > 2 ? cores - 2 : 1, 1, 16);
+      if (workers.size() < wanted && workers.size() < jobs.size())
+         workers.emplace_back([this] { runCompiles(); });
+      jobReady.notify_one();
+#endif
+   }
 
-   WasmCache::WasmCache(const WasmCache& src) : impl{src.impl} {}
+   void WasmCacheImpl::runCompiles()
+   {
+#if defined(__APPLE__)
+      // Execution is waiting on these threads; without a class they are
+      // scheduled as background work on the efficiency cores.
+      pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
+#endif
+      for (;;)
+      {
+         std::unique_lock lock{mutex};
+         jobReady.wait(lock, [&] { return stopping || !jobs.empty(); });
+         if (stopping)
+         {
+            // Release anything still waiting; it compiles for itself.
+            for (auto& job : jobs)
+               job.done.set_value();
+            jobs.clear();
+            pending.clear();
+            compilesIdle.notify_all();
+            return;
+         }
+         Job job = std::move(jobs.front());
+         jobs.pop_front();
+         lock.unlock();
+         try
+         {
+            // Code that fails here fails the same way, with its error
+            // reported, when a transaction first executes it.
+            const auto& [hash, limits, vmVersion] = job.key;
+            NativeVMOptions options{limits, nativeArtifacts, vmVersion};
+            validateNativeWasm(job.code, options);
+            psizam::debug::binary::input_stream stream{
+                reinterpret_cast<const char*>(job.code.data()), job.code.size()};
+            if (!dwarf::has_debug_info(stream))
+            {
+               BackendEntry entry{hash, limits, vmVersion};
+               entry.backend = std::make_unique<backend_t>(job.code, nullptr, options);
+               entry.debug   = dwarf::register_with_debugger(entry.backend->get_module());
+               add(std::move(entry));
+            }
+         }
+         catch (...)
+         {
+         }
+         lock.lock();
+         pending.erase(job.key);
+         lock.unlock();
+         job.done.set_value();
+         compilesIdle.notify_all();
+      }
+   }
 
-   WasmCache::WasmCache(WasmCache&& src) : impl{std::move(src.impl)} {}
-
-   WasmCache::~WasmCache() {}
-
-   std::vector<std::span<const char>> WasmCache::span() const
+   std::vector<std::span<const char>> WasmCacheImpl::span() const
    {
       std::vector<std::span<const char>> result;
-      std::lock_guard                    lock{impl->mutex};
-      for (const auto& backend : impl->backends)
+      std::lock_guard                    lock{mutex};
+      for (const auto& backend : backends)
       {
          auto& alloc = backend.backend->get_module().allocator;
-         result.push_back({alloc._base, alloc._capacity});
-         result.push_back({alloc._code_base, alloc._code_size});
+         if (alloc._base)
+            result.push_back({alloc._base, alloc._capacity});
+         auto code = alloc.get_code_span();
+         if (!code.empty())
+            result.push_back({reinterpret_cast<const char*>(code.data()), code.size()});
       }
       return result;
    }
 
-   struct ExecutionMemoryImpl
+   struct ExecutionMemoryImpl : vm::Memory
    {
-      eosio::vm::wasm_allocator wa;
+      psizam::wasm_allocator wa;
+      std::span<const char>  span() const override { return wa.span(); }
    };
 
-   std::unique_ptr<ExecutionMemoryImpl> impl;
-
-   ExecutionMemory::ExecutionMemory()
-   {
-      impl = std::make_unique<ExecutionMemoryImpl>();
-   }
-   ExecutionMemory::ExecutionMemory(ExecutionMemory&& src)
-   {
-      impl = std::move(src.impl);
-   }
-   ExecutionMemory::~ExecutionMemory() {}
-
-   std::span<const char> ExecutionMemory::span() const
-   {
-      auto        raw         = impl->wa.get_base_ptr<const char>();
-      std::size_t syspagesize = static_cast<std::size_t>(::sysconf(_SC_PAGESIZE));
-      return {raw - syspagesize, eosio::vm::max_memory + 2 * syspagesize};
-   }
-
    // TODO: debugger
-   struct ExecutionContextImpl : NativeFunctions
+   struct ExecutionContextImpl : NativeFunctions, vm::Context
    {
-      VMOptions                                     vmOptions;
-      eosio::vm::wasm_allocator&                    wa;
+      WasmCacheImpl&                                wasmCache;
+      NativeVMOptions                               vmOptions;
+      psizam::wasm_allocator&                       wa;
       BackendEntry                                  backend;
       std::shared_ptr<dwarf::debugger_registration> dbg;
       std::atomic<bool>                             timedOut    = false;
       bool                                          initialized = false;
 
-      ExecutionContextImpl(TransactionContext& transactionContext,
-                           const VMOptions&    vmOptions,
-                           ExecutionMemory&    memory,
-                           AccountNumber       service)
+      ExecutionContextImpl(TransactionContext&  transactionContext,
+                           const VMOptions&     vmOptions,
+                           ExecutionMemoryImpl& memory,
+                           WasmCacheImpl&       wasmCache,
+                           AccountNumber        service)
           : NativeFunctions{transactionContext.blockContext.db, transactionContext,
                             transactionContext.dbMode},
-            vmOptions{vmOptions},
-            wa{memory.impl->wa}
+            wasmCache{wasmCache},
+            vmOptions{vmOptions, wasmCache.nativeArtifacts},
+            wa{memory.wa}
       {
          database.checkoutSubjective();
-         psio::finally _{[&] { database.abortSubjective(); }};
+         psibase::finally _{[&] { database.abortSubjective(); }};
          auto [ca, db] = getCode(service);
 
          code   = std::move(ca);
-         auto c = database.kvGet<CodeByHashRow>(
-             db, codeByHashKey(code.codeHash, code.vmType, code.vmVersion));
-         check(c.has_value(), "service code record is missing");
-         check(c->vmType == 0, "vmType is not 0");
-         check(c->vmVersion == 0, "vmVersion is not 0");
+         // The code itself is read only to compile it. It is hundreds of
+         // kilobytes, and a context is created for every service a
+         // transaction touches; reading and unpacking it each time, to then
+         // take the compiled module from the cache, was a fifth of the time
+         // a transfer spent in the chain. The record must still exist, so
+         // that a node with the module cached and one without agree.
+         const auto codeRecord =
+             psio::encode(psio::key{}, codeByHashKey(code.codeHash, code.vmType, code.vmVersion));
+         check(database.kvContains(db, codeRecord), "service code record is missing");
+         std::optional<CodeByHashRow> c;
+         auto                         loadCode = [&]
+         {
+            if (!c)
+            {
+               c = database.kvGet<CodeByHashRow>(
+                   db, codeByHashKey(code.codeHash, code.vmType, code.vmVersion));
+               check(c.has_value(), "service code record is missing");
+            }
+         };
+         check(code.vmType == 0, "vmType is not 0");
+         // The version a service was deployed under selects the execution
+         // policy its code keeps until it is next deployed.
+         auto profile = nativeFloatProfile(code.vmVersion);
+         check(profile.has_value(), "vmVersion is not supported");
+         this->vmOptions.float_profile = *profile;
          if (transactionContext.dbMode.verifyOnly)
          {
             check(code.flags & CodeRow::isVerify,
@@ -208,40 +362,55 @@ namespace psibase
          rethrowVMExcept(
              [&]
              {
-                backend = transactionContext.blockContext.systemContext.wasmCache.impl->get(
-                    code.codeHash, vmOptions);
+                auto& cache = wasmCache;
+                backend = cache.get(code.codeHash, vmOptions, code.vmVersion);
+                // Waiting for a compile in flight, or compiling here, is not
+                // billed to the transaction.
+                //
+                // NOT VERIFIED ON THESE ENGINES: this file serves the psizam
+                // engines (JIT2, LLVM AOT, JIT1). The watchdog-only CPU budget
+                // changed the order here (cache first, pause only on a miss)
+                // and the trace timing below, and was qualified on wasmtime
+                // only; work on the other engines is paused. Run their suites
+                // before relying on a build that selects one of them.
+                std::optional<TransactionContext::BillingPause> unbilled;
                 if (!backend.backend)
                 {
-                   psio::input_stream s{reinterpret_cast<const char*>(c->code.data()),
-                                        c->code.size()};
-#ifdef __x86_64__
+                   unbilled.emplace(transactionContext);
+                   cache.awaitCompile(code.codeHash, vmOptions, code.vmVersion);
+                   backend = cache.get(code.codeHash, vmOptions, code.vmVersion);
+                }
+                if (!backend.backend)
+                {
+                   loadCode();
+                   validateNativeWasm(c->code, this->vmOptions);
+                   psizam::debug::binary::input_stream s{
+                       reinterpret_cast<const char*>(c->code.data()), c->code.size()};
                    if (dwarf::has_debug_info(s))
                    {
-                      debug_eos_vm::debug_instr_map debug;
+                      psizam::debug::debug_instr_map debug;
                       backend.backend =
-                          std::make_unique<backend_t>(c->code, nullptr, vmOptions, debug);
+                          std::make_unique<backend_t>(c->code, nullptr, this->vmOptions, debug);
                       auto info     = dwarf::get_info_from_wasm(s);
                       backend.debug = dwarf::register_with_debugger(
                           info, debug.locs, backend.backend->get_module(), s);
                    }
                    else
                    {
-                      backend.backend = std::make_unique<backend_t>(c->code, nullptr, vmOptions);
+                      backend.backend =
+                          std::make_unique<backend_t>(c->code, nullptr, this->vmOptions);
                       backend.debug = dwarf::register_with_debugger(backend.backend->get_module());
                    }
-#else
-                   backend.backend = std::make_unique<backend_t>(c->code, nullptr, vmOptions);
-#endif
                 }
              });
       }
 
       ~ExecutionContextImpl()
       {
-         transactionContext.blockContext.systemContext.wasmCache.impl->add(std::move(backend));
+         wasmCache.add(std::move(backend));
       }
 
-      eosio::vm::stack_manager& getAltStack() { return transactionContext.getAltStack(); }
+      psizam::detail::stack_manager& getAltStack() { return transactionContext.getAltStack(); }
 
       std::pair<CodeRow, DbId> getCode(AccountNumber service)
       {
@@ -281,27 +450,31 @@ namespace psibase
              });
       }
 
+      // The time an action took, for its trace. This is elapsed time, read
+      // without a system call; the thread's CPU clock is read only where a
+      // value is billed.
       struct RecordActionTime
       {
-         explicit RecordActionTime(ActionContext& actionContext) : actionContext(actionContext)
-         {
-            actionContext.actionTrace.totalTime =
-                actionContext.transactionContext.getBillableTime();
-         }
+         explicit RecordActionTime(ActionContext& actionContext) : actionContext(actionContext) {}
          ~RecordActionTime()
          {
-            actionContext.actionTrace.totalTime =
-                actionContext.transactionContext.getBillableTime() -
-                actionContext.actionTrace.totalTime;
+            actionContext.actionTrace.totalTime = std::chrono::steady_clock::now() - start;
          }
-         ActionContext& actionContext;
+         ActionContext&                        actionContext;
+         std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
       };
 
       template <typename F>
-      void exec(ActionContext& actionContext, F f)
+      void run(ActionContext& actionContext, F f)
       {
          auto prev         = currentActContext;
          currentActContext = &actionContext;
+         auto& vmContext = backend.backend->get_context();
+         const auto previousStack = vmContext.get_remaining_call_depth();
+         auto restore = psibase::finally{[&] {
+            currentActContext = prev;
+            vmContext.set_max_call_depth(previousStack);
+         }};
          RecordActionTime timer{actionContext};
          try
          {
@@ -311,13 +484,18 @@ namespace psibase
                init();
             rethrowVMExcept(f);
          }
+         catch (const accounting::Cancelled&)
+         {
+            // A synchronous storage check can observe expiry before the
+            // watchdog thread has delivered asyncTimeout to this VM.
+            throw TimeoutException{};
+         }
          catch (...)
          {
             if (timedOut)
                throw TimeoutException{};
             throw;
          }
-         currentActContext = prev;
       }
 
       void onTransferControl(std::uint64_t callerFlags)
@@ -326,25 +504,16 @@ namespace psibase
          std::swap(transactionContext.exportedHandles, transactionContext.importedHandles);
       }
 
+      void rebind(ExecutionContext* self) override { currentExecContext = self; }
+      std::uint32_t remainingStack() const override;
+      void          execProcessTransaction(ActionContext& actionContext) override;
+      void          execCalled(uint64_t callerFlags, ActionContext& actionContext) override;
+      void          execServe(ActionContext& actionContext) override;
+      void          exec(ActionContext& actionContext, std::string_view fn) override;
+      void          asyncTimeout() override;
    };  // ExecutionContextImpl
 
-   ExecutionContext::ExecutionContext(TransactionContext& transactionContext,
-                                      const VMOptions&    vmOptions,
-                                      ExecutionMemory&    memory,
-                                      AccountNumber       service)
-   {
-      impl = std::make_unique<ExecutionContextImpl>(transactionContext, vmOptions, memory, service);
-      impl->currentExecContext = this;
-   }
-
-   ExecutionContext::ExecutionContext(ExecutionContext&& src)
-   {
-      impl                     = std::move(src.impl);
-      impl->currentExecContext = this;
-   }
-   ExecutionContext::~ExecutionContext() {}
-
-   void ExecutionContext::registerHostFunctions()
+   static void registerHostFunctions()
    {
       // TODO: enable linking to disabled functions below after we finalize
       //       their interfaces. Disabling now simplifies future upgrades.
@@ -380,53 +549,74 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::readFile>("env", "readFile");
    }
 
-   std::uint32_t ExecutionContext::remainingStack() const
+   std::uint32_t ExecutionContextImpl::remainingStack() const
    {
-      return impl->backend.backend->get_context().get_remaining_call_depth();
+      return backend.backend->get_context().get_remaining_call_depth();
    }
 
-   void ExecutionContext::execProcessTransaction(ActionContext& actionContext)
+   void ExecutionContextImpl::execProcessTransaction(ActionContext& actionContext)
    {
-      impl->exec(actionContext, [&] {  //
-         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "processTransaction");
+      run(actionContext, [&] {  //
+         (*backend.backend)(getAltStack(), *this, "env", "processTransaction");
       });
    }
 
-   void ExecutionContext::execCalled(uint64_t callerFlags, ActionContext& actionContext)
+   void ExecutionContextImpl::execCalled(uint64_t callerFlags, ActionContext& actionContext)
    {
-      impl->onTransferControl(callerFlags);
-      auto cleanup = psio::finally{[&] { impl->onTransferControl(callerFlags); }};
+      onTransferControl(callerFlags);
+      auto cleanup = psibase::finally{[&] { onTransferControl(callerFlags); }};
 
-      if ((callerFlags & (callerSudo | isLocal)) == callerSudo)
+      if ((callerFlags & (ExecutionContext::callerSudo | ExecutionContext::isLocal)) ==
+          ExecutionContext::callerSudo)
       {
-         check((impl->code.flags & (isLocal | CodeRow::isReplacement)) != isLocal,
+         check((code.flags & (ExecutionContext::isLocal | CodeRow::isReplacement)) !=
+                   ExecutionContext::isLocal,
                "on-chain service cannot sudo when calling a node-local service");
       }
 
-      impl->exec(actionContext, [&] {  //
-         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "called",
+      run(actionContext, [&] {  //
+         (*backend.backend)(getAltStack(), *this, "env", "called",
                                   actionContext.action.service.value,
                                   actionContext.action.sender.value);
       });
    }
 
-   void ExecutionContext::execServe(ActionContext& actionContext)
+   void ExecutionContextImpl::execServe(ActionContext& actionContext)
    {
-      impl->exec(actionContext, [&] {  //
-         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "serve");
+      run(actionContext, [&] {  //
+         (*backend.backend)(getAltStack(), *this, "env", "serve");
       });
    }
 
-   void ExecutionContext::exec(ActionContext& actionContext, std::string_view fn)
+   void ExecutionContextImpl::exec(ActionContext& actionContext, std::string_view fn)
    {
-      impl->exec(actionContext, [&] {  //
-         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", fn);
+      run(actionContext, [&] {  //
+         (*backend.backend)(getAltStack(), *this, "env", fn);
       });
    }
 
-   void ExecutionContext::asyncTimeout()
+   void ExecutionContextImpl::asyncTimeout()
    {
-      impl->timedOut = true;
-      impl->backend.backend->get_module().allocator.disable_code();
+      timedOut = true;
+      backend.backend->get_module().allocator.disable_code();
    }
-}  // namespace psibase
+
+   const vm::Engine& engine()
+   {
+      static const vm::Engine result{
+          PSIBASE_VM_ENGINE_NAME,
+          &registerHostFunctions,
+          +[](std::uint32_t cacheSize, const std::filesystem::path& path) -> std::shared_ptr<vm::Cache>
+          { return std::make_shared<WasmCacheImpl>(cacheSize, path); },
+          +[]() -> std::unique_ptr<vm::Memory> { return std::make_unique<ExecutionMemoryImpl>(); },
+          +[](TransactionContext& transactionContext, const VMOptions& vmOptions,
+              vm::Memory& memory, vm::Cache& cache,
+              AccountNumber service) -> std::unique_ptr<vm::Context>
+          {
+             return std::make_unique<ExecutionContextImpl>(
+                 transactionContext, vmOptions, static_cast<ExecutionMemoryImpl&>(memory),
+                 static_cast<WasmCacheImpl&>(cache), service);
+          }};
+      return result;
+   }
+}  // namespace psibase::PSIBASE_VM_ENGINE_NS

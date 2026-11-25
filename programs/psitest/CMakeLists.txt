@@ -1,17 +1,16 @@
 find_package(Boost 1.75 CONFIG REQUIRED COMPONENTS filesystem)
 
 add_executable(psitest main.cpp)
+target_include_directories(psitest PRIVATE "${CMAKE_SOURCE_DIR}/libraries/psibase/native/tests")
 
 if(APPLE)
     target_link_libraries(psitest
         psibase
-        debug_eos_vm
         ${Boost_LIBRARIES}
     )
 elseif(UNIX)
     target_link_libraries(psitest
         psibase
-        debug_eos_vm
         ${Boost_LIBRARIES}
         -static-libgcc
         -static-libstdc++

@@ -7,7 +7,7 @@ find_package(ZLIB REQUIRED)
 
 function(add suffix)
     add_library(psibase${suffix})
-    target_link_libraries(psibase${suffix} PUBLIC psio boost OpenSSL::Crypto ZLIB::ZLIB services_system${suffix} services_user${suffix} services_local)
+    target_link_libraries(psibase${suffix} PUBLIC psio::psio rapidjson boost OpenSSL::Crypto ZLIB::ZLIB services_system${suffix} services_user${suffix} services_local)
     target_sources(psibase${suffix} PRIVATE
         common/src/api.cpp
         common/src/base64.cpp
@@ -16,6 +16,7 @@ function(add suffix)
         common/src/db.cpp
         common/src/KvMerkle.cpp
         common/src/nativeTables.cpp
+        common/src/pem.cpp
         common/src/Rpc.cpp
         common/src/SocketInfo.cpp
         common/src/schema.cpp
@@ -31,6 +32,7 @@ function(add suffix)
     )
 
     if(DEFINED IS_WASM)
+        target_sources(psibase${suffix} PRIVATE common/src/codecAbort.cpp)
         find_package(Catch2 3 REQUIRED)
         target_link_libraries(psibase${suffix} PUBLIC wasm-base${suffix})
         target_mapped_include_directories(psibase${suffix} PUBLIC common/include wasm32-psibase)
@@ -200,20 +202,25 @@ function(add suffix)
     if(DEFINED IS_NATIVE)
         find_package(Boost 1.70 CONFIG REQUIRED COMPONENTS filesystem log)
 
-        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent Boost::filesystem Boost::log debug_eos_vm -ldl)
+        target_link_libraries(psibase${suffix} PUBLIC psibase-psizam Boost::filesystem Boost::log -ldl)
         target_include_directories(psibase${suffix} PUBLIC
             native/include
             common/include)
+        # The engine adapters this build has (external/psizam-core.cmake), and
+        # the engine-neutral implementation of ExecutionContext.hpp over them.
+        get_property(vm_engine_sources GLOBAL PROPERTY PSIBASE_VM_ENGINE_SOURCES)
+        target_sources(psibase${suffix} PRIVATE native/src/VmEngine.cpp ${vm_engine_sources})
         target_sources(psibase${suffix} PRIVATE
             native/src/BlockContext.cpp
             native/src/BucketSet.cpp
             native/src/ConfigFile.cpp
-            native/src/ExecutionContext.cpp
             native/src/ForkDb.cpp
             native/src/log.cpp
             native/src/LogSocket.cpp
             native/src/Mount.cpp
             native/src/NativeFunctions.cpp
+            native/src/PsizamPolicy.cpp
+            native/src/NativeAotCache.cpp
             native/src/OpenSSLProver.cpp
             native/src/pkcs11.cpp
             native/src/PKCS11Prover.cpp
@@ -224,10 +231,15 @@ function(add suffix)
             native/src/Socket.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp
-            native/src/useTriedent.cpp
+            native/src/usePsitri.cpp
+            native/src/psitriStorage.cpp
             native/src/VerifyProver.cpp
             native/src/Watchdog.cpp
         )
+
+        include(${ROOT_SOURCE_DIR}/cmake/psitri.cmake)
+        psibase_add_psitri()
+        target_link_libraries(psibase${suffix} PRIVATE psibase::storage_engine)
 
         add_subdirectory(native/tests)
         add_subdirectory(common/tests)
@@ -237,6 +249,7 @@ endfunction()
 add("")
 if(DEFINED IS_WASM)
     add("-debug")
+    add_subdirectory(common/tests)
 endif()
 
 if(IS_WASM)

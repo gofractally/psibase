@@ -1,4 +1,5 @@
 #pragma once
+#include <filesystem>
 
 #include <psibase/block.hpp>
 #include <psibase/nativeTables.hpp>
@@ -13,19 +14,28 @@ namespace psibase
                 AccountNumber      service,
                 uint8_t            vmType,
                 uint8_t            vmVersion,
-                psio::input_stream code);
+                std::span<const char> code);
 
    struct WasmCacheImpl;
    struct WasmCache
    {
       std::shared_ptr<WasmCacheImpl> impl;
 
-      WasmCache(uint32_t cacheSize);
+      WasmCache(uint32_t cacheSize, const std::filesystem::path& nativeArtifactPath = {});
       WasmCache(const WasmCache&);
       WasmCache(WasmCache&&);
       ~WasmCache();
 
       std::vector<std::span<const char>> span() const;
+
+      /// Start compiling newly stored code in the background, so that it is
+      /// ready, or nearly, when a transaction first executes it.
+      void compileAhead(const Checksum256&    hash,
+                        std::span<const char> code,
+                        const VMOptions&      options,
+                        std::uint8_t          vmVersion);
+      /// Returns once every compile started by compileAhead has finished.
+      void finishCompiles();
    };
 
    struct ExecutionMemoryImpl;

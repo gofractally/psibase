@@ -10,7 +10,7 @@ use psibase::services::setcode::action_structs::{setCode, stageCode};
 use transact::plugin::api::add_action_to_transaction;
 
 use crate::trust::*;
-use psibase::fracpack::Pack;
+
 
 psibase::define_trust! {
     descriptions {
@@ -38,14 +38,13 @@ impl Api for SetcodePlugin {
             .unwrap();
 
         add_action_to_transaction(
-            setCode::ACTION_NAME,
-            &setCode {
+            <setCode as psio::interface::Method>::NAME,
+            &psio::to_pssz(&setCode {
                 service: account.parse().unwrap(),
                 vmType: 0,
                 vmVersion: 0,
                 code: code.into(),
-            }
-            .packed(),
+            }),
         )
         .unwrap();
     }
@@ -57,15 +56,14 @@ impl Api for SetcodePlugin {
         .unwrap();
 
         add_action_to_transaction(
-            stageCode::ACTION_NAME,
-            &stageCode {
+            <stageCode as psio::interface::Method>::NAME,
+            &psio::to_pssz(&stageCode {
                 service: account.parse().unwrap(),
                 id,
                 vmType: 0,
                 vmVersion: 0,
                 code: code.into(),
-            }
-            .packed(),
+            }),
         )
         .unwrap();
     }
