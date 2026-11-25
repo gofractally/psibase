@@ -1,21 +1,13 @@
 function(add suffix)
     add_executable(VerifySig${suffix} src/VerifySig.cpp)
     target_mapped_include_directories(VerifySig${suffix} PUBLIC include)
-    target_link_libraries(VerifySig${suffix} PUBLIC services_system${suffix} psibase-service${suffix})
+    target_link_libraries(VerifySig${suffix} PUBLIC services_system${suffix} psibase-service-simple-malloc${suffix})
 
-    target_include_directories(VerifySig${suffix} PUBLIC ${ROOT_BINARY_DIR}/wasm/deps/include/botan-3)
-    target_link_libraries(VerifySig${suffix} PUBLIC -lbotan-3 exception-stub${suffix} -Wl,-z,stack-size=32768 -Wl,--initial-memory=786432)
-    set_target_properties(VerifySig${suffix} PROPERTIES
-        RUNTIME_OUTPUT_NAME         VerifySig-prestart${suffix}
-        RUNTIME_OUTPUT_DIRECTORY    ${CMAKE_CURRENT_BINARY_DIR}
-    )
-    add_custom_command(TARGET VerifySig${suffix} POST_BUILD
-        COMMAND wasm-ctor-eval
-            -c prestart
-            --enable-sign-ext --enable-nontrapping-float-to-int --enable-simd --enable-bulk-memory
-            VerifySig-prestart${suffix}.wasm
-            -o ${ROOT_BINARY_DIR}/VerifySig${suffix}.wasm
-    )
+    # libsecp256k1 (secp256k1) and BearSSL (P-256); see the root CMakeLists.txt.
+    target_include_directories(VerifySig${suffix} PUBLIC ${ROOT_BINARY_DIR}/wasm/deps/include)
+    target_compile_definitions(VerifySig${suffix} PUBLIC SECP256K1_STATIC)
+    target_link_libraries(VerifySig${suffix} PUBLIC -lsecp256k1 -lbearssl exception-stub${suffix} -Wl,-z,stack-size=32768)
+    set_target_properties(VerifySig${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
     psibase_schema(VerifySig${suffix} OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction(add)
 

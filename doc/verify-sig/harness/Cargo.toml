@@ -1,0 +1,23 @@
+[package]
+name = "verify-bench"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Same wasmtime version and feature set as the node's engine shim
+# (psizam wasmtime/shim/Cargo.toml).
+[dependencies]
+wasmtime = { version = "=51.0.0", default-features = false, features = [
+    "runtime",
+    "cranelift",
+    "std",
+    "threads",
+    "parallel-compilation",
+    "wat",
+    "gc",
+    "gc-null",
+] }
+libc = "0.2"
+
+[profile.release]
+opt-level = 3

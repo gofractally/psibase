@@ -102,6 +102,58 @@ impl Signer for PKCS8PrivateKeyK1 {
     }
 }
 
+/// The group order n of a curve, big-endian, if `spki` is a public key on
+/// secp256k1 or P-256.
+#[cfg(not(target_family = "wasm"))]
+fn group_order(spki: &[u8]) -> Option<[u8; 32]> {
+    const K1_OID: [u8; 7] = [0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x0a];
+    const R1_OID: [u8; 10] = [0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07];
+    const K1_ORDER: [u8; 32] = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xfe, 0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b, 0xbf, 0xd2, 0x5e, 0x8c, 0xd0, 0x36,
+        0x41, 0x41,
+    ];
+    const R1_ORDER: [u8; 32] = [
+        0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xbc, 0xe6, 0xfa, 0xad, 0xa7, 0x17, 0x9e, 0x84, 0xf3, 0xb9, 0xca, 0xc2, 0xfc, 0x63,
+        0x25, 0x51,
+    ];
+    let contains = |oid: &[u8]| spki.windows(oid.len()).any(|w| w == oid);
+    if contains(&K1_OID) {
+        Some(K1_ORDER)
+    } else if contains(&R1_OID) {
+        Some(R1_ORDER)
+    } else {
+        None
+    }
+}
+
+/// Rewrites a 64-byte r || s ECDSA signature into the low-S form, s <= n/2.
+/// verify-sig accepts no other form. (r, n - s) is the same signature with
+/// the other of its two encodings.
+#[cfg(not(target_family = "wasm"))]
+fn normalize_signature(mut signature: Vec<u8>, pubkey: &[u8]) -> Vec<u8> {
+    let Some(order) = group_order(pubkey) else {
+        return signature;
+    };
+    if signature.len() != 64 {
+        return signature;
+    }
+    // other = n - s
+    let mut other = [0u8; 32];
+    let mut borrow = 0i16;
+    for i in (0..32).rev() {
+        let d = order[i] as i16 - signature[32 + i] as i16 - borrow;
+        borrow = (d < 0) as i16;
+        other[i] = (d + 256 * borrow) as u8;
+    }
+    // s > n/2 exactly when n - s < s, because n is odd.
+    if other[..] < signature[32..] {
+        signature[32..].copy_from_slice(&other);
+    }
+    signature
+}
+
 #[cfg(not(target_family = "wasm"))]
 #[derive(Debug)]
 struct EcdsaPrivateKey {
@@ -120,15 +172,17 @@ impl Signer for EcdsaPrivateKey {
     fn get_claim(&self) -> crate::Claim {
         crate::Claim {
             service: AccountNumber::new(account_raw!("verify-sig")),
-            rawData: crate::Hex::from(self.pubkey.clone()),
+            rawData: self.pubkey.clone(),
         }
     }
     fn sign(&self, data: &[u8]) -> Vec<u8> {
-        self.key_pair
+        let signature = self
+            .key_pair
             .sign(get_system_random(), data)
             .expect("Failed to sign")
             .as_ref()
-            .to_vec()
+            .to_vec();
+        normalize_signature(signature, &self.pubkey)
     }
 }
 
@@ -191,13 +245,15 @@ impl Signer for PKCS11PrivateKey {
     fn get_claim(&self) -> crate::Claim {
         crate::Claim {
             service: AccountNumber::new(account_raw!("verify-sig")),
-            rawData: crate::Hex::from(self.pubkey.clone()),
+            rawData: self.pubkey.clone(),
         }
     }
     fn sign(&self, data: &[u8]) -> Vec<u8> {
         let digest = Sha256::digest(data);
         let session = self.session.lock().unwrap();
-        session.sign(&Mechanism::Ecdsa, self.key, &digest).unwrap()
+        // The token returns whichever s it computed.
+        let signature = session.sign(&Mechanism::Ecdsa, self.key, &digest).unwrap();
+        normalize_signature(signature, &self.pubkey)
     }
 }
 
@@ -688,13 +744,13 @@ pub fn sign_transaction(
     keys: &[AnyPrivateKey],
 ) -> Result<crate::SignedTransaction, K1Error> {
     trx.claims = keys.iter().map(|k| k.key.get_claim()).collect();
-    let transaction = fracpack::Pack::packed(&trx);
+    let transaction = psio::to_pssz(&trx);
     let proofs = keys
         .iter()
         .map(|k| k.key.sign(&transaction).into())
         .collect();
     Ok(crate::SignedTransaction {
-        transaction: transaction.into(),
+        transaction: psio::pssz::Nested::unchecked(transaction),
         proofs,
         subjectiveData: None,
     })
@@ -710,4 +766,211 @@ pub fn generate_keypair() -> Result<(String, String), anyhow::Error> {
         .to_string();
 
     Ok((public_key, private_key))
+}
+
+#[cfg(all(test, not(target_family = "wasm")))]
+mod tests {
+    use super::*;
+    use p256::ecdsa::signature::Verifier;
+    use p256::pkcs8::DecodePublicKey;
+
+    const K1_PARAMS: [u8; 7] = [0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x0a];
+    const R1_PARAMS: [u8; 10] = [0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07];
+
+    /// n / 2 for the curve of `pubkey`
+    fn half_order(pubkey: &[u8]) -> [u8; 32] {
+        let mut half = group_order(pubkey).unwrap();
+        let mut carry = 0u8;
+        for byte in half.iter_mut() {
+            let next = *byte & 1;
+            *byte = (*byte >> 1) | (carry << 7);
+            carry = next;
+        }
+        half
+    }
+
+    fn is_low_s(signature: &[u8], pubkey: &[u8]) -> bool {
+        signature.len() == 64 && signature[32..] <= half_order(pubkey)[..]
+    }
+
+    /// (r, n - s): the other encoding of the same signature
+    fn other_s(signature: &[u8], pubkey: &[u8]) -> Vec<u8> {
+        let order = group_order(pubkey).unwrap();
+        let mut result = signature.to_vec();
+        let mut borrow = 0i16;
+        for i in (0..32).rev() {
+            let d = order[i] as i16 - signature[32 + i] as i16 - borrow;
+            borrow = (d < 0) as i16;
+            result[32 + i] = (d + 256 * borrow) as u8;
+        }
+        result
+    }
+
+    fn verify(signature: &[u8], data: &[u8], pubkey: &[u8]) {
+        if pubkey.windows(K1_PARAMS.len()).any(|w| w == K1_PARAMS) {
+            let digest =
+                secp256k1::Message::from_hashed_data::<secp256k1::hashes::sha256::Hash>(data);
+            let key = secp256k1::PublicKey::from_slice(&pubkey[pubkey.len() - 65..]).unwrap();
+            let signature = secp256k1::ecdsa::Signature::from_compact(signature).unwrap();
+            secp256k1::SECP256K1
+                .verify_ecdsa(&digest, &signature, &key)
+                .unwrap();
+        } else {
+            VerifyingKey::from_public_key_der(pubkey)
+                .unwrap()
+                .verify(data, &p256::ecdsa::Signature::from_slice(signature).unwrap())
+                .unwrap();
+        }
+    }
+
+    #[test]
+    fn normalize_signature_picks_the_low_s_form() {
+        for params in [&K1_PARAMS[..], &R1_PARAMS[..]] {
+            let half = half_order(params);
+            let mut above = half;
+            *above.last_mut().unwrap() += 1;
+            let mut one = [0u8; 32];
+            one[31] = 1;
+            for s in [one, half, above, [0x5a; 32], [0xa5; 32]] {
+                let mut signature = vec![7u8; 32];
+                signature.extend_from_slice(&s);
+                let other = other_s(&signature, params);
+                // Exactly one of the two encodings is low.
+                assert_ne!(is_low_s(&signature, params), is_low_s(&other, params));
+                let low = if is_low_s(&signature, params) {
+                    signature.clone()
+                } else {
+                    other.clone()
+                };
+                assert_eq!(normalize_signature(signature, params), low);
+                assert_eq!(normalize_signature(other, params), low);
+            }
+        }
+    }
+
+    #[test]
+    fn p256_key_file_signs_low_s() {
+        let (_public, private) = generate_keypair().unwrap();
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), private).unwrap();
+        let signer = load_private_key(file.path().to_str().unwrap()).unwrap();
+        let pubkey = signer.get_claim().rawData;
+        for i in 0u32..128 {
+            let data = i.to_le_bytes();
+            let signature = signer.sign(&data);
+            assert!(is_low_s(&signature, &pubkey), "message {i}");
+            verify(&signature, &data, &pubkey);
+        }
+    }
+
+    /// Signs with keys held by a PKCS #11 token (SoftHSM). A token returns
+    /// whichever s it computed and cannot be told otherwise, so this checks
+    /// that the signer normalizes afterwards.
+    ///
+    /// Runs when PSIBASE_TEST_SOFTHSM2 is the path of libsofthsm2.so.
+    #[test]
+    fn pkcs11_token_signs_low_s() {
+        let Ok(module) = std::env::var("PSIBASE_TEST_SOFTHSM2") else {
+            eprintln!("PSIBASE_TEST_SOFTHSM2 is not set; skipping the PKCS #11 signer test");
+            return;
+        };
+        let util =
+            std::env::var("PSIBASE_TEST_SOFTHSM2_UTIL").unwrap_or("softhsm2-util".to_string());
+        const PIN: &str = "567890";
+
+        let dir = tempfile::tempdir().unwrap();
+        let tokens = dir.path().join("tokens");
+        std::fs::create_dir(&tokens).unwrap();
+        let conf = dir.path().join("softhsm2.conf");
+        std::fs::write(
+            &conf,
+            format!(
+                "directories.tokendir = {}\nobjectstore.backend = file\nlog.level = ERROR\n",
+                tokens.display()
+            ),
+        )
+        .unwrap();
+        // Read by softhsm2-util and by the module when it is loaded below.
+        std::env::set_var("SOFTHSM2_CONF", &conf);
+        // softhsm2-util looks for the library at a compiled-in path, which is
+        // wrong for a SoftHSM that is unpacked rather than installed.
+        let status = std::process::Command::new(util)
+            .args(["--module", &module])
+            .args(["--init-token", "--free", "--label", "psibase-test"])
+            .args(["--so-pin", "12345678", "--pin", PIN])
+            .stdout(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success());
+
+        let keys = [("r1", &R1_PARAMS[..]), ("k1", &K1_PARAMS[..])];
+        {
+            let mut modules = PKCS11ModuleSet::instance().lock().unwrap();
+            let (context, _) = modules.get_or_create(module.clone()).unwrap();
+            let slot = context.get_slots_with_initialized_token().unwrap()[0];
+            let session = context.open_rw_session(slot).unwrap();
+            session
+                .login(UserType::User, Some(&AuthPin::from_str(PIN).unwrap()))
+                .unwrap();
+            for (label, params) in keys {
+                session
+                    .generate_key_pair(
+                        &Mechanism::EccKeyPairGen,
+                        &[
+                            Attribute::Token(true),
+                            Attribute::Verify(true),
+                            Attribute::EcParams(params.to_vec()),
+                            Attribute::Id(label.into()),
+                            Attribute::Label(label.into()),
+                        ],
+                        &[
+                            Attribute::Token(true),
+                            Attribute::Sign(true),
+                            Attribute::Id(label.into()),
+                            Attribute::Label(label.into()),
+                        ],
+                    )
+                    .unwrap();
+            }
+            session.logout().unwrap();
+        }
+
+        for (label, _) in keys {
+            let uri = format!(
+                "pkcs11:token=psibase-test;object={label}?module-path={module}&pin-value={PIN}"
+            );
+            let signer = load_private_key(&uri).unwrap();
+            let pubkey = signer.get_claim().rawData;
+            for i in 0u32..64 {
+                let data = i.to_le_bytes();
+                let signature = signer.sign(&data);
+                assert!(is_low_s(&signature, &pubkey), "{label} message {i}");
+                verify(&signature, &data, &pubkey);
+            }
+
+            // What the token returns before normalization. If none of these
+            // were high-S, the assertions above would not have tested anything.
+            let mut modules = PKCS11ModuleSet::instance().lock().unwrap();
+            let (context, sessions) = modules.get_or_create(module.clone()).unwrap();
+            let slot = context.get_slots_with_initialized_token().unwrap()[0];
+            let session = get_session(context, sessions, slot).unwrap().lock().unwrap();
+            let key = extract_first(
+                session
+                    .find_objects(&[
+                        Attribute::Class(ObjectClass::PRIVATE_KEY),
+                        Attribute::Label(label.into()),
+                    ])
+                    .unwrap(),
+            )
+            .unwrap();
+            let high = (0u32..64)
+                .filter(|i| {
+                    let digest = Sha256::digest(i.to_le_bytes());
+                    let raw = session.sign(&Mechanism::Ecdsa, key, &digest).unwrap();
+                    !is_low_s(&raw, &pubkey)
+                })
+                .count();
+            assert!(high > 0, "{label}: the token never returned a high-S signature");
+        }
+    }
 }

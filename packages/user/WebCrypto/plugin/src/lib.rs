@@ -5,6 +5,7 @@ mod errors;
 use errors::ErrorType::*;
 mod db;
 use db::*;
+mod sign;
 mod types;
 use types::*;
 
@@ -14,7 +15,7 @@ use bindings::host::types::types as HostTypes;
 use bindings::host::types::types::Pem;
 
 // Third-party crates
-use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey, VerifyingKey};
+use p256::ecdsa::{SigningKey, VerifyingKey};
 use p256::pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePublicKey, LineEnding};
 
 fn pub_from_priv(private_key: Pem) -> Result<Pem, HostTypes::Error> {
@@ -52,12 +53,7 @@ impl Api for WebCryptoShim {
 
         // NOTE for future: this could very well not be an account's key, so I'd have to import it to WebCrypto and then sign
         // (perferably don't import it to WebCryto to avoid bloat)
-        let signing_key =
-            SigningKey::from_pkcs8_der(&private_key).map_err(|e| CryptoError(e.to_string()))?;
-        let signature: Signature = signing_key
-            .sign_prehash(&hashed_message)
-            .map_err(|e| CryptoError(e.to_string()))?;
-        Ok(signature.to_bytes().to_vec())
+        sign::sign_prehashed(&hashed_message, &private_key).map_err(|e| CryptoError(e).into())
     }
 
     fn sign(hashed_message: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {

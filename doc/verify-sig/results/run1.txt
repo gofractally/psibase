@@ -1,0 +1,38 @@
+wasm: ~/psibase-claude-psizam-build/VerifySig.wasm (936015 bytes), cranelift compile 108.5 ms
+native: build/libVerifySig-llvm20.dylib load+prestart 162.2 ms
+native: build/libVerifySig-apple.dylib load+prestart 151.7 ms
+native: build/libVerifySig-llvm20-w32.dylib load+prestart 208.7 ms
+
+iterations per case: 2000; times in microseconds per verification
+vector                   path                                     min    median      mean  outcome
+(no input)               wasm instantiate + start only           39.9      44.4      49.2
+secp256k1_valid          wasm (wasmtime, fresh instance)        567.9     619.5     674.4  accepted
+secp256k1_valid          wasm (wasmtime, reused instance)       519.2     537.8     580.4  accepted
+secp256k1_valid          native libVerifySig-llvm20.dylib       127.2     130.7     141.6  accepted
+                                                            wasm/native median ratio 4.74x
+secp256k1_valid          native libVerifySig-apple.dylib        127.6     131.3     145.4  accepted
+                                                            wasm/native median ratio 4.72x
+secp256k1_valid          native libVerifySig-llvm20-w32.dylib     299.1     304.9     337.4  accepted
+                                                            wasm/native median ratio 2.03x
+secp256r1_valid          wasm (wasmtime, fresh instance)        464.5     510.9     573.3  accepted
+secp256r1_valid          wasm (wasmtime, reused instance)       420.1     458.8     505.3  accepted
+secp256r1_valid          native libVerifySig-llvm20.dylib       124.7     128.1     144.6  accepted
+                                                            wasm/native median ratio 3.99x
+secp256r1_valid          native libVerifySig-apple.dylib        124.8     129.2     145.5  accepted
+                                                            wasm/native median ratio 3.95x
+secp256r1_valid          native libVerifySig-llvm20-w32.dylib     218.0     221.7     251.8  accepted
+                                                            wasm/native median ratio 2.30x
+secp256k1_invalid        wasm (wasmtime, fresh instance)        563.0     616.1     674.5  rejected: signature invalid
+secp256k1_invalid        native libVerifySig-llvm20.dylib       131.6     136.0     150.3  rejected: signature invalid
+                                                            wasm/native median ratio 4.53x
+secp256k1_invalid        native libVerifySig-apple.dylib        131.2     148.2     160.9  rejected: signature invalid
+                                                            wasm/native median ratio 4.16x
+secp256k1_invalid        native libVerifySig-llvm20-w32.dylib     301.2     306.3     338.3  rejected: signature invalid
+                                                            wasm/native median ratio 2.01x
+secp256r1_invalid        wasm (wasmtime, fresh instance)        470.2     509.9     567.0  rejected: signature invalid
+secp256r1_invalid        native libVerifySig-llvm20.dylib       129.2     132.0     145.9  rejected: signature invalid
+                                                            wasm/native median ratio 3.86x
+secp256r1_invalid        native libVerifySig-apple.dylib        128.9     133.0     147.4  rejected: signature invalid
+                                                            wasm/native median ratio 3.83x
+secp256r1_invalid        native libVerifySig-llvm20-w32.dylib     224.0     226.4     251.6  rejected: signature invalid
+                                                            wasm/native median ratio 2.25x

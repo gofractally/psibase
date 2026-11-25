@@ -65,9 +65,9 @@ Currently psibase hosts multiple JavaScript modules in the `/common/` service ta
     tapos: {
         refBlockIndex: ...,   // Identifies block
         refBlockSuffix: ...,  // Identifies block
-        expiration: "..."     // When transaction expires (UTC)
+        expiration: "...",    // When transaction expires (UTC), in whole seconds
                               // Example value: "2022-05-31T21:32:23Z"
-                              // Use `new Date(...)` to generate the correct format.
+        flags: 0              // Required
     },
     actions: [],        // See below
 }
@@ -115,7 +115,7 @@ Example uses:
 
 ## Key Conversions
 
-`/common/common-lib.js` exports functions which convert [Elliptic KeyPair objects](https://github.com/indutny/elliptic) and Elliptic Signature objects to and from psibase's text and fracpack forms. 
+`/common/common-lib.js` exports functions which convert [Elliptic KeyPair objects](https://github.com/indutny/elliptic) and Elliptic Signature objects to and from psibase's text forms. 
 
 | Function                                      | Description                                                                        |
 | --------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -123,8 +123,6 @@ Example uses:
 | `publicStringToKeyPair(s)`                    | Convert a public key in string form to `{keyType, keyPair}`                        |
 | `privateKeyPairToString({keyType, keyPair})`  | Convert the private key in `{keyType, keyPair}` to a string                        |
 | `publicKeyPairToString({keyType, keyPair})`   | Convert the public key in `{keyType, keyPair}` to a string                         |
-| `publicKeyPairToFracpack({keyType, keyPair})` | Convert the public key in `{keyType, keyPair}` to fracpack format in a Uint8Array  |
-| `signatureToFracpack({keyType, signature})`   | Convert the signature in `{keyType, signature}` to fracpack format in a Uint8Array |
 
 Each function accepts or returns a `{keyType, keyPair}` or `{keyType, signature}`, where `keyType` is one of the following values:
 
