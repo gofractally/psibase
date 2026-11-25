@@ -165,8 +165,20 @@ namespace psibase::http
             p2pState = P2PState::reading;
          }
          channel.set("p2p");
+         // Usage metering: from here on this is a peer connection, and what
+         // it carries is charged to its owner: the account the peer logged
+         // in with if it did, otherwise the peer by the address of the
+         // connection. This also gives a record to connections this node
+         // opened, which have none until now.
+         if (auto meter = server.sharedState->usage(); meter->enabled())
+         {
+            auto current = usage();
+            if (!current || current->identity.kind != UsageKind::account)
+               setUsage(meter->find(UsageIdentity::peer(savedInfo.endpoint)));
+         }
          callback(shared_from_this());
       }
+      std::shared_ptr<UsageRecord> usageRecord() const override { return usage(); }
 
       void async_write(std::vector<char>&&                         data,
                        std::function<void(const std::error_code&)> callback) override

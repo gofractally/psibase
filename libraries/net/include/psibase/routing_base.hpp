@@ -40,6 +40,8 @@ namespace psibase::net
       auto& consensus() { return static_cast<Derived*>(this)->consensus(); }
       auto& chain() { return static_cast<Derived*>(this)->chain(); }
       auto& derived() { return static_cast<Derived*>(this)->network(); }
+      // Usage metering: who owns the connection a message arrived on
+      auto connectionUsage(peer_id peer) { return peers().usage(peer); }
       explicit routing_base(boost::asio::io_context& ctx) {}
       static const std::uint32_t protocol_version = 0;
       // This is used solely for type deduction
