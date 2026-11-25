@@ -208,7 +208,8 @@ namespace psibase::http
          if (sibling_origin.empty())
             return;
          auto allow = res.find(bhttp::field::access_control_allow_origin);
-         if (allow == res.end() || allow->value() != "*")
+         // Either "anyone", or this very page named by the service itself.
+         if (allow == res.end() || (allow->value() != "*" && allow->value() != sibling_origin))
             return;
          res.set(bhttp::field::access_control_allow_origin, sibling_origin);
          res.set(bhttp::field::access_control_allow_credentials, "true");

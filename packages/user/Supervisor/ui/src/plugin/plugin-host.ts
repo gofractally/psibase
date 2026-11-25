@@ -129,7 +129,10 @@ export class PluginHost implements HostInterface {
             // To another host of this network, the visitor's billing cookie
             // goes along, so the request is attributable even when no token
             // is attached. The app answering is not told who the visitor is.
-            xhr.withCredentials = withCredentials || isNetworkUrl(req.uri);
+            xhr.withCredentials =
+                withCredentials ||
+                (isNetworkUrl(req.uri) &&
+                    !new URL(req.uri).hostname.startsWith("x-"));
 
             // Sync XHR cannot use responseType=arraybuffer. Always read the
             // response as a binary-safe string so every byte survives, then

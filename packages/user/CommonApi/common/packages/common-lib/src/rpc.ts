@@ -84,9 +84,11 @@ export function networkFetchOptions(
         const target = new URL(url, window.location.href);
         if (target.origin === window.location.origin) return options;
         const parent = (host: string) => host.split(".").slice(1).join(".");
+        // Node-local x- services are not billed and answer for themselves.
         if (
             parent(target.hostname) !== "" &&
-            parent(target.hostname) === parent(window.location.hostname)
+            parent(target.hostname) === parent(window.location.hostname) &&
+            !target.hostname.startsWith("x-")
         ) {
             return { ...options, credentials: "include" };
         }
