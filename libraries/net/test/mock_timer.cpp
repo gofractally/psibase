@@ -75,15 +75,22 @@ namespace psibase::test
       std::lock_guard l{queue_mutex};
       if (!timer_queue.empty() && timer_queue.front()->deadline <= limit)
       {
-         mock_current_time = timer_queue.front()->deadline;
+         // After a stall the deadline is in the past; time does not run
+         // backwards.
+         mock_current_time = std::max(mock_current_time, timer_queue.front()->deadline);
          process_queue(mock_current_time);
          return true;
       }
       else
       {
-         mock_current_time = limit;
+         mock_current_time = std::max(mock_current_time, limit);
          return false;
       }
+   }
+   void mock_clock::stall(mock_clock::duration d)
+   {
+      std::lock_guard l{queue_mutex};
+      mock_current_time += d;
    }
    std::ostream& operator<<(std::ostream& os, mock_clock::time_point tp)
    {

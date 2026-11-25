@@ -6,6 +6,7 @@
 #include <psibase/Prover.hpp>
 #include <psibase/PsizamPolicy.hpp>
 #include <psibase/Socket.hpp>
+#include <psibase/VmEngine.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/api.hpp>
 #include <psibase/finally.hpp>
@@ -1917,6 +1918,14 @@ OPTIONS:
       --timing
 
             Show how long transactions take in µs.
+
+      --debug-services
+
+            Run the services of test chains with debugging support: log
+            where in a service a failed call was, and register compiled
+            services with an attached debugger (gdb, lldb). Shows warnings
+            unless -v or --log-filter says otherwise. Can also be turned on
+            with PSIBASE_DEBUG_SERVICES=1.
 )";
 
 int main(int argc, char* argv[])
@@ -1966,6 +1975,10 @@ int main(int argc, char* argv[])
       {
          additional_args[cl_flags::timing] = true;
       }
+      else if (!strcmp(argv[next_arg], "--debug-services"))
+      {
+         psibase::vm::setServiceDebugging(true);
+      }
       // TODO
       // else if (!strcmp(argv[next_arg], "-s") || !strcmp(argv[next_arg], "--subst"))
       // {
@@ -2001,6 +2014,12 @@ int main(int argc, char* argv[])
       if (show_usage)
          std::cerr << help;
       return error;
+   }
+   // A service's backtrace is logged as a warning, which the tester does not
+   // show by default. Someone who asked to debug services wants to see it.
+   if (psibase::vm::serviceDebugging() && logConfig.stderr.filter == ConsoleLog{}.filter)
+   {
+      logConfig.stderr.filter = "Severity >= warning";
    }
    if (verbose == 1)
    {
