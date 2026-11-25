@@ -9,20 +9,12 @@ namespace TestService
    {
       static constexpr auto service = psibase::AccountNumber{"memo-svc"};
 
-      // Allow the tests to use string instead of MemoService
-      // 1) using string verifies serialization compatibility between string and Memo
-      // 2) using string skips validation when building the transaction, so we can
-      //    get errors from the service.
-#ifdef MEMO_IS_STRING
-      using Memo = std::string;
-#else
       using Memo = psibase::Memo;
-#endif
 
       std::string testValue(Memo memo);
-      std::string testView(psio::view<const Memo> memo);
-      void        testJson(const std::string& data);
-      void        testConstruct(const std::string& data);
+      std::string testView(psio::pssz_view<Memo> memo);
+      void        testJson(const std::string& memo);
+      void        testConstruct(const std::string& memo);
    };
    PSIO_REFLECT(TestMemo,
                 method(testValue, memo),

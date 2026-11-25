@@ -1,6 +1,6 @@
 #include <psibase/crypto.hpp>
 
-#include <psio/from_json.hpp>
+#include <psio/to_hex.hpp>
 
 #include <psibase/tester.hpp>
 
@@ -13,7 +13,7 @@ Checksum256 c256(std::string_view s)
 {
    Checksum256 result;
    check(s.size() == 2 * result.size(), "wrong size for sha256");
-   check(psio::unhex(result.begin(), s.begin(), s.end()), "expected hex string");
+   check(psio::from_hex(s, result), "expected hex string");
    return result;
 }
 
@@ -22,18 +22,20 @@ TEST_CASE("sha256")
    CHECK(sha256("", 0) == c256("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"));
 }
 
+// A leaf is SHA-256 of 00 and the PSSZ of the value (a string: its bytes);
+// an inner node is SHA-256 of 01, left, right.
 TEST_CASE("merkle")
 {
    Merkle m;
    CHECK(m.root() == Checksum256{});
    m.push("Humpty Dumpty sat on a wall"s);
-   CHECK(m.root() == c256("7dc04c8ce45a4ccb47e8c27b6a2670d6d20afe0d76df7619a5f1bcf111caac30"));
+   CHECK(m.root() == c256("307078b83cc2c8f389908022f097c6dee3bed23a0b6a4778c3f747bfb1749f30"));
    m.push("Humpty Dumpty had a great fall"s);
-   CHECK(m.root() == c256("49c42986a440d7aaff541c12b4efdda90c1d2c22fd69caff665d56b59c781408"));
+   CHECK(m.root() == c256("f974891c81e51376daeed44c8fddeab33785e1598de2c9dbc0fd425ade76f383"));
    m.push("All the king's horses and all the kings men"s);
-   CHECK(m.root() == c256("d29bf8f14d8f94f15ead4530d4fbce2b9364f87b3c1fae79807ff66e24be62b7"));
+   CHECK(m.root() == c256("b103968b7cf50a054a5cdd69e987e5c4c0924d1ebeb0edae8c7fbdcbd16b905b"));
    m.push("Couldn't put Humpty together again"s);
-   CHECK(m.root() == c256("2f699f82a77b0f03d62f368af6f4e76619807d6c77794ee44ca6901a59e4ed9f"));
+   CHECK(m.root() == c256("f60cc86c09c3123f0bca6551fcbcab93713675b98e97871cdcdb8280f945471c"));
 }
 
 // Test vectors from RFC 4231

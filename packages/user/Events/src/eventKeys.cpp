@@ -24,7 +24,7 @@ namespace UserService
 
    EventIndexHandle::EventIndexHandle(psibase::KvMode mode)
        : value(psibase::proxyKvOpen(DbId::writeOnly,
-                                    psio::composite_key(EventIndex::service, eventIndexesNum),
+                                    psio::to_key(std::tuple{EventIndex::service, eventIndexesNum}),
                                     mode))
    {
    }
