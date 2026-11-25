@@ -51,8 +51,9 @@ namespace psibase::vm_wasmtime
    {
       // Native stack for wasm, per executing thread. The byte budget
       // (max_stack_bytes) must run out long before this does: a frame was
-      // measured at up to 1.33 native bytes per budget byte, and each nested
-      // service call adds host frames on top.
+      // measured at up to 1.72 native bytes per budget byte (psizam's
+      // "byte budget ends recursion before the native stack can" test), and
+      // each nested service call adds host frames on top.
       constexpr std::uint64_t nativeStackBytes     = std::uint64_t(256) << 20;
       constexpr std::uint64_t nativeBytesPerBudget = 16;
 
