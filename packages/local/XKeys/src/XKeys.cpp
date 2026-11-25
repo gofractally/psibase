@@ -2,11 +2,11 @@
 
 #include <psibase/dispatch.hpp>
 #include <psibase/trace.hpp>
+#include <psibase/verifier.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/Spki.hpp>
 #include <services/system/Transact.hpp>
-#include <services/system/VerifySig.hpp>
 
 using namespace psibase;
 using namespace LocalService;
@@ -120,7 +120,8 @@ SignedTransaction XKeys::signTxFor(std::vector<psibase::Action> actions, std::ui
       {
          auto pub = getSubjectPublicKeyInfo(row.key);
          auto claim =
-             Claim{.service = VerifySig::service, .rawData = {pub.data.begin(), pub.data.end()}};
+             Claim{.service = requireVerifierFor(pub.data),
+                   .rawData = {pub.data.begin(), pub.data.end()}};
          keys.push_back({std::move(claim), std::move(row.key)});
       }
    }

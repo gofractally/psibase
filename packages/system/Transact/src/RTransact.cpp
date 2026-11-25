@@ -14,6 +14,7 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/jwt.hpp>
 #include <psibase/serveGraphQL.hpp>
+#include <psibase/verifier.hpp>
 #include <ranges>
 
 using namespace psibase;
@@ -1656,10 +1657,10 @@ std::optional<HttpReply> RTransact::serveSys(psio::pssz_view<psibase::HttpReques
       auto host    = std::string(rootHost(request));
       auto message = guestLoginMessage(host, data.exp);
       // Aborts the request if the key is unsupported or the proof is wrong.
-      const AccountNumber verifySig{"verify-sig"};
-      Actor<VerifyInterface> verify(RTransact::service, verifySig);
-      verify.verifySys(sha256(message.data(), message.size()),
-                       Claim{verifySig, data.key}, data.sig);
+      const AccountNumber    verifier = requireVerifierFor(data.key);
+      Actor<VerifyInterface> verify(RTransact::service, verifier);
+      verify.verifySys(sha256(message.data(), message.size()), Claim{verifier, data.key},
+                       data.sig);
 
       auto exp = now + std::chrono::duration_cast<std::chrono::seconds>(std::chrono::days(30))
                            .count();

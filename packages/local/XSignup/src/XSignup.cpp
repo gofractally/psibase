@@ -5,6 +5,7 @@
 #include <psibase/HttpHeaders.hpp>
 #include <psibase/base64.hpp>
 #include <psibase/dispatch.hpp>
+#include <psibase/verifier.hpp>
 #include <psio/json_value.hpp>
 #include <psio/to_hex.hpp>
 #include <services/local/XAdmin.hpp>
@@ -272,10 +273,12 @@ namespace
       auto row = to<Accounts>().getAccount(account);
       if (!row || row->authService != AuthSig::AuthSig::service)
          return false;
+      auto verifier = verifierFor(key);
+      if (!verifier)
+         return false;
       return to<AuthSig::AuthSig>().checkAuthSys(
           AuthInterface::firstAuthFlag, account, ServiceMethod{},
-          std::vector<Claim>{Claim{.service = AccountNumber{"verify-sig"},
-                                   .rawData = {key.begin(), key.end()}}});
+          std::vector<Claim>{Claim{.service = *verifier, .rawData = {key.begin(), key.end()}}});
    }
 
    // Notices that an issued creation transaction has landed.
@@ -754,7 +757,7 @@ namespace
 
       // The account gets the guest's own key: the one this session proved.
       SubjectPublicKeyInfo key{{body.key.begin(), body.key.end()}};
-      if (guestIdOf(key.data) != session.guest || !SubjectPublicKeyInfo::validate(key.data))
+      if (guestIdOf(key.data) != session.guest || !verifierFor(key.data))
          return fail(req, HttpStatus::forbidden, "That is not this guest's key.");
 
       auto found = linkOfGuest(session.guest);

@@ -12,7 +12,7 @@
 #include <services/local/XPackages.hpp>
 #include <services/system/RTransact.hpp>
 #include <services/system/Transact.hpp>
-#include <services/system/VerifySig.hpp>
+#include <psibase/verifier.hpp>
 
 #include <chrono>
 
@@ -514,7 +514,7 @@ psibase::SignedTransaction psibase::TestChain::signTransaction(Transaction trx, 
 {
    for (auto& [pub, priv] : keys)
       trx.claims.push_back({
-          .service = SystemService::VerifySig::service,
+          .service = requireVerifierFor(pub.data),
           .rawData = {pub.data.begin(), pub.data.end()},
       });
    SignedTransaction signedTrx;

@@ -3,7 +3,7 @@
 #include <services/system/AuthDelegate.hpp>
 #include <services/system/Credentials.hpp>
 #include <services/system/RAuthSig.hpp>
-#include <services/system/VerifySig.hpp>
+#include <psibase/verifier.hpp>
 #include <services/user/Tokens.hpp>
 
 using namespace psibase;
@@ -60,7 +60,7 @@ void CredResThief::bill(SubjectPublicKeyInfo key, ServiceMethod method)
 {
    to<Credentials>().checkAuthSys(
        AuthInterface::firstAuthFlag, Credentials::CREDENTIAL_SENDER, method,
-       std::vector{Claim{VerifySig::service, {key.data.begin(), key.data.end()}}});
+       std::vector{Claim{requireVerifierFor(key.data), {key.data.begin(), key.data.end()}}});
 }
 
 void CredResThief::useDisk(std::uint32_t n)
