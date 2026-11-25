@@ -51,9 +51,8 @@ namespace
 
    // The transaction service of a chain. Both do what `Mode` says. The first
    // is assembled from psizam-debug-service.wat and has function names only.
-   // The second is compiled from C with DWARF, and deployed under the VM
-   // version whose code the engine compiles as deployed, so that the DWARF
-   // still describes it.
+   // The second is compiled from C with DWARF. The engine compiles every
+   // service as deployed, under either VM version, so its DWARF describes it.
    enum class Service
    {
       names,
@@ -174,7 +173,8 @@ namespace
 
       explicit Chain(bool                         debugging,
                      Service                      transact  = Service::names,
-                     const std::filesystem::path& artifacts = {})
+                     const std::filesystem::path& artifacts = {},
+                     std::uint8_t                 vmVersion = vmVersionPerformance)
           : mode(debugging), cache(16, artifacts)
       {
          static const bool registered = []
@@ -217,7 +217,7 @@ namespace
                  .code      = {reinterpret_cast<const char*>(code.data()),
                                reinterpret_cast<const char*>(code.data()) + code.size()}});
          };
-         install(transactionServiceNum, transact == Service::dwarf ? 1 : 0, code);
+         install(transactionServiceNum, vmVersion, code);
          install(peer, 0, names);
          startBlock();
          Transaction transaction;
@@ -378,13 +378,19 @@ TEST_CASE("The default engine can debug services")
    CHECK(registeredImages() == before);
    {
       // A service with DWARF is handed over with it: line tables, and the
-      // name of its source file.
-      Chain chain(true, Service::dwarf);
-      chain.startBlock();
-      CHECK(error(chain.push(Mode::write, 'a')) == "");
-      CHECK(newImagesNaming(before, "debug_middle") >= 1);
-      CHECK(newImagesNaming(before, ".debug_line") >= 1);
-      CHECK(newImagesNaming(before, "psizam-debug-dwarf-service.c") >= 1);
+      // name of its source file. Under either float profile.
+      for (auto vmVersion : {vmVersionPerformance, vmVersionStrict})
+      {
+         INFO("VM version " << int(vmVersion));
+         const auto listed = registeredImages();
+         Chain      chain(true, Service::dwarf, {}, vmVersion);
+         chain.startBlock();
+         CHECK(error(chain.push(Mode::write, 'a')) == "");
+         CHECK(newImagesNaming(listed, "debug_middle") >= 1);
+         CHECK(newImagesNaming(listed, ".debug_line") >= 1);
+         CHECK(newImagesNaming(listed, "psizam-debug-dwarf-service.c") >= 1);
+      }
+      CHECK(registeredImages() == before);
    }
    {
       Chain chain(false, Service::dwarf);
@@ -497,18 +503,21 @@ TEST_CASE("A node that debugs services logs where a failed service was")
                                      "(and 126 more of the same)", "(outer frames not shown)"});
       }
    }
+   // A service with DWARF: each frame also says where in the source it is.
+   // That holds under both VM versions: the strict float profile is compiled
+   // from the service as deployed, as the performance profile is.
+   for (auto vmVersion : {vmVersionPerformance, vmVersionStrict})
    {
-      // A service with DWARF: each frame also says where in the source it is.
-      Chain chain(true, Service::dwarf);
+      INFO("VM version " << int(vmVersion));
+      Chain chain(true, Service::dwarf, {}, vmVersion);
       chain.startBlock();
       auto where = [](int line)
       { return " at " + std::string(dwarfSource) + ":" + std::to_string(line); };
       auto frame = [&](int index, const char* function, int line)
       {
          // "<index>: <function> (<wasm index>) +0x<offset> at <file>:<line>"
-         return std::regex(std::to_string(index) + ": " + function +
-                           " \\([0-9]+\\) \\+0x[0-9a-f]+ at \\./psizam-debug-dwarf-service\\.c:" +
-                           std::to_string(line) + "\n");
+         return std::regex(std::to_string(index) + ": " + function + " \\([0-9]+\\) \\+0x[0-9a-f]+" +
+                           " at \\./psizam-debug-dwarf-service\\.c:" + std::to_string(line) + "\n");
       };
       auto requireFrames = [&](const std::string& log, const char* innermost, int line,
                                const char* entry = "processTransaction")
@@ -519,13 +528,18 @@ TEST_CASE("A node that debugs services logs where a failed service was")
          CHECK(std::regex_search(log, frame(2, "debug_outer", outerLine)));
          CHECK(log.find(std::string("3: ") + entry + " (") != std::string::npos);
       };
+      auto requireLine = [&](const std::string& log, int line)
+      {
+         INFO(log);
+         CHECK(log.find(where(line)) != std::string::npos);
+      };
       {
          LogCapture  log;
          const auto& trace = chain.push(Mode::abort);
          CHECK(error(trace) == transactAborted);
          requireFrames(log.text() + "\n", "debug_inner", abortLine);
          CHECK(log.text().find("3: processTransaction") != std::string::npos);
-         CHECK(log.text().find(where(entryLine)) != std::string::npos);
+         requireLine(log.text(), entryLine);
          CHECK(psio::to_ijson(trace).find(dwarfSource) == std::string::npos);
       }
       {
@@ -547,7 +561,7 @@ TEST_CASE("A node that debugs services logs where a failed service was")
          CHECK(error(chain.push(Mode::recurse)) == "stack overflow");
          INFO(log.text());
          CHECK(log.text().find("debug_recurse") != std::string::npos);
-         CHECK(log.text().find(where(recurseLine)) != std::string::npos);
+         requireLine(log.text(), recurseLine);
       }
    }
    {
