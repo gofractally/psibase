@@ -1,34 +1,6 @@
 [workspace]
 resolver = "2"
 members = [
-    "Favor",
-    "Favor/service",
-    "Favor/query-service",
-    "Favor/plugin",
-    "Favor/plugin-legacy",
-    "EthBridge/plugin",
-    "EthBridge",
-    "EthBridge/core",
-    "EthBridge/service",
-    "EthBridge/query-service",
-    "EthRelay/core",
-    "EthRelay/service",
-    "EthRelay/verify",
-    "Signing",
-    "Signing/core",
-    "Signing/service",
-    "Signing/query-service",
-    "BtcBridge",
-    "BtcBridge/core",
-    "BtcBridge/service",
-    "BtcBridge/plugin",
-    "BtcRelay/plugin",
-    "BtcBridge/query-service",
-    "BtcRelay/service",
-    "Exchange",
-    "Exchange/service",
-    "Exchange/query-service",
-    "Exchange/plugin",
     "Branding",
     "Branding/service",
     "Branding/plugin",
@@ -101,8 +73,6 @@ members = [
 ]
 
 exclude = [
-    "EthBridge/relayer",
-    "Signing/daemon",
     "CommonApi/common/packages/component-parser",
     "Aes/plugin",
     "BrotliCodec/plugin",

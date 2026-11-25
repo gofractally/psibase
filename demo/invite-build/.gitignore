@@ -1,4 +1,0 @@
-*.wasm
-*-schema.json
-*.log
-*compile-command.txt

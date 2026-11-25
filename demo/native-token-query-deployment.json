@@ -1,7 +1,0 @@
-{
-  "service": "tokens+1",
-  "wasm_sha256": "9974983cd20028ce7bade6a3fd6541a0f378706dc74b8273057d6c0f76b6e8d3",
-  "schema_sha256": "223cde70b4288e39082ae8df4da1b785df739c8cfaeedfd4d65c350a931b1c44",
-  "financial_token_service_replaced": false,
-  "deployment_error": null
-}

@@ -1,6 +1,0 @@
-package btcbridge:plugin;
-interface api {
-    use host:types/types.{error};
-    submit: func(actions: string) -> result<_, error>;
-}
-world imports { import api; }

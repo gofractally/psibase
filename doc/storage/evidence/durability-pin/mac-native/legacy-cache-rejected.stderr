@@ -1,1 +1,0 @@
-database-cache-size is a removed triedent control; replace it with database-cache-policy=disabled (psitri read promotion off, pinned-cache budget 0 MiB)

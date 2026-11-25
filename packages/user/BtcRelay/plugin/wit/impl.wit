@@ -1,8 +1,0 @@
-package btcrelay:plugin;
-world impl {
-    include host:client/imports;
-    include accounts:query/imports;
-    include transact:plugin/imports;
-    include permissions:plugin/imports;
-    export api;
-}

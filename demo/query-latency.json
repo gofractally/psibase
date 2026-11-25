@@ -1,8 +1,0 @@
-{
-  "sample_count": 20,
-  "kind": "warm authenticated local HTTP wall time; not gas or matcher CPU",
-  "markets": 2,
-  "median_ms": 7.518,
-  "p95_ms": 7.663,
-  "max_ms": 8.599
-}

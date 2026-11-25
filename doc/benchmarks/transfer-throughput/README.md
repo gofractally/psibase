@@ -1,7 +1,7 @@
 # Transfer throughput: team `main` to `bytemaster/head`
 
 Measured 2026-11-22 and 2026-11-23 on one x86-64 cloud server that was otherwise
-idle, with the wasmtime engine. Raw output for every figure is in [raw/](raw/).
+idle, with the wasmtime engine.
 
 Two measurements are used throughout.
 
@@ -54,9 +54,7 @@ the network was not measured at the three later commits.
 
 Measured separately on the 44c57f739 base, tester, 5,000 unsigned transfers:
 300–308 with neither change, 346–351 with the write-session change, 646–654 with
-per-block event indexing added
-([raw/x86-tester-transaction-stack.txt](raw/x86-tester-transaction-stack.txt),
-[raw/x86-tester-event-indexing.txt](raw/x86-tester-event-indexing.txt)).
+per-block event indexing added.
 
 ## Read these numbers with care
 
@@ -71,7 +69,5 @@ per-block event indexing added
 
 ## Reproducing
 
-[raw/full_run.sh](raw/full_run.sh) is the script that produced the three later
-columns; its paths are those of the server it ran on. The benchmark itself is
-`packages/user/Tokens/test/src/TransferBench.cpp`; each run prints `BENCH` lines,
-which are what the `raw/*.txt` files hold.
+The benchmark is `packages/user/Tokens/test/src/TransferBench.cpp`; each run
+prints `BENCH` lines with the figures quoted here.

@@ -1,9 +1,0 @@
-{
-  "argv": [
-    "build-storage-canonical-fetch/identity_io_contract",
-    "build-storage-canonical-fetch/evidence/identity-reference-20261121T202225Z/database"
-  ],
-  "exit_code": 1,
-  "scope": "Regression against previous single write/no EINTR retry identity initialization",
-  "source_sha256": "9538e8a0474278c3b4f8502039d1ad3a9f4ee81dc5c9244d65b0db8b1a8b5add"
-}

@@ -80,14 +80,3 @@ foreach(UI ${UI_PROJECTS})
     )
     set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH})
 endforeach()
-
-# Favor keeps its npm lockfile and dependencies local to its UI workspace.
-ExternalProject_Add(Favor_js
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Favor/ui
-    CONFIGURE_COMMAND ""
-    BUILD_COMMAND node ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Favor/ui/build.mjs
-    BUILD_BYPRODUCTS ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Favor/ui/dist/index.html
-    INSTALL_COMMAND ""
-    BUILD_ALWAYS 1
-)
-set(Favor_js_DEP Favor_js ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Favor/ui/dist/index.html)
