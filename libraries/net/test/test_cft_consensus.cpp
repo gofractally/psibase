@@ -131,3 +131,42 @@ TEST_CASE("cft partition", "[cft]")
    CHECK(final_time >= mock_clock::now() - 2s);
    CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);
 }
+
+// A node that is the only producer cannot be replaced, so however long its
+// thread is kept busy (a slow transaction, a loaded machine) it has to go on
+// with the block it is building instead of standing down for an election
+// that only it can win.
+//
+// The case that matters: a timer's handler is already queued when a long
+// handler starts ahead of it, so by the time it runs the election deadline
+// it would have found still in the future has passed.
+TEST_CASE("cft sole producer survives a stall", "[cft]")
+{
+   TEST_START(logger);
+
+   boost::asio::io_context ctx;
+   NodeSet<node_type>      nodes(ctx);
+
+   setup<CftConsensus>(nodes, {"a"});
+   runFor(ctx, 20s);
+
+   auto term     = nodes[0].chain().get_head_state()->info.header.term;
+   auto blockNum = nodes[0].chain().get_head_state()->info.header.blockNum;
+
+   for (int i = 0; i < 200; ++i)
+   {
+      // Timers that are due have their handlers queued...
+      mock_clock::advance(mock_clock::now() + 1h);
+      // ...behind something that takes longer than any election timeout
+      mock_clock::stall(15s);
+      ctx.poll();
+      ctx.restart();
+   }
+   runFor(ctx, 5s);
+
+   auto state = nodes[0].chain().get_head_state();
+   CHECK(state->info.header.term == term);
+   CHECK(state->info.header.blockNum > blockNum + 20);
+   mock_clock::time_point final_time{state->info.header.time.time_since_epoch()};
+   CHECK(final_time >= mock_clock::now() - 2s);
+}

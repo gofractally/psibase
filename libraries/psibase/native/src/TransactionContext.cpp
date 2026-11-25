@@ -601,8 +601,8 @@ namespace psibase
       }
       // Creating a context is billed like any other work, except for
       // compiling the service: the context pauses the budget around that
-      // itself (BillingPause). Pausing here cost two thread CPU clock reads
-      // for every service a transaction calls, compiled or not.
+      // itself (BillingPause). Pausing here was paid for every service a
+      // transaction calls, compiled or not.
       check(impl->executionContexts.size() < blockContext.systemContext.executionMemories.size(),
             "exceeded maximum number of running services");
       if (impl->executionContexts.size() + impl->altExecContexts.size() >=

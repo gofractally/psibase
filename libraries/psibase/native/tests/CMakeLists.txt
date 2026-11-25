@@ -71,6 +71,24 @@ target_link_libraries(PsizamTests psibase Catch2::Catch2WithMain Threads::Thread
 add_test(NAME PsizamTests COMMAND PsizamTests)
 set_tests_properties(PsizamTests PROPERTIES TIMEOUT 30)
 
+# Service debugging (psinode --debug-services) is the default engine's to
+# provide, and that engine is wasmtime. The test links the debugger interface
+# the engine defines, so it is built where wasmtime is the default.
+set(vm_default_engine "${PSIBASE_VM_BACKEND}")
+if(PSIBASE_VM_BACKEND STREQUAL "DYNAMIC")
+    list(GET PSIBASE_VM_ENGINES 0 vm_default_engine)
+endif()
+if(vm_default_engine STREQUAL "WASMTIME")
+    add_executable(ServiceDebugTests ServiceDebugTests.cpp)
+    target_compile_definitions(ServiceDebugTests PRIVATE
+        PSIBASE_PSIZAM_DEBUG_SERVICE_WASM="${CMAKE_CURRENT_SOURCE_DIR}/psizam-debug-service.wasm"
+        PSIBASE_PSIZAM_DEBUG_DWARF_SERVICE_WASM="${CMAKE_CURRENT_SOURCE_DIR}/psizam-debug-dwarf-service.wasm")
+    target_link_directories(ServiceDebugTests PRIVATE ${ICU_LIBRARY_DIR})
+    target_link_libraries(ServiceDebugTests psibase Catch2::Catch2WithMain Threads::Threads)
+    add_test(NAME ServiceDebugTests COMMAND ServiceDebugTests)
+    set_tests_properties(ServiceDebugTests PROPERTIES TIMEOUT 120 PROCESSORS 2)
+endif()
+
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 add_test(NAME PsizamAltTimeout
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/run_psizam_alt_timeout.py"
