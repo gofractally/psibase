@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from psinode import Cluster
+from psinode import Cluster, verifier_for_key_type
 import testutil
 import predicates
 import unittest
@@ -16,7 +16,7 @@ class TestSnapshot(unittest.TestCase):
         a.push_action('root', 'accounts', 'setAuthServ', {'authService': 'auth-any'})
         auth = []
         for p in prods:
-            with p.post('/native/admin/keys', service='x-admin', json={"service":"verify-sig"}) as reply:
+            with p.post('/native/admin/keys', service='x-admin', json={"service": verifier_for_key_type("secp256k1")}) as reply:
                 reply.raise_for_status()
                 print(reply.json())
                 auth.append({"name":p.producer, "auth":reply.json()[0]})

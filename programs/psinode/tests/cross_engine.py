@@ -48,7 +48,7 @@ def scenario(producer, validator, extra_blocks, root):
         # whole chain state. A node only has a verified checkpoint if its own
         # state matches what was signed.
         a.push_action('root', 'accounts', 'setAuthServ', {'authService': 'auth-any'})
-        with a.post('/native/admin/keys', service='x-admin', json={"service": "verify-sig"}) as reply:
+        with a.post('/native/admin/keys', service='x-admin', json={"service": psinode.verifier_for_key_type("secp256k1")}) as reply:
             reply.raise_for_status()
             auth = {"name": a.producer, "auth": reply.json()[0]}
         a.set_producers([auth], algorithm='cft')

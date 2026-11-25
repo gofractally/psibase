@@ -10,7 +10,8 @@
 #include <services/system/Producers.hpp>
 #include <services/system/RTransact.hpp>
 #include <services/system/Transact.hpp>
-#include <services/system/VerifySig.hpp>
+#include <services/system/VerifyK1.hpp>
+#include <services/system/VerifyR1.hpp>
 
 #include <algorithm>
 #include <filesystem>
@@ -87,9 +88,14 @@ auto makeBoot(const ConsensusData& producers, bool ec) -> std::vector<SignedTran
    if (ec)
    {
       services.push_back({
-          .service = VerifySig::service,
-          .flags   = VerifySig::serviceFlags,
-          .code    = readWholeFile("VerifySig.wasm"),
+          .service = VerifyK1::service,
+          .flags   = VerifyK1::serviceFlags,
+          .code    = readWholeFile("VerifyK1.wasm"),
+      });
+      services.push_back({
+          .service = VerifyR1::service,
+          .flags   = VerifyR1::serviceFlags,
+          .code    = readWholeFile("VerifyR1.wasm"),
       });
    }
    result.push_back({psio::shared_pssz<Transaction>{Transaction{

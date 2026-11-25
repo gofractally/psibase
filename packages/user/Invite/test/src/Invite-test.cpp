@@ -6,7 +6,7 @@
 #include <services/system/Credentials.hpp>
 #include <services/system/PrivateKeyInfo.hpp>
 #include <services/system/Spki.hpp>
-#include <services/system/VerifySig.hpp>
+#include <psibase/verifier.hpp>
 #include <services/system/commonErrors.hpp>
 #include <services/user/Invite.hpp>
 #include <services/user/InviteErrors.hpp>
@@ -327,7 +327,7 @@ SCENARIO("Accepting an invite")
             for (const auto& key : combinedKeyList)
             {
                trx.claims.push_back({
-                   .service = VerifySig::service,
+                   .service = requireVerifierFor(key.first.data),
                    .rawData = psio::to_pssz(key.first),
                });
             }

@@ -426,12 +426,12 @@ TEST_CASE("json: a signed transaction holds its transaction as an object", "[jso
                           .service = AccountNumber{"tokens"},
                           .method  = MethodNumber{"credit"},
                           .rawData = {1, 2, 0x7f}}},
-       .claims  = {Claim{.service = AccountNumber{"verify-sig"}, .rawData = {5, 6}}},
+       .claims  = {Claim{.service = AccountNumber{"verify-k1"}, .rawData = {5, 6}}},
    };
    constexpr std::string_view trxText =
        R"({"tapos":{"expiration":"2023-11-14T22:13:20Z","refBlockSuffix":16909060,"flags":0,"refBlockIndex":7},)"
        R"("actions":[{"sender":"alice","service":"tokens","method":"credit","rawData":"01027F"}],)"
-       R"("claims":[{"service":"verify-sig","rawData":"0506"}]})";
+       R"("claims":[{"service":"verify-k1","rawData":"0506"}]})";
    CHECK(psio::to_ijson(trx) == trxText);
    CHECK(psio::to_pssz(psio::from_ijson<Transaction>(trxText)) == psio::to_pssz(trx));
 
@@ -446,8 +446,8 @@ TEST_CASE("json: a signed transaction holds its transaction as an object", "[jso
    CHECK(psio::to_pssz(psio::from_ijson<SignedTransaction>(
              R"({"transaction":)" + std::string{trxText} + R"(,"proofs":["0707"]})")) ==
          psio::to_pssz(signedTrx));
-   CHECK(psio::to_pssz(psio::from_ijson<Claim>(R"({"service":"verify-sig","rawData":"0a0B"})")) ==
-         psio::to_pssz(Claim{AccountNumber{"verify-sig"}, {0x0a, 0x0b}}));
+   CHECK(psio::to_pssz(psio::from_ijson<Claim>(R"({"service":"verify-k1","rawData":"0a0B"})")) ==
+         psio::to_pssz(Claim{AccountNumber{"verify-k1"}, {0x0a, 0x0b}}));
    // The hex of the packed transaction, which the legacy JSON held, is not
    // the member's text any more.
    const std::string legacy =

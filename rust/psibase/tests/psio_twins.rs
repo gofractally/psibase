@@ -610,7 +610,7 @@ fn rust_callers_pack_what_cpp_packs() {
     let alice = account!("alice");
     let producer = Producer {
         name: account!("prod1"),
-        auth: Claim { service: account!("verify-sig"), rawData: bytes.clone() },
+        auth: Claim { service: account!("verify-k1"), rawData: bytes.clone() },
     };
 
     let start_boot = transact::Wrapper::pack().startBoot(vec![digest, [0; 32]]);
@@ -781,7 +781,7 @@ fn rust_views_name_parameters_as_the_implementation_does() {
         "auth-none" => auth_none, "auth-sig" => auth_sig, "cpu-limit" => cpu_limit, "db" => db,
         "dyn-ld" => dyn_ld, "http" => http_server, "packages" => packages,
         "producers" => producers, "setcode" => setcode, "sites" => sites, "transact" => transact,
-        "verify-sig" => verify_sig, "x-admin" => x_admin, "x-db" => x_db, "x-http" => x_http,
+        "verify-k1" => verify_k1, "verify-r1" => verify_r1, "x-admin" => x_admin, "x-db" => x_db, "x-http" => x_http,
         "x-keys" => x_keys, "x-packages" => x_packages, "x-sites" => x_sites,
         "credential" => credentials, "nft" => nft, "staged-tx" => staged_tx, "symbol" => symbol,
         "tokens" => tokens, "vserver" => virtual_server, "wsauth" => ws_auth,

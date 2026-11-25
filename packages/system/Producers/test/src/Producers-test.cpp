@@ -5,7 +5,6 @@
 #include <services/system/AuthDelegate.hpp>
 #include <services/system/Producers.hpp>
 #include <services/system/StagedTx.hpp>
-#include <services/system/VerifySig.hpp>
 #include <services/user/Nft.hpp>
 
 using namespace SystemService;

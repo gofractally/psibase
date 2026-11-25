@@ -2,7 +2,7 @@
 #include <psibase/DefaultTestChain.hpp>
 
 #include <services/system/SetCode.hpp>
-#include <services/system/VerifySig.hpp>
+#include <services/system/VerifyK1.hpp>
 #include <services/test/AbortService.hpp>
 #include <services/test/RemoveCode.hpp>
 
@@ -38,6 +38,11 @@ namespace
                            "HEfwKktshavRCyzHq3X55sdfgs6hRANCAARZ0Aumf5wa4PWSWxJFdN1qliUbma5a\n"
                            "CgAuh9li58vzfwZFSjjdS6gbPG7+ZblPqv0jHj+pziAfYH5lzpVjD+kp\n"
                            "-----END PRIVATE KEY-----\n")};
+
+   // What is tested here is how the chain tracks verify services, whatever
+   // they verify. One of the installed verifiers stands for all of them.
+   using Verifier           = VerifyK1;
+   const char* verifierWasm = "VerifyK1.wasm";
 
    std::vector<BlockHeaderAuthAccount> getActual(TestChain& t)
    {
@@ -196,24 +201,24 @@ TEST_CASE("Verify service tracking")
    SECTION("Add new service")
    {
       t.addAccount(verify2);
-      passOrFail({setCode(verify2, "VerifySig.wasm"), setFlags(verify2, VerifySig::serviceFlags)});
+      passOrFail({setCode(verify2, verifierWasm), setFlags(verify2, Verifier::serviceFlags)});
    }
    SECTION("Add new service after flag")
    {
       t.addAccount(verify2);
       REQUIRE(t.from(SetCode::service)
                   .to<SetCode>()
-                  .setFlags(verify2, VerifySig::serviceFlags)
+                  .setFlags(verify2, Verifier::serviceFlags)
                   .succeeded());
       t.startBlock();
-      passOrFail({setCode(verify2, "VerifySig.wasm")});
+      passOrFail({setCode(verify2, verifierWasm)});
    }
    SECTION("Set flag without service")
    {
       t.addAccount(verify2);
       REQUIRE(t.from(SetCode::service)
                   .to<SetCode>()
-                  .setFlags(verify2, VerifySig::serviceFlags)
+                  .setFlags(verify2, Verifier::serviceFlags)
                   .succeeded());
    }
    SECTION("Set flag for service")
@@ -222,23 +227,23 @@ TEST_CASE("Verify service tracking")
    }
    SECTION("Unset flag for service")
    {
-      passOrFail({setFlags(VerifySig::service, 0)});
+      passOrFail({setFlags(Verifier::service, 0)});
    }
    SECTION("Remove service")
    {
-      passOrFail({setCode(VerifySig::service, nullptr)});
+      passOrFail({setCode(Verifier::service, nullptr)});
    }
    SECTION("Remove code")
    {
-      passOrFail({removeCode(VerifySig::service)});
+      passOrFail({removeCode(Verifier::service)});
    }
    SECTION("Add without code")
    {
-      passOrFail({setCodeRow({verify2, VerifySig::serviceFlags, sha256("", 0), 0, 0})});
+      passOrFail({setCodeRow({verify2, Verifier::serviceFlags, sha256("", 0), 0, 0})});
    }
    SECTION("Add and...")
    {
-      t.addService(verify2, "VerifySig.wasm", VerifySig::serviceFlags);
+      t.addService(verify2, verifierWasm, Verifier::serviceFlags);
       SECTION("remove")
       {
          passOrFail({setCode(verify2, nullptr)});
@@ -254,10 +259,10 @@ TEST_CASE("Verify service tracking")
    }
    SECTION("Remove and...")
    {
-      expect(t.pushTransaction(t.makeTransaction({setCode(VerifySig::service, nullptr)})));
+      expect(t.pushTransaction(t.makeTransaction({setCode(Verifier::service, nullptr)})));
       SECTION("add")
       {
-         passOrFail({setCode(VerifySig::service, "VerifySig.wasm")});
+         passOrFail({setCode(Verifier::service, verifierWasm)});
       }
    }
 

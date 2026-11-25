@@ -653,7 +653,7 @@ TEST_CASE("methods: a signed transaction holds its transaction packed", "[method
    trx.tapos.refBlockSuffix = 0x01020304;
    trx.actions.push_back(Action{AccountNumber{"alice"}, AccountNumber{"tokens"},
                                 MethodNumber{"credit"}, {1, 2, 3}});
-   trx.claims.push_back(Claim{AccountNumber{"verify-sig"}, {9, 8}});
+   trx.claims.push_back(Claim{AccountNumber{"verify-k1"}, {9, 8}});
    const auto trxBytes = psio::to_pssz(trx);
 
    const SignedTransaction signedTrx{psio::shared_pssz<Transaction>{trx}, {{7, 7}}, {}};
@@ -670,7 +670,7 @@ TEST_CASE("methods: a signed transaction holds its transaction packed", "[method
    CHECK(signedTrx.transaction->tapos().refBlockSuffix() == 0x01020304);
    CHECK(signedTrx.transaction->actions().size() == 1);
    CHECK(signedTrx.transaction->actions()[0].sender() == AccountNumber{"alice"});
-   CHECK(signedTrx.transaction->claims()[0].service() == AccountNumber{"verify-sig"});
+   CHECK(signedTrx.transaction->claims()[0].service() == AccountNumber{"verify-k1"});
    CHECK(signedTrx.transaction.unpack().actions[0].rawData == std::vector<char>{1, 2, 3});
 
    // A copy shares the bytes.

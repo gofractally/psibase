@@ -1,7 +1,7 @@
 #include <catch2/catch_all.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <services/system/AuthSig.hpp>
-#include <services/system/VerifySig.hpp>
+#include <psibase/verifier.hpp>
 
 #include <psibase/nativeTables.hpp>
 #include <psibase/serviceEntry.hpp>
@@ -74,7 +74,7 @@ TEST_CASE("ec")
        .service = AccountNumber{"nop"},
    }});
    ec_trx.claims.push_back({
-       .service = SystemService::VerifySig::service,
+       .service = requireVerifierFor(pub_key1.data),
        .rawData = {pub_key1.data.begin(), pub_key1.data.end()},
    });
 

@@ -6,7 +6,6 @@
 #include <services/system/PrivateKeyInfo.hpp>
 #include <services/system/Spki.hpp>
 #include <services/system/StagedTx.hpp>
-#include <services/system/VerifySig.hpp>
 #include <services/user/Nft.hpp>
 
 using namespace SystemService;

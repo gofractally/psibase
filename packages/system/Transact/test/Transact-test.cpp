@@ -4,6 +4,7 @@
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/testerApi.hpp>
+#include <psibase/verifier.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/AuthNone.hpp>
 #include <services/system/AuthSig.hpp>
@@ -11,7 +12,8 @@
 #include <services/system/RTransact.hpp>
 #include <services/system/SetCode.hpp>
 #include <services/system/Transact.hpp>
-#include <services/system/VerifySig.hpp>
+#include <services/system/VerifyK1.hpp>
+#include <services/system/VerifyR1.hpp>
 #include <services/test/AuthTest.hpp>
 #include <services/test/RemoveCode.hpp>
 #include <services/user/Nop.hpp>
@@ -52,6 +54,11 @@ namespace
                            "LIBPQ6CIYjeRapOKRdm/M3Olx16hRANCAASN85E37t2w9rkShxk36NQRgXCo00cL\n"
                            "5OTVFFNQ1q5UTRIY/7pQwrZANDKMGORrpeF4LJoqNoVA0/zu/fbOKV1M\n"
                            "-----END PRIVATE KEY-----\n")};
+
+   // The verifier for the keys above, and the file holding its code
+   const AccountNumber verifysig = requireVerifierFor(aliceKeys.first.data);
+   const char*         verifierWasm =
+       verifysig == VerifyK1::service ? "VerifyK1.wasm" : "VerifyR1.wasm";
 
    struct KeyWithAccount
    {
@@ -273,7 +280,6 @@ TEST_CASE("Test push_transaction")
       auto           accounts = transactor<Accounts>{alice, Accounts::service};
       auto           act      = accounts.setAuthServ(AuthAny::service);
       auto           trx = t.signTransaction(t.makeTransaction({std::move(act)}, 5), {aliceKeys});
-      constexpr auto verifysig = VerifySig::service;
 
       t.setAutoRun(false);
       auto reply = t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
@@ -317,13 +323,11 @@ TEST_CASE("Test push_transaction")
    }
    SECTION("Change verify service 2 keys")
    {
-      constexpr auto verifysig = VerifySig::service;
-
       // make a second verify service
-      auto verify2 = t.addService("verify2", "VerifySig.wasm");
+      auto verify2 = t.addService("verify2", verifierWasm);
       REQUIRE(t.from(SetCode::service)
                   .to<SetCode>()
-                  .setFlags(verify2, VerifySig::serviceFlags)
+                  .setFlags(verify2, CodeRow::isVerify)
                   .succeeded());
 
       auto alice    = t.addAccount("alice", aliceKeys.first);
@@ -379,8 +383,6 @@ TEST_CASE("Test push_transaction")
    }
    SECTION("Duplicate push 2 keys error")
    {
-      constexpr auto verifysig = VerifySig::service;
-
       auto alice    = t.addAccount("alice", aliceKeys.first);
       auto accounts = transactor<Accounts>{alice, Accounts::service};
       auto act      = accounts.setAuthServ(AuthAny::service);

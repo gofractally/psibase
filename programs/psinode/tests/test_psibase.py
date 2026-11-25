@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from psinode import Cluster, PrivateKey
+from psinode import Cluster, PrivateKey, verifier_for_key_type
 from predicates import *
 from services import *
 import testutil
@@ -456,7 +456,7 @@ class TestPsibase(unittest.TestCase):
         a = cluster.complete(*testutil.generate_names(1), softhsm=testutil.libsofthsm2())[0]
 
         device = a.unlock_softhsm()
-        with a.post('/native/admin/keys', service='x-admin', json={'service': 'verify-sig', 'device': device}) as reply:
+        with a.post('/native/admin/keys', service='x-admin', json={'service': verifier_for_key_type('secp256r1'), 'device': device}) as reply:
             reply.raise_for_status()
             key = bytes.fromhex(reply.json()[0]['rawData'])
 

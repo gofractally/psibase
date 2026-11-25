@@ -16,12 +16,12 @@ class TestPsibaseTypes(unittest.TestCase):
                          '{"sender":"alice","service":"ink","method":"foo","rawData":"0000"}')
     def test_transaction(self):
         tapos = {"expiration": "1970-01-01T00:00:00Z", "refBlockSuffix": 0, "refBlockIndex": 0, "flags": 0}
-        trx = Transaction(tapos, [Action('alice', 'ink', 'foo', '0000')], [{"service": "verify-sig", "rawData": "02030405"}])
+        trx = Transaction(tapos, [Action('alice', 'ink', 'foo', '0000')], [{"service": "verify-k1", "rawData": "02030405"}])
         self.assertEqual(psio.to_pssz(trx).hex().upper(),
                          '17000000000000000000000000000000000000170000003D00000004000000'
                          '1C00000000B82A1B83AEDF04003019CAC1149308D3D50000000000001C0000000000'
-                         '040000000C000000004A3347810E700E0C00000002030405')
-        self.assertEqual(trx.claims, [Claim('verify-sig', bytes.fromhex('02030405'))])
+                         '040000000C00000000FC0547810E700E0C00000002030405')
+        self.assertEqual(trx.claims, [Claim('verify-k1', bytes.fromhex('02030405'))])
     def test_cpp_transactions(self):
         '''The transactions of the C++ fixture: their bytes, their id and their text are read and written alike'''
         fixture = pathlib.Path(__file__).parent / '../../../libraries/psibase/common/tests/rust-twins.json'

@@ -44,7 +44,8 @@
 #include <services/system/SetCode.hpp>
 #include <services/system/StagedTx.hpp>
 #include <services/system/Transact.hpp>
-#include <services/system/VerifySig.hpp>
+#include <services/system/VerifyK1.hpp>
+#include <services/system/VerifyR1.hpp>
 #include <services/system/VirtualServer.hpp>
 #include <services/system/WsAuth.hpp>
 #include <services/user/DynLd.hpp>
@@ -300,7 +301,7 @@ namespace
       // Core records that hold byte sequences.
       const Action action{AccountNumber{"alice"}, AccountNumber{"tokens"}, MethodNumber{"credit"},
                           bytes};
-      const Claim  claim{AccountNumber{"verify-sig"}, bytes};
+      const Claim  claim{AccountNumber{"verify-k1"}, bytes};
       const GenesisService genesisService{AccountNumber{"transact"}, 3, 1, 1, bytes};
       const Producer       producer{AccountNumber{"prod1"}, claim};
       f.add<Action>("Action", {Action{}, action});
@@ -313,7 +314,7 @@ namespace
       f.add<BftConsensus>("BftConsensus", {BftConsensus{}, BftConsensus{{producer}}});
       f.add<BlockHeaderAuthAccount>(
           "BlockHeaderAuthAccount",
-          {BlockHeaderAuthAccount{}, BlockHeaderAuthAccount{AccountNumber{"verify-sig"}, digest, 1, 1}});
+          {BlockHeaderAuthAccount{}, BlockHeaderAuthAccount{AccountNumber{"verify-k1"}, digest, 1, 1}});
       f.add<HttpRequest>(
           "HttpRequest",
           {HttpRequest{},
@@ -532,7 +533,8 @@ namespace
       f.interfaceNames<SystemService::SetCode>("setcode");
       f.interfaceNames<SystemService::Sites>("sites");
       f.interfaceNames<SystemService::Transact>("transact");
-      f.interfaceNames<SystemService::VerifySig>("verify-sig");
+      f.interfaceNames<SystemService::VerifyK1>("verify-k1");
+      f.interfaceNames<SystemService::VerifyR1>("verify-r1");
       f.interfaceNames<LocalService::XAdmin>("x-admin");
       f.interfaceNames<LocalService::XDb>("x-db");
       f.interfaceNames<LocalService::XHttp>("x-http");

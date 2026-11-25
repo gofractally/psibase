@@ -172,7 +172,7 @@ fn an_action_and_a_transaction() {
 
     // `POST /common/pack/Transaction`: every member of `tapos` is required
     // and `expiration` is in whole seconds.
-    let text = r#"{"tapos":{"expiration":"2023-11-14T22:13:20Z","refBlockSuffix":16909060,"flags":0,"refBlockIndex":7},"actions":[{"sender":"alice","service":"tokens","method":"credit","rawData":"0102AB"}],"claims":[{"service":"verify-sig","rawData":"00"}]}"#;
+    let text = r#"{"tapos":{"expiration":"2023-11-14T22:13:20Z","refBlockSuffix":16909060,"flags":0,"refBlockIndex":7},"actions":[{"sender":"alice","service":"tokens","method":"credit","rawData":"0102AB"}],"claims":[{"service":"verify-k1","rawData":"00"}]}"#;
     assert_eq!(reread::<psibase::Transaction>(text), text);
     assert!(reread::<psibase::Transaction>(
         r#"{"tapos":{"expiration":"2023-11-14T22:13:20Z","refBlockSuffix":1,"refBlockIndex":7},"actions":[],"claims":[]}"#
@@ -206,10 +206,10 @@ fn a_variant_is_an_object_of_one_member() {
     let consensus = ConsensusData::CftConsensus(CftConsensus {
         producers: vec![Producer {
             name: account("prod"),
-            auth: psibase::Claim { service: account("verify-sig"), rawData: vec![0x30] },
+            auth: psibase::Claim { service: account("verify-k1"), rawData: vec![0x30] },
         }],
     });
-    let text = r#"{"CftConsensus":{"producers":[{"name":"prod","auth":{"service":"verify-sig","rawData":"30"}}]}}"#;
+    let text = r#"{"CftConsensus":{"producers":[{"name":"prod","auth":{"service":"verify-k1","rawData":"30"}}]}}"#;
     pinned(&consensus, text);
     for wrong in [
         r#"{"cftConsensus":{"producers":[]}}"#,

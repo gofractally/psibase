@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from psinode import Cluster
+from psinode import Cluster, verifier_for_key_type
 from predicates import *
 import testutil
 import time
@@ -142,7 +142,7 @@ class TestCrash(unittest.TestCase):
         keys = []
         for p in prods:
             device = p.unlock_softhsm()
-            with p.post('/native/admin/keys', service='x-admin', json={'service': 'verify-sig', 'device': device}) as reply:
+            with p.post('/native/admin/keys', service='x-admin', json={'service': verifier_for_key_type('secp256r1'), 'device': device}) as reply:
                 reply.raise_for_status()
                 keys.append({'name': p.producer, 'auth': reply.json()[0]})
 

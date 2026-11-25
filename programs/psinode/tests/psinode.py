@@ -167,6 +167,37 @@ class GraphQLError(Exception):
         super().__init__(msg)
         self.json = payload
 
+# Which service verifies signatures made with which kind of key. Each kind of
+# key has its own verifier service, and a claim for a key names the verifier
+# for that key's kind. This mirrors psibase/verifier.hpp; nothing else in the
+# tests should name a verifier for a key.
+_VERIFIERS = {
+    # key type: (service, AlgorithmIdentifier { id-ecPublicKey, namedCurve })
+    'secp256k1': ('verify-k1', bytes.fromhex('301006072a8648ce3d020106052b8104000a')),
+    'secp256r1': ('verify-r1', bytes.fromhex('301306072a8648ce3d020106082a8648ce3d030107')),
+}
+
+def verifier_for_key_type(key_type):
+    """The service that verifies signatures made with keys of this type ('secp256k1' or 'secp256r1')"""
+    return _VERIFIERS[key_type][0]
+
+def verifier_for(spki):
+    """The service that verifies signatures made with the key whose DER
+    SubjectPublicKeyInfo is spki, or None if no verifier accepts the key.
+    Only the fixed encoding for each curve is accepted, holding an
+    uncompressed or a compressed point."""
+    spki = bytes(spki)
+    for (service, algorithm) in _VERIFIERS.values():
+        header = 2 + len(algorithm) + 3
+        if len(spki) not in (header + 65, header + 33):
+            continue
+        point_size = len(spki) - header
+        if (spki[0] == 0x30 and spki[1] == len(spki) - 2
+                and spki[2:2 + len(algorithm)] == algorithm
+                and spki[header - 3:header] == bytes([0x03, point_size + 1, 0x00])):
+            return service
+    return None
+
 class PrivateKey:
     def __init__(self, data=None):
         from cryptography.hazmat.primitives.asymmetric import ec
@@ -186,7 +217,7 @@ class PrivateKey:
         from cryptography.hazmat.primitives.asymmetric import ec, utils
         result = self.private.sign(digest, ec.ECDSA(utils.Prehashed(SHA256())))
         (r, s) = utils.decode_dss_signature(result)
-        # verify-sig only accepts the low-S form, s <= n/2. Older releases of
+        # The verifiers only accept the low-S form, s <= n/2. Older releases of
         # the cryptography package do not expose the group order.
         orders = {
             'secp256k1': 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141,
@@ -200,7 +231,10 @@ class PrivateKey:
     def claim(self):
         from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding
         pub = self.private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
-        return {"service": "verify-sig", "rawData": pub}
+        service = verifier_for(pub)
+        if service is None:
+            raise Exception("No verifier accepts this key")
+        return {"service": service, "rawData": pub}
     def pkcs8(self):
         from cryptography.hazmat.primitives.serialization import PrivateFormat, Encoding, NoEncryption
         return self.private.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()).decode()
