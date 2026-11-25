@@ -23,7 +23,7 @@ The defaults are immutable Git revisions:
 | psio | `e11fd099f5a584d259357dad0764502c91b992db` | Sources by FetchContent; the maintained upstream CMake project is added by `psibase_acquire_dependency` |
 | psitri | `0fd4723128f47e9445419f9043a20fe02d3f1306` | Sources only |
 | ucc | `d79166da0290fdf9d1f9d5880d4dfb45b2822cf3` | Sources only |
-| psizam | `8b993cd91357df12754e3dd8e1e754c4ec4a6192` | Sources only |
+| psizam | `cc85445731dd7d13596dc26e613f89a3c6a4a84f` | Sources only |
 
 The PSIO pin is `main` of gofractally/psio: PSSZ with record evolution by
 appended optionals, mandatory pruning, type-derived offset widths, the `key`

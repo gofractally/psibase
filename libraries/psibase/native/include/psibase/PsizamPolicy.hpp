@@ -192,14 +192,19 @@ namespace psibase
    //        per the float profile), atomics instructions (no shared memory),
    //        wide arithmetic
    //   off: extended constant expressions (gofractally/psibase#2266), tail
-   //        calls, exception handling, multi-memory, memory64, typed function
-   //        references, GC, stack switching, custom page sizes, components
+   //        calls, exception handling (the legacy try and the exnref type
+   //        included), multi-memory, memory64, typed function references,
+   //        GC (with it, global.get of a global the module defines in a
+   //        constant expression), stack switching, custom page sizes,
+   //        components
    //
    // psizam's parser has a switch for most of these; the constants below are
    // those switches. Typed function references are refused by its switch
    // (enable_typed_references, gofractally/psizam#6) wherever the parser
    // reads a reference type or a heap type: block types, table and element
-   // declarations, ref.null. It has no switch for extended constant
+   // declarations, ref.null. A constant expression that reads a global the
+   // module defines is refused by enable_const_defined_globals
+   // (gofractally/psizam#7). It has no switch for extended constant
    // expressions: validateNativeWasm refuses them.
    struct NativeVMOptions : VMOptions
    {
@@ -216,6 +221,7 @@ namespace psibase
       static constexpr bool          enable_sign_ext             = true;
       static constexpr bool          enable_nontrapping_fptoint  = true;
       static constexpr bool          enable_typed_references     = false;
+      static constexpr bool          enable_const_defined_globals = false;
       // Not a parser switch: enforced by validateNativeWasm.
       static constexpr bool          enable_extended_const       = false;
       // Incoming arguments remain live across normal and tail calls. Count

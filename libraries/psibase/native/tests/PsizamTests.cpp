@@ -972,29 +972,32 @@ namespace
    };
 
    // A service the chain admits and wasmtime refuses to compile. With every
-   // limit a chain value below the engines' own (gofractally/psibase#2262)
-   // and the typed-reference forms refused by admission
-   // (gofractally/psizam#6), what is left is where psizam's validator and
-   // wasmtime's disagree (gofractally/psibase#2266). This is one: a global
-   // initialised from a global the module itself defines, which psizam
-   // accepts (as WebAssembly 3.0 does) and wasmtime, without the GC
-   // proposal, refuses. When the two agree on it the tests that use this
-   // need another example, or a hook that makes the compile fail.
-   // start and called, both empty.
-   constexpr std::string_view compilerRefusal = "global.get of locally defined global";
+   // limit a chain value below the engines' own (gofractally/psibase#2262),
+   // the typed-reference forms refused by admission (gofractally/psizam#6)
+   // and the five disagreements of gofractally/psizam#7 closed, what is
+   // left is where psizam's validator and wasmtime's still disagree
+   // (gofractally/psibase#2266). This is one, found by the probe set of
+   // that issue: a function body with ref.func of a function that no
+   // element segment, export or global declares, which the specification
+   // refuses and psizam does not check. When psizam refuses it the tests
+   // that use this need another example, or a hook that makes the compile
+   // fail.
+   // start and called, both empty, and a third function: ref.func 2; drop.
+   constexpr std::string_view compilerRefusal = "undeclared function reference";
    std::vector<std::uint8_t>  admittedButRefusedByWasmtime()
    {
       const EntryPoints         entry{0, 0};
-      std::vector<std::uint8_t> types{2}, declared{2}, exported{2}, bodies{2};
+      std::vector<std::uint8_t> types{3}, declared{3}, exported{2}, bodies{3};
       types.insert(types.end(), entry.types.begin(), entry.types.end());
+      types.insert(types.end(), {0x60, 0, 0});  // type 2: () -> ()
       declared.insert(declared.end(), entry.functions.begin(), entry.functions.end());
+      declared.push_back(2);
       exported.insert(exported.end(), entry.exports.begin(), entry.exports.end());
       bodies.insert(bodies.end(), entry.bodies.begin(), entry.bodies.end());
+      bodies.insert(bodies.end(), {5, 0, 0xd2, 2, 0x1a, 0x0b});
       auto code = wasmModule({});
       section(code, 1, types);
       section(code, 3, declared);
-      // (global i32 (i32.const 1)) (global i32 (global.get 0))
-      section(code, 6, {2, 0x7f, 0, 0x41, 1, 0x0b, 0x7f, 0, 0x23, 0, 0x0b});
       section(code, 7, exported);
       section(code, 10, bodies);
       return code;

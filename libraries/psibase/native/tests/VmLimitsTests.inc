@@ -849,6 +849,64 @@ TEST_CASE("What wasmtime refuses is refused by admission under the default limit
       m.addFunction(2, {0, 0x02, 0x70, 0xd0, 0x70, 0x0b, 0x1a, 0x0b});
       CHECK_NOTHROW(psibase::admitNativeWasm(m.build(), {}, 0));
    }
+   // Where psizam's validator accepted what wasmtime refuses
+   // (gofractally/psizam#7), one case of each kind and of each place.
+   // A global initialised with ref.func of a function that does not exist.
+   {
+      ServiceModule m;
+      m.globals     = {0x70, 0, 0xd2, 9, 0x0b};
+      m.globalCount = 1;
+      refused(m.build(), "ref.func of an undefined function");
+   }
+   // A funcref global initialised with ref.null extern.
+   {
+      ServiceModule m;
+      m.globals     = {0x70, 0, 0xd0, 0x6f, 0x0b};
+      m.globalCount = 1;
+      refused(m.build(), "type mismatch");
+   }
+   // Exception handling is off: the legacy try, and the type exnref as a
+   // local and as a block type.
+   refused(function({0, 0x06, 0x40, 0x0b, 0x0b}), "Exception handling not enabled");
+   refused(function({1, 1, 0x69, 0x0b}), "invalid local type");
+   refused(function({0, 0x02, 0x69, 0x00, 0x0b, 0x1a, 0x0b}), "Invalid type code in block");
+   // global.get of a global the module defines, in a constant expression
+   // (NativeVMOptions::enable_const_defined_globals): a global's
+   // initialiser, an element segment's offset and item, a data segment's
+   // offset.
+   const std::string_view definedGlobal = "global.get of a defined global";
+   {
+      ServiceModule m;
+      m.globals     = {0x7f, 0, 0x41, 1, 0x0b, 0x7f, 0, 0x23, 0, 0x0b};
+      m.globalCount = 2;
+      refused(m.build(), definedGlobal);
+   }
+   {
+      ServiceModule m;
+      m.tables       = {1};
+      m.globals      = {0x7f, 0, 0x41, 0, 0x0b};
+      m.globalCount  = 1;
+      m.elements     = {0, 0x23, 0, 0x0b, 0};
+      m.elementCount = 1;
+      refused(m.build(), definedGlobal);
+   }
+   {
+      ServiceModule m;
+      m.globals      = {0x70, 0, 0xd0, 0x70, 0x0b};
+      m.globalCount  = 1;
+      m.elements     = {5, 0x70, 1, 0x23, 0, 0x0b};
+      m.elementCount = 1;
+      refused(m.build(), definedGlobal);
+   }
+   {
+      ServiceModule m;
+      m.memories    = {1};
+      m.globals     = {0x7f, 0, 0x41, 0, 0x0b};
+      m.globalCount = 1;
+      m.data        = {0, 0x23, 0, 0x0b, 0};
+      m.dataCount   = 1;
+      refused(m.build(), definedGlobal);
+   }
 }
 
 TEST_CASE("A module at the ceilings that size an instance at once is stored and runs", "[limits]")
