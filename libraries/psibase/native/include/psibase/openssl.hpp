@@ -30,4 +30,7 @@ namespace psibase
    std::vector<char>                         getPublicKey(EVP_PKEY* key);
    std::unique_ptr<EVP_PKEY, OpenSSLDeleter> generateKey(int nid);
    std::unique_ptr<EVP_PKEY, OpenSSLDeleter> parsePrivateKey(std::span<const char> key);
+   // Rewrites a raw r || s ECDSA signature made with key into the low-S form,
+   // s <= n/2. verify-sig accepts no other form.
+   void normalizeSignature(EVP_PKEY* key, std::span<char> signature);
 }  // namespace psibase

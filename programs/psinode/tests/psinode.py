@@ -9,9 +9,9 @@ import datetime
 import calendar
 from hashlib import sha256
 from collections import namedtuple
-import psibase
-from psibase import MethodNumber, Action, Transaction, SignedTransaction, ServiceSchema
-import fracpack
+import json
+import psio
+from psibase import Action, Claim, Transaction, SignedTransaction, ServiceSchema
 
 class _LocalConnection(urllib3.connection.HTTPConnection):
     def __init__(self, *args, **kwargs):
@@ -128,23 +128,32 @@ def _get_producer_claim(producer):
         return producer
 
 class ChainPackContext:
+    '''Packs transactions, with the schemas of the services of a chain for the arguments of actions'''
     def __init__(self, api):
         self._api = api
         self._schemas = {}
-        self._custom = dict(**psibase.default_custom, **{"Action": Action.with_context(self)})
-    def pack(self, value, ty=None):
-        return fracpack.pack(value, ty, custom=self._custom)
+    def pack_transaction(self, trx):
+        '''The PSSZ of a Transaction. The arguments of its actions that are not packed yet are packed in place.'''
+        for action in trx.actions:
+            if action.rawData is None:
+                action.rawData = self.pack_action_data(action.service, action.method, action.data)
+        return psio.to_pssz(trx)
     def pack_action_data(self, service, method, data):
-        if isinstance(type(data), fracpack.TypeBase):
-            return fracpack.pack(data, custom=self._custom)
-        if isinstance(method, str):
-            method = MethodNumber(method)
-        return fracpack.pack(data, self.get_schema(service).actions[method].params)
+        '''The PSSZ of the arguments of an action: data is the object keyed by parameter name or the positional list'''
+        function = self.get_schema(str(service)).actions.get(method.value)
+        if function is None:
+            raise Exception('Action not found: %s::%s' % (service, method))
+        # Bytes are hex in I-JSON
+        def hex_bytes(value):
+            if isinstance(value, (bytes, bytearray)):
+                return value.hex()
+            raise TypeError('%s has no JSON text' % type(value).__name__)
+        return function.params.json_to_pssz(json.dumps(data if data is not None else {}, default=hex_bytes))
     def get_schema(self, service):
         if service not in self._schemas:
             with self._api.get('/schema?service=%s' % service, service='packages') as reply:
                 reply.raise_for_status()
-                self._schemas[service] = ServiceSchema(reply.json(), custom=self._custom)
+                self._schemas[service] = ServiceSchema(reply.json())
         return self._schemas[service]
 
 class TransactionError(Exception):
@@ -163,19 +172,30 @@ class PrivateKey:
         from cryptography.hazmat.primitives.asymmetric import ec
         from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding, load_pem_private_key, load_der_private_key
         if data is None:
-            self.private = ec.generate_private_key(ec.SECP256R1())
+            # Software keys use secp256k1, which is the faster curve to verify
+            self.private = ec.generate_private_key(ec.SECP256K1())
         else:
             try:
-                self.private = load_pem_private_key(data)
+                self.private = load_pem_private_key(data, None)
             except ValueError:
-                self.private = load_der_public_key(data)
-            if not isinstance(self.private, ec.EllipticCurvePrivateKey) or self.private.curve != ec.SECP256R1:
-                raise Exception("Only P-256 keys are supported")
+                self.private = load_der_private_key(data, None)
+            if not isinstance(self.private, ec.EllipticCurvePrivateKey) or not isinstance(self.private.curve, (ec.SECP256K1, ec.SECP256R1)):
+                raise Exception("Only secp256k1 and P-256 keys are supported")
     def sign_prehashed(self, digest):
         from cryptography.hazmat.primitives.hashes import SHA256
         from cryptography.hazmat.primitives.asymmetric import ec, utils
         result = self.private.sign(digest, ec.ECDSA(utils.Prehashed(SHA256())))
         (r, s) = utils.decode_dss_signature(result)
+        # verify-sig only accepts the low-S form, s <= n/2. Older releases of
+        # the cryptography package do not expose the group order.
+        orders = {
+            'secp256k1': 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141,
+            'secp256r1': 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551,
+        }
+        curve = self.private.curve
+        n = getattr(curve, 'group_order', None) or orders[curve.name]
+        if s > n // 2:
+            s = n - s
         return r.to_bytes(32, byteorder='big') + s.to_bytes(32, byteorder='big')
     def claim(self):
         from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding
@@ -234,17 +254,14 @@ class API:
         return self.request('DELETE', path, service, **kw)
 
     # Transaction processing
-    def pack_action(self, act):
-        '''Pack an action and return a json object suitable for use in pack_transaction'''
-        return ChainPackContext(self).pack(trx, Action)
     def pack_transaction(self, trx):
         '''Pack a transaction and return the result as bytes'''
-        return ChainPackContext(self).pack(trx, Transaction)
+        return ChainPackContext(self).pack_transaction(trx)
     def pack_signed_transaction(self, trx, keys=[]):
         '''Pack a signed transactions and return the result as bytes'''
         trx = self.sign_transaction(trx, keys)
         if isinstance(trx, SignedTransaction):
-            return SignedTransaction.packed(trx)
+            return psio.to_pssz(trx)
         elif isinstance(trx, str):
             return bytes.fromhex(trx)
         else:
@@ -252,7 +269,7 @@ class API:
     def sign_transaction(self, trx, keys=[]):
         if isinstance(trx, Transaction):
             if keys is not None:
-                trx.claims += [key.claim() for key in keys]
+                trx.claims += [Claim(**key.claim()) for key in keys]
             trx = self.pack_transaction(trx)
             digest = sha256(trx).digest()
             signatures = [key.sign_prehashed(digest) for key in keys]
@@ -439,7 +456,7 @@ def _write_config(dir, log_filter, log_format, softhsm, trustfile):
         with open(logfile, 'x') as f:
             f.write(_default_config % (extra, log_filter, log_format))
 
-def _init_softhsm(dir, pin):
+def _init_softhsm(dir, pin, module):
     conf = os.path.join(dir, 'softhsm.conf')
     tokens = os.path.join(dir, 'tokens')
     os.makedirs(tokens, exist_ok=True)
@@ -448,11 +465,11 @@ def _init_softhsm(dir, pin):
     env = {'SOFTHSM2_CONF': conf}
     full_env = dict(os.environ)
     full_env.update(env)
-    subprocess.run(['softhsm2-util', '--init-token', '--slot', '0', '--label', 'psibase', '--pin', pin, '--so-pin', pin], env=full_env, check=True)
+    subprocess.run(['softhsm2-util', '--module', module, '--init-token', '--slot', '0', '--label', 'psibase', '--pin', pin, '--so-pin', pin], env=full_env, check=True)
     return env
 
 class Node(API):
-    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_size=None, start=True, softhsm=None, trustfile=None, env={}):
+    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_policy=None, start=True, softhsm=None, trustfile=None, env={}):
         '''
         Create a new psinode server
         If dir is not specified, the server will reside in a temporary directory
@@ -474,17 +491,17 @@ class Node(API):
         os.makedirs(self.dir, exist_ok=True)
         if softhsm is not None:
             self.softhsm_pin = 'Ch4ng#Me!'
-            self.env.update(_init_softhsm(os.path.join(self.dir, 'softhsm'), self.softhsm_pin))
+            self.env.update(_init_softhsm(os.path.join(self.dir, 'softhsm'), self.softhsm_pin, softhsm))
         _write_config(self.dir, log_filter, log_format, softhsm, trustfile)
         if isinstance(listen, str):
             listen = [listen]
         self.listen = listen
         self.p2p = p2p
         if start:
-            self.start(database_cache_size=database_cache_size)
+            self.start(database_cache_policy=database_cache_policy)
     def node_args(self):
         return ['-a', self.url, '--proxy', 'unix:' + self.socketpath]
-    def start(self, database_cache_size=None):
+    def start(self, database_cache_policy=None):
         args = [self.executable, self.dir, "-l", self.socketpath]
         for interface in self.listen:
             args.extend(['-l', interface])
@@ -495,17 +512,20 @@ class Node(API):
         args.extend(['--host', 'psibase.localhost'])
         if self.p2p:
             args.append('--p2p')
-        if database_cache_size is not None:
-            args.extend(['--database-cache-size', str(database_cache_size)])
-        kw = {}
-        if len(self.env) != 0:
-            env = dict(os.environ)
-            for (k, v) in self.env.items():
-                if v is None:
-                    del env[k]
-                else:
-                    env[k] = v
-            kw['env'] = env
+        if database_cache_policy is not None:
+            args.extend(['--database-cache-policy', str(database_cache_policy)])
+        env = dict(os.environ)
+        # Each test node has a new database directory, and with it a new, empty
+        # cache of compiled services. Share the user's cache so a service is
+        # compiled once, not once per node per test.
+        cache_home = env.get('XDG_CACHE_HOME') or os.path.join(os.path.expanduser('~'), '.cache')
+        env.setdefault('PSIBASE_NATIVE_AOT_CACHE', os.path.join(cache_home, 'psibase', 'native-aot'))
+        for (k, v) in self.env.items():
+            if v is None:
+                env.pop(k, None)
+            else:
+                env[k] = v
+        kw = {'env': env}
         with open(self.logpath, 'a') as logfile:
             self.child = subprocess.Popen(args, stderr=logfile, **kw)
         self._wait_for_startup()
