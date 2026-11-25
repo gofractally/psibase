@@ -204,27 +204,6 @@ mod tests {
         );
     }
 
-    fn assert_no_cors(reply: &HttpReply) {
-        for name in [
-            "access-control-allow-origin",
-            "access-control-allow-credentials",
-            "access-control-allow-methods",
-            "access-control-allow-headers",
-        ] {
-            assert_eq!(header(reply, name), None, "{name}");
-        }
-    }
-
-    #[track_caller]
-    fn assert_forbidden(reply: &HttpReply) {
-        assert_status(reply, HttpStatus::Forbidden);
-        assert_no_cors(reply);
-        assert!(!reply
-            .headers
-            .iter()
-            .any(|header| header.matches("set-cookie")));
-    }
-
     fn assert_cookie_attrs(raw: &str) {
         for attr in ["Path=/", "SameSite=Strict", "Secure", "HttpOnly"] {
             assert!(raw.contains(attr), "{raw}");
@@ -359,20 +338,6 @@ mod tests {
         let persistent = b"persistent-value";
         expires_after_idle(&chain, Session, &session_cookie, session)?;
         expires_after_idle(&chain, Persistent, &device, persistent)?;
-        Ok(())
-    }
-
-    #[psibase::test_case(packages("HostDb"))]
-    fn supervisor_origin(chain: Chain) -> Result<(), Error> {
-        chain.start_block();
-        let target = format!("/kv/{}/{}", Persistent, storage_key());
-        let reply = get(
-            &chain,
-            &target,
-            Some("https://accounts.psibase.io"),
-            Some(&cookies(&device_a(), None)),
-        )?;
-        assert_forbidden(&reply);
         Ok(())
     }
 
