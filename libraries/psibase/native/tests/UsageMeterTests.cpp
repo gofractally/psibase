@@ -658,8 +658,18 @@ TEST_CASE("usage meter: a flush racing subjective commits loses nothing on eithe
    unsigned rounds = 1;
    if (auto env = std::getenv("USAGE_RACE_ROUNDS"))
       rounds = static_cast<unsigned>(std::atoi(env));
-   for (unsigned round = 0; round < rounds; ++round)
+   // The test must not pass without ever racing. Counted over all rounds:
+   // commits that were refused and retried (two transactions overlapped),
+   // and transactions that had a flush batch published between their
+   // checkout and their commit (a flush overlapped a transaction). If the
+   // requested rounds saw neither, more are run, up to a bound.
+   std::uint64_t  totalConflicts = 0, totalInterleaved = 0, totalBatches = 0;
+   const unsigned maxRounds = rounds + 50;
+   for (unsigned round = 0;
+        round < rounds || (round < maxRounds && (totalConflicts == 0 || totalInterleaved == 0));
+        ++round)
    {
+      std::atomic<std::uint64_t> batches{0}, interleaved{0};
       TempDirectory  dir;
       SharedDatabase shared(dir.path / "db", dbConfig, psibase::storage::open_mode::create_new);
       UsageMeter     meter;
@@ -687,6 +697,7 @@ TEST_CASE("usage meter: a flush racing subjective commits loses nothing on eithe
                    auto key   = "svc-" + std::to_string(t) + "-" + std::to_string(i);
                    auto run   = "\x7f run-" + std::to_string(t) + "-" + std::to_string(i);
                    auto value = std::to_string(i);
+                   auto batchesBefore = batches.load();
                    db.checkoutSubjective();
                    do
                    {
@@ -697,6 +708,8 @@ TEST_CASE("usage meter: a flush racing subjective commits loses nothing on eithe
                       db.kvPutRaw(DbId::subjective, bytes(key), bytes(value));
                       db.kvPutRaw(DbId::nativeSubjective, bytes(run), bytes(value));
                    } while (!db.commitSubjective(sockets, closing) && ++conflicts);
+                   if (batches.load() != batchesBefore)
+                      ++interleaved;
                 }
                 --running;
              });
@@ -730,7 +743,8 @@ TEST_CASE("usage meter: a flush racing subjective commits loses nothing on eithe
          while (running)
          {
             meter.prepareFlush();
-            meter.writeFlush(shared, *writer, UsageMeter::batchRows);
+            if (meter.writeFlush(shared, *writer, UsageMeter::batchRows).written)
+               ++batches;
          }
          for (auto& thread : threads)
             thread.join();
@@ -762,7 +776,17 @@ TEST_CASE("usage meter: a flush racing subjective commits loses nothing on eithe
          CHECK(sum(again.rows()).requests == std::uint64_t{chargers} * charges);
          CHECK(shared.kvGetSubjective(*writer, DbId::nativeSubjective, bytes("\x7f run-0-0")));
       }
+      totalConflicts += conflicts;
+      totalInterleaved += interleaved;
+      totalBatches += batches;
    }
+   std::printf("usage flush race: %llu refused commits retried, %llu transactions with a flush "
+               "batch inside, %llu flush batches during commits\n",
+               static_cast<unsigned long long>(totalConflicts),
+               static_cast<unsigned long long>(totalInterleaved),
+               static_cast<unsigned long long>(totalBatches));
+   REQUIRE(totalConflicts > 0);
+   REQUIRE(totalInterleaved > 0);
 }
 
 // Not part of the suite: UsageMeterTests "[.bench]". How long a flush is,
