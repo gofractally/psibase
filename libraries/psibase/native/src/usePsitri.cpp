@@ -340,6 +340,11 @@ namespace psibase
       return result;
    }
 
+   storage::cache_root SharedDatabase::cacheRoot() const
+   {
+      return impl->trie->get_cache_root();
+   }
+
    ConstRevisionPtr SharedDatabase::getHead()
    {
       return impl->getHead();

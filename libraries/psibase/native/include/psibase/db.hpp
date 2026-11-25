@@ -122,6 +122,10 @@ namespace psibase
       // the storage is shared.
       SharedDatabase clone() const;
 
+      // The root of this database that is no part of the chain: rebuildable
+      // data, kept out of every revision, fork and snapshot (storage.hpp).
+      storage::cache_root cacheRoot() const;
+
       ConstRevisionPtr getHead();
       ConstRevisionPtr emptyRevision();
       WriterPtr        createWriter();

@@ -1290,9 +1290,14 @@ void run(const std::string&              db_path,
    ExecutionContext::registerHostFunctions();
 
    // TODO: configurable WasmCache size
-   // Compiled modules are kept in a database of their own in the data
-   // directory (PsizamPolicy.hpp).
-   WasmCache wasmCache{128, psibase::nodeNativeAotCache(db_path)};
+   SharedDatabase database{
+       db_path,
+       {db_conf.hot_bytes, db_conf.warm_bytes, db_conf.cool_bytes, db_conf.cold_bytes,
+        db_conf.sync},
+       psibase::storage::open_mode::resize};
+   // Compiled modules are kept under a root of the node's database that is
+   // no part of the chain (PsizamPolicy.hpp).
+   WasmCache wasmCache{128, psibase::nodeNativeAotCache(database.cacheRoot())};
    // What this run compiled and what it found compiled. Declared before the
    // node's state, so it is reported after everything that executes has gone.
    auto reportModules = psibase::finally{
@@ -1303,13 +1308,7 @@ void run(const std::string&              db_path,
               << "Service modules: " << stats.compiled << " compiled, " << stats.loaded
               << " loaded from the cache, " << stats.discarded << " cache entries discarded";
        }};
-   auto sharedState = std::make_shared<psibase::SharedState>(
-       SharedDatabase{
-           db_path,
-           {db_conf.hot_bytes, db_conf.warm_bytes, db_conf.cool_bytes, db_conf.cold_bytes,
-            db_conf.sync},
-           psibase::storage::open_mode::resize},
-       wasmCache);
+   auto sharedState = std::make_shared<psibase::SharedState>(std::move(database), wasmCache);
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
 

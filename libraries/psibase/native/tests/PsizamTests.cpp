@@ -1221,18 +1221,23 @@ TEST_CASE("A damaged stored artifact is discarded and the service compiled again
    }
 }
 
-TEST_CASE("A node's compiled modules survive a restart in their own database")
+TEST_CASE("A node's compiled modules survive a restart under its database's cache root")
 {
    if (!isWasmtime())
       SKIP("counts compiles, which only the wasmtime engine reports");
    TempDirectory data;
-   const auto    directory = data.path / "cache" / "modules";
-   auto          run       = [&](bool expectUsable = true)
+   bool          clear = false;
+   auto          run   = [&]
    {
-      // A node: its chain state in one database, its modules in another.
-      auto artifacts = std::make_shared<psibase::NativeAotCache>(
-          std::make_unique<psibase::NativeAotDatabase>(directory));
-      CHECK(artifacts->usable() == expectUsable);
+      // The database of a node that is stopped and started again. (The
+      // fixture's chain is a new one each time; the modules are the node's.)
+      psibase::SharedDatabase node{data.path / "node",
+                                   {64ull << 20, 64ull << 20, 64ull << 20, 64ull << 20}};
+      auto store = std::make_unique<psibase::NativeAotDatabase>(node.cacheRoot());
+      if (clear)
+         store->clear();
+      auto artifacts = std::make_shared<psibase::NativeAotCache>(std::move(store));
+      CHECK(artifacts->usable());
       NativeService               fixture{artifacts};
       psibase::TransactionContext transaction{fixture.block, fixture.signedTransaction,
                                               fixture.trace, psibase::DbMode::transaction()};
@@ -1247,11 +1252,12 @@ TEST_CASE("A node's compiled modules survive a restart in their own database")
    CHECK(stats.compiled == 0);
    CHECK(stats.loaded == 1);
    CHECK(stats.discarded == 0);
-   // The database is deleted while the node is down: one compile, and it is back.
-   std::filesystem::remove_all(directory);
+   // The cache root is cleared: one compile, and it is back.
+   clear = true;
    stats = run();
    CHECK(stats.compiled == 1);
    CHECK(stats.loaded == 0);
+   clear = false;
    stats = run();
    CHECK(stats.compiled == 0);
    CHECK(stats.loaded == 1);

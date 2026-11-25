@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <psibase/storage.hpp>
 #include <span>
 #include <vector>
 
@@ -47,54 +48,37 @@ namespace psibase
       int directory = -1;
    };
 
-   // Records in a psitri database of their own: what a node uses. The database
-   // is separate from the chain's (its own directory, its own roots), so it is
-   // in no state hash, snapshot or revision, and deleting the directory while
-   // the node is stopped costs recompiles and nothing else.
-   //
-   // Threads. psitri sessions belong to the thread that created them. Every
-   // thread that reads or writes here gets its own read session and write
-   // session the first time it does, and no session is ever used by two
-   // threads. The database object owns them: a thread reaches its own through
-   // thread-local state, without a lock; they are released when the thread
-   // exits, or when the database closes, whichever is first.
-   //
-   // Writers. Records are spread over 64 psitri roots by the first byte of
-   // their key. psitri has one writer per root at a time and writers on
-   // different roots do not wait for each other, so speculative runs, block
-   // execution and verify threads that compile different modules store them
-   // side by side; two that land on one root queue for the length of one
-   // insert, never for a compile.
-   //
-   // Readers. A read takes a snapshot of one root and copies the record out.
-   // It waits for no writer, on that root or another, beyond the instant a
-   // root is published, and takes none of this class's own locks (keeping the
-   // order of use is skipped when that would mean waiting). Reads happen when
-   // a module is not in memory: once per module per run, not per transaction.
-   //
-   // Durability. None is asked for (psitri's sync_mode::none, its cheapest):
-   // a record lost in a crash is compiled again, and one that survives in
-   // part fails NativeAotCache's digest.
+   // Records under a root of the node's own database: what a node uses. The
+   // root (storage::cache_root, engine root 2) is beside the chain's roots and
+   // no part of the chain: it is in no state hash, snapshot, revision or fork,
+   // a reverted block reverts nothing here, and clearing it costs recompiles
+   // and nothing else. storage.hpp says how it is written beside the chain's
+   // writer without either waiting for the other, how it is read without
+   // waiting for a writer, and that it is never flushed.
    //
    // Size. An entry is not removed when its code is: the row can be removed
    // by a speculative run that never lands or by a block that is later
    // reverted, the same code can be a node-local service, and one code has
    // an entry per set of limits it was compiled under, which the removal
-   // does not name. Instead the database is bounded: what it holds never
+   // does not name. Instead the store is bounded: what it holds never
    // exceeds maxBytes, and making room evicts the least recently used
    // records (read or written in this run; those not yet touched since the
    // database was opened go first). A record larger than maxBytes is not
-   // kept. psitri stores a value of any size up to 4 GiB as chunks of just
-   // under 32 MiB, so no artifact needs splitting here.
+   // kept. The space of an evicted record goes back to the database's
+   // allocator and is reused by later writes, of the chain or of the cache;
+   // the files do not shrink. The engine stores a value of any size up to
+   // 4 GiB as chunks of just under 32 MiB, so no artifact needs splitting.
+   //
+   // The accounting (what is held, how large, how recently used) is in
+   // memory, rebuilt from the root when the store is made, and guarded by a
+   // mutex a reader only ever tries: it is never what a read waits for.
    class NativeAotDatabase final : public NativeArtifactStore
    {
      public:
       static constexpr std::uint64_t defaultMaxBytes = std::uint64_t(4) << 30;
 
-      // Opens or creates the database. If it cannot be opened it is left as
-      // it is and reported, and the store is not usable.
-      explicit NativeAotDatabase(const std::filesystem::path& directory,
-                                 std::uint64_t                maxBytes = defaultMaxBytes) noexcept;
+      explicit NativeAotDatabase(storage::cache_root root,
+                                 std::uint64_t       maxBytes = defaultMaxBytes) noexcept;
       ~NativeAotDatabase();
       NativeAotDatabase(const NativeAotDatabase&)            = delete;
       NativeAotDatabase& operator=(const NativeAotDatabase&) = delete;
@@ -103,6 +87,8 @@ namespace psibase
       std::optional<std::vector<char>> read(const Key& key) noexcept override;
       void write(const Key& key, std::span<const char> record) noexcept override;
       void erase(const Key& key) noexcept override;
+      // Removes every record.
+      void clear() noexcept;
 
       // Bytes of records held, and how many.
       std::uint64_t bytes() const noexcept;
@@ -110,7 +96,7 @@ namespace psibase
 
      private:
       struct Impl;
-      std::shared_ptr<Impl> impl;
+      std::unique_ptr<Impl> impl;
    };
 
    // Compiled modules kept between runs: native code an engine executes as it

@@ -82,17 +82,26 @@ namespace psibase
       return processNativeAotCache();
    }
 
-   std::shared_ptr<NativeAotCache> nodeNativeAotCache(const std::filesystem::path& dataDirectory)
+   std::shared_ptr<NativeAotCache> nodeNativeAotCache(storage::cache_root root)
    {
-      if (auto path = nativeAotCachePath({}); !path.empty())
-         return std::make_shared<NativeAotCache>(path);
       std::uint64_t maxBytes = NativeAotDatabase::defaultMaxBytes;
       if (const char* text = std::getenv("PSIBASE_NATIVE_AOT_CACHE_MB"); text && *text)
          maxBytes = std::strtoull(text, nullptr, 10) << 20;
-      auto cache = std::make_shared<NativeAotCache>(
-          std::make_unique<NativeAotDatabase>(dataDirectory / "cache" / "modules", maxBytes));
-      // A database that cannot be opened has been reported; the node still
-      // keeps what it compiles, where a process that configures nothing does.
+      auto store = std::make_unique<NativeAotDatabase>(std::move(root), maxBytes);
+      // Once per process: a node that restarts in place keeps what it has
+      // compiled since.
+      static bool cleared = false;
+      if (const char* clear = std::getenv("PSIBASE_NATIVE_AOT_CACHE_CLEAR");
+          clear && std::string_view(clear) == "1" && !cleared)
+      {
+         cleared = true;
+         store->clear();
+      }
+      if (auto path = nativeAotCachePath({}); !path.empty())
+         return std::make_shared<NativeAotCache>(path);
+      auto cache = std::make_shared<NativeAotCache>(std::move(store));
+      // A read-only database has no cache root to write; the node still keeps
+      // what it compiles, where a process that configures nothing does.
       return cache->usable() ? cache : nativeAotCacheFromEnvironment();
    }
 

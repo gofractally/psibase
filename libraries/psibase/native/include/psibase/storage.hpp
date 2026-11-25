@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <utility>
 #include <vector>
 
 namespace psibase::storage
@@ -161,6 +162,55 @@ namespace psibase::storage
                          std::span<const char> upper);
    };
 
+   struct database_state;
+   // A flat key/value tree on an engine root of its own (root 2), for data
+   // that can be rebuilt: the node's compiled service modules.
+   //
+   // It is no part of the chain. The chain's state is reached from the top
+   // root (root 0: head, revisions, saved snapshots) and the node's
+   // persistent subjective state from the local root (root 1). Nothing under
+   // either refers to this root, so it is in no revision, fork, state hash or
+   // snapshot; publishing, reverting or pruning a revision does not touch it,
+   // and a clone of the database sees the same one. clear() empties it.
+   //
+   // Writers. The engine has one writer per root, and writers of different
+   // roots do not wait for each other. This root has a write session of its
+   // own, which the chain's writer never uses, and a mutex of its own, which
+   // the chain's writer never takes: a write here holds that mutex for one
+   // insert and does not enter the gate chain publication goes through.
+   // (An engine session may be used by one thread at a time, not only by the
+   // thread that made it; the mutex is what makes that so. A session per
+   // writing thread would spend one of the engine's 64 session slots, and
+   // an allocation segment, on every thread that ever compiled a module.)
+   //
+   // Readers use the calling thread's engine reader, as every read of the
+   // database does, and take a snapshot of the root: they wait for no writer.
+   //
+   // Durability. Like the local root, this root is published without a
+   // flush, whatever the database's sync level, and after a power loss it is
+   // whatever version reached the disk whole. Callers must check what they
+   // read (NativeAotCache does, by digest). With the default sync level
+   // nothing is flushed at all. With flushing on, the data written here is in
+   // the same file as the chain's, so the chain's next flushed publication
+   // also writes it out: about half a millisecond per megabyte stored since
+   // the last flush, measured on an SSD (NativeAotDatabaseTests).
+   class cache_root
+   {
+      std::shared_ptr<database_state> state;
+      explicit cache_root(std::shared_ptr<database_state>);
+      friend class database;
+
+     public:
+      // False for a read-only database: reads work, writes do nothing.
+      bool                             writable() const noexcept;
+      std::optional<std::vector<char>> get(std::span<const char> key);
+      void put(std::span<const char> key, std::span<const char> value);
+      void erase(std::span<const char> key);
+      void clear();
+      // Every key with the size of its value, in key order.
+      std::vector<std::pair<std::vector<char>, std::uint64_t>> sizes();
+   };
+
    class database
    {
       std::shared_ptr<database_view> view;
@@ -175,5 +225,7 @@ namespace psibase::storage
       std::filesystem::path directory() const;
       bool                  read_only() const;
       bool                  owns(const write_session&) const;
+      // The root beside the chain's two. Every handle is the same root.
+      cache_root            get_cache_root() const;
    };
 }  // namespace psibase::storage

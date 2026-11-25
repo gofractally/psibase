@@ -50,6 +50,9 @@ namespace psibase::storage
    // Engine root 0 is the flushed manifest (the "top root"). Root 1 is node-local
    // state that is published without flushing.
    constexpr std::uint32_t localRootIndex = 1;
+   // Root 2 is rebuildable data (cache_root): nothing under roots 0 and 1
+   // refers to it.
+   constexpr std::uint32_t cacheRootIndex = 2;
 
    std::string_view bytes(std::span<const char> data)
    {
@@ -176,7 +179,12 @@ namespace psibase::storage
    };
 
    inline std::atomic<std::uint64_t> nextStateId{1};
-   struct State
+   struct State;
+   // storage.hpp names the state without defining it.
+   struct database_state
+   {
+   };
+   struct State : database_state
    {
       SerializedNativeAccess                 access;  // the single writer; never taken by reads
       std::shared_ptr<Engine::database>      engine;
@@ -185,6 +193,10 @@ namespace psibase::storage
       // One engine reader per thread that has read this database.
       std::mutex                                                           threadReadersMutex;
       std::map<std::thread::id, std::shared_ptr<Engine::read_session>>     threadReaders;
+      // The cache root's own writer (see cache_root). Guarded by cacheMutex,
+      // never by `access`; made by the first write.
+      std::mutex                             cacheMutex;
+      std::shared_ptr<Engine::write_session> cacheWriter;
       const std::uint64_t id = nextStateId.fetch_add(1, std::memory_order_relaxed);
       std::filesystem::path                  path;
       bool                                   readonly  = false;
@@ -196,6 +208,7 @@ namespace psibase::storage
              {
                 readers.close();
                 threadReaders.clear();
+                cacheWriter.reset();
                 writer.reset();
                 engine.reset();
              },
@@ -1239,6 +1252,112 @@ namespace psibase::storage
       }
       return std::shared_ptr<database>(new database(std::move(result)));
    }
+   cache_root database::get_cache_root() const
+   {
+      return cache_root(view->state);
+   }
+
+   namespace
+   {
+      State& cacheState(const std::shared_ptr<database_state>& state)
+      {
+         return static_cast<State&>(*state);
+      }
+      // A read of the cache root on the caller's thread. Unlike `reading`, it
+      // is not charged to, or cancelled with, the request that happens to
+      // need a module: the module is the node's, not the request's.
+      template <class F>
+      auto readingCache(State& state, F&& function)
+      {
+         if (auto* session = threadReader(state))
+            return function(*session);
+         return state.readers.use(*state.engine, function);
+      }
+      // One change to the cache root: continue from what is published, edit
+      // copy-on-write, publish without a flush. Readers see the root before
+      // or after, never between.
+      template <class F>
+      void editCache(State& state, F&& change)
+      {
+         if (state.readonly)
+            return;
+         std::lock_guard lock(state.cacheMutex);
+         if (!state.cacheWriter)
+            state.cacheWriter = state.engine->start_write_session();
+         auto& writer = *state.cacheWriter;
+         writer.set_root(cacheRootIndex, change(writer));
+      }
+   }  // namespace
+
+   cache_root::cache_root(std::shared_ptr<database_state> state) : state(std::move(state)) {}
+
+   bool cache_root::writable() const noexcept
+   {
+      return !cacheState(state).readonly;
+   }
+
+   std::optional<std::vector<char>> cache_root::get(std::span<const char> key)
+   {
+      std::optional<std::vector<char>> result;
+      readingCache(cacheState(state),
+                   [&](Engine::read_session& session)
+                   {
+                      auto cursor = session.create_cursor(cacheRootIndex);
+                      cursor.get(bytes(key), [&](std::string_view value)
+                                 { result.emplace(value.begin(), value.end()); });
+                      return 0;
+                   });
+      return result;
+   }
+
+   void cache_root::put(std::span<const char> key, std::span<const char> value)
+   {
+      editCache(cacheState(state),
+                [&](Engine::write_session& writer)
+                {
+                   auto edit = writer.start_write_transaction(writer.get_root(cacheRootIndex));
+                   edit.upsert(bytes(key), bytes(value));
+                   return edit.get_tree();
+                });
+   }
+
+   void cache_root::erase(std::span<const char> key)
+   {
+      editCache(cacheState(state),
+                [&](Engine::write_session& writer)
+                {
+                   auto edit = writer.start_write_transaction(writer.get_root(cacheRootIndex));
+                   edit.remove(bytes(key));
+                   return edit.get_tree();
+                });
+   }
+
+   void cache_root::clear()
+   {
+      editCache(cacheState(state),
+                [&](Engine::write_session& writer) { return writer.create_temporary_tree(); });
+   }
+
+   std::vector<std::pair<std::vector<char>, std::uint64_t>> cache_root::sizes()
+   {
+      std::vector<std::pair<std::vector<char>, std::uint64_t>> result;
+      readingCache(cacheState(state),
+                   [&](Engine::read_session& session)
+                   {
+                      auto cursor = session.create_cursor(cacheRootIndex);
+                      for (bool found = cursor.seek_begin(); found; found = cursor.next())
+                      {
+                         auto key  = cursor.key();
+                         auto size = cursor.value_size();
+                         if (size >= 0)
+                            result.emplace_back(std::vector<char>(key.begin(), key.end()),
+                                                static_cast<std::uint64_t>(size));
+                      }
+                      return 0;
+                   });
+      return result;
+   }
+
    std::shared_ptr<write_session> database::start_write_session()
    {
       // A compatibility proxy is also used for reads by existing psibase

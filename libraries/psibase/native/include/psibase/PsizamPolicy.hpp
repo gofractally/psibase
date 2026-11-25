@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <psibase/block.hpp>
+#include <psibase/storage.hpp>
 #include <psizam/config.hpp>
 #include <psizam/options.hpp>
 #include <span>
@@ -18,13 +19,16 @@ namespace psibase
    /// The cache for a process that configures none: PSIBASE_NATIVE_AOT_CACHE,
    /// else one shared by the user's processes.
    std::shared_ptr<NativeAotCache> nativeAotCacheFromEnvironment();
-   /// The cache of a node whose data is in `dataDirectory`: a database of
-   /// its own beside the chain's, `cache/modules` (NativeAotDatabase), of at
-   /// most PSIBASE_NATIVE_AOT_CACHE_MB MiB if that is set. If
-   /// PSIBASE_NATIVE_AOT_CACHE is set it names a directory to use instead,
-   /// as for every other program: that is how the nodes of a test share what
-   /// one of them compiled, which a database, open in one process, cannot.
-   std::shared_ptr<NativeAotCache> nodeNativeAotCache(const std::filesystem::path& dataDirectory);
+   /// The cache of a node: records under `root`, the root of the node's
+   /// database that is no part of the chain (NativeAotDatabase), holding at
+   /// most PSIBASE_NATIVE_AOT_CACHE_MB MiB if that is set. Starting the node
+   /// with PSIBASE_NATIVE_AOT_CACHE_CLEAR=1 empties that root first: every
+   /// module is then compiled again when it is next needed, and nothing else
+   /// changes. If PSIBASE_NATIVE_AOT_CACHE is set it names a directory to use
+   /// instead, as for every other program: that is how the nodes of a test
+   /// share what one of them compiled, which a root of one node's database
+   /// cannot.
+   std::shared_ptr<NativeAotCache> nodeNativeAotCache(storage::cache_root root);
 
    /// The float profile a code version (CodeRow::vmVersion) executes under:
    /// 0 is the strict WebAssembly deterministic profile, 1 the deterministic
