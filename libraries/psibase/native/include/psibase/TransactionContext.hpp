@@ -6,7 +6,7 @@
 #include <psibase/Socket.hpp>
 #include <psibase/Watchdog.hpp>
 
-namespace eosio::vm
+namespace psizam::detail
 {
    struct stack_manager;
 }
@@ -66,14 +66,28 @@ namespace psibase
 
       std::chrono::nanoseconds getBillableTime();
 
+      // Stops the transaction's CPU budget while a service is compiled or its
+      // compiled code is loaded: a node that already has the code must not
+      // behave differently from one that does not. The budget runs again when
+      // the returned object is destroyed.
+      struct BillingPause
+      {
+         explicit BillingPause(TransactionContext& context);
+         ~BillingPause();
+         BillingPause(const BillingPause&) = delete;
+         TransactionContext& context;
+      };
+
       // Set watchdog timer; it will expire at startTime + serviceLoadTime + watchdogLimit.
       // This may be called multiple times with different limits; the most-recent limit applies.
-      void setWatchdog(CpuClock::duration watchdogLimit);
+      /// The VM limits this context executes services under.
+      const VMOptions& vmOptions() const;
+      void setWatchdog(RunClock::duration watchdogLimit);
 
       const WasmConfigRow& getWasmConfig() const;
 
       // Returns the alt stack for wasm execution.
-      eosio::vm::stack_manager& getAltStack();
+      psizam::detail::stack_manager& getAltStack();
 
       void incCodeRef(const Checksum256& codeHash,
                       std::uint8_t       vmType,

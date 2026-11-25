@@ -2,7 +2,6 @@ use p256::ecdsa::{Signature, SigningKey, signature::hazmat::PrehashSigner};
 use p256::pkcs8::DecodePrivateKey;
 use psibase::{
     account,
-    fracpack::Pack,
     services::{
         auth_sig::SubjectPublicKeyInfo,
         credentials,
@@ -406,12 +405,13 @@ fn system_writes_accumulate_shortfall(chain: psibase::Chain) -> Result<(), psiba
         net_after,
     );
 
-    // Confirm the free was exactly 93 bytes (the IncludedTrxTable row size)
+    // Confirm the free was exactly 92 bytes (the IncludedTrxTable row size:
+    // its key and the PSSZ of the row, a one-byte header and 40 bytes)
     let freed_bytes =
         disk_after.remaining_capacity as i128 - disk_before.remaining_capacity as i128;
     assert_eq!(
-        freed_bytes, 93,
-        "Expected exactly 93 bytes freed by startBlock system writes, got {}",
+        freed_bytes, 92,
+        "Expected exactly 92 bytes freed by startBlock system writes, got {}",
         freed_bytes,
     );
 
@@ -424,6 +424,189 @@ fn system_writes_accumulate_shortfall(chain: psibase::Chain) -> Result<(), psiba
     Ok(())
 }
 
+#[psibase::test_case(packages("VirtualServer", "StagedTx"))]
+fn settlement_creates_auto_debit_fee_balance(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    initial_setup(&chain)?;
+    let receiver = account!("fees");
+    chain.new_account(receiver)?;
+    Tokens::push_from(&chain, receiver)
+        .setUserConf(tokens::BalanceFlags::AUTO_DEBIT.index(), true)
+        .get()?;
+    assert_eq!(Tokens::push(&chain).getBalance(1, receiver).get()?.value, 0);
+
+    // The first settlement must allocate both the shared-balance indexes and
+    // the recipient's primary balance after the billing caches are drained.
+    super::helpers::enable_billing_with_receiver(&chain, receiver)?;
+    assert!(
+        Tokens::push_from(&chain, PRODUCER_ACCOUNT)
+            .getBalance(1, receiver)
+            .get()?
+            .value > 0
+    );
+    chain.finish_block();
+    assert!(check_disk_invariant("auto-debit fee settlement", &chain));
+    Ok(())
+}
+
+#[psibase::test_case(packages("VirtualServer", "StagedTx"))]
+fn settlement_exhausts_resource_buffer(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    initial_setup(&chain)?;
+    let alice = account!("alice");
+    Wrapper::push_from(&chain, alice)
+        .conf_buffer(Some(crate::tables::tables::BufferConfig {
+            threshold_percent: 0,
+            capacity: 0,
+        }))
+        .get()?;
+    setup_enable_billing(&chain)?;
+
+    // buy_res_for creates an automatically deleted Tokens subaccount. Charge
+    // exactly its balance using the trusted CPU-usage notification, while the
+    // funded producer pays the transaction's ordinary CPU/network/disk costs.
+    // This avoids depending on a measured execution time to hit zero exactly.
+    let buffer_key = psio::to_key(&(Tokens::SERVICE, 8u16, 0u8, Wrapper::SERVICE, alice.to_string()));
+    for _ in 0..2 {
+        let cost = Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .get_cpu_cost(1)
+            .get()?;
+        assert!(cost.value > 0);
+        Tokens::push_from(&chain, PRODUCER_ACCOUNT)
+            .credit(1, Wrapper::SERVICE, cost, "".into())
+            .get()?;
+        Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .buy_res_for(cost, alice, None)
+            .get()?;
+        assert!(chain.kv_get_bytes(DbId::Service, &buffer_key).is_some());
+
+        chain
+            .propose::<Wrapper>(PRODUCER_ACCOUNT, services::transact::Wrapper::SERVICE)
+            .useCpuSys(alice, 1)
+            .get()?;
+        assert!(chain.kv_get_bytes(DbId::Service, &buffer_key).is_none());
+        assert_eq!(
+            Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+                .get_resources(alice)
+                .get()?
+                .value,
+            0
+        );
+    }
+
+    chain.finish_block();
+    assert!(check_disk_invariant("exhausted resource buffer settlement", &chain));
+    Ok(())
+}
+
+// End to end: alice starts with only what her transaction's bytes and the
+// purchase's own writes cost, buys resources in her first action and then does
+// work the purchase pays for. The purchase updates the limit of the transaction
+// it runs in (see tests/billed_balance.rs for the rule).
+//
+// This cannot show the limit rising by timing: at current prices the cost of
+// storing one byte buys most of a second of CPU, so any balance that covers
+// the purchase's writes already affords more CPU than a block allows.
+#[psibase::test_case(packages("VirtualServer", "StagedTx"))]
+fn resources_bought_in_a_transaction_pay_for_the_rest_of_it(
+    chain: psibase::Chain,
+) -> Result<(), psibase::Error> {
+    initial_setup(&chain)?;
+    let sys: tokens::TID = 1;
+    let alice = account!("alice");
+    let bob = account!("bob");
+    // No automatic refill: alice has exactly what is bought for her.
+    Wrapper::push_from(&chain, alice)
+        .conf_buffer(Some(crate::tables::tables::BufferConfig {
+            threshold_percent: 0,
+            capacity: 0,
+        }))
+        .get()?;
+    // What alice will buy with, credited before she has to pay for anything.
+    let purchase: Quantity = 1_000_0000u64.into();
+    Tokens::push_from(&chain, alice)
+        .credit(sys, Wrapper::SERVICE, (purchase.value * 2).into(), "".into())
+        .get()?;
+    setup_enable_billing(&chain)?;
+
+    // The work: enough transfers to take many times the starting allowance.
+    const TRANSFERS: usize = 40;
+    const STARTING_CPU_NS: u64 = 5_000_000; // 5 ms, plus the service's leeway
+    const PURCHASE_DISK_BYTES: u64 = 2_000;
+    let build = |with_purchase: bool| {
+        let memo: psibase::Memo = "".into();
+        let mut actions = Vec::new();
+        if with_purchase {
+            actions.push(Wrapper::pack_from(alice).buy_res(purchase));
+        }
+        for _ in 0..TRANSFERS {
+            actions.push(Tokens::pack_from(alice).credit(
+                sys,
+                bob,
+                Quantity::from(1u64),
+                memo.clone(),
+            ));
+        }
+        let mut trx = Transaction {
+            tapos: Default::default(),
+            actions,
+            claims: vec![],
+        };
+        chain.fill_tapos(&mut trx, 2);
+        SignedTransaction {
+            transaction: psio::pssz::Nested::unchecked(psio::to_pssz(&trx)),
+            proofs: vec![],
+            subjectiveData: None,
+        }
+    };
+    // Give alice what the transaction's bytes cost, what the purchase writes,
+    // and a little CPU.
+    // The balance is one pool, so anything over the byte cost is CPU she can
+    // afford: the byte cost has to be the transaction's own, not an estimate.
+    let fund_start = |trx: &SignedTransaction| -> Result<(), psibase::Error> {
+        let available = Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .get_resources(alice)
+            .get()?;
+        let net = Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .get_net_cost(psio::to_pssz(trx).len() as u64)
+            .get()?;
+        let cpu = Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .get_cpu_cost(STARTING_CPU_NS)
+            .get()?;
+        // The purchase itself writes rows before it credits the balance.
+        let disk = Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .get_disk_cost(PURCHASE_DISK_BYTES)
+            .get()?;
+        println!(
+            "starting balance: net {} + cpu {} + disk {}",
+            net.value, cpu.value, disk.value
+        );
+        let wanted = net.value + cpu.value + disk.value;
+        if wanted <= available.value {
+            return Ok(());
+        }
+        let start: Quantity = (wanted - available.value).into();
+        Tokens::push_from(&chain, PRODUCER_ACCOUNT)
+            .credit(sys, Wrapper::SERVICE, start, "".into())
+            .get()?;
+        Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .buy_res_for(start, alice, None)
+            .get()?;
+        Ok(())
+    };
+
+    // With the purchase as its first action it runs to the end.
+    fund_start(&build(true))?;
+    let funded = build(true);
+    let trace = chain.push(&funded);
+    println!("with the purchase: {:?}", trace.error);
+    assert!(
+        trace.error.is_none(),
+        "a transaction that bought resources in its first action did not complete: {}",
+        trace.error.unwrap_or_default()
+    );
+    chain.finish_block();
+    Ok(())
+}
+
 // Bytes consumed since init
 fn disk_consumed(chain: &psibase::Chain) -> u64 {
     let disk = get_disk_state(chain);
@@ -431,7 +614,7 @@ fn disk_consumed(chain: &psibase::Chain) -> u64 {
 }
 
 fn status_row_bytes(chain: &psibase::Chain) -> u64 {
-    let key = status_key().to_key();
+    let key = psio::to_key(&status_key());
     chain
         .kv_get_bytes(DbId::Native, &key)
         .map(|value| key.len() as u64 + value.len() as u64)
@@ -563,11 +746,10 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
         .into_contents();
 
     let fingerprint = psibase::sha256(&inv_pubkey_der);
-    let payload = InvPayload {
+    let payload = psio::to_pssz(&InvPayload {
         fingerprint: fingerprint.to_vec(),
         secret: "".to_string(),
-    }
-    .packed();
+    });
 
     invite::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
         .createInvite(invite_id, payload, 1, false, min_cost.into())
@@ -585,11 +767,10 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
             sender: credentials::CREDENTIAL_SENDER,
             service: invite,
             method: MethodNumber::new(method_raw!("createAccount")),
-            rawData: (
+            rawData: psio::to_pssz(&(
                 account!("alicealice"),
                 SubjectPublicKeyInfo(new_pub_key_der),
-            )
-                .packed()
+            ))
                 .into(),
         }],
         claims: vec![Claim {
@@ -598,20 +779,22 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
         }],
     };
     chain.fill_tapos(&mut trx, 2);
-    let tx_packed = trx.packed();
+    let tx_packed = psio::to_pssz(&trx);
     let signing_key =
         SigningKey::from_pkcs8_pem(&private_key).map_err(|e| psibase::Error::new(e))?;
     let signature: Signature = signing_key
-        .sign_prehash(&psibase::sha256(&tx_packed).0)
+        .sign_prehash(&psibase::sha256(&tx_packed))
         .map_err(|e| psibase::Error::new(e))?;
+    // verify-sig only accepts the low-S form.
+    let signature = signature.normalize_s().unwrap_or(signature);
     let strx = SignedTransaction {
-        transaction: tx_packed.into(),
+        transaction: psio::pssz::Nested::unchecked(tx_packed),
         proofs: vec![signature.to_bytes().to_vec().into()],
         subjectiveData: None,
     };
     let trace = chain.push(&strx);
     if trace.error.is_some() {
-        println!("{}", trace.error.unwrap());
+        println!("{}", trace.error_text().unwrap());
         assert!(false, "Invite create acc fail");
     }
 
@@ -622,8 +805,8 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
     );
 
     // Verify that the resource balance of cred_sys is untouched
-    use psibase::fracpack::Unpack;
-    let cred_resources = Quantity::unpacked(
+
+    let cred_resources = psio::from_pssz::<Quantity>(
         &chain
             .run_action(
                 RunMode::RPC,
