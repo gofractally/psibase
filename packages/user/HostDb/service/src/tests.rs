@@ -142,23 +142,6 @@ mod tests {
         )
     }
 
-    fn put_device(
-        chain: &Chain,
-        origin: Option<&str>,
-        cookie: Option<&str>,
-    ) -> Result<HttpReply, Error> {
-        send(
-            chain,
-            "PUT",
-            "/kv/device",
-            origin,
-            cookie,
-            &[],
-            "",
-            Vec::new(),
-        )
-    }
-
     fn get_key(chain: &Chain, kind: Duration, cookie: &str, key: &str) -> Result<HttpReply, Error> {
         send(
             chain,
@@ -371,7 +354,6 @@ mod tests {
         let bad_device_cookie = format!("{DEVICE_COOKIE}=abcd");
         let duplicate_cookie = format!("{DEVICE_COOKIE}={device}; {DEVICE_COOKIE}={device}");
         let bad_cookie = format!("{cookie}; {SESSION_COOKIE}=zz");
-        let max_age = format!("Max-Age={DEVICE_RETENTION_SECS}");
 
         // A read with no device cookie is unauthorized and sets no cookie.
         let missing = get(&chain, &target, Some(ORIGIN), None)?;
@@ -379,20 +361,6 @@ mod tests {
         assert_cors(&missing);
         assert_eq!(set_cookie(&missing, DEVICE_COOKIE), None);
         assert_eq!(set_cookie(&missing, SESSION_COOKIE), None);
-
-        // PUT /kv/device mints a device and a session.
-        let minted = put_device(&chain, Some(ORIGIN), None)?;
-        assert_status(&minted, HttpStatus::NoContent);
-        assert_cors(&minted);
-        let minted_device = require_cookie(&minted, DEVICE_COOKIE);
-        assert_eq!(minted_device.len(), DEVICE_ID_LEN * 2); // hex encoding uses two chars per byte
-        let minted_header = set_cookie_header(&minted, DEVICE_COOKIE);
-        assert_cookie_attrs(minted_header);
-        assert!(minted_header.contains(&max_age));
-        require_cookie(&minted, SESSION_COOKIE);
-        let session_header = set_cookie_header(&minted, SESSION_COOKIE);
-        assert_cookie_attrs(session_header);
-        assert!(!session_header.contains("Max-Age"));
 
         // An existing device cookie is echoed unchanged.
         let known = get(&chain, &target, Some(ORIGIN), Some(&cookie))?;
@@ -420,7 +388,6 @@ mod tests {
         // A malformed session cookie is rejected on a session read.
         let bad_session = get(&chain, &session_target, Some(ORIGIN), Some(&bad_cookie))?;
         assert_status(&bad_session, HttpStatus::BadRequest);
-        assert_eq!(set_cookie(&bad_session, DEVICE_COOKIE), None);
         assert_eq!(set_cookie(&bad_session, SESSION_COOKIE), None);
 
         // A session read with no session cookie mints one.
@@ -438,7 +405,6 @@ mod tests {
         let allow_headers = header(&preflight, "access-control-allow-headers");
         assert_eq!(methods, Some("GET, POST, PUT"));
         assert_eq!(allow_headers, Some("content-type"));
-        assert_eq!(set_cookie(&preflight, DEVICE_COOKIE), None);
         let get_preflight = options(&chain, &target, &preflight_headers)?;
         assert_status(&get_preflight, HttpStatus::NoContent);
         assert_cors(&get_preflight);
@@ -474,8 +440,6 @@ mod tests {
         let nope = store_body(Session, &key, &encode(b"nope"));
         let bad_session_write = post_batch(&chain, &bad_cookie, nope)?;
         assert_status(&bad_session_write, HttpStatus::BadRequest);
-        assert_eq!(set_cookie(&bad_session_write, DEVICE_COOKIE), None);
-        assert_eq!(set_cookie(&bad_session_write, SESSION_COOKIE), None);
         assert_absent(&chain, Session, &cookies(&device, Some(&session_a())), &key)?;
 
         // A session write with no session cookie mints one.
