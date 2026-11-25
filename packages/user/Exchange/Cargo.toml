@@ -16,6 +16,9 @@ HttpServer = "0.29.0"
 Transact = "0.29.0"
 Sites = "0.29.0"
 Events = "0.29.0"
+Host = "0.29.0"
+Permissions = "0.29.0"
+Accounts = "0.29.0"
 [dependencies]
 exchange = { path = "service" }
 r-exchange = { path = "query-service" }
