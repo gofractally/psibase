@@ -2,7 +2,7 @@ use crate::bindings::exports::host::prompt::admin::PromptDetails;
 use crate::host::client::api::{get_active_app, get_sender};
 use crate::host::db::store::{DbMode::*, StorageDuration::*, *};
 use chrono::Utc;
-use psibase::fracpack::{Pack, Unpack};
+
 
 mod tables {
     use super::*;
@@ -18,7 +18,7 @@ mod tables {
     }
 }
 
-#[derive(Pack, Unpack)]
+#[derive(psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct ActivePrompt {
     pub prompt_app: String,
     pub active_app: String, // Currently active application
@@ -56,11 +56,11 @@ pub struct ActivePrompts;
 impl ActivePrompts {
     pub fn set(prompt_name: String, packed_context: Option<Vec<u8>>) {
         let prompt = ActivePrompt::new(prompt_name, packed_context);
-        tables::active_prompt().set(PROMPT_KEY, &prompt.packed());
+        tables::active_prompt().set(PROMPT_KEY, &psio::to_pssz(&prompt));
     }
 
     pub fn get() -> Option<ActivePrompt> {
         let val = tables::active_prompt().get(PROMPT_KEY).unwrap();
-        Some(<ActivePrompt>::unpacked(&val).unwrap())
+        Some(psio::from_pssz::<ActivePrompt>(&val).unwrap())
     }
 }

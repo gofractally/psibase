@@ -44,13 +44,13 @@ namespace
 
 }  // namespace
 
-UniqueKvHandle XDb::open(DbId db, psio::view<const std::vector<char>> prefixView, KvMode mode)
+UniqueKvHandle XDb::open(DbId db, psio::pssz_view<std::vector<char>> prefixView, KvMode mode)
 {
    auto prefix        = std::span<const char>(prefixView);
    auto sender        = getSender();
    auto requirePrefix = [&]
    {
-      auto expected = psio::convert_to_key(sender);
+      auto expected = psio::to_key(sender);
       if (!std::ranges::starts_with(prefix, expected))
       {
          abortMessage("key prefix must match service");

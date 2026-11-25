@@ -19,12 +19,12 @@ use exports::packages::plugin::queries::Guest as Queries;
 use setcode::plugin::api as SetCode;
 use sites::plugin::api as Sites;
 
-use psibase::fracpack::{Pack, Unpack};
+
 use psibase::services::packages::PackageSource;
 use psibase::{
     fetch_all_schemas, make_refs, method, solve_dependencies, AccountNumber, Action,
     EssentialServices, InstalledPackageInfo, PackageDisposition, PackageList, PackageManifest,
-    PackagedService, Schema, SchemaFetcher, SchemaMap, ServiceWrapper, StagedUpload,
+    PackagedService, SchemaFetcher, SchemaMap, ServiceSchema, ServiceWrapper, StagedUpload,
     TransactionBuilder,
 };
 
@@ -92,7 +92,7 @@ impl From<types::PackageInfo> for psibase::PackageInfo {
                 .map(|a| a.parse().unwrap())
                 .collect(),
             exports: value.exports.into_iter().map(|e| e.into()).collect(),
-            sha256: value.sha256.parse().unwrap(),
+            sha256: psio::from_hex_array(&value.sha256).unwrap(),
             file: value.file,
         }
     }
@@ -109,7 +109,7 @@ impl From<psibase::PackageInfo> for types::PackageInfo {
             accounts: value.accounts.into_iter().map(|a| a.to_string()).collect(),
             services: value.services.into_iter().map(|a| a.to_string()).collect(),
             exports: value.exports.into_iter().map(|e| e.into()).collect(),
-            sha256: value.sha256.to_string(),
+            sha256: psio::to_hex(&value.sha256),
             file: value.file,
         }
     }
@@ -228,7 +228,8 @@ struct InstalledEdge {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct NextPageInfo {
     hasNextPage: bool,
-    endCursor: String,
+    /// Null on a page without edges.
+    endCursor: Option<String>,
 }
 
 #[allow(non_snake_case)]
@@ -259,7 +260,7 @@ fn get_installed_packages() -> Result<Vec<psibase::InstalledPackageInfo>, HostTy
         if !root.data.installed.pageInfo.hasNextPage {
             break;
         }
-        end_cursor = Some(root.data.installed.pageInfo.endCursor);
+        end_cursor = root.data.installed.pageInfo.endCursor;
     }
     Ok(result)
 }
@@ -290,7 +291,7 @@ struct PluginSchemaFetcher;
 
 #[async_trait(?Send)]
 impl SchemaFetcher for PluginSchemaFetcher {
-    async fn fetch_schema(&self, service: AccountNumber) -> Result<Schema, anyhow::Error> {
+    async fn fetch_schema(&self, service: AccountNumber) -> Result<ServiceSchema, anyhow::Error> {
         Ok(serde_json::from_str(&Server::get_json(&format!(
             "/schema?service={service}"
         ))?)?)
@@ -492,7 +493,7 @@ impl PrivateApi for PackagesPlugin {
                 0,
                 PackagesService::Wrapper::pack_from(sender).checkOrder(id.clone(), index),
             );
-            Ok(actions.packed())
+            Ok(psio::to_pssz(&actions))
         };
 
         let action_limit: usize = 1024 * 1024;
@@ -509,7 +510,7 @@ impl PrivateApi for PackagesPlugin {
 
         let mut upload_builder = TransactionBuilder::new(
             action_limit,
-            |actions: Vec<Action>| -> Result<Vec<u8>, anyhow::Error> { Ok(actions.packed()) },
+            |actions: Vec<Action>| -> Result<Vec<u8>, anyhow::Error> { Ok(psio::to_pssz(&actions)) },
         );
         let mut packages = packages
             .into_iter()
@@ -564,15 +565,15 @@ impl PrivateApi for PackagesPlugin {
     fn push_data(tx: Vec<u8>) {
         assert_caller_config_or_self("push_data");
 
-        let tx = <Vec<Action>>::unpacked(&tx).unwrap();
+        let tx = psio::from_pssz::<Vec<Action>>(&tx).unwrap();
         for action in tx {
             if action.service == SitesService::SERVICE && action.method == method!("storeSys") {
                 let data =
-                    SitesService::action_structs::storeSys::unpacked(&action.rawData).unwrap();
+                    psio::from_pssz::<SitesService::action_structs::storeSys>(&action.rawData).unwrap();
                 let file = Sites::File {
-                    path: data.path,
+                    path: data.path.to_string_lossy().into_owned(),
                     content_type: data.contentType,
-                    content: data.content.0,
+                    content: data.content,
                 };
                 if let Some(encoding) = data.contentEncoding {
                     Sites::upload_encoded(&file, &encoding).unwrap()
@@ -583,24 +584,24 @@ impl PrivateApi for PackagesPlugin {
                 && action.method == method!("stageCode")
             {
                 let data =
-                    SetCodeService::action_structs::stageCode::unpacked(&action.rawData).unwrap();
+                    psio::from_pssz::<SetCodeService::action_structs::stageCode>(&action.rawData).unwrap();
                 assert!(data.vmType == 0);
                 assert!(data.vmVersion == 0);
-                SetCode::stage_service_code(&data.service.to_string(), data.id, &data.code.0)
+                SetCode::stage_service_code(&data.service.to_string(), data.id, &data.code)
             }
         }
     }
     fn propose_install(tx: Vec<u8>) -> Result<(), HostTypes::Error> {
         assert_caller_config_or_self("propose_install");
 
-        let tx = <Vec<Action>>::unpacked(&tx).unwrap();
+        let tx = psio::from_pssz::<Vec<Action>>(&tx).unwrap();
         propose(&tx.into_iter().map(|a| a.into()).collect::<Vec<_>>(), true)
     }
 
     fn set_account_sources(accounts: Vec<String>) -> Result<(), HostTypes::Error> {
         assert_caller_config_or_self("set_account_sources");
 
-        let packed_args = psibase::services::packages::action_structs::setSources {
+        let packed_args = psio::to_pssz(&psibase::services::packages::action_structs::setSources {
             sources: accounts
                 .into_iter()
                 .map(|account| PackageSource {
@@ -608,11 +609,10 @@ impl PrivateApi for PackagesPlugin {
                     url: None,
                 })
                 .collect(),
-        }
-        .packed();
+        });
 
         add_action_to_transaction(
-            psibase::services::packages::action_structs::setSources::ACTION_NAME,
+            <psibase::services::packages::action_structs::setSources as psio::interface::Method>::NAME,
             &packed_args,
         )?;
         Ok(())
@@ -625,7 +625,7 @@ impl From<Action> for transact::plugin::types::Action {
             sender: action.sender.to_string(),
             service: action.service.to_string(),
             method: action.method.to_string(),
-            raw_data: action.rawData.0,
+            raw_data: action.rawData,
         }
     }
 }

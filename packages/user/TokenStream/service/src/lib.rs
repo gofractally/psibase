@@ -2,14 +2,13 @@
 pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::tokens::{Decimal, Precision, Quantity, TID};
-    use psibase::{AccountNumber, Pack, ServiceWrapper, Table, TimePointSec, ToSchema, Unpack};
-    use serde::{Deserialize, Serialize};
+    use psibase::{AccountNumber, ServiceWrapper, Table, TimePointSec};
 
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::transact::Wrapper as TransactSvc;
 
     #[table(name = "StreamTable", index = 0)]
-    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct Stream {
         #[primary_key]
@@ -51,7 +50,7 @@ pub mod tables {
     impl Stream {
         fn new(half_life_seconds: u32, token_id: u32) -> Self {
             assert!(half_life_seconds > 0, "half life must be over 0");
-            let now = TransactSvc::call().currentBlock().time.seconds();
+            let now = TransactSvc::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
 
             Self {
                 nft_id: Nfts::call().mint(None),
@@ -117,7 +116,7 @@ pub mod tables {
             self.claimable_at_last_deposit = already_claimable;
             self.total_claimed = 0.into();
             self.total_deposited = (still_in_stream.value + amount.value).into();
-            self.last_deposit_timestamp = TransactSvc::call().currentBlock().time.seconds();
+            self.last_deposit_timestamp = TransactSvc::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
 
             self.save();
         }
@@ -145,8 +144,8 @@ pub mod tables {
             if self.total_deposited.value == 0 {
                 return self.claimable_at_last_deposit;
             }
-            let now = TransactSvc::call().currentBlock().time.seconds().seconds;
-            let delta_seconds = (now - self.last_deposit_timestamp.seconds) as f64;
+            let now = TransactSvc::call().currentBlock().time.floor::<psibase::psio::time::Seconds>().ticks();
+            let delta_seconds = (now - self.last_deposit_timestamp.ticks()) as f64;
             let factor = (-self.decay_rate() * delta_seconds).exp();
             let new_principal = self
                 .total_deposited

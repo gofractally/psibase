@@ -6,14 +6,13 @@ pub mod tables {
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::tokens::{icon_hash, Decimal, Precision, Quantity};
     use psibase::{
-        abort_message, get_sender, AccountNumber, Checksum256, Memo, ServiceWrapper, TableRecord,
+        abort_message, get_sender, AccountNumber, Memo, ServiceWrapper, TableRecord,
     };
     use psibase::{define_flags, Flags};
-    use psibase::{Pack, Table, ToSchema, Unpack};
-    use serde::{Deserialize, Serialize};
+    use psibase::{Table};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
+    #[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct InitRow {
         pub last_used_id: TID,
         pub last_used_shared_bal_id: u64,
@@ -89,7 +88,7 @@ pub mod tables {
     }
 
     #[table(name = "TokenTable", index = 1)]
-    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct Token {
         #[primary_key]
@@ -288,13 +287,13 @@ pub mod tables {
         }
 
         /// Content hash of the token's icon, or null if it has no icon
-        pub async fn icon_hash(&self) -> Option<Checksum256> {
-            icon_hash(self.id)
+        pub async fn icon_hash(&self) -> Option<String> {
+            icon_hash(self.id).map(|hash| psio::to_hex(&hash))
         }
     }
 
     #[table(name = "BalanceTable", index = 2)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject)]
+    #[derive(Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct Balance {
         pub account: AccountNumber,
@@ -401,8 +400,8 @@ pub mod tables {
         }
 
         /// Content hash of the token's icon, or null if it has no icon
-        pub async fn icon_hash(&self) -> Option<Checksum256> {
-            icon_hash(self.token_id)
+        pub async fn icon_hash(&self) -> Option<String> {
+            icon_hash(self.token_id).map(|hash| psio::to_hex(&hash))
         }
 
         pub async fn precision(&self) -> Precision {
@@ -414,7 +413,7 @@ pub mod tables {
     }
 
     #[table(name = "SharedBalanceTable", index = 3)]
-    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[derive(SimpleObject, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct SharedBalance {
         #[primary_key]
@@ -456,8 +455,8 @@ pub mod tables {
         }
 
         /// Content hash of the token's icon, or null if it has no icon
-        pub async fn icon_hash(&self) -> Option<Checksum256> {
-            icon_hash(self.token_id)
+        pub async fn icon_hash(&self) -> Option<String> {
+            icon_hash(self.token_id).map(|hash| psio::to_hex(&hash))
         }
 
         pub async fn precision(&self) -> Precision {
@@ -469,6 +468,14 @@ pub mod tables {
     }
 
     impl SharedBalance {
+        // Added for fresh deployments. Existing chains must populate this
+        // secondary index for every SharedBalance row before upgrading callers
+        // to rely on it; see docs/exchange/SECURITY.md.
+        #[secondary_key(1)]
+        pub fn by_creditor_debitor_token(&self) -> (AccountNumber, AccountNumber, TID) {
+            (self.creditor, self.debitor, self.token_id)
+        }
+
         fn new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
             Token::get_assert(token_id);
             assert_ne!(
@@ -493,32 +500,10 @@ pub mod tables {
             }
         }
 
-        pub fn get(
-            creditor: AccountNumber,
-            debitor: AccountNumber,
-            token_id: TID,
-        ) -> Option<Self> {
-            let shared_creditor_bal_ids = UserPendingTable::read()
-                .get_index_pk()
-                .range((creditor, token_id, 0_u64)..(creditor, token_id, u64::MAX))
-                .map(|bal| bal.shared_bal_id)
-                .collect::<Vec<_>>();
-
-            if shared_creditor_bal_ids.is_empty() {
-                return None;
-            }
-
-            shared_creditor_bal_ids.iter().find_map(|bal_id| {
-                let shared_bal = SharedBalanceTable::read().get_index_pk().get(bal_id)?;
-                if shared_bal.creditor == creditor
-                    && shared_bal.debitor == debitor
-                    && shared_bal.token_id == token_id
-                {
-                    Some(shared_bal)
-                } else {
-                    None
-                }
-            })
+        pub fn get(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Option<Self> {
+            SharedBalanceTable::read()
+                .get_index_by_creditor_debitor_token()
+                .get(&(creditor, debitor, token_id))
         }
 
         pub fn get_assert(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
@@ -526,7 +511,8 @@ pub mod tables {
         }
 
         pub fn get_or_new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
-            Self::get(creditor, debitor, token_id).unwrap_or(Self::new(creditor, debitor, token_id))
+            Self::get(creditor, debitor, token_id)
+                .unwrap_or_else(|| Self::new(creditor, debitor, token_id))
         }
 
         pub fn credit(&mut self, quantity: Quantity, memo: Memo) {
@@ -674,7 +660,7 @@ pub mod tables {
     });
 
     #[table(name = "BalanceConfigTable", index = 4)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject)]
+    #[derive(Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct BalanceConfig {
         pub account: AccountNumber,
         pub token_id: TID,
@@ -740,7 +726,7 @@ pub mod tables {
     }
 
     #[table(name = "UserConfigTable", index = 5)]
-    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[derive(SimpleObject, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct UserConfig {
         #[primary_key]
@@ -795,7 +781,7 @@ pub mod tables {
     }
 
     #[table(name = "ConfigTable", index = 6)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject)]
+    #[derive(Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct ConfigRow {
         pub sys_tid: TID,
@@ -814,7 +800,7 @@ pub mod tables {
     }
 
     #[table(name = "UserPendingTable", index = 7)]
-    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[derive(SimpleObject, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct UserPendingRecord {
         #[graphql(skip)]
@@ -867,7 +853,7 @@ pub mod tables {
     }
 
     #[table(name = "SubAccountTable", index = 8)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject)]
+    #[derive(Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct SubAccount {
         pub account: AccountNumber,
         pub sub_account: String,
@@ -995,7 +981,7 @@ pub mod tables {
     }
 
     #[table(name = "SubAccountBalanceTable", index = 9)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject)]
+    #[derive(Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct SubAccountBalance {
         #[graphql(skip)]

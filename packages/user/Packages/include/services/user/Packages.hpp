@@ -10,14 +10,14 @@ namespace UserService
       std::string name;
       std::string version;
    };
-   PSIO_REFLECT(PackageRef, name, version)
+   PSIO_REFLECT(PackageRef, attr(name, utf8), attr(version, utf8))
 
    struct PackageExport
    {
       std::string            name;
       psibase::AccountNumber service;
    };
-   PSIO_REFLECT(PackageExport, name, service)
+   PSIO_REFLECT(PackageExport, attr(name, utf8), service)
 
    struct PackageMeta
    {
@@ -31,10 +31,10 @@ namespace UserService
       std::vector<PackageExport>          exports;
    };
    PSIO_REFLECT(PackageMeta,
-                name,
-                version,
-                scope,
-                description,
+                attr(name, utf8),
+                attr(version, utf8),
+                attr(scope, utf8),
+                attr(description, utf8),
                 depends,
                 accounts,
                 services,
@@ -76,7 +76,7 @@ namespace UserService
       std::optional<std::string>            url;
       std::optional<psibase::AccountNumber> account;
    };
-   PSIO_REFLECT(PackageSource, url, account)
+   PSIO_REFLECT(PackageSource, attr(url, utf8), account)
 
    struct PackageSources
    {
@@ -106,9 +106,9 @@ namespace UserService
       using ByName = psibase::CompositeKey<&InstalledPackage::name, &InstalledPackage::owner>;
    };
    PSIO_REFLECT(InstalledPackage,
-                name,
-                version,
-                description,
+                attr(name, utf8),
+                attr(version, utf8),
+                attr(description, utf8),
                 depends,
                 accounts,
                 services,
@@ -132,7 +132,7 @@ namespace UserService
 
       using ByName = psibase::CompositeKey<&PackageManifest::name, &PackageManifest::owner>;
    };
-   PSIO_REFLECT(PackageManifest, name, owner, data)
+   PSIO_REFLECT(PackageManifest, attr(name, utf8), owner, data)
 
    struct InstalledSchema
    {
@@ -193,9 +193,9 @@ namespace UserService
    };
    PSIO_REFLECT(Packages,
                 method(postinstall, package, manifest),
-                method(setSchema, account, schema),
-                method(getSchema),
-                method(publish, package, sha256, file),
+                method(setSchema, schema),
+                method(getSchema, service),
+                method(publish, package, sha256, attr(file, utf8)),
                 method(setSources, sources),
                 method(checkOrder, id, index),
                 method(removeOrder, id))

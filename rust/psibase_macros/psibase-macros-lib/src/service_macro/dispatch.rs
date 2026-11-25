@@ -3,6 +3,8 @@ use syn::{ItemFn, ReturnType};
 
 pub fn process_dispatch_body(
     psibase_mod: &proc_macro2::TokenStream,
+    psio_mod: &proc_macro2::TokenStream,
+    args_mod: &proc_macro2::TokenStream,
     f: &ItemFn,
     dispatch_body: &mut proc_macro2::TokenStream,
     invoke_struct_args: proc_macro2::TokenStream,
@@ -10,8 +12,9 @@ pub fn process_dispatch_body(
     let name = &f.sig.ident;
     let name_str = name.to_string();
 
+    // The arguments of an action come from outside the service: validated.
     let args_unpacking = if !invoke_struct_args.is_empty() {
-        quote! { let args = <super::action_structs::#name as #psibase_mod::fracpack::Unpack>::unpacked(&act.rawData)?; }
+        quote! { let args = #psio_mod::from_pssz::<super::#args_mod::#name>(raw_data)?; }
     } else {
         quote! {}
     };
@@ -23,11 +26,11 @@ pub fn process_dispatch_body(
     } else {
         quote! {
             let val = super::#name(#invoke_struct_args);
-            #psibase_mod::set_retval(&val);
+            #psibase_mod::set_method_retval::<super::#args_mod::#name>(&val);
         }
     };
 
-    let method_comparison = quote! { act.method == #psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str)) };
+    let method_comparison = quote! { method == #psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str)) };
 
     let if_block = if dispatch_body.is_empty() {
         quote! { if }
@@ -54,7 +57,7 @@ pub fn add_unknown_action_check_to_dispatch_body(
             else {
                 #psibase_mod::abort_message(&format!(
                     "unknown service action: {}",
-                    act.method.to_string()
+                    method.to_string()
                 ));
             }
         };

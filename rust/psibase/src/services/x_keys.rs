@@ -33,6 +33,6 @@ mod service {
 fn verify_schema() {
     // TODO:
     // C++ uses shared_view_ptr in SignedTransaction
-    // Rust uses raw Hex<Vec<u8>>
+    // Rust uses raw Vec<u8>
     // crate::assert_schema_matches_package::<Wrapper>();
 }

@@ -125,7 +125,7 @@ template <typename QueryRoot>
 auto gql(DefaultTestChain& t, const std::string& query_str)
 {
    auto body = query(t, query_str);
-   return psio::convert_from_json<QueryRoot>(body);
+   return psio::from_ijson<QueryRoot>(body);
 }
 
 TEST_CASE("test merkle events")

@@ -254,7 +254,7 @@ namespace SystemService
       /// the node operator is committing as part of the boot sequence. The subsequent
       /// transactions listed must then be pushed in order, and no other transactions
       /// will be accepted until [finishBoot] is run.
-      void startBoot(psio::view<const std::vector<psibase::Checksum256>> bootTransactions);
+      void startBoot(psio::pssz_view<std::vector<psibase::Checksum256>> bootTransactions);
 
       /// Only called once during chain initialization
       ///
@@ -269,7 +269,7 @@ namespace SystemService
       void startBlock();
 
       /// Called by RTransact to execute a transaction speculatively
-      void execTrx(psio::view<const psio::shared_view_ptr<psibase::Transaction>> trx,
+      void execTrx(psio::pssz_view<psio::shared_pssz<psibase::Transaction>> transaction,
                    bool                                                          speculative);
 
       /// Called by native code on objective writes to the database
@@ -285,6 +285,14 @@ namespace SystemService
       /// setting because snapshots are signed by the block producers.
       void setSnapTime(uint32_t seconds);
 
+      /// Sets the most bytes of transactions a block may hold
+      ///
+      /// A transaction counts for its packed size plus its proofs. A block
+      /// with a single transaction is exempt, so one large transaction can
+      /// always be included. This is a consensus rule: validators reject a
+      /// block that breaks it. The new limit applies from the next block.
+      void setMaxBlockSize(uint32_t bytes);
+
       /// Adds a callback that will be run whenever the trigger happens.
       /// - onTransaction is run at the end of every transaction
       /// - onBlock runs at the end of every block
@@ -299,9 +307,9 @@ namespace SystemService
       /// identical callback is already registered.
       ///
       /// The order in which callbacks are executed is unspecified.
-      void addCallback(CallbackType type, bool objective, psibase::Action act);
+      void addCallback(CallbackType type, bool objective, psibase::Action action);
       /// Removes an existing callback
-      void removeCallback(CallbackType type, bool objective, psibase::Action act);
+      void removeCallback(CallbackType type, bool objective, psibase::Action action);
 
       /// Registers an event index service
       void regEvIdx(psibase::AccountNumber service);
@@ -332,7 +340,7 @@ namespace SystemService
 
       /// Checks authorization for the sender of the first action
       bool checkFirstAuth(psibase::Checksum256                   id,
-                          psio::view<const psibase::Transaction> transaction);
+                          psio::pssz_view<psibase::Transaction> transaction);
 
       /// Enable/disable resource monitoring
       void resMonitoring(bool enable);
@@ -368,7 +376,7 @@ namespace SystemService
       void setWork(bool work);
 
       /// Get the currently executing transaction
-      psio::view<const psibase::Transaction> getTransaction() const;
+      psio::pssz_view<psibase::Transaction> getTransaction() const;
 
       /// Returns true if running a transaction
       bool isTransaction() const;
@@ -396,13 +404,13 @@ namespace SystemService
       };
    };
    PSIO_REFLECT(Transact,
-                allowHashedMethods(),
                 method(startBoot, bootTransactions),
                 method(finishBoot),
                 method(startBlock),
                 method(execTrx, transaction, speculative),
                 method(kvNotify, service, db, keyLen, oldValueLen, newValueLen),
                 method(setSnapTime, seconds),
+                method(setMaxBlockSize, bytes),
                 method(addCallback, type, objective, action),
                 method(removeCallback, type, objective, action),
                 method(regEvIdx, service),
@@ -521,12 +529,12 @@ namespace SystemService
          return {0, 0};  // Usable for transactions in the genesis block
    }
 
-   inline bool isStartBlock(psio::view<const psibase::Action> act)
+   inline bool isStartBlock(psio::pssz_view<psibase::Action> act)
    {
       return act.sender() == psibase::AccountNumber{} && act.service() == Transact::service &&
              act.method() == psibase::MethodNumber{"startBlock"};
    }
-   inline bool isStartBlock(psio::view<const psibase::Transaction> tx)
+   inline bool isStartBlock(psio::pssz_view<psibase::Transaction> tx)
    {
       return tx.actions().size() == 1 && isStartBlock(tx.actions()[0]);
    }

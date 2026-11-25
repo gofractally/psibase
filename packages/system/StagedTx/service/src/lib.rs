@@ -28,7 +28,7 @@ pub mod service {
     pub use crate::db::tables::*;
     pub use crate::event::StagedTxEvent;
     use crate::policy::StagedTxPolicy;
-    use fracpack::Pack;
+
     use psibase::services::transact::ServiceMethod;
     use psibase::services::{events::Wrapper as Events, transact::Wrapper as Transact};
     use psibase::*;
@@ -218,7 +218,7 @@ pub mod service {
                 {
                     abort_message(&format!("Authorization for {} failed", action.sender));
                 }
-                let act = action.packed();
+                let act = psio::to_pssz(&action);
                 unsafe { native_raw::call(act.as_ptr(), act.len() as u32, 0) };
             });
 

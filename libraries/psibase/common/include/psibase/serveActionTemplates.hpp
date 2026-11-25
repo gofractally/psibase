@@ -1,67 +1,40 @@
 #pragma once
 
 #include <psibase/Rpc.hpp>
-#include <psio/fracpack.hpp>
-#include <psio/to_json.hpp>
+#include <psio/json.hpp>
+#include <psio/pssz.hpp>
+#include <psio/reflect.hpp>
 
 namespace psibase
 {
-   template <typename S>
-   void generateActionJsonTemplate(std::tuple<>*,
-                                   bool               needComma,
-                                   const char* const* begin,
-                                   const char* const* end,
-                                   S&                 stream)
-   {
-   }
-
-   template <typename T, typename... Ts, typename S>
-   void generateActionJsonTemplate(std::tuple<T, Ts...>*,
-                                   bool               needComma,
-                                   const char* const* begin,
-                                   const char* const* end,
-                                   S&                 stream)
-   {
-      if (needComma)
-         stream.write(',');
-      if (begin != end)
-         to_json(*begin, stream);
-      else
-         to_json("error_missing_arg_name", stream);
-      stream.write(':');
-      T empty = {};
-      to_json(empty, stream);
-      generateActionJsonTemplate((std::tuple<Ts...>*)nullptr, true,
-                                 begin != end ? begin + 1 : begin, end, stream);
-   }
-
+   /// `{"<action>": <sample arguments>, ...}` for every action of `T`: the
+   /// I-JSON of a value-initialized argument list (an object keyed by
+   /// parameter name; the positional array when the reflection does not
+   /// name the parameters; `null` when such a value has no text).
    template <typename T>
    std::vector<char> generateActionJsonTemplate()
    {
-      std::vector<char>   json;
-      psio::vector_stream s{json};
-      s.write('{');
-      bool        needComma = false;
-      std::size_t i         = 0;
-      psio::for_each_member_type(
-          (typename psio::reflect<T>::member_functions*)nullptr,
-          [&](auto member)
+      using reflect = psio::reflect<T>;
+      std::vector<char> json;
+      json.push_back('{');
+      bool needComma = false;
+      reflect::for_each_method(
+          [&](auto index, std::string_view name)
           {
-             using MemPtr = decltype(member);
-             auto names   = psio::reflect<T>::member_function_names[i];
+             constexpr std::size_t I = decltype(index)::value;
              if (needComma)
-                s.write(',');
+                json.push_back(',');
              needComma = true;
-             to_json(*names.begin(), s);
-             s.write(':');
-             s.write('{');
-             generateActionJsonTemplate(
-                 (typename psio::make_param_value_tuple<MemPtr>::type*)nullptr, false,
-                 names.begin() + 1, names.end(), s);
-             s.write('}');
-             ++i;
+             psio::to_ijson(name, json);
+             json.push_back(':');
+             typename reflect::template method_arg_tuple<I> sample{};
+             if (!psio::encode_json_checked(psio::ijson{}, sample, json).ok())
+             {
+                constexpr std::string_view null = "null";
+                json.insert(json.end(), null.begin(), null.end());
+             }
           });
-      s.write('}');
+      json.push_back('}');
       return json;
    }
 

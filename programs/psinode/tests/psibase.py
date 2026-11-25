@@ -1,116 +1,149 @@
+'''psibase's wire types for the node tests.
+
+Bytes and text are PSIO's: the types are declared for PSIO's Python package
+(external/psio/python in the pinned checkout), which gives each its PSSZ
+(psio.to_pssz) and its I-JSON (psio.from_ijson). psibase adds the two names:
+an account and a method are 64-bit numbers on the wire and their names in
+text.
+'''
+
+import json
+from dataclasses import dataclass
+from typing import Annotated, Any, Optional
+
+import psio
+from psio import u8, u16, u32, u64
+
 import name
-import fracpack
-from fracpack import *
 
-import calendar
-import time
-
-class RawAccountNumber(Struct):
+@psio.transparent
+@dataclass(frozen=True)
+class AccountNumber:
     value: u64
 
-class AccountNumber(RawAccountNumber):
-    @staticmethod
-    def pack(value, stream):
-        RawAccountNumber.pack(RawAccountNumber(name.account_to_number(value)), stream)
+    @psio.to_text
+    def __str__(self):
+        return name.number_to_account(self.value)
 
-class RawMethodNumber(Struct):
+    @psio.from_text
+    @classmethod
+    def parse(cls, text):
+        return cls(name.account_to_number(text))
+
+@psio.transparent
+@dataclass(frozen=True)
+class MethodNumber:
     value: u64
 
-class MethodNumber(Custom(RawMethodNumber, "MethodNumber"), str):
-    def __eq__(self, other):
-        return name.method_to_number(self) == name.method_to_number(other)
-    def __hash__(self):
-        return hash(name.method_to_number(self))
-    @staticmethod
-    def pack(value, stream):
-        RawMethodNumber.pack(RawMethodNumber(name.method_to_number(value)), stream)
+    @psio.to_text
+    def __str__(self):
+        return psio.number_to_method(self.value)
 
-class TimePointSec(i64):
-    @staticmethod
-    def pack(value, stream):
-        if isinstance(value, str):
-            value = calendar.timegm(time.strptime(value, "%Y-%m-%dT%H:%M:%SZ"))
-        i64.pack(value, stream)
+    @psio.from_text
+    @classmethod
+    def parse(cls, text):
+        return cls(psio.method_to_number(text))
 
-class RawAction(Object):
+def _account(value):
+    return value if isinstance(value, AccountNumber) else AccountNumber.parse(value)
+
+def _bytes(value):
+    '''Bytes, given as bytes or as hex text'''
+    return bytes.fromhex(value) if isinstance(value, str) else bytes(value)
+
+@dataclass(init=False)
+class Action:
+    '''
+    An action. The arguments are either packed (rawData: bytes or hex) or
+    still to be packed with the schema of the service (data: an object keyed
+    by parameter name, or the positional list); ChainPackContext packs them.
+    '''
     sender: AccountNumber
     service: AccountNumber
     method: MethodNumber
-    rawData: Bytes
+    rawData: bytes
 
-class Action(Custom(RawAction, "Action"), ObjectValue):
     def __init__(self, sender, service, method, dataOrRaw=None, *, data=None, rawData=None):
-        self.sender = sender
-        self.service = service
-        self.method = method
-        self.data = data
-        if rawData is not None:
-            self.rawData = rawData
+        self.sender = _account(sender)
+        self.service = _account(service)
+        self.method = method if isinstance(method, MethodNumber) else MethodNumber.parse(method)
         if dataOrRaw is not None:
             if data is not None or rawData is not None:
                 raise Exception('Multiple values for data')
             if isinstance(dataOrRaw, bytes) or isinstance(dataOrRaw, str) and all(ch in '0123456789ABCDEFabcdef' for ch in dataOrRaw):
-                self.rawData = dataOrRaw
+                rawData = dataOrRaw
             else:
-                self.data = dataOrRaw
-    @staticmethod
-    def with_context(context):
-        class Action(RawAction, ObjectValue):
-            @staticmethod
-            def pack(value, stream):
-                if isinstance(value, ObjectValue):
-                    value = value.__dict__
-                service = value['service']
-                method = value['method']
-                if 'rawData' in value:
-                    rawData = value['rawData']
-                elif 'data' in value:
-                    rawData = context.pack_action_data(service, method, value['data'])
-                RawAction.pack({'sender': value['sender'], 'service': service, 'method': method, 'rawData':rawData}, stream)
-        return Action
+                data = dataOrRaw
+        self.data = data
+        self.rawData = _bytes(rawData) if rawData is not None else None
 
-default_custom = dict(**fracpack.default_custom, **{
-    "AccountNumber": AccountNumber,
-    "MethodNumber": MethodNumber,
-    "TimePointSec": TimePointSec,
-})
+@dataclass(init=False)
+class Claim:
+    service: AccountNumber
+    rawData: bytes
 
-class ServiceSchema:
-    def __init__(self, json, custom=None):
-        if custom is None:
-            custom = default_custom
-        self.service = json['service']
-        self.types = Schema(json.get('types', {}), custom=custom)
-        self.actions = {}
-        for (name, ty) in json.get('actions', {}).items():
-            params = load_type(ty['params'], self.types)
-            result = ty.get('result')
-            if result is not None:
-                result = load_type(result, self.types)
-            self.actions[MethodNumber(name)] = FunctionType(params, result)
-        def get_events(name):
-            events = {}
-            for (name, ty) in json.get(name, {}).items():
-                events[MethodNumber(name)] = load_type(ty['type'], self.types)
-            return events
-        self.history = get_events('history')
-        self.merkle = get_events('merkle')
+    def __init__(self, service, rawData):
+        self.service = _account(service)
+        self.rawData = _bytes(rawData)
 
-class Tapos(Struct):
-    expiration: TimePointSec
+@psio.record(definition_will_not_change=True)
+@dataclass
+class Tapos:
+    expiration: psio.TimePointSec
     refBlockSuffix: u32
     flags: u16
     refBlockIndex: u8
 
-class Claim(Object):
-    service: AccountNumber
-    rawData: Bytes
-
-class Transaction(Object):
+@dataclass(init=False)
+class Transaction:
     tapos: Tapos
-    actions: List(Action)
-    claims: List(Claim)
+    actions: list[Action]
+    claims: list[Claim]
 
-class SignedTransaction(Object):
-    transaction: Hex(FracPack(Transaction))
-    proofs: List(Bytes)
+    def __init__(self, tapos, actions, claims):
+        '''tapos is a Tapos or its JSON object; a claim is a Claim or its JSON object'''
+        self.tapos = tapos if isinstance(tapos, Tapos) else psio.from_ijson(Tapos, json.dumps(tapos))
+        self.actions = list(actions)
+        self.claims = [claim if isinstance(claim, Claim) else Claim(**claim) for claim in claims]
+
+@dataclass
+class SignedTransaction:
+    # The packed transaction: its id is the SHA-256 of these bytes
+    transaction: Annotated[bytes, psio.nested(Transaction, deferred=True)]
+    proofs: list[bytes]
+    subjectiveData: Optional[list[bytes]] = None
+
+def _wire_text(to_number, to_name):
+    '''The text of a name whose wire type is a record of one 64-bit number'''
+    return psio.Handler(to_text=lambda wire: to_name(wire['value']),
+                        from_text=lambda text: {'value': to_number(text)})
+
+# The custom types of a service schema that are a name in text. Any other
+# custom type is read as its wire type.
+schema_handlers = {
+    'AccountNumber': _wire_text(name.account_to_number, name.number_to_account),
+    'MethodNumber': _wire_text(psio.method_to_number, psio.number_to_method),
+}
+
+@dataclass
+class FunctionType:
+    params: Any
+    result: Any
+
+class ServiceSchema:
+    '''
+    The schema of a service, from its I-JSON (GET packages/schema?service=).
+    actions maps a method's number to the codecs of its argument list and of
+    its result (psio.Schema types: json_to_pssz, from_pssz, ...)
+    '''
+    def __init__(self, document):
+        self.service = document['service']
+        self.types = psio.Schema.from_json(json.dumps(document['types']), handlers=schema_handlers)
+        node = psio.Schema.meta().type('AnyType')
+        def codec(type):
+            return self.types.type(node.from_json(json.dumps(type), 'ijson'))
+        self.actions = {}
+        for (method, function) in document['actions'].items():
+            result = function['result']
+            self.actions[psio.method_to_number(method)] = FunctionType(
+                codec(function['params']), codec(result) if result is not None else None)

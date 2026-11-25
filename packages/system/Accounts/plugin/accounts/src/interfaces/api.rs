@@ -5,7 +5,7 @@ use crate::errors::ErrorType::*;
 use crate::plugin::AccountsPlugin;
 
 use crate::trust::*;
-use psibase::fracpack::Pack;
+
 use psibase::services::accounts as AccountsService;
 use psibase::AccountNumber;
 
@@ -20,10 +20,9 @@ impl API for AccountsPlugin {
             .map_err(|_| InvalidAccountName(service_name))?;
         Transact::add_action_to_transaction(
             "setAuthServ",
-            &AccountsService::action_structs::setAuthServ {
+            &psio::to_pssz(&AccountsService::action_structs::setAuthServ {
                 authService: account_num,
-            }
-            .packed(),
+            }),
         )?;
         Ok(())
     }

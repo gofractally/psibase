@@ -269,17 +269,17 @@ namespace
    template <typename T>
    std::vector<char> serializeMessage(const T& msg)
    {
+      // The type of the message, then its PSSZ
       std::vector<char> result;
       result.push_back(T::type);
-      psio::vector_stream stream{result};
-      psio::to_frac(psio::nested<const T&>{msg}, stream);
+      psio::to_pssz(msg, result);
       return result;
    }
 
    template <typename T>
    T deserializeMessage(std::span<const char> msg)
    {
-      return psio::from_frac<psio::nested<T>>(msg.subspan(1)).value;
+      return psio::from_pssz<T>(msg.subspan(1));
    }
 
    bool hasCommonHost(const PeerConnection& lhs, const PeerConnection& rhs)
@@ -363,7 +363,7 @@ namespace
 
    void recvMessage(std::int32_t socket, IdMessage&& msg)
    {
-      printf("Id %s\n", psio::convert_to_json(msg).c_str());
+      printf("Id %s\n", psio::to_ijson(msg).c_str());
       auto table   = XPeers{}.open<PeerConnectionTable>();
       auto hostIds = XPeers{}.open<HostIdTable>();
       std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
@@ -390,7 +390,7 @@ namespace
 
    void recvMessage(std::int32_t socket, HostnamesMessage&& msg)
    {
-      printf("Hostnames %s\n", psio::convert_to_json(msg).c_str());
+      printf("Hostnames %s\n", psio::to_ijson(msg).c_str());
       auto table   = XPeers{}.open<PeerConnectionTable>();
       auto hostIds = XPeers{}.open<HostIdTable>();
       std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
@@ -419,7 +419,7 @@ namespace
    // on a different socket will work correctly.
    void recvMessage(std::int32_t socket, CheckDuplicatesMessage&& msg)
    {
-      printf("CheckDuplicates %s\n", psio::convert_to_json(msg).c_str());
+      printf("CheckDuplicates %s\n", psio::to_ijson(msg).c_str());
       auto table   = XPeers{}.open<PeerConnectionTable>();
       auto hostIds = XPeers{}.open<HostIdTable>();
       std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
@@ -435,7 +435,7 @@ namespace
    }
    void recvMessage(std::int32_t socket, DuplicateConnectionMessage&& msg)
    {
-      printf("DuplicateConnection %s\n", psio::convert_to_json(msg).c_str());
+      printf("DuplicateConnection %s\n", psio::to_ijson(msg).c_str());
       auto table = XPeers{}.open<PeerConnectionTable>();
       PSIBASE_SUBJECTIVE_TX
       {
@@ -517,7 +517,8 @@ namespace
 
    struct GQLUrl
    {
-      std::string   url;
+      std::string url;
+      // Working state for connected(); not a field of the query result.
       std::uint32_t refcount;
       bool          hasToken() const { return XPeers{}.open<UrlAuthTable>().get(url).has_value(); }
       bool          connected() const { return refcount != 0; }
@@ -526,23 +527,32 @@ namespace
 
    struct Query
    {
-      auto peers() const
+      auto peers(psio::graphql::key_range<std::int32_t> range, psio::graphql::page_args page) const
       {
-         return TransformedConnection{
-             XPeers{}.open<PeerConnectionTable>().getIndex<0>(), [](PeerConnection&& row)
-             {
-                return GQLPeerConnection{std::move(row.socket), std::move(row.urls),
-                                         std::move(row.hosts)};
-             }};
+         return psio::graphql::paginate(
+             psio::graphql::transform(
+                 IndexView{XPeers{}.open<PeerConnectionTable>().getIndex<0>()},
+                 [](psio::shared_pssz<PeerConnection> packed)
+                 {
+                    auto row = packed.unpack();
+                    return GQLPeerConnection{std::move(row.socket), std::move(row.urls),
+                                             std::move(row.hosts)};
+                 }),
+             range, page, allRows);
       }
-      auto urls() const
+      auto urls(psio::graphql::key_range<std::string> range, psio::graphql::page_args page) const
       {
-         return TransformedConnection{
-             XPeers{}.open<UrlTable>().getIndex<0>(),
-             [](UrlRow&& row) { return GQLUrl{std::move(row.url), std::move(row.refcount)}; }};
+         return psio::graphql::paginate(
+             psio::graphql::transform(IndexView{XPeers{}.open<UrlTable>().getIndex<0>()},
+                                      [](psio::shared_pssz<UrlRow> packed)
+                                      {
+                                         auto row = packed.unpack();
+                                         return GQLUrl{std::move(row.url), std::move(row.refcount)};
+                                      }),
+             range, page, allRows);
       }
       auto users() const { return XPeers{}.open<PeerUsernameTable>().getIndex<0>(); }
-      PSIO_REFLECT(Query, method(peers), method(urls), method(users))
+      PSIO_REFLECT(Query, method(peers, range, page), method(urls, range, page), method(users))
    };
 
 }  // namespace
@@ -625,8 +635,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       }
       if (request.method != "POST")
          return HttpReply::methodNotAllowed(request);
-      auto body = psio::convert_from_json<ConnectRequest>(
-          std::string(request.body.begin(), request.body.end()));
+      auto body = psio::from_ijson<ConnectRequest>(request.body);
       connect(body.url, socket, &request);
 
       return {};
@@ -643,8 +652,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       if (request.method != "POST")
          return HttpReply::methodNotAllowed(request);
 
-      auto body = psio::convert_from_json<DisconnectRequest>(
-          std::string(request.body.begin(), request.body.end()));
+      auto body = psio::from_ijson<DisconnectRequest>(request.body);
 
       auto                          table = XPeers{}.open<PeerConnectionTable>();
       std::optional<PeerConnection> row;
@@ -676,8 +684,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       if (request.method != "POST")
          return HttpReply::methodNotAllowed(request);
 
-      auto body = psio::convert_from_json<UserRequest>(
-          std::string(request.body.begin(), request.body.end()));
+      auto body = psio::from_ijson<UserRequest>(request.body);
 
       auto table = open<PeerUsernameTable>();
       PSIBASE_SUBJECTIVE_TX
@@ -700,8 +707,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       if (request.method != "POST")
          return HttpReply::methodNotAllowed(request);
 
-      auto body = psio::convert_from_json<AuthorizationRequest>(
-          std::string(request.body.begin(), request.body.end()));
+      auto body = psio::from_ijson<AuthorizationRequest>(request.body);
 
       auto table = open<UrlAuthTable>();
       PSIBASE_SUBJECTIVE_TX
@@ -729,8 +735,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
          }
       }
       HttpReply           reply{.status = HttpStatus::ok, .contentType = "application/json"};
-      psio::vector_stream stream{reply.body};
-      to_json(result, stream);
+      psio::to_ijson(result, reply.body);
       return reply;
    }
    else if (target == "/urls")
@@ -745,8 +750,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
          }
       }
       HttpReply           reply{.status = HttpStatus::ok, .contentType = "application/json"};
-      psio::vector_stream stream{reply.body};
-      to_json(result, stream);
+      psio::to_ijson(result, reply.body);
       return reply;
    }
    else if (target == "/graphql")
@@ -856,8 +860,7 @@ void XPeers::onP2P(std::int32_t socket, HttpReply reply)
           .contentType = "application/json",
           .headers     = std::move(request->replyHeaders),
       };
-      psio::vector_stream stream(reply.body);
-      to_json(*replyBody, stream);
+      psio::to_ijson(*replyBody, reply.body);
       to<XHttp>().sendReply(request->requestSocket, std::move(reply));
    }
    to<XHttp>().send(socket, serializeMessage(IdMessage{myNodeId(), socket}),
@@ -903,7 +906,7 @@ void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply)
 }
 
 void XPeers::recvP2P(std::int32_t                        socket,
-                     psio::view<const std::vector<char>> data,
+                     psio::pssz_view<std::vector<char>> data,
                      std::uint32_t                       flags)
 {
    check(getSender() == XHttp::service, "Wrong sender");

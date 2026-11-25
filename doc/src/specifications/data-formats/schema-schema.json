@@ -1,94 +1,2343 @@
 {
-  "ServiceSchema": {
-    "Object": {
-      "service": "@AccountNumber",
-      "types": "@types",
-      "actions": "@actions",
-      "history": "@events",
-      "merkle": "@events",
-      "database": {"Option": "@databases"}
-    }
-  },
-  "@types": {
-    "Custom": {
-      "id": "map",
-      "type": {"List":{"Object": {"name": "@string", "type": "@type"}}}
-    }
-  },
-  "@actions": {
-    "Custom": {
-      "id": "map",
-      "type": {"List": {"Object": {"name":"@string", "type": "@fn"}}}
-    }
-  },
-  "@events": {
-    "Custom": {
-      "id": "map",
-      "type": {"List": {"Object": {"name":"@string", "type": "@event"}}}
-    }
-  },
-  "@fn": {
-    "Object": {
-      "params": "@type",
-      "result": {"Option": "@type"}
-    }
-  },
-  "@event": {
-    "Object": {
-      "type": "@type",
-      "access": "@string"
-    }
-  },
-  "@type": {
-    "Variant": {
-      "Struct": "@members",
-      "Object": "@members",
-      "Array": {"Object": {"type": "@type", "len": "@u64"}},
-      "List": "@type",
-      "Option": "@type",
-      "Variant": "@members",
-      "Tuple": {"List": "@type"},
-      "Int": {"Object": {"bits": "@u32", "isSigned": "@bool"}},
-      "Float": {"Object": {"exp": "@u32", "mantissa": "@u32"}},
-      "FracPack": "@type",
-      "Custom": {"Object": {"type": "@type", "id": "@string"}},
-      "@Type": "@string"
-    }
-  },
-  "@members": {
-    "Custom": {
-      "id": "map",
-      "type": {"List":{"Object": {"name": "@string", "type": "@type"}}}
-    }
-  },
-  "@u8": {"Int": {"bits": 8, "isSigned": false}},
-  "@u16": {"Int": {"bits": 16, "isSigned": false}},
-  "@u32": {"Int": {"bits": 32, "isSigned": false}},
-  "@u64": {"Int": {"bits": 64, "isSigned": false}},
-  "@bool": {"Custom": {"id": "bool", "type": {"Int": {"bits": 1, "isSigned": false}}}},
-  "@string": {"Custom": {"id": "string", "type": {"List": "@u8"}}},
-  "@AccountNumber": {"Custom": {"id": "AccountNumber", "type": "@u64"}},
-  "@databases": {
-    "Custom": {
-      "id": "map",
-      "type": {"List": {"Object": {"name": "@string", "value": "@database"}}}
-    }
-  },
-  "@database": {"List": "@table"},
-  "@table": {
-    "Object": {
-      "name": {"Option": "@string"},
-      "table": "@u16",
-      "type": "@type",
-      "indexes": {"List": "@index"}
-    }
-  },
-  "@index": {"List": "@field"},
-  "@field": {
-    "Object": {
-      "path": {"List": "@u32"},
-      "transform": {"Option": "@string"},
-      "type": {"Option": "@type"}
-    }
-  }
+    "package": {
+        "name": "",
+        "version": "",
+        "attributes": []
+    },
+    "interfaces": [],
+    "worlds": [],
+    "uses": [],
+    "types": [
+        {
+            "name": "ServiceSchema",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "service",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "AccountNumber"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "types",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "Schema"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "actions",
+                                "type": {
+                                    "value": {
+                                        "Custom": {
+                                            "type": {
+                                                "value": {
+                                                    "List": {
+                                                        "type": {
+                                                            "value": {
+                                                                "Tuple": {
+                                                                    "members": [
+                                                                        {
+                                                                            "value": {
+                                                                                "Custom": {
+                                                                                    "type": {
+                                                                                        "value": {
+                                                                                            "List": {
+                                                                                                "type": {
+                                                                                                    "value": {
+                                                                                                        "Type": {
+                                                                                                            "type": "@6"
+                                                                                                        }
+                                                                                                    }
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                    },
+                                                                                    "id": "utf8"
+                                                                                }
+                                                                            }
+                                                                        },
+                                                                        {
+                                                                            "value": {
+                                                                                "Type": {
+                                                                                    "type": "FunctionType"
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    ]
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "id": "map"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "history",
+                                "type": {
+                                    "value": {
+                                        "Custom": {
+                                            "type": {
+                                                "value": {
+                                                    "List": {
+                                                        "type": {
+                                                            "value": {
+                                                                "Tuple": {
+                                                                    "members": [
+                                                                        {
+                                                                            "value": {
+                                                                                "Custom": {
+                                                                                    "type": {
+                                                                                        "value": {
+                                                                                            "List": {
+                                                                                                "type": {
+                                                                                                    "value": {
+                                                                                                        "Type": {
+                                                                                                            "type": "@6"
+                                                                                                        }
+                                                                                                    }
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                    },
+                                                                                    "id": "utf8"
+                                                                                }
+                                                                            }
+                                                                        },
+                                                                        {
+                                                                            "value": {
+                                                                                "Type": {
+                                                                                    "type": "EventType"
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    ]
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "id": "map"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "merkle",
+                                "type": {
+                                    "value": {
+                                        "Custom": {
+                                            "type": {
+                                                "value": {
+                                                    "List": {
+                                                        "type": {
+                                                            "value": {
+                                                                "Tuple": {
+                                                                    "members": [
+                                                                        {
+                                                                            "value": {
+                                                                                "Custom": {
+                                                                                    "type": {
+                                                                                        "value": {
+                                                                                            "List": {
+                                                                                                "type": {
+                                                                                                    "value": {
+                                                                                                        "Type": {
+                                                                                                            "type": "@6"
+                                                                                                        }
+                                                                                                    }
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                    },
+                                                                                    "id": "utf8"
+                                                                                }
+                                                                            }
+                                                                        },
+                                                                        {
+                                                                            "value": {
+                                                                                "Type": {
+                                                                                    "type": "EventType"
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    ]
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "id": "map"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "database",
+                                "type": {
+                                    "value": {
+                                        "Option": {
+                                            "type": {
+                                                "value": {
+                                                    "Custom": {
+                                                        "type": {
+                                                            "value": {
+                                                                "List": {
+                                                                    "type": {
+                                                                        "value": {
+                                                                            "Tuple": {
+                                                                                "members": [
+                                                                                    {
+                                                                                        "value": {
+                                                                                            "Custom": {
+                                                                                                "type": {
+                                                                                                    "value": {
+                                                                                                        "List": {
+                                                                                                            "type": {
+                                                                                                                "value": {
+                                                                                                                    "Type": {
+                                                                                                                        "type": "@6"
+                                                                                                                    }
+                                                                                                                }
+                                                                                                            }
+                                                                                                        }
+                                                                                                    }
+                                                                                                },
+                                                                                                "id": "utf8"
+                                                                                            }
+                                                                                        }
+                                                                                    },
+                                                                                    {
+                                                                                        "value": {
+                                                                                            "Type": {
+                                                                                                "type": "@59"
+                                                                                            }
+                                                                                        }
+                                                                                    }
+                                                                                ]
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                        "id": "map"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "AccountNumber",
+            "type": {
+                "value": {
+                    "Custom": {
+                        "type": {
+                            "value": {
+                                "Object": {
+                                    "members": [
+                                        {
+                                            "name": "value",
+                                            "type": {
+                                                "value": {
+                                                    "Type": {
+                                                        "type": "@2"
+                                                    }
+                                                }
+                                            },
+                                            "attributes": []
+                                        }
+                                    ],
+                                    "attributes": [
+                                        {
+                                            "name": "definitionWillNotChange",
+                                            "value": ""
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        "id": "AccountNumber"
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@2",
+            "type": {
+                "value": {
+                    "Int": {
+                        "bits": 64,
+                        "isSigned": false
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Schema",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "package",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "Package"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "interfaces",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@10"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "worlds",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@41"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "uses",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@45"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "types",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@15"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "ir_version",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@49"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Package",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "name",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "version",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "attributes",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@7"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@5",
+            "type": {
+                "value": {
+                    "Custom": {
+                        "type": {
+                            "value": {
+                                "List": {
+                                    "type": {
+                                        "value": {
+                                            "Type": {
+                                                "type": "@6"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "id": "string"
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@6",
+            "type": {
+                "value": {
+                    "Int": {
+                        "bits": 8,
+                        "isSigned": false
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@7",
+            "type": {
+                "value": {
+                    "List": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "Attribute"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Attribute",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "name",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "value",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@9"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@9",
+            "type": {
+                "value": {
+                    "Option": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "@5"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@10",
+            "type": {
+                "value": {
+                    "List": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "Interface"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Interface",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "name",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "type_names",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@12"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "funcs",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@13"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "attributes",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@7"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@12",
+            "type": {
+                "value": {
+                    "List": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "@5"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@13",
+            "type": {
+                "value": {
+                    "List": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "Func"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Func",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "name",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "params",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@15"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "result",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@40"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "attributes",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@7"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@15",
+            "type": {
+                "value": {
+                    "List": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "Member"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Member",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "name",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "type",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@17"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "attributes",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@7"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@17",
+            "type": {
+                "value": {
+                    "Custom": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "AnyType"
+                                }
+                            }
+                        },
+                        "id": "box"
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "AnyType",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "value",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@19"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@19",
+            "type": {
+                "value": {
+                    "Variant": {
+                        "members": [
+                            {
+                                "name": "Struct",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "Struct"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "Object",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "Object"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "Array",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "Array"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "List",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "List"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "BoundedList",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "BoundedList"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "Option",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "Option"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "Variant",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "Variant"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "Tuple",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "Tuple"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "Int",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "Int"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "Float",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "Float"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "Nested",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "Nested"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "Custom",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "Custom"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "Resource",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "Resource"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "Type",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "Type"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "Enum",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "Enum"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Struct",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "members",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@15"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "attributes",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@7"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Object",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "members",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@15"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "attributes",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@7"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Array",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "type",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@17"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "len",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@2"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "List",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "type",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@17"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "BoundedList",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "type",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@17"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "maxCount",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@2"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Option",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "type",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@17"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Variant",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "members",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@15"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "attributes",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@7"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Tuple",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "members",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@28"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@28",
+            "type": {
+                "value": {
+                    "List": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "@17"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Int",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "bits",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@30"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "isSigned",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@31"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@30",
+            "type": {
+                "value": {
+                    "Int": {
+                        "bits": 32,
+                        "isSigned": false
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@31",
+            "type": {
+                "value": {
+                    "Custom": {
+                        "type": {
+                            "value": {
+                                "Int": {
+                                    "bits": 1,
+                                    "isSigned": false
+                                }
+                            }
+                        },
+                        "id": "bool"
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Float",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "exp",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@30"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "mantissa",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@30"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Nested",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "type",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@17"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Custom",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "type",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@17"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "id",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Resource",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "name",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "methods",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@13"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "attributes",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@7"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Type",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "type",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Enum",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "type",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@17"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "members",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@38"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@38",
+            "type": {
+                "value": {
+                    "List": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "Enumerator"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Enumerator",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "name",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "value",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@2"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@40",
+            "type": {
+                "value": {
+                    "Option": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "@17"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@41",
+            "type": {
+                "value": {
+                    "List": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "World"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "World",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "name",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "imports",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@43"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "exports",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@12"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "attributes",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@7"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@43",
+            "type": {
+                "value": {
+                    "List": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "UseRef"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "UseRef",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "package",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "interface_name",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@45",
+            "type": {
+                "value": {
+                    "List": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "Use"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "Use",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "package",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "interface_name",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "version",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "items",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@47"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@47",
+            "type": {
+                "value": {
+                    "List": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "UseItem"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "UseItem",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "name",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@5"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "alias",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@9"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@49",
+            "type": {
+                "value": {
+                    "Option": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "@30"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@50",
+            "type": {
+                "value": {
+                    "Custom": {
+                        "type": {
+                            "value": {
+                                "List": {
+                                    "type": {
+                                        "value": {
+                                            "Type": {
+                                                "type": "@51"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "id": "map"
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@51",
+            "type": {
+                "value": {
+                    "Tuple": {
+                        "members": [
+                            {
+                                "value": {
+                                    "Type": {
+                                        "type": "@5"
+                                    }
+                                }
+                            },
+                            {
+                                "value": {
+                                    "Type": {
+                                        "type": "FunctionType"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "FunctionType",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "params",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@17"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "result",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@40"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@53",
+            "type": {
+                "value": {
+                    "Custom": {
+                        "type": {
+                            "value": {
+                                "List": {
+                                    "type": {
+                                        "value": {
+                                            "Type": {
+                                                "type": "@54"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "id": "map"
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@54",
+            "type": {
+                "value": {
+                    "Tuple": {
+                        "members": [
+                            {
+                                "value": {
+                                    "Type": {
+                                        "type": "@5"
+                                    }
+                                }
+                            },
+                            {
+                                "value": {
+                                    "Type": {
+                                        "type": "EventType"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "EventType",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "type",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "AnyType"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "access",
+                                "type": {
+                                    "value": {
+                                        "Custom": {
+                                            "type": {
+                                                "value": {
+                                                    "List": {
+                                                        "type": {
+                                                            "value": {
+                                                                "Type": {
+                                                                    "type": "@6"
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "id": "utf8"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@56",
+            "type": {
+                "value": {
+                    "Option": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "@57"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@57",
+            "type": {
+                "value": {
+                    "Custom": {
+                        "type": {
+                            "value": {
+                                "List": {
+                                    "type": {
+                                        "value": {
+                                            "Type": {
+                                                "type": "@58"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "id": "map"
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@58",
+            "type": {
+                "value": {
+                    "Tuple": {
+                        "members": [
+                            {
+                                "value": {
+                                    "Type": {
+                                        "type": "@5"
+                                    }
+                                }
+                            },
+                            {
+                                "value": {
+                                    "Type": {
+                                        "type": "@59"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@59",
+            "type": {
+                "value": {
+                    "List": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "TableInfo"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "TableInfo",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "name",
+                                "type": {
+                                    "value": {
+                                        "Option": {
+                                            "type": {
+                                                "value": {
+                                                    "Custom": {
+                                                        "type": {
+                                                            "value": {
+                                                                "List": {
+                                                                    "type": {
+                                                                        "value": {
+                                                                            "Type": {
+                                                                                "type": "@6"
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                        "id": "utf8"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "table",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@61"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "type",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "AnyType"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "indexes",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@62"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@61",
+            "type": {
+                "value": {
+                    "Int": {
+                        "bits": 16,
+                        "isSigned": false
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@62",
+            "type": {
+                "value": {
+                    "List": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "@63"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@63",
+            "type": {
+                "value": {
+                    "List": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "FieldId"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "FieldId",
+            "type": {
+                "value": {
+                    "Object": {
+                        "members": [
+                            {
+                                "name": "path",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@65"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "transform",
+                                "type": {
+                                    "value": {
+                                        "Option": {
+                                            "type": {
+                                                "value": {
+                                                    "Custom": {
+                                                        "type": {
+                                                            "value": {
+                                                                "List": {
+                                                                    "type": {
+                                                                        "value": {
+                                                                            "Type": {
+                                                                                "type": "@6"
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                        "id": "utf8"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            },
+                            {
+                                "name": "type",
+                                "type": {
+                                    "value": {
+                                        "Type": {
+                                            "type": "@66"
+                                        }
+                                    }
+                                },
+                                "attributes": []
+                            }
+                        ],
+                        "attributes": []
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@65",
+            "type": {
+                "value": {
+                    "List": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "@30"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        },
+        {
+            "name": "@66",
+            "type": {
+                "value": {
+                    "Option": {
+                        "type": {
+                            "value": {
+                                "Type": {
+                                    "type": "AnyType"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "attributes": []
+        }
+    ],
+    "ir_version": 1
 }

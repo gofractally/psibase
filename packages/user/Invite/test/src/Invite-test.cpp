@@ -76,7 +76,7 @@ auto createInvite = [](auto& user, const auto& pubKey)
        .fingerprint = fingerprint_vec,
        .secret      = "",
    };
-   auto                 packed = psio::to_frac(payload);
+   auto                 packed = psio::to_pssz(payload);
    std::vector<uint8_t> packed_payload(packed.begin(), packed.end());
 
    return user.createInvite(++inviteId, packed_payload, 1, false, 0);
@@ -96,7 +96,7 @@ SCENARIO("Auth")
 
       THEN("Accounts can still create new accounts")
       {
-         auto newAcc = accounts.newAccount("bob", AuthAny::service, NewAccountMode::requireNew);
+         auto newAcc = accounts.newAccount(AccountNumber{"bob"}, AuthAny::service, NewAccountMode::requireNew);
          CHECK(newAcc.succeeded());
       }
    }
@@ -328,14 +328,14 @@ SCENARIO("Accepting an invite")
             {
                trx.claims.push_back({
                    .service = VerifySig::service,
-                   .rawData = psio::convert_to_frac(key.first),
+                   .rawData = psio::to_pssz(key.first),
                });
             }
             SignedTransaction signedTrx;
-            signedTrx.transaction = trx;
+            signedTrx.transaction = psio::shared_pssz<Transaction>{trx};
             auto hash = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
             auto key  = combinedKeyList[0];
-            signedTrx.proofs.push_back(psio::convert_to_frac(sign(key.second, hash)));
+            signedTrx.proofs.push_back(psio::to_pssz(sign(key.second, hash)));
             auto accept = t.pushTransaction(signedTrx);
 
             auto failed = [&](TransactionTrace& _t, std::string_view expected) -> bool

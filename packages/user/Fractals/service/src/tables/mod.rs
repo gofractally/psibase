@@ -13,13 +13,11 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
         services::tokens::{Quantity, TID},
-        AccountNumber, Pack, TimePointSec, ToSchema, Unpack,
-    };
+        AccountNumber, TimePointSec, };
 
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Config {
         pub last_levy_id: u32,
     }
@@ -30,7 +28,7 @@ pub mod tables {
     }
 
     #[table(name = "FractalTable", index = 1)]
-    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct Fractal {
         #[primary_key]
@@ -52,7 +50,7 @@ pub mod tables {
     }
 
     #[table(name = "FractalMemberTable", index = 2)]
-    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct FractalMember {
         pub fractal: AccountNumber,
@@ -73,7 +71,7 @@ pub mod tables {
     }
 
     #[table(name = "FractalExileTable", index = 3)]
-    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct FractalExile {
         #[graphql(skip)]
@@ -94,7 +92,7 @@ pub mod tables {
     }
 
     #[table(name = "RewardStreamTable", index = 4)]
-    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct RewardStream {
         pub fractal: AccountNumber,
         pub owner: AccountNumber,
@@ -110,7 +108,7 @@ pub mod tables {
     }
 
     #[table(name = "RoleTable", index = 5)]
-    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct Role {
         pub fractal: AccountNumber,
@@ -126,7 +124,7 @@ pub mod tables {
     }
 
     #[table(name = "OccupationTable", index = 6)]
-    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    #[derive(Default, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Occupation {
         pub fractal: AccountNumber,
         pub index: u8,
@@ -141,7 +139,7 @@ pub mod tables {
     }
 
     #[table(name = "LevyTable", index = 7)]
-    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Default, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Levy {
         pub id: u32,
         pub fractal: AccountNumber,

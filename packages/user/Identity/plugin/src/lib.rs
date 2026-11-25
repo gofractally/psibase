@@ -8,7 +8,7 @@ use bindings::exports::identity::plugin::types as IdentityTypes;
 use bindings::host::http::api as CommonServer;
 use bindings::host::types::types as HostTypes;
 use bindings::transact::plugin::api as Transact;
-use psibase::fracpack::Pack;
+
 
 use serde::Deserialize;
 
@@ -45,11 +45,10 @@ impl Api for IdentityPlugin {
 
         let int_score = (score * 100.0).trunc() as u8;
 
-        let packed_a = identity::action_structs::attest {
+        let packed_a = psio::to_pssz(&identity::action_structs::attest {
             subject: subject.parse().unwrap(),
             value: int_score,
-        }
-        .packed();
+        });
 
         Transact::add_action_to_transaction("attest", &packed_a)
     }

@@ -1,6 +1,6 @@
 # Entry points
 
-All entry points must be WASM exports with type `(func (param) (result))`. The service should use `getCurrentAction` to get an `Action` containing the arguments. The `sender` and `method` fields are both set to `0`. The result (if any) should be returned with `setRetval`. Both the arguments and result use [fracpack](../data-formats/fracpack.md) encoding.
+All entry points must be WASM exports with type `(func (param) (result))`. The service should use `getCurrentAction` to get an `Action` containing the arguments. The `sender` and `method` fields are both set to `0`. The result (if any) should be returned with `setRetval`. Both the arguments and result use [PSSZ](https://github.com/gofractally/psio/blob/main/docs/pssz-spec.md) encoding.
 
 Each entry point starts a fresh transaction context. Modules will be instantiated on their first use within the context.
 

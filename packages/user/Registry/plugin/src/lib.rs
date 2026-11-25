@@ -11,7 +11,7 @@ use exports::registry::plugin::authorized::Guest as Authorized;
 use exports::registry::plugin::developer::Guest as Developer;
 use host::http::api as Server;
 use host::types::types::Error;
-use psibase::fracpack::Pack;
+
 use transact::plugin::api as Transact;
 
 psibase::define_trust! {
@@ -41,8 +41,8 @@ impl Developer for RegistryPlugin {
             .unwrap();
 
         Transact::add_action_to_transaction(
-            setMetadata::ACTION_NAME,
-            &setMetadata::from(metadata).packed(),
+            <setMetadata as psio::interface::Method>::NAME,
+            &psio::to_pssz(&setMetadata::from(metadata)),
         )
         .unwrap();
     }
@@ -51,14 +51,14 @@ impl Developer for RegistryPlugin {
         assert_authorized_with_whitelist(FunctionName::publish, vec!["workshop".to_string()])
             .unwrap();
 
-        Transact::add_action_to_transaction(publish::ACTION_NAME, &publish {}.packed()).unwrap();
+        Transact::add_action_to_transaction(<publish as psio::interface::Method>::NAME, &psio::to_pssz(&publish {})).unwrap();
     }
 
     fn unpublish() {
         assert_authorized_with_whitelist(FunctionName::unpublish, vec!["workshop".to_string()])
             .unwrap();
 
-        Transact::add_action_to_transaction(unpublish::ACTION_NAME, &unpublish {}.packed())
+        Transact::add_action_to_transaction(<unpublish as psio::interface::Method>::NAME, &psio::to_pssz(&unpublish {}))
             .unwrap();
     }
 }

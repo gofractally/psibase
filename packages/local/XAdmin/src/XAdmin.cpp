@@ -3,7 +3,8 @@
 #include <charconv>
 #include <psibase/HttpHeaders.hpp>
 #include <psibase/dispatch.hpp>
-#include <psio/json/any.hpp>
+#include <psio/json.hpp>
+#include <psio/json_value.hpp>
 #include <services/local/XBasic.hpp>
 #include <services/local/XDb.hpp>
 #include <services/local/XHttp.hpp>
@@ -71,11 +72,12 @@ namespace LocalService
       };
       PSIO_REFLECT(LoginReply, access_token, token_type)
 
+      // The body of POST /shutdown. Each member may be left out: false.
       struct ShutdownRequest
       {
-         bool restart = false;
-         bool force   = false;
-         bool soft    = false;
+         std::optional<bool> restart;
+         std::optional<bool> force;
+         std::optional<bool> soft;
       };
       PSIO_REFLECT(ShutdownRequest, restart, force, soft);
 
@@ -312,31 +314,24 @@ namespace LocalService
          return parseOption(name1, iter, end, value) || parseOption(name2, iter, end, value);
       }
 
-      bool parseOption(const psio::json::any& opt, bool default_)
+      bool parseOption(const psio::json_value& opt, bool default_)
       {
-         if (auto* b = opt.get_if<bool>())
+         if (auto* b = opt.as_bool())
             return *b;
-         else if (auto* s = opt.get_if<std::string>())
+         else if (auto* s = opt.as_string())
          {
             return parseOptionValue(*s, default_);
          }
          return default_;
       }
-      std::uint32_t parseOption(const psio::json::any& opt, std::uint32_t default_)
+      std::uint32_t parseOption(const psio::json_value& opt, std::uint32_t default_)
       {
-         if (auto* i = opt.get_if<std::int32_t>())
+         if (auto* n = opt.as_number())
          {
-            if (*i >= 0 &&
-                static_cast<std::uint32_t>(*i) <= std::numeric_limits<std::uint32_t>::max())
+            if (auto i = n->as_uint64(); i && *i <= std::numeric_limits<std::uint32_t>::max())
                return static_cast<std::uint32_t>(*i);
          }
-         if (auto* i = opt.get_if<std::int64_t>())
-         {
-            if (*i >= 0 &&
-                static_cast<std::uint64_t>(*i) <= std::numeric_limits<std::uint32_t>::max())
-               return static_cast<std::uint32_t>(*i);
-         }
-         else if (auto* s = opt.get_if<std::string>())
+         else if (auto* s = opt.as_string())
          {
             std::uint32_t result;
             const char*   p   = s->data();
@@ -348,9 +343,9 @@ namespace LocalService
          return default_;
       }
 
-      std::string parseOption(const psio::json::any& opt, std::string default_)
+      std::string parseOption(const psio::json_value& opt, std::string default_)
       {
-         if (auto* s = opt.get_if<std::string>())
+         if (auto* s = opt.as_string())
          {
             return *s;
          }
@@ -358,10 +353,10 @@ namespace LocalService
       }
 
       template <typename T>
-      std::vector<T> parseOptionList(const psio::json::any& opt, const std::vector<T>& default_)
+      std::vector<T> parseOptionList(const psio::json_value& opt, const std::vector<T>& default_)
       {
          std::vector<T> result;
-         if (auto* l = opt.get_if<psio::json::any_array>())
+         if (auto* l = opt.as_array())
          {
             for (const auto& item : *l)
             {
@@ -376,9 +371,9 @@ namespace LocalService
       }
 
       template <typename T>
-      T parseOptionList(const psio::json::any& opt, const T& default_)
+      T parseOptionList(const psio::json_value& opt, const T& default_)
       {
-         if (auto* l = opt.get_if<psio::json::any_array>())
+         if (auto* l = opt.as_array())
          {
             if (!l->empty())
                return parseOption(l->back(), default_);
@@ -391,15 +386,15 @@ namespace LocalService
          }
       }
 
-      std::optional<std::string> guessUrl(const psio::json::any& listen, std::string&& host)
+      std::optional<std::string> guessUrl(const psio::json_value& listen, std::string&& host)
       {
          std::string   proto;
          std::uint16_t port;
-         if (auto* l = listen.get_if<psio::json::any_array>())
+         if (auto* l = listen.as_array())
          {
             for (const auto& item : *l)
             {
-               if (auto* o = item.get_if<psio::json::any_object>())
+               if (auto* o = item.as_object())
                {
                   std::string   newProto;
                   std::uint32_t newPort = 0;
@@ -438,48 +433,33 @@ namespace LocalService
             return proto + "://" + std::move(host) + ':' + std::to_string(port);
       }
 
+      // The configuration document in HostConfigRow::config. psinode
+      // defines its content; this service passes it through, any JSON.
       struct PsinodeConfig
       {
-         psio::json::any  host;
-         psio::json::any  service;
-         psio::json::any* hostOption(std::string_view key)
+         psio::json_value host;
+         // psinode writes it; a test chain's document has only `host`
+         std::optional<psio::json_value> service;
+         psio::json_value*               hostOption(std::string_view key) { return host.find(key); }
+         psio::json_value::object*       serviceConfig()
          {
-            if (auto* s = host.get_if<psio::json::any_object>())
-            {
-               auto pos = std::ranges::find_if(*s, [key](auto& entry) { return entry.key == key; });
-               if (pos != s->end())
-               {
-                  return &pos->value;
-               }
-            }
-            return nullptr;
-         }
-         psio::json::any_object* serviceConfig()
-         {
-            if (auto* s = service.get_if<psio::json::any_object>())
-            {
-               auto pos =
-                   std::ranges::find_if(*s, [](auto& entry) { return entry.key == "config"; });
-               if (pos != s->end())
-               {
-                  return pos->value.get_if<psio::json::any_object>();
-               }
-            }
+            if (service)
+               if (auto* config = service->find("config"))
+                  return config->as_object();
             return nullptr;
          }
          std::vector<std::string> serviceArgv()
          {
-            if (auto* s = service.get_if<psio::json::any_object>())
+            if (service)
             {
-               auto pos = std::ranges::find_if(*s, [](auto& entry) { return entry.key == "argv"; });
-               if (pos != s->end())
+               if (auto* argv = service->find("argv"))
                {
-                  if (auto* arr = pos->value.get_if<psio::json::any_array>())
+                  if (auto* arr = argv->as_array())
                   {
                      std::vector<std::string> result;
                      for (const auto& arg : *arr)
                      {
-                        if (auto* s = arg.get_if<std::string>())
+                        if (auto* s = arg.as_string())
                            result.push_back(*s);
                         else
                            return {};
@@ -501,83 +481,96 @@ namespace LocalService
          PSIBASE_SUBJECTIVE_TX
          {
             HostConfigRow hostConfig = Native::session().open<HostConfigTable>().get({}).value();
-            json                     = psio::convert_from_json<PsinodeConfig>(hostConfig.config);
+            json                     = psio::from_ijson<PsinodeConfig>(hostConfig.config);
             adminOpts = XAdmin{}.open<AdminOptionsTable>().get({}).value_or(AdminOptionsRow{});
          }
-         psio::json::any_object result;
-         if (auto* host = json.host.get_if<psio::json::any_object>())
+         psio::json_value::object result;
+         if (auto* host = json.host.as_object())
          {
-            for (auto& entry : *host)
+            for (auto& [key, value] : *host)
             {
                // Rename host options that conflict with ours.
                // Note that we preserve the service defined options here,
                // because they are used by the UI, which is part of this
                // service. Unknown host options will not be displayed and
                // will be round-tripped unmodified.
-               if (entry.key == "hosts" || entry.key == "peers")
+               if (key == "hosts" || key == "peers")
                   continue;
-               else if (psio::get_data_member<AdminOptionsRow>(entry.key, [](auto) {}) ||
+               else if (psio::reflect<AdminOptionsRow>::index_of(key).has_value() ||
                         // In the unlikely event that the host has a option that
                         // begins with "host.", writeConfig should not remove it
-                        entry.key.starts_with("host."))
-                  entry.key = "host." + entry.key;
-               result.push_back(std::move(entry));
+                        key.starts_with("host."))
+                  key = "host." + key;
+               result.emplace_back(std::move(key), std::move(value));
             }
          }
-         result.push_back({"p2p", adminOpts.p2p});
-         result.push_back({"hosts", psio::convert_from_json<psio::json::any>(
-                                        psio::convert_to_json(adminOpts.hosts))});
-         result.push_back({"peers", psio::convert_from_json<psio::json::any>(
-                                        psio::convert_to_json(adminOpts.peers))});
-         return psio::convert_to_json(psio::json::any{std::move(result)});
+         result.emplace_back("p2p", adminOpts.p2p);
+         result.emplace_back(
+             "hosts", psio::json_value::array(adminOpts.hosts.begin(), adminOpts.hosts.end()));
+         result.emplace_back(
+             "peers", psio::json_value::array(adminOpts.peers.begin(), adminOpts.peers.end()));
+         return psio::to_ijson(psio::json_value{std::move(result)});
       }
-      void writeConfig(std::string config)
+
+      // The strings of a JSON array of strings; aborts for anything else
+      std::vector<std::string> stringList(const psio::json_value& value)
+      {
+         auto* items = value.as_array();
+         check(items != nullptr, "Expected an array of strings");
+         std::vector<std::string> result;
+         for (const auto& item : *items)
+         {
+            auto* s = item.as_string();
+            check(s != nullptr, "Expected an array of strings");
+            result.push_back(*s);
+         }
+         return result;
+      }
+
+      void writeConfig(std::span<const char> config)
       {
          PSIBASE_SUBJECTIVE_TX
          {
             auto            table      = Native::session().open<HostConfigTable>();
             HostConfigRow   hostConfig = table.get({}).value();
             AdminOptionsRow adminConfig{};
-            auto json = psio::convert_from_json<psio::json::any_object>(std::move(config));
-            psio::json::any_object host;
-            psio::json::any_object service;
-            for (auto& entry : json)
+            auto            json    = psio::from_ijson<psio::json_value>(config);
+            auto*           members = json.as_object();
+            check(members != nullptr, "Expected a configuration object");
+            psio::json_value::object host;
+            psio::json_value::object service;
+            for (auto& [key, value] : *members)
             {
-               if (entry.key == "p2p")
+               if (key == "p2p")
                {
-                  if (const bool* b = entry.value.get_if<bool>())
+                  if (const bool* b = value.as_bool())
                   {
                      adminConfig.p2p = *b;
-                     entry.value     = std::string(*b ? "on" : "off");
-                     service.push_back(std::move(entry));
+                     service.emplace_back(std::move(key), std::string(*b ? "on" : "off"));
                   }
                }
-               else if (entry.key == "hosts")
+               else if (key == "hosts")
                {
-                  adminConfig.hosts = psio::convert_from_json<std::vector<std::string>>(
-                      psio::convert_to_json(entry.value));
-                  entry.key = "host";
-                  service.push_back(std::move(entry));
+                  adminConfig.hosts = stringList(value);
+                  service.emplace_back("host", std::move(value));
                }
-               else if (entry.key == "peers")
+               else if (key == "peers")
                {
-                  adminConfig.peers = psio::convert_from_json<std::vector<std::string>>(
-                      psio::convert_to_json(entry.value));
-                  entry.key = "peer";
-                  service.push_back(std::move(entry));
+                  adminConfig.peers = stringList(value);
+                  service.emplace_back("peer", std::move(value));
                }
                else
                {
-                  if (entry.key.starts_with("host."))
-                     entry.key = entry.key.substr(5);
+                  if (key.starts_with("host."))
+                     key = key.substr(5);
 
-                  host.push_back(std::move(entry));
+                  host.emplace_back(std::move(key), std::move(value));
                }
             }
-            hostConfig.config = psio::convert_to_json(PsinodeConfig{
-                .host = std::move(host),
-                .service =
-                    psio::json::any_object{psio::json::entry{"config", std::move(service)}}});
+            psio::json_value serviceJson{psio::json_value::object{}};
+            serviceJson.set("config", std::move(service));
+            hostConfig.config = psio::to_ijson(
+                PsinodeConfig{.host = std::move(host), .service = std::move(serviceJson)});
             table.put(hostConfig);
             XAdmin{}.open<AdminOptionsTable>().put(adminConfig);
          }
@@ -664,7 +657,7 @@ namespace LocalService
       PSIBASE_SUBJECTIVE_TX
       {
          HostConfigRow hostConfig = Native::session().open<HostConfigTable>().get({}).value();
-         auto          json       = psio::convert_from_json<PsinodeConfig>(hostConfig.config);
+         auto          json       = psio::from_ijson<PsinodeConfig>(hostConfig.config);
 
          AdminOptionsRow adminOpts{};
          if (auto* hosts = json.hostOption("hosts"))
@@ -677,23 +670,23 @@ namespace LocalService
          }
          if (auto* config = json.serviceConfig())
          {
-            for (const auto& entry : *config)
+            for (const auto& [key, value] : *config)
             {
-               if (entry.key == "p2p")
+               if (key == "p2p")
                {
-                  adminOpts.p2p = parseOptionList(entry.value, false);
+                  adminOpts.p2p = parseOptionList(value, false);
                }
-               else if (entry.key == "host")
+               else if (key == "host")
                {
-                  adminOpts.hosts = parseOptionList(entry.value, std::vector<std::string>());
+                  adminOpts.hosts = parseOptionList(value, std::vector<std::string>());
                }
-               else if (entry.key == "peer")
+               else if (key == "peer")
                {
-                  adminOpts.peers = parseOptionList(entry.value, std::vector<std::string>());
+                  adminOpts.peers = parseOptionList(value, std::vector<std::string>());
                }
                else
                {
-                  abortMessage(std::format("Unknown option: {}", entry.key));
+                  abortMessage(std::format("Unknown option: {}", key));
                }
             }
          }
@@ -834,7 +827,7 @@ namespace LocalService
                    .body        = toVec("Content-Type must be application/json\n"),
                };
             }
-            writeConfig(std::string(req.body.begin(), req.body.end()));
+            writeConfig(req.body);
             recurse().to<XPeers>().onConfig();
             return HttpReply{
                 .status = HttpStatus::ok,
@@ -862,23 +855,23 @@ namespace LocalService
                 .body        = toVec("Content-Type must be application/json\n"),
             };
          }
-         auto body = psio::convert_from_json<ShutdownRequest>(
-             std::string{req.body.begin(), req.body.end()});
+         auto body = psio::from_ijson<ShutdownRequest>(req.body);
          PSIBASE_SUBJECTIVE_TX
          {
             auto now = std::chrono::time_point_cast<MicroSeconds>(std::chrono::steady_clock::now())
                            .time_since_epoch();
 
-            PsinodeShutdownArgs args{.restart  = std::nullopt,
-                                     .soft     = body.soft,
-                                     .deadline = body.force ? now : now + std::chrono::seconds{10}};
-            if (body.restart)
+            PsinodeShutdownArgs args{
+                .restart  = std::nullopt,
+                .soft     = body.soft.value_or(false),
+                .deadline = body.force.value_or(false) ? now : now + std::chrono::seconds{10}};
+            if (body.restart.value_or(false))
             {
                HostConfigRow hostConfig = Native::session().open<HostConfigTable>().get({}).value();
-               auto          opts       = psio::convert_from_json<PsinodeConfig>(hostConfig.config);
+               auto          opts       = psio::from_ijson<PsinodeConfig>(hostConfig.config);
                args.restart             = opts.serviceArgv();
             }
-            PendingShutdownRow row{.args = psio::convert_to_json(args)};
+            PendingShutdownRow row{.args = psio::to_ijson(args)};
 
             auto table = Native::session(KvMode::readWrite).open<PendingShutdownTable>();
             table.put(row);
@@ -1037,8 +1030,7 @@ namespace LocalService
                    .body        = toVec("Content-Type must be application/json\n"),
                };
             }
-            auto op = psio::convert_from_json<AdminAccountOp>(
-                std::string(req.body.data(), req.body.size()));
+            auto op = psio::from_ijson<AdminAccountOp>(req.body);
             PSIBASE_SUBJECTIVE_TX
             {
                if (op.admin)
@@ -1065,8 +1057,7 @@ namespace LocalService
             HttpReply reply{
                 .contentType = "application/json",
             };
-            psio::vector_stream stream{reply.body};
-            psio::to_json(result, stream);
+            psio::to_ijson(result, reply.body);
             return reply;
          }
          else
@@ -1093,9 +1084,9 @@ namespace LocalService
             };
          }
 
-         HttpReply           reply{.contentType = "application/json"};
-         psio::vector_stream stream{reply.body};
-         to_json(LoginReply{to<RTransact>().login(to<XHttp>().rootHost(req.host))}, stream);
+         HttpReply reply{.contentType = "application/json"};
+         psio::to_ijson(LoginReply{to<RTransact>().login(to<XHttp>().rootHost(req.host))},
+                        reply.body);
          return reply;
       }
       return {};

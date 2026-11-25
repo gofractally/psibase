@@ -1,4 +1,4 @@
-use crate::fracpack::{Pack, UnpackOwned};
+use psio::interface::Method;
 use crate::services::transact::ServiceMethod;
 use crate::{get_result_bytes, native_raw, AccountNumber, Action, MethodNumber};
 use serde::de::DeserializeOwned;
@@ -88,9 +88,11 @@ pub fn service_start() {
 pub trait ProcessActionStruct {
     type Output;
 
+    /// `ArgStruct` is the argument record of the action
+    /// (`psio_actions::args::<action>`).
     fn process<
-        Return: Serialize + DeserializeOwned,
-        ArgStruct: Pack + Serialize + DeserializeOwned,
+        Return: psio::json::JsonText,
+        ArgStruct: Method + psio::json::JsonText + Serialize + DeserializeOwned,
     >(
         self,
     ) -> Self::Output;
@@ -100,17 +102,23 @@ pub trait WithActionStruct {
     fn with_action_struct<P: ProcessActionStruct>(action: &str, process: P) -> Option<P::Output>;
 }
 
+/// Who carries a call of an action. `args` is the action's argument
+/// record (`psio_actions::args::<action>`); its PSSZ is the action's
+/// `rawData`.
 pub trait Caller: Clone {
     type ReturnsNothing;
-    type ReturnType<T: UnpackOwned>;
+    type ReturnType<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>>;
 
-    fn call_returns_nothing<Args: Pack>(
+    fn call_returns_nothing<Args: Method>(
         &self,
         method: MethodNumber,
         args: Args,
     ) -> Self::ReturnsNothing;
 
-    fn call<Ret: UnpackOwned, Args: Pack>(
+    /// `Ret` is the result of the method `Args`. A caller that reads the
+    /// bytes that come back reads them as the method declares its result
+    /// (`Args::result_from_pssz`: validated, `returns(...)` applied).
+    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: Method<Result = Ret>>(
         &self,
         method: MethodNumber,
         args: Args,
@@ -122,10 +130,15 @@ pub struct JustSchema;
 
 impl Caller for JustSchema {
     type ReturnsNothing = ();
-    type ReturnType<T: UnpackOwned> = ();
+    type ReturnType<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> = ();
 
-    fn call_returns_nothing<Args: Pack>(&self, _method: MethodNumber, _args: Args) {}
-    fn call<Ret: UnpackOwned, Args: Pack>(&self, _method: MethodNumber, _args: Args) {}
+    fn call_returns_nothing<Args: Method>(&self, _method: MethodNumber, _args: Args) {}
+    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: Method<Result = Ret>>(
+        &self,
+        _method: MethodNumber,
+        _args: Args,
+    ) {
+    }
 }
 
 #[derive(Clone, Default)]
@@ -135,33 +148,65 @@ pub struct ServiceCaller {
     pub flags: u64,
 }
 
+/// An [`Action`] that holds its arguments instead of their bytes: it has
+/// the wire of `Action`, and the arguments are written straight into the
+/// buffer of the action (`psio::pssz::PackedRef`).
+#[derive(psio::PsszPack)]
+#[allow(non_snake_case)]
+struct ActionRef<'a, A: psio::pssz::PsszPack<psio::Pssz>> {
+    sender: AccountNumber,
+    service: AccountNumber,
+    method: MethodNumber,
+    rawData: psio::pssz::PackedRef<'a, A>,
+}
+
+/// The packed [`Action`] of a call, in one buffer: the same bytes as
+/// packing the arguments and then an `Action` around them.
+fn pack_action<A: psio::pssz::PsszPack<psio::Pssz>>(
+    sender: AccountNumber,
+    service: AccountNumber,
+    method: MethodNumber,
+    args: &A,
+) -> Vec<u8> {
+    psio::to_pssz(&ActionRef {
+        sender,
+        service,
+        method,
+        rawData: psio::pssz::PackedRef::new(args),
+    })
+}
+
+impl ServiceCaller {
+    fn action<Args: Method>(&self, method: MethodNumber, args: &Args) -> Vec<u8> {
+        pack_action(self.sender, self.service, method, args)
+    }
+}
+
 impl Caller for ServiceCaller {
     type ReturnsNothing = ();
-    type ReturnType<T: UnpackOwned> = T;
+    type ReturnType<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> = T;
 
-    fn call_returns_nothing<Args: Pack>(&self, method: MethodNumber, args: Args) {
-        let act = Action {
-            sender: self.sender,
-            service: self.service,
-            method,
-            rawData: args.packed().into(),
-        }
-        .packed();
+    fn call_returns_nothing<Args: Method>(&self, method: MethodNumber, args: Args) {
+        let act = self.action(method, &args);
         unsafe { native_raw::call(act.as_ptr(), act.len() as u32, self.flags) };
     }
 
-    fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) -> Ret {
-        let act = Action {
-            sender: self.sender,
-            service: self.service,
-            method,
-            rawData: args.packed().into(),
-        }
-        .packed();
+    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: Method<Result = Ret>>(
+        &self,
+        method: MethodNumber,
+        args: Args,
+    ) -> Ret {
+        let act = self.action(method, &args);
         let ret = get_result_bytes(unsafe {
             native_raw::call(act.as_ptr(), act.len() as u32, self.flags)
         });
-        Ret::unpacked(&ret).unwrap()
+        // The result of another service: validated as the method declares it.
+        Args::result_from_pssz(&ret).unwrap_or_else(|e| {
+            crate::abort_message(&format!(
+                "value returned from {} was not serialized as expected: {e}",
+                Args::NAME
+            ))
+        })
     }
 }
 
@@ -173,24 +218,23 @@ pub struct ActionPacker {
 
 impl Caller for ActionPacker {
     type ReturnsNothing = Action;
-    type ReturnType<T: UnpackOwned> = Action;
+    type ReturnType<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> = Action;
 
-    fn call_returns_nothing<Args: Pack>(&self, method: MethodNumber, args: Args) -> Action {
+    fn call_returns_nothing<Args: Method>(&self, method: MethodNumber, args: Args) -> Action {
         Action {
             sender: self.sender,
             service: self.service,
             method,
-            rawData: args.packed().into(),
+            rawData: psio::to_pssz(&args).into(),
         }
     }
 
-    fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) -> Action {
-        Action {
-            sender: self.sender,
-            service: self.service,
-            method,
-            rawData: args.packed().into(),
-        }
+    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: Method<Result = Ret>>(
+        &self,
+        method: MethodNumber,
+        args: Args,
+    ) -> Action {
+        self.call_returns_nothing(method, args)
     }
 }
 
@@ -296,7 +340,7 @@ pub trait ServiceWrapper {
     /// Pack actions into [psibase::Action](psibase::Action).
     ///
     /// This method returns an object which has methods
-    /// (one per action) which pack the action's arguments using [fracpack] and
+    /// (one per action) which pack the action's arguments as PSSZ and
     /// return a [psibase::Action](psibase::Action). The `pack_*` series of
     /// functions is mainly useful to applications which push transactions
     /// to blockchains.
@@ -309,7 +353,7 @@ pub trait ServiceWrapper {
     /// Pack actions into [psibase::Action](psibase::Action).
     ///
     /// This method returns an object which has methods
-    /// (one per action) which pack the action's arguments using [fracpack] and
+    /// (one per action) which pack the action's arguments as PSSZ and
     /// return a [psibase::Action](psibase::Action). The `pack_*` series of
     /// functions is mainly useful to applications which push transactions
     /// to blockchains.
@@ -322,7 +366,7 @@ pub trait ServiceWrapper {
     /// Pack actions into [psibase::Action](psibase::Action).
     ///
     /// This method returns an object which has methods
-    /// (one per action) which pack the action's arguments using [fracpack] and
+    /// (one per action) which pack the action's arguments as PSSZ and
     /// return a [psibase::Action](psibase::Action). The `pack_*` series of
     /// functions is mainly useful to applications which push transactions
     /// to blockchains.
@@ -335,7 +379,7 @@ pub trait ServiceWrapper {
     /// Pack actions into [psibase::Action](psibase::Action).
     ///
     /// This method returns an object which has methods
-    /// (one per action) which pack the action's arguments using [fracpack] and
+    /// (one per action) which pack the action's arguments as PSSZ and
     /// return a [psibase::Action](psibase::Action). The `pack_*` series of
     /// functions is mainly useful to applications which push transactions
     /// to blockchains.
@@ -353,27 +397,71 @@ pub struct RunAsCaller {
 
 impl Caller for RunAsCaller {
     type ReturnsNothing = ();
-    type ReturnType<T: UnpackOwned> = T;
+    type ReturnType<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> = T;
 
-    fn call_returns_nothing<Args: Pack>(&self, method: MethodNumber, args: Args) {
+    fn call_returns_nothing<Args: Method>(&self, method: MethodNumber, args: Args) {
         let action = Action {
             sender: self.sender,
             service: self.service,
             method,
-            rawData: args.packed().into(),
+            rawData: psio::to_pssz(&args).into(),
         };
         crate::services::transact::Wrapper::call().runAs(action, self.allowed_actions.clone());
     }
 
-    fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) -> Ret {
+    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: Method<Result = Ret>>(
+        &self,
+        method: MethodNumber,
+        args: Args,
+    ) -> Ret {
         let action = Action {
             sender: self.sender,
             service: self.service,
             method,
-            rawData: args.packed().into(),
+            rawData: psio::to_pssz(&args).into(),
         };
         let ret =
             crate::services::transact::Wrapper::call().runAs(action, self.allowed_actions.clone());
-        Ret::unpacked(&ret.0).unwrap()
+        Args::result_from_pssz(&ret).unwrap_or_else(|e| {
+            crate::abort_message(&format!(
+                "value returned from {} was not serialized as expected: {e}",
+                Args::NAME
+            ))
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(psio::PsszPack)]
+    struct Transfer {
+        to: AccountNumber,
+        amount: u64,
+        memo: String,
+    }
+
+    // A call is packed in one buffer; the bytes are those of the two-step
+    // form (the arguments, then the action around them).
+    #[test]
+    fn a_call_packed_in_place_has_the_bytes_of_the_action() {
+        let sender = AccountNumber::from_exact("alice").unwrap();
+        let service = AccountNumber::from_exact("tokens").unwrap();
+        let method = MethodNumber::from("credit");
+        for args in [
+            Transfer { to: AccountNumber::from_exact("bob").unwrap(), amount: 5, memo: "rent".into() },
+            Transfer { to: AccountNumber::from_exact("carol").unwrap(), amount: u64::MAX, memo: "x".repeat(70_000) },
+        ] {
+            let two_step = psio::to_pssz(&Action {
+                sender,
+                service,
+                method,
+                rawData: psio::to_pssz(&args).into(),
+            });
+            assert!(pack_action(sender, service, method, &args) == two_step);
+        }
+        let none = psio::to_pssz(&Action { sender, service, method, rawData: psio::to_pssz(&()).into() });
+        assert!(pack_action(sender, service, method, &()) == none);
     }
 }

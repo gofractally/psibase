@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::{AccountNumber, Hex, Pack, ToKey, ToSchema, Unpack};
+use crate::{AccountNumber};
 use anyhow::anyhow;
 use percent_encoding::percent_decode;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -12,23 +12,33 @@ use std::collections::HashMap;
 /// Note: `http-server` aborts when most services set HTTP headers. It only allows services
 /// it trust to set them in order to enforce security rules.
 #[derive(
-    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, ToKey, ToSchema, Serialize, Deserialize,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Clone,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::Key,
+    psio::JsonText,
+    psio::Serde,
 )]
-#[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
+#[psio(definition_will_not_change)]
 pub struct HttpHeader {
     /// Name of header, e.g. "Content-Security-Policy"
     pub name: String,
 
     /// Value of header
-    pub value: String,
+    pub value: psio::pssz::RawString,
 }
 
 impl HttpHeader {
     pub fn new(name: &str, value: &str) -> Self {
         HttpHeader {
             name: name.to_string(),
-            value: value.to_string(),
+            value: value.into(),
         }
     }
     pub fn matches(&self, name: &str) -> bool {
@@ -37,7 +47,7 @@ impl HttpHeader {
 }
 
 /// HTTP Status codes
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(u16)]
 pub enum HttpStatus {
     Ok = 200,
@@ -60,10 +70,18 @@ pub enum HttpStatus {
 /// action. The `http-server` service receives it via its `serve` exported function.
 
 #[derive(
-    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, ToKey, ToSchema, Serialize, Deserialize,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Clone,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::JsonText,
+    psio::Serde,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
 pub struct HttpRequest {
     /// Fully-qualified domain name
     pub host: String,
@@ -72,7 +90,7 @@ pub struct HttpRequest {
     pub method: String,
 
     /// Absolute path, e.g. "/index.js"
-    pub target: String,
+    pub target: psio::pssz::RawString,
 
     /// "application/json", "text/html", ...
     pub contentType: String,
@@ -81,19 +99,19 @@ pub struct HttpRequest {
     pub headers: Vec<HttpHeader>,
 
     /// Request body, e.g. POST data
-    pub body: Hex<Vec<u8>>,
+    pub body: Vec<u8>,
 }
 
 impl HttpRequest {
     pub fn path<'a>(&'a self) -> Cow<'a, str> {
-        let encoded = self
-            .target
-            .split_once('?')
-            .map_or(self.target.as_str(), |s| s.0);
+        // Borrowed from the request: a target that is not UTF-8 has no path.
+        let target = self.target.to_str().unwrap_or_default();
+        let encoded = target.split_once('?').map_or(target, |s| s.0);
         return percent_decode(encoded.as_bytes()).decode_utf8_lossy();
     }
     pub fn query(&self) -> HashMap<String, String> {
-        let encoded = self.target.split_once('?').map_or("", |s| s.1);
+        let target = self.target.to_string_lossy();
+        let encoded = target.split_once('?').map_or("", |s| s.1);
         return form_urlencoded::parse(encoded.as_bytes())
             .into_owned()
             .collect();
@@ -102,13 +120,13 @@ impl HttpRequest {
         self.headers
             .iter()
             .find(|h| h.matches(name))
-            .map(|h| h.value.as_str())
+            .and_then(|h| h.value.to_str().ok())
     }
 }
 
 pub struct HttpBody {
     pub contentType: String,
-    pub body: Hex<Vec<u8>>,
+    pub body: Vec<u8>,
 }
 
 impl HttpBody {
@@ -130,18 +148,27 @@ impl HttpBody {
 ///
 /// Services return this from their [serveSys](crate::server_interface::ServerActions::serveSys) action.
 #[derive(
-    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, ToSchema, ToKey, Serialize, Deserialize,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Clone,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::JsonText,
+    psio::Serde,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
 pub struct HttpReply {
+    #[psio(default = 200)]
     pub status: u16,
 
     /// "application/json", "text/html", ...
     pub contentType: String,
 
     /// Response body
-    pub body: Hex<Vec<u8>>,
+    pub body: Vec<u8>,
 
     /// HTTP Headers
     pub headers: Vec<HttpHeader>,
@@ -149,7 +176,7 @@ pub struct HttpReply {
 
 impl HttpReply {
     pub fn text(self) -> Result<String, anyhow::Error> {
-        Ok(String::from_utf8(self.body.0)?)
+        Ok(String::from_utf8(self.body)?)
     }
     pub fn json<T: DeserializeOwned>(self) -> Result<T, anyhow::Error> {
         if self.status != 200 {

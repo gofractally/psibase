@@ -5,7 +5,6 @@ import testutil
 import unittest
 import os
 import time
-from fracpack import *
 from psibase import *
 from threading import Thread, Semaphore
 from requests import ConnectionError

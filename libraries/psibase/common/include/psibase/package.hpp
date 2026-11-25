@@ -6,7 +6,6 @@
 #include <psibase/block.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/zip.hpp>
-#include <psio/from_json.hpp>
 #include <psio/reflect.hpp>
 #include <services/user/Packages.hpp>
 #include <span>

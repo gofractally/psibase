@@ -11,10 +11,21 @@ namespace psibase
 {
    std::optional<std::string> findDifference(const ServiceSchema& lhs, const ServiceSchema& rhs)
    {
-      auto matcher = psio::schema_types::TypeMatcher{
-          lhs.types,
-          rhs.types,
-          psio::SchemaDifference::equivalent,
+      // Both schemas are of one service. Compared as contracts: the bytes
+      // and what a consumer of the text forms sees (member and parameter
+      // names, variant alternative labels, custom ids, argument list
+      // forms). The comparison is the same whichever language built the
+      // package: a declaration and its twin in the other language are one
+      // contract (doc/flip-interop.md section 0.1).
+      std::string why;
+      auto        same = [&](const psio::schema_types::AnyType& l,
+                             const psio::schema_types::AnyType& r)
+      {
+         auto result = psio::pssz_ir::equivalent(lhs.types, l, rhs.types, r,
+                                                 psio::pssz_ir::compare::contract);
+         if (!result)
+            why = " (" + result.path + ": " + result.reason + ")";
+         return result.ok;
       };
 
       for (const auto& [name, lty] : lhs.actions)
@@ -22,12 +33,12 @@ namespace psibase
          if (auto rpos = rhs.actions.find(name); rpos != rhs.actions.end())
          {
             const auto& rty = rpos->second;
-            if (!matcher.match(lty.params, rty.params))
-               return std::format("Parameter types for action {} do not match", name);
+            if (!same(*lty.params, *rty.params))
+               return std::format("Parameter types for action {} do not match{}", name, why);
             if (lty.result && rty.result)
             {
-               if (!matcher.match(*lty.result, *rty.result))
-                  return std::format("Return type for {} does not match", name);
+               if (!same(**lty.result, **rty.result))
+                  return std::format("Return type for {} does not match{}", name, why);
             }
             else if (!lty.result && !rty.result)
             {
@@ -60,8 +71,8 @@ namespace psibase
          {
             if (auto rty = revents->find(name); rty != revents->end())
             {
-               if (!matcher.match(lty.type, rty->second.type))
-                  return std::format("Type for event {} does not match", name);
+               if (!same(lty.type, rty->second.type))
+                  return std::format("Type for event {} does not match{}", name, why);
                if (lty.access != rty->second.access)
                   return std::format("Access for event {} does not match", name);
             }
@@ -107,8 +118,8 @@ namespace psibase
 
                auto tableName =
                    ltab.name ? std::string_view{*ltab.name} : std::string_view{"<unnamed>"};
-               if (!matcher.match(ltab.type, rtab.type))
-                  return std::format("Type for table {}::{} does not match", db, tableName);
+               if (!same(ltab.type, rtab.type))
+                  return std::format("Type for table {}::{} does not match{}", db, tableName, why);
                if (ltab.indexes.size() < rtab.indexes.size())
                   return std::format("Too many indexes for table {}::{}", db, tableName);
                for (const auto& [lindex, rindex] : std::views::zip(ltab.indexes, rtab.indexes))
@@ -121,7 +132,7 @@ namespace psibase
                   {
                      if (lfield.path != rfield.path || lfield.transform != rfield.transform ||
                          lfield.type.has_value() != rfield.type.has_value() ||
-                         (lfield.type && rfield.type && !matcher.match(*lfield.type, *rfield.type)))
+                         (lfield.type && rfield.type && !same(*lfield.type, *rfield.type)))
                      {
                         return std::format("Index does not match in {}::{}", db, tableName);
                      }

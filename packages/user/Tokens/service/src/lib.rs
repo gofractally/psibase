@@ -236,7 +236,7 @@ pub mod service {
     /// * `image`       - Image bytes, at most `MAX_ICON_SIZE` bytes
     /// * `contentType` - Image type (see `image_content_type`). PNG, JPEG, and WebP are allowed.
     #[action]
-    fn setIcon(token_id: TID, image: Hex<Vec<u8>>, contentType: ImgContentType) {
+    fn setIcon(token_id: TID, image: Vec<u8>, contentType: ImgContentType) {
         Token::get_assert(token_id).check_is_owner(get_sender());
         assert!(
             image.len() <= MAX_ICON_SIZE,
@@ -246,7 +246,7 @@ pub mod service {
             .filter(|_| is_icon_content_type(contentType))
             .expect("Icon content type not allowed");
 
-        Sites::call().storeSys(icon_path(token_id), mime.to_string(), None, image);
+        Sites::call().storeSys(icon_path(token_id).into(), mime.to_string(), None, image);
 
         Wrapper::emit().history().configured(
             token_id,
@@ -265,12 +265,12 @@ pub mod service {
         let path = icon_path(token_id);
         assert!(
             Sites::call()
-                .getProps(Wrapper::SERVICE, path.clone())
+                .getProps(Wrapper::SERVICE, path.clone().into())
                 .is_some(),
             "Token has no icon"
         );
 
-        Sites::call().remove(path);
+        Sites::call().remove(path.into());
 
         Wrapper::emit().history().configured(
             token_id,

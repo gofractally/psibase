@@ -73,7 +73,7 @@ fn deserialize_timepoint<'d, D>(deserializer: D) -> Result<i64, D::Error>
 where
     D: de::Deserializer<'d>,
 {
-    Ok(TimePointSec::deserialize(deserializer)?.seconds)
+    Ok(TimePointSec::deserialize(deserializer)?.ticks())
 }
 
 impl Into<Message> for TempMessageForDeserEvents {

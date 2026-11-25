@@ -72,7 +72,7 @@ struct basic_fuzz_routing : psibase::net::message_serializer<Derived>
          PSIBASE_LOG(logger, warning) << e.what();
       }
    }
-   void recv(const psio::shared_view_ptr<psibase::SignedBlock>& message)
+   void recv(const psio::shared_pssz<psibase::SignedBlock>& message)
    {
       recv(psibase::net::BlockMessage{message});
    }
@@ -193,7 +193,7 @@ struct NetworkBase
       }
       if (!prepared_blocks[idx])
       {
-         psibase::BlockInfo info(blocks[idx]->block());
+         psibase::BlockInfo info(blocks[idx]->block().header().unpack());
          prepared_blocks[idx] = true;
          prepares.push_back(SignedMessage<PrepareMessage>{PrepareMessage{info.blockId, producer}});
       }
@@ -209,7 +209,7 @@ struct NetworkBase
       }
       if (!commited_blocks[idx])
       {
-         psibase::BlockInfo info(blocks[idx]->block());
+         psibase::BlockInfo info(blocks[idx]->block().header().unpack());
          commited_blocks[idx] = true;
          commits.push_back(SignedMessage<CommitMessage>{CommitMessage{info.blockId, producer}});
       }
@@ -226,7 +226,7 @@ struct NetworkBase
       if (blocks.empty())
          return;
       auto                 block = blocks[idx];
-      psibase::BlockInfo   info{block->block()};
+      psibase::BlockInfo   info{block->block().header().unpack()};
       psibase::SignedBlock newBlock;
       newBlock.block.header.previous = info.blockId;
       newBlock.block.header.blockNum = info.header.blockNum + 1;
@@ -241,7 +241,7 @@ struct NetworkBase
 
    void recv(const psibase::net::BlockMessage& message)
    {
-      psibase::BlockInfo info(message.block->block());
+      psibase::BlockInfo info(message.block->block().header().unpack());
       if (blockIds.insert(info.blockId).second)
       {
          blocks.push_back(message.block);
@@ -360,7 +360,7 @@ struct NetworkBase
       }
    }
 
-   std::vector<psio::shared_view_ptr<psibase::SignedBlock>>               blocks;
+   std::vector<psio::shared_pssz<psibase::SignedBlock>>               blocks;
    std::set<psibase::Checksum256>                                         blockIds;
    std::vector<psibase::net::SignedMessage<psibase::net::PrepareMessage>> prepares;
    std::vector<psibase::net::SignedMessage<psibase::net::CommitMessage>>  commits;

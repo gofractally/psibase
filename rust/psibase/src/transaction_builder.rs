@@ -91,22 +91,21 @@ impl<R, F: Fn(Vec<Action>) -> Result<R, anyhow::Error>> ActionSink for Transacti
 mod tests {
     use super::*;
     use crate::{SignedTransaction, Tapos, Transaction};
-    use fracpack::Pack;
+
 
     fn mkact(size: usize) -> Action {
         let mut result = Action::default();
-        result.rawData.0.resize(size, 0u8);
+        result.rawData.resize(size, 0u8);
         result
     }
     fn mktx(actions: Vec<Action>) -> Result<SignedTransaction, anyhow::Error> {
         Ok(SignedTransaction {
-            transaction: Transaction {
+            transaction: psio::pssz::Nested::new(&Transaction {
                 tapos: Tapos::default(),
                 actions,
                 claims: Vec::new(),
-            }
-            .packed()
-            .into(),
+            })
+            .unwrap(),
             proofs: Vec::new(),
             subjectiveData: None,
         })

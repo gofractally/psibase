@@ -40,10 +40,14 @@ fn account_number_has_valid_format(s: &str) -> bool {
 /// contain the characters `a-z`, `0-9`, and `-` (hyphen). Names
 /// must not start or end with '-' or contain two consecutive '-'s
 ///
-/// The empty name `""` is value 0.
+/// The empty name `""` is value 0, and so is any text that is not a name.
 pub fn account_number_from_str(s: &str) -> u64 {
     if let Some((base, sub)) = s.split_once(SUBACCOUNT_SEPARATOR) {
-        return account_number_from_str(base) + (sub.parse::<u8>().unwrap() as u64);
+        // A subaccount that is not a number from 0 to 255 names no account.
+        return match sub.parse::<u8>() {
+            Ok(sub) => account_number_from_str(base) + sub as u64,
+            Err(_) => 0,
+        };
     }
     if s.is_empty()
         || s.len() > MAX_ACCOUNT_NAME_LENGTH as usize

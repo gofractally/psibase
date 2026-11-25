@@ -1,9 +1,17 @@
-use crate::{Pack, ToSchema, Unpack};
 
-use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Pack, Unpack, ToSchema)]
-#[fracpack(fracpack_mod = "fracpack")]
+
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::JsonText,
+    psio::Serde,
+)]
 pub struct PackageSource {
     pub url: Option<String>,
     pub account: Option<crate::AccountNumber>,
@@ -15,13 +23,22 @@ mod service {
     use super::PackageSource;
     use crate as psibase;
     use crate::package::Meta;
-    use crate::{AccountNumber, Checksum256, Hex, PackageExport, PackageRef, Schema};
-    use fracpack::{Pack, ToSchema, Unpack};
-    use serde::{Deserialize, Serialize};
+    use crate::{AccountNumber, Checksum256, PackageExport, PackageRef, ServiceSchema};
+
 
     #[table(name = "InstalledPackageTable", index = 0)]
     #[derive(
-        Debug, Clone, Default, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq, ToSchema,
+        Debug,
+        Clone,
+        Default,
+        PartialEq,
+        Eq,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
     )]
     pub struct InstalledPackage {
         pub name: String,
@@ -42,11 +59,11 @@ mod service {
     }
 
     #[table(name = "PackageManifestTable", index = 1)]
-    #[derive(Debug, Clone, Default, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+    #[derive(Debug, Clone, Default, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     struct PackageManifest {
         name: String,
         owner: AccountNumber,
-        data: Hex<Vec<u8>>,
+        data: Vec<u8>,
     }
     impl PackageManifest {
         #[primary_key]
@@ -56,7 +73,7 @@ mod service {
     }
 
     #[table(name = "TransactionOrderTable", index = 2)]
-    #[derive(Debug, Clone, Default, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+    #[derive(Debug, Clone, Default, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     struct TransactionOrder {
         owner: AccountNumber,
         id: u64,
@@ -70,25 +87,25 @@ mod service {
     }
 
     #[table(name = "InstalledSchemaTable", index = 3)]
-    #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+    #[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct InstalledSchema {
         #[primary_key]
         pub account: AccountNumber,
-        pub schema: Schema,
+        pub schema: ServiceSchema,
     }
 
     #[action]
-    fn postinstall(package: Meta, manifest: Hex<Vec<u8>>) {
+    fn postinstall(package: Meta, manifest: Vec<u8>) {
         unimplemented!()
     }
 
     #[action]
-    fn setSchema(schema: Schema) {
+    fn setSchema(schema: ServiceSchema) {
         unimplemented!()
     }
 
     #[action]
-    fn getSchema(service: AccountNumber) -> Option<Schema> {
+    fn getSchema(service: AccountNumber) -> Option<ServiceSchema> {
         unimplemented!()
     }
 

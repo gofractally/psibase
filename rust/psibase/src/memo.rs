@@ -1,6 +1,5 @@
-use crate::serialize_as_str;
 use custom_error::custom_error;
-use fracpack::{FracInputStream, Pack, ToSchema, Unpack};
+
 use std::fmt;
 use std::str::FromStr;
 
@@ -8,9 +7,25 @@ custom_error! { pub MemoError
     MemoTooLarge = "Memo must be 80 bytes or less"
 }
 
-#[derive(Debug, Clone, ToSchema, Default, Pack)]
-#[fracpack(fracpack_mod = "fracpack")]
-pub struct Memo(String);
+/// A note attached to a transfer or another action: UTF-8 text of at most
+/// 80 bytes.
+///
+/// For PSIO a memo is its text (`transparent`) and the bound is declared on
+/// it, so every pSSZ and JSON reader and writer refuses a longer one. It is
+/// not a key: PSIO's key derive does not enforce the bound of a transparent
+/// type's member.
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::ToPsszSchema,
+    psio::JsonText,
+    psio::Serde,
+)]
+#[psio(transparent)]
+pub struct Memo(#[psio(max = 80)] String);
 
 impl Memo {
     pub fn new(value: String) -> Result<Self, MemoError> {
@@ -55,27 +70,4 @@ impl From<&str> for Memo {
     }
 }
 
-impl<'a> Unpack<'a> for Memo {
-    const FIXED_SIZE: u32 = 4;
-    const VARIABLE_SIZE: bool = true;
-
-    fn unpack(src: &mut FracInputStream) -> fracpack::Result<Self> {
-        Ok(Self::new(String::unpack(src)?).map_err(|_| fracpack::Error::ExtraData)?)
-    }
-
-    fn verify(src: &mut FracInputStream) -> fracpack::Result<()> {
-        let len = <&str>::unpack(src)?.len();
-
-        if len <= 80 {
-            Ok(())
-        } else {
-            Err(fracpack::Error::ExtraData)
-        }
-    }
-
-    fn new_empty_container() -> fracpack::Result<Self> {
-        Ok(Default::default())
-    }
-}
-
-serialize_as_str!(Memo, "memo");
+psio::async_graphql_scalar!(Memo, "Memo");

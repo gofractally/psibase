@@ -29,7 +29,7 @@ namespace SystemService
       uint64_t               seq;
       bool                   accepted;
    };
-   PSIO_REFLECT(Response, id, account, accepted)
+   PSIO_REFLECT(Response, id, account, seq, accepted)
 
    /// A service for staged transaction proposal and execution
    ///
@@ -109,7 +109,6 @@ namespace SystemService
 
    // clang-format off
    PSIO_REFLECT(StagedTxService,
-      allowHashedMethods(),
       method(init),
       method(propose, actions, auto_exec),
       method(remove, id, txid),
@@ -119,7 +118,7 @@ namespace SystemService
       method(get_staged_tx, id),
    );
    PSIBASE_REFLECT_HISTORY_EVENTS(StagedTxService,
-      method(updated, txid, actor, datetime, event_type),
+      method(updated, txid, actor, datetime, attr(event_type, utf8)),
    );
    // clang-format on
 

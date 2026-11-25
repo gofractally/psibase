@@ -14,8 +14,7 @@ using namespace psibase;
 std::optional<HttpReply> ServerId::serveSys(HttpRequest req)
 {
    HttpReply           reply{.contentType = "application/json"};
-   psio::vector_stream stream{reply.body};
-   to_json(getReceiver(), stream);
+   psio::to_ijson(getReceiver(), reply.body);
    return std::move(reply);
 }
 

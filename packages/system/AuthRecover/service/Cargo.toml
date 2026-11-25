@@ -10,6 +10,7 @@ server = "r-auth-recover"
 plugins = ["auth-recover-plugin"]
 
 [dependencies]
+psio.workspace = true
 psibase.workspace = true
 psibase_macros.workspace = true
 psibase_service.workspace = true
@@ -20,3 +21,4 @@ psibase-system-workspace-hack.workspace = true
 
 [dev-dependencies]
 auth-recover-pkg = { path = "..", version = "0.29.0" }
+p256 = { version = "0.13", features = ["ecdsa", "pem", "ecdsa-core"] }

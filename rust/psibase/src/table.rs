@@ -5,12 +5,14 @@ use std::{
 
 use custom_error::custom_error;
 
-use fracpack::{Pack, UnpackOwned};
+use psio::key::KeyPack;
+use psio::pssz::{PsszPack, PsszUnpack};
+use psio::Pssz;
 
 use crate::{
-    get_key_bytes, kv_get, kv_get_bytes, kv_greater_equal_bytes, kv_less_than_bytes, kv_max_bytes,
-    kv_put, kv_put_bytes, kv_remove, kv_remove_bytes, AccountNumber, DbId, KeyView, KvHandle,
-    KvMode, RawKey, ToKey,
+    get_key_bytes, kv_get_bytes, kv_greater_equal_bytes, kv_less_than_bytes, kv_max_bytes,
+    kv_put, kv_put_bytes, kv_remove, kv_remove_bytes, AccountNumber, DbId, KvHandle,
+    KvMode, RawKey,
 };
 
 custom_error! {
@@ -19,8 +21,18 @@ custom_error! {
     DuplicatedKey       = "Duplicated secondary key",
 }
 
-pub trait TableRecord: Pack + UnpackOwned {
-    type PrimaryKey: ToKey;
+/// The one place a table row is decoded.
+///
+/// Every row read through a table is validated (`psio::from_pssz`), as it
+/// always was. A service's own rows are bytes it wrote itself; to trust
+/// them, this is the function to change (`psio::from_pssz_trusted` when the
+/// table belongs to the running service).
+pub(crate) fn decode_row<Record: TableRecord>(bytes: &[u8]) -> Record {
+    psio::from_pssz::<Record>(bytes).unwrap()
+}
+
+pub trait TableRecord: PsszPack<Pssz> + PsszUnpack<Pssz> {
+    type PrimaryKey: KeyPack;
     const SECONDARY_KEYS: u8;
     const DB: DbId = DbId::Service;
 
@@ -69,14 +81,14 @@ pub trait Table<Record: TableRecord>: Sized {
     }
 
     fn with_service_mode(service: AccountNumber, mode: KvMode) -> Self {
-        let prefix = (service, Self::TABLE_INDEX).to_key();
+        let prefix = psio::to_key(&(service, Self::TABLE_INDEX));
         Self::with_prefix(<Record as TableRecord>::DB, prefix, mode)
     }
 
     /// Returns one of the table indexes: 0 = Primary Key Index, else secondary indexes
-    fn get_index<Key: ToKey>(&self, idx: u8) -> TableIndex<Key, Record> {
+    fn get_index<Key: KeyPack>(&self, idx: u8) -> TableIndex<Key, Record> {
         let mut idx_prefix = self.prefix().to_owned();
-        idx.append_key(&mut idx_prefix);
+        idx_prefix.extend_from_slice(&psio::to_key(&idx));
 
         TableIndex::new(self.handle(), idx_prefix, idx > 0)
     }
@@ -89,7 +101,7 @@ pub trait Table<Record: TableRecord>: Sized {
     /// Put a value in the table
     fn put(&self, value: &Record) -> Result<(), Error> {
         let pk = self.serialize_key(0, &value.get_primary_key());
-        self.handle_secondary_keys_put(&pk.to_key(), value)?;
+        self.handle_secondary_keys_put(&psio::to_key(&pk), value)?;
         kv_put(self.handle(), &pk, value);
         Ok(())
     }
@@ -105,7 +117,7 @@ pub trait Table<Record: TableRecord>: Sized {
     ///
     /// The key must be the primary key. If object has secondary keys, this is
     /// equivalent to looking an object up by the key, then calling [remove] if found.
-    fn erase(&self, key: &impl ToKey) {
+    fn erase(&self, key: &impl KeyPack) {
         if Record::SECONDARY_KEYS > 0 {
             if let Some(record) = self.get_index(0).get(key) {
                 self.remove(&record);
@@ -116,10 +128,10 @@ pub trait Table<Record: TableRecord>: Sized {
         }
     }
 
-    fn serialize_key<K: ToKey>(&self, idx: u8, key: &K) -> RawKey {
+    fn serialize_key<K: KeyPack>(&self, idx: u8, key: &K) -> RawKey {
         let mut data = self.prefix().to_owned();
-        idx.append_key(&mut data);
-        key.append_key(&mut data);
+        data.extend_from_slice(&psio::to_key(&idx));
+        data.extend_from_slice(&psio::to_key(key));
         RawKey::new(data)
     }
 
@@ -130,7 +142,7 @@ pub trait Table<Record: TableRecord>: Sized {
 
         let secondary_keys = value.get_secondary_keys();
 
-        let old_record: Option<Record> = kv_get(self.handle(), &KeyView::new(pk)).unwrap();
+        let old_record: Option<Record> = kv_get_bytes(self.handle(), pk).map(|row| decode_row(&row));
 
         if let Some(old_record) = old_record {
             self.replace_secondary_keys(pk, &secondary_keys, old_record)
@@ -194,8 +206,8 @@ pub trait Table<Record: TableRecord>: Sized {
 
     fn make_prefixed_key_bytes(&self, key_idx: u8, raw_key: &RawKey) -> Vec<u8> {
         let mut key = self.prefix().to_owned();
-        key_idx.append_key(&mut key);
-        raw_key.append_key(&mut key);
+        key.extend_from_slice(&psio::to_key(&key_idx));
+        key.extend_from_slice(&psio::to_key(raw_key));
         key
     }
 
@@ -228,11 +240,14 @@ pub trait ServiceTablesWrapper {
 
 pub struct SingletonKey {}
 
-impl ToKey for SingletonKey {
-    fn append_key(&self, _key: &mut Vec<u8>) {}
+impl KeyPack for SingletonKey {
+    fn key_size(&self) -> usize {
+        0
+    }
+    fn key_pack(&self, _out: &mut Vec<u8>) {}
 }
 
-pub struct TableIndex<Key: ToKey, Record: TableRecord> {
+pub struct TableIndex<Key: KeyPack, Record: TableRecord> {
     pub db: KvHandle,
     pub prefix: Vec<u8>,
     pub is_secondary: bool,
@@ -240,7 +255,7 @@ pub struct TableIndex<Key: ToKey, Record: TableRecord> {
     pub record_type: PhantomData<Record>,
 }
 
-impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
+impl<Key: KeyPack, Record: TableRecord> TableIndex<Key, Record> {
     /// Instantiate a new Table Index (Primary or Secondary)
     pub fn new(db: &KvHandle, prefix: Vec<u8>, is_secondary: bool) -> TableIndex<Key, Record> {
         TableIndex {
@@ -255,7 +270,7 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
     /// Get the table record for the given key, if any
     pub fn get(&self, key: &Key) -> Option<Record> {
         let mut key_bytes = self.prefix.clone();
-        key.append_key(&mut key_bytes);
+        key_bytes.extend_from_slice(&psio::to_key(key));
 
         kv_get_bytes(&self.db, &key_bytes).and_then(|v| self.get_value_from_bytes(v))
     }
@@ -281,12 +296,12 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
         let front_key = match range.start_bound() {
             Bound::Included(k) => {
                 // println!("included fc");
-                k.append_key(&mut front_key);
+                front_key.extend_from_slice(&psio::to_key(k));
                 Some(front_key)
             }
             Bound::Excluded(k) => {
                 // println!("excluded fc");
-                k.append_key(&mut front_key);
+                front_key.extend_from_slice(&psio::to_key(k));
                 front_key.push(0);
                 Some(front_key)
             }
@@ -294,27 +309,27 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
         }
         .map(RawKey::new);
         // if front_key.is_some() {
-        //  println!("range2 fc: {}", Hex(&front_key.as_ref().unwrap().data[..]));
+        //  println!("range2 fc: {}", &front_key.as_ref().unwrap().data[..]);
         // }
 
         let mut back_key = self.prefix.clone();
         let back_key = match range.end_bound() {
             Bound::Included(k) => {
                 // println!("excluded bc");
-                k.append_key(&mut back_key);
+                back_key.extend_from_slice(&psio::to_key(k));
                 back_key.push(0);
                 Some(back_key)
             }
             Bound::Excluded(k) => {
                 // println!("excluded bc");
-                k.append_key(&mut back_key);
+                back_key.extend_from_slice(&psio::to_key(k));
                 Some(back_key)
             }
             Bound::Unbounded => None,
         }
         .map(RawKey::new);
         // if back_key.is_some() {
-        //     println!("range2 bc: {}", Hex(&back_key.as_ref().unwrap().data[..]));
+        //     println!("range2 bc: {}", &back_key.as_ref().unwrap().data[..]);
         // }
 
         TableIter {
@@ -327,14 +342,14 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
 
     fn get_value_from_bytes(&self, bytes: Vec<u8>) -> Option<Record> {
         if self.is_secondary {
-            kv_get(&self.db, &RawKey::new(bytes)).unwrap()
+            kv_get_bytes(&self.db, &bytes).map(|row| decode_row(&row))
         } else {
-            Some(Record::unpacked(&bytes[..]).unwrap())
+            Some(decode_row(&bytes))
         }
     }
 }
 
-impl<'a, Key: ToKey, Record: TableRecord> IntoIterator for &'a TableIndex<Key, Record> {
+impl<'a, Key: KeyPack, Record: TableRecord> IntoIterator for &'a TableIndex<Key, Record> {
     type Item = Record;
     type IntoIter = TableIter<'a, Key, Record>;
 
@@ -343,14 +358,14 @@ impl<'a, Key: ToKey, Record: TableRecord> IntoIterator for &'a TableIndex<Key, R
     }
 }
 
-pub struct TableIter<'a, Key: ToKey, Record: TableRecord> {
+pub struct TableIter<'a, Key: KeyPack, Record: TableRecord> {
     table_index: &'a TableIndex<Key, Record>,
     front_key: Option<RawKey>,
     back_key: Option<RawKey>,
     is_end: bool,
 }
 
-impl<'a, Key: ToKey, Record: TableRecord> Iterator for TableIter<'a, Key, Record> {
+impl<'a, Key: KeyPack, Record: TableRecord> Iterator for TableIter<'a, Key, Record> {
     type Item = Record;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -405,7 +420,7 @@ impl<'a, Key: ToKey, Record: TableRecord> Iterator for TableIter<'a, Key, Record
     }
 }
 
-impl<'a, Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIter<'a, Key, Record> {
+impl<'a, Key: KeyPack, Record: TableRecord> DoubleEndedIterator for TableIter<'a, Key, Record> {
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.is_end {
             return None;
@@ -427,13 +442,13 @@ impl<'a, Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIter<'a, 
             // if self.front_key.is_some() {
             //     println!(
             //         "iterated from the back bc: {} fc: {}",
-            //         Hex(&self.back_key.as_ref().unwrap().data[..]),
-            //         Hex(&self.front_key.as_ref().unwrap().data[..])
+            //         &self.back_key.as_ref().unwrap().data[..],
+            //         &self.front_key.as_ref().unwrap().data[..]
             //     );
             // } else {
             //     println!(
             //         "iterated from the back bc: {} NO FC",
-            //         Hex(&self.back_key.as_ref().unwrap().data[..])
+            //         &self.back_key.as_ref().unwrap().data[..]
             //     );
             // }
 

@@ -1,9 +1,8 @@
-//! This defines macros for the [fracpack crate](https://docs.rs/fracpack) and
-//! [psibase crate](https://docs.rs/psibase). See the documentation for those crates.
+//! This defines macros for the [psibase crate](https://docs.rs/psibase). See the
+//! documentation for that crate.
 
 use authorized_macro::authorized_attr_impl;
 use component_name_macro::component_name_macro_impl;
-use fracpack_macro::fracpack_macro_impl;
 use graphql_macro::{queries_macro_impl, table_query_macro_impl, table_query_subindex_macro_impl};
 use number_macro::{account_macro_impl, method_macro_impl};
 use plugin_error_macro::plugin_error_derive_impl;
@@ -11,46 +10,19 @@ use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use psibase_macros_lib::service_macro::service_macro_impl;
 use psibase_macros_lib::service_tables_macro::service_tables_macro_impl;
-use schema_macro::schema_derive_macro;
 use test_case_macro::test_case_macro_impl;
-use to_key_macro::to_key_macro_impl;
-use view_macro::view_macro_impl;
 
 mod authorized_macro;
 mod component_name_macro;
-mod fracpack_macro;
 mod graphql_macro;
 mod number_macro;
 mod plugin_error_macro;
-mod schema_macro;
 mod test_case_macro;
-mod to_key_macro;
-mod view_macro;
 
 #[proc_macro_error]
 #[proc_macro]
 pub fn component_name(_item: TokenStream) -> TokenStream {
     component_name_macro_impl()
-}
-
-#[proc_macro_derive(Pack, attributes(fracpack))]
-pub fn derive_pack(input: TokenStream) -> TokenStream {
-    fracpack_macro_impl(input, true, false)
-}
-
-#[proc_macro_derive(Unpack, attributes(fracpack))]
-pub fn derive_unpack(input: TokenStream) -> TokenStream {
-    fracpack_macro_impl(input, false, true)
-}
-
-#[proc_macro_derive(View, attributes(fracpack))]
-pub fn derive_view(input: TokenStream) -> TokenStream {
-    view_macro_impl(input)
-}
-
-#[proc_macro_derive(ToKey, attributes(to_key))]
-pub fn derive_to_key(input: TokenStream) -> TokenStream {
-    to_key_macro_impl(input)
 }
 
 /// # psibase_plugin::ErrorEnum
@@ -122,11 +94,6 @@ pub fn derive_plugin_error(input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn authorized(attr: TokenStream, item: TokenStream) -> TokenStream {
     authorized_attr_impl(attr, item)
-}
-
-#[proc_macro_derive(ToSchema, attributes(schema, fracpack))]
-pub fn to_schema(input: TokenStream) -> TokenStream {
-    schema_derive_macro(input)
 }
 
 /// Define a [psibase](https://psibase.io) service interface.
@@ -282,7 +249,7 @@ pub fn to_schema(input: TokenStream) -> TokenStream {
 ///     // Pack actions into psibase::Action.
 ///     //
 ///     // `pack_*` functions return an object which has methods (one per action)
-///     // which pack the action's arguments using fracpack and return a psibase::Action.
+///     // which pack the action's arguments as PSSZ and return a psibase::Action.
 ///     // The `pack_*` series of functions is mainly useful to applications which
 ///     // push transactions to blockchains.
 ///     pub fn pack() -> Actions<psibase::ActionPacker>;
@@ -323,7 +290,8 @@ pub fn to_schema(input: TokenStream) -> TokenStream {
 ///
 /// `action_structs` contains a public struct for each action. Each struct has the same
 /// name as its action and has the same fields as the action's arguments. The structs
-/// implement `fracpack::Packable`.
+/// are the argument records of the PSIO interface: the PSSZ of one is the action's
+/// `rawData`.
 ///
 /// ## service_wasm_interface module
 ///
@@ -359,6 +327,16 @@ pub fn to_schema(input: TokenStream) -> TokenStream {
 ///
 /// `name` defaults to the package name.
 ///
+/// The module also holds `PsioActions`, a trait with one function per
+/// action, declared with `#[psio::interface]`, and `psio_actions`, the
+/// module that attribute generates: the interface (`psio_actions::Tag`), the
+/// argument record of each action (`psio_actions::args::<action>`) and the
+/// Schema IR of both; events likewise as `psio_history_events` and
+/// `psio_merkle_events`. Every parameter and result type is a PSIO value,
+/// named as the service module sees it and not through `self::` or `super::`.
+///
+/// Two actions whose names have the same method number are a compile error.
+///
 /// `dispatch` defaults to true if the `CARGO_PRIMARY_PACKAGE` environment
 /// variable is set, and false otherwise. Cargo sets this variable automatically.
 /// For example, assume you have two services, A and B. B brings in A as a
@@ -376,6 +354,7 @@ pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
     service_macro_impl(
         proc_macro2::TokenStream::from(attr),
         proc_macro2::TokenStream::from(item),
+        &psio::compress_name::method_to_number,
     )
     .into()
 }

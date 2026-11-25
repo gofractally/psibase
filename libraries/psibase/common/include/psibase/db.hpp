@@ -95,6 +95,21 @@ namespace psibase
       /// context
       temporary = endIndependent,
    };
+   // The named databases. In text (JSON) a `DbId` is its name; in PSSZ and
+   // in a key it is its number. `numChainDatabases` and the range markers
+   // are not databases and have no name.
+   PSIO_REFLECT_ENUM(DbId,
+                     service,
+                     writeOnly,
+                     native,
+                     blockLog,
+                     blockProof,
+                     prevAuthServices,
+                     subjective,
+                     nativeSubjective,
+                     session,
+                     nativeSession,
+                     temporary)
 
    inline constexpr uint32_t numChainDatabases = ((uint32_t)DbId::numChainDatabases);
    inline constexpr uint32_t numIndependentDatabases =

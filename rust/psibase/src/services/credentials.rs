@@ -3,7 +3,7 @@ use crate::{self as psibase, account, AccountNumber};
 pub const CREDENTIAL_SENDER: AccountNumber = account!("cred-sys");
 
 #[crate::service(name = "credential", dispatch = false, psibase_mod = "crate")]
-#[allow(unused_variables)]
+#[allow(unused_variables, non_snake_case)]
 pub mod service {
     use crate::{
         services::{tokens::Quantity, transact::ServiceMethod},

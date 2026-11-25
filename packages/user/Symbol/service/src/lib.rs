@@ -7,14 +7,12 @@ pub mod tables {
     use psibase::services::tokens::Wrapper as Tokens;
     use psibase::services::tokens::{Decimal, Quantity, TokenRecord, TID};
     use psibase::{
-        get_sender, get_service, AccountNumber, Pack, ServiceWrapper, Table, ToSchema, Unpack,
-    };
-    use serde::{Deserialize, Serialize};
+        get_sender, get_service, AccountNumber, ServiceWrapper, Table, };
 
     use crate::service::{CREATED, MAPPED};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
+    #[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -22,7 +20,7 @@ pub mod tables {
     }
 
     #[table(name = "SymbolLengthTable", index = 1)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject)]
+    #[derive(Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct SymbolLength {
         #[primary_key]
@@ -131,7 +129,7 @@ pub mod tables {
     }
 
     #[table(name = "SymbolTable", index = 2)]
-    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject)]
+    #[derive(Default, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct Symbol {
         #[primary_key]
@@ -228,7 +226,7 @@ pub mod tables {
     }
 
     #[table(name = "MappingTable", index = 3)]
-    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject)]
+    #[derive(Default, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct Mapping {
         #[primary_key]

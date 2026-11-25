@@ -29,7 +29,7 @@ void TestExport::testCallback()
 void TestExport::doExport(int initialValue, bool subjective)
 {
    auto handle = kvOpen(subjective ? DbId::subjective : DbId::service,
-                        psio::convert_to_key(getReceiver()), KvMode::readWrite);
+                        psio::encode(psio::key{}, getReceiver()), KvMode::readWrite);
    if (subjective)
       PSIBASE_SUBJECTIVE_TX
       {
@@ -44,7 +44,7 @@ void TestExport::doExport(int initialValue, bool subjective)
 
 int TestExport::getValue()
 {
-   auto handle = kvOpen(DbId::service, psio::convert_to_key(getReceiver()), KvMode::readWrite);
+   auto handle = kvOpen(DbId::service, psio::encode(psio::key{}, getReceiver()), KvMode::readWrite);
    auto row    = kvGet<int>(handle, std::tuple{});
    kvClose(handle);
    check(row.has_value(), "Missing value");

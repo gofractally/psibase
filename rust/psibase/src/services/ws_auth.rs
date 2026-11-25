@@ -2,8 +2,7 @@
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::{AccountNumber, HttpReply, HttpRequest};
-    use fracpack::{Pack, ToSchema, Unpack};
-    use serde::{Deserialize, Serialize};
+
 
     #[action]
     fn serveSys(
@@ -24,8 +23,15 @@ mod service {
         unimplemented!()
     }
 
-    #[derive(Debug, Pack, Unpack, ToSchema, Serialize, Deserialize)]
-    #[fracpack(fracpack_mod = "fracpack")]
+    #[derive(
+        Debug,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
+    )]
     pub struct WsTicketInfo {
         pub user: AccountNumber,
         pub app: AccountNumber,
@@ -40,7 +46,8 @@ pub fn get_ticket(request: &crate::HttpRequest) -> Option<String> {
         .headers
         .iter()
         .filter(|header| header.matches("Sec-WebSocket-Protocol"))
-        .flat_map(|header| header.value.split(','))
+        .filter_map(|header| header.value.to_str().ok())
+        .flat_map(|value| value.split(','))
         .find_map(|protocol| protocol.trim().strip_prefix(SUBPROTOCOL_PREFIX))
         .map(str::to_string)
 }

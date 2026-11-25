@@ -12,45 +12,31 @@ namespace UserService
 {
    namespace
    {
-      using namespace psio::schema_types;
+      namespace ir = psio::pssz_ir;
+      using psio::schema_types::AnyType;
+      using psio::schema_types::Schema;
 
-      const AnyType* getFieldType(const Object& ty, std::uint32_t index)
+      // The type of one component of an index key: the transform's result,
+      // or the member the path leads to (checkValid resolved every path).
+      const AnyType& keyType(const Schema& schema, const AnyType& row, const FieldId& field)
       {
-         return &ty.members.at(index).type;
-      }
-      const AnyType* getFieldType(const Struct& ty, std::uint32_t index)
-      {
-         return &ty.members.at(index).type;
-      }
-      const AnyType* getFieldType(const Tuple& ty, std::uint32_t index)
-      {
-         return &ty.members.at(index);
-      }
-      const AnyType* getFieldType(const auto& ty, std::uint32_t index)
-      {
-         abortMessage("Can only extract fields of Tuple, Struct, or Object");
-      }
-
-      const AnyType& getFieldType(const Schema& schema, const AnyType& ty, const FieldId& field)
-      {
-         const AnyType* result = &ty;
-         for (auto idx : field.path)
-         {
-            result = result->resolve(schema);
-            if (!result)
-               abortMessage("Failed to resolve type");
-            result = std::visit([&](const auto& t) { return getFieldType(t, idx); }, result->value);
-         }
+         if (field.type)
+            return *field.type;
+         const char* msg    = nullptr;
+         auto*       result = psibase::getFieldType(schema, row, field.path, msg);
+         if (!result)
+            abortMessage(msg);
          return *result;
       }
 
+      // An installed schema and the one that replaces it are of one service:
+      // they are compared as contracts (doc/flip-interop.md section 0.1).
       bool indexesEqual(const Schema&                 lschema,
                         const AnyType&                ltype,
                         const std::vector<IndexInfo>& lhs,
                         const Schema&                 rschema,
                         const AnyType&                rtype,
-                        const std::vector<IndexInfo>& rhs,
-                        TypeMatcher&                  keyMatcher)
+                        const std::vector<IndexInfo>& rhs)
       {
          return std::ranges::equal(
              lhs, rhs,
@@ -61,11 +47,26 @@ namespace UserService
                     [&](const auto& lhs, const auto& rhs)
                     {
                        return lhs.path == rhs.path && lhs.transform == rhs.transform &&
-                              keyMatcher.match(
-                                  lhs.type ? *lhs.type : getFieldType(lschema, ltype, lhs),
-                                  rhs.type ? *rhs.type : getFieldType(rschema, rtype, rhs));
+                              ir::equivalent(lschema, keyType(lschema, ltype, lhs), rschema,
+                                             keyType(rschema, rtype, rhs), ir::compare::contract)
+                                  .ok;
                     });
              });
+      }
+
+      // Whether every value of `prev` is a value of `next` with the same
+      // bytes (docs/pssz-spec.md 7.5: members are appended and optional, no
+      // offset width moves)
+      std::string upgradeError(const Schema&  prevSchema,
+                               const AnyType& prev,
+                               const Schema&  nextSchema,
+                               const AnyType& next)
+      {
+         auto result =
+             ir::evolves_from(prevSchema, prev, nextSchema, next, ir::compare::contract);
+         if (result)
+            return {};
+         return ": " + result.path + ": " + result.reason;
       }
    }  // namespace
 
@@ -113,8 +114,7 @@ namespace UserService
       auto schemas = tables.open<InstalledSchemaTable>();
       if (auto existing = schemas.get(service))
       {
-         TypeMatcher rowMatcher(existing->schema.types, schema.types, SchemaDifference::upgrade);
-         TypeMatcher keyMatcher(existing->schema.types, schema.types, SchemaDifference::equivalent);
+         const auto& prevTypes = existing->schema.types;
          if (existing->schema.database && !existing->schema.database->empty())
          {
             std::vector<TableInfo> nullTables;
@@ -148,10 +148,11 @@ namespace UserService
                      //   existing rows. Key conflict on regular update fails as usual. Key
                      //   conflict in migrate aborts migration. Index can be read after migration
                      //   completes.
-                     if (!rowMatcher.match(prev.type, pos->type))
-                        abortMessage("Incompatible update for table " + prev.str());
-                     if (!indexesEqual(existing->schema.types, prev.type, prev.indexes,
-                                       schema.types, pos->type, pos->indexes, keyMatcher))
+                     if (auto err = upgradeError(prevTypes, prev.type, schema.types, pos->type);
+                         !err.empty())
+                        abortMessage("Incompatible update for table " + prev.str() + err);
+                     if (!indexesEqual(prevTypes, prev.type, prev.indexes, schema.types,
+                                       pos->type, pos->indexes))
                      {
                         abortMessage("Cannot change indexes for table " + prev.str());
                      }
@@ -168,9 +169,10 @@ namespace UserService
             }
             else
             {
-               if (!rowMatcher.match(ty.type, pos->second.type))
+               if (auto err = upgradeError(prevTypes, ty.type, schema.types, pos->second.type);
+                   !err.empty())
                {
-                  abortMessage("Incompatible update to event history." + name);
+                  abortMessage("Incompatible update to event history." + name + err);
                }
                // Changing access is allowed because it doesn't break the layout
             }
@@ -184,9 +186,10 @@ namespace UserService
             }
             else
             {
-               if (!rowMatcher.match(ty.type, pos->second.type))
+               if (auto err = upgradeError(prevTypes, ty.type, schema.types, pos->second.type);
+                   !err.empty())
                {
-                  abortMessage("Incompatible update to event merkle." + name);
+                  abortMessage("Incompatible update to event merkle." + name + err);
                }
             }
          }

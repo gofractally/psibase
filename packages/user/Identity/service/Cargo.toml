@@ -12,6 +12,7 @@ data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [{ sender = "identity", service = "identity", method = "init" }]
 
 [dependencies]
+psio.workspace = true
 psibase_macros.workspace = true
 psibase_service.workspace = true
 psibase.workspace = true

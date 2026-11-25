@@ -364,7 +364,8 @@ pub mod service {
     /// * `evaluation_id` - The ID of the evaluation.
     /// * `account` - The account number of the unregistering user.
     #[action]
-    fn on_ev_unreg(_evaluation_id: u32, _account: AccountNumber) {}
+    #[allow(unused_variables)]
+    fn on_ev_unreg(evaluation_id: u32, account: AccountNumber) {}
 
     fn check_is_sender(account: AccountNumber) {
         assert_eq!(get_sender(), account, "sender must be {}", account);
@@ -378,10 +379,11 @@ pub mod service {
     /// * `user` - The account number of the user submitting the attestation.
     /// * `attestation` - The attestation data.
     #[action]
+    #[allow(unused_variables)]
     fn on_attest(
         evaluation_id: u32,
         group_number: u32,
-        _user: AccountNumber,
+        user: AccountNumber,
         attestation: Vec<u8>,
     ) {
         check_is_sender(psibase::services::evaluations::SERVICE);
@@ -500,23 +502,23 @@ pub mod service {
             let banned_service_methods: Vec<ServiceMethod> = vec![
                 ServiceMethod::new(
                     Accounts::SERVICE,
-                    Accounts::action_structs::setAuthServ::ACTION_NAME.into(),
+                    <Accounts::action_structs::setAuthServ as psio::interface::Method>::NAME.into(),
                 ),
                 ServiceMethod::new(
                     SetCode::SERVICE,
-                    SetCode::action_structs::setCode::ACTION_NAME.into(),
+                    <SetCode::action_structs::setCode as psio::interface::Method>::NAME.into(),
                 ),
                 ServiceMethod::new(
                     SetCode::SERVICE,
-                    SetCode::action_structs::setCodeStaged::ACTION_NAME.into(),
+                    <SetCode::action_structs::setCodeStaged as psio::interface::Method>::NAME.into(),
                 ),
                 ServiceMethod::new(
                     StagedTx::SERVICE,
-                    StagedTx::action_structs::propose::ACTION_NAME.into(),
+                    <StagedTx::action_structs::propose as psio::interface::Method>::NAME.into(),
                 ),
                 ServiceMethod::new(
                     StagedTx::SERVICE,
-                    StagedTx::action_structs::accept::ACTION_NAME.into(),
+                    <StagedTx::action_structs::accept as psio::interface::Method>::NAME.into(),
                 ),
             ];
 

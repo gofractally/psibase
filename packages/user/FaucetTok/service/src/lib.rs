@@ -8,7 +8,7 @@ pub mod tables {
     use psibase::*;
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(ToSchema, Pack, Unpack)]
+    #[derive(psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct ConfigRow {
         pub token_id: TID,
     }
@@ -38,7 +38,7 @@ pub mod tables {
 #[psibase::service(name = "faucet-tok", tables = "tables", recursive = true)]
 mod service {
     use crate::tables::{ConfigRow, *};
-    use psibase::fracpack::Pack;
+
     use psibase::services::{
         nft::Wrapper as Nft,
         symbol::{action_structs::admin_create, Wrapper as Symbol},
@@ -59,8 +59,8 @@ mod service {
         let set_sys_token = Action {
             sender: Tokens::SERVICE,
             service: Tokens::SERVICE,
-            method: MethodNumber::from(setSysToken::ACTION_NAME),
-            rawData: setSysToken { tokenId: id }.packed().into(),
+            method: MethodNumber::from(<setSysToken as psio::interface::Method>::NAME),
+            rawData: psio::to_pssz(&setSysToken { tokenId: id }).into(),
         };
         Transact::call().runAs(set_sys_token, vec![]);
 
@@ -78,12 +78,11 @@ mod service {
         let admin_create_action = Action {
             sender: Symbol::SERVICE,
             service: Symbol::SERVICE,
-            method: MethodNumber::from(admin_create::ACTION_NAME),
-            rawData: admin_create {
+            method: MethodNumber::from(<admin_create as psio::interface::Method>::NAME),
+            rawData: psio::to_pssz(&admin_create {
                 symbol: SYSTEM_SYMBOL,
                 recipient: Wrapper::SERVICE,
-            }
-            .packed()
+            })
             .into(),
         };
         Transact::call().runAs(admin_create_action, vec![]);

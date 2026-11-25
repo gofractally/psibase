@@ -9,10 +9,9 @@ mod tables {
     use async_graphql::*;
     use core::fmt;
     use psibase::*;
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
+    #[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -20,7 +19,7 @@ mod tables {
     }
 
     #[table(name = "AttestationTable", index = 1)]
-    #[derive(Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject)]
+    #[derive(Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Attestation {
         /// The attesting account / the issuer
         pub attester: AccountNumber,
@@ -51,13 +50,13 @@ mod tables {
             writeln!(
                 f,
                 "--Attestation--\n  {}: attester\n  {}: subject\n  {}: value\n  {}: issued",
-                self.attester, self.subject, self.value, self.issued.seconds
+                self.attester, self.subject, self.value, self.issued.ticks()
             )
         }
     }
 
     #[table(name = "AttestationStatsTable", index = 2)]
-    #[derive(Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject)]
+    #[derive(Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct AttestationStats {
         /// The credential subject, in this case, the subject/subject
         #[primary_key]
@@ -80,7 +79,7 @@ mod tables {
                 self.subject,
                 self.uniqueAttesters,
                 self.numHighConfAttestations,
-                self.mostRecentAttestation.seconds
+                self.mostRecentAttestation.ticks()
             )
         }
     }
@@ -117,7 +116,7 @@ mod service {
     pub fn attest(subject: AccountNumber, value: u8) {
         assert!(value <= 100, "bad confidence score");
         let attester = get_sender();
-        let issued = transact::Wrapper::call().currentBlock().time.seconds();
+        let issued = transact::Wrapper::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
 
         let attestation_table = AttestationTable::new();
 

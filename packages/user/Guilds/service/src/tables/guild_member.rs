@@ -22,7 +22,7 @@ impl HasScore for GuildMember {
 
 impl GuildMember {
     fn new(guild: AccountNumber, member: AccountNumber) -> Self {
-        let now = TransactSvc::call().currentBlock().time.seconds();
+        let now = TransactSvc::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
 
         Self {
             guild,
@@ -114,7 +114,7 @@ impl GuildMember {
 
     pub fn set_candidacy(&mut self, active: bool) {
         assert_ne!(self.is_candidate, active, "candidacy state unchanged");
-        let now = TransactSvc::call().currentBlock().time.seconds();
+        let now = TransactSvc::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
         if active {
             assert!(
                 now >= self.candidacy_eligible_from,
@@ -122,7 +122,8 @@ impl GuildMember {
             );
         } else {
             let guild = Guild::get_assert(self.guild);
-            self.candidacy_eligible_from = (now.seconds + guild.candidacy_cooldown as i64).into();
+            self.candidacy_eligible_from =
+                now + psibase::Seconds::from_ticks(guild.candidacy_cooldown as i64);
         }
         self.is_candidate = active;
         self.save();

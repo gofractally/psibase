@@ -15,7 +15,7 @@ namespace SystemService
       std::string            endpoint;
       psibase::Claim         claim;
    };
-   PSIO_REFLECT(CandidateInfo, account, endpoint, claim)
+   PSIO_REFLECT(CandidateInfo, account, attr(endpoint, utf8), claim)
    using CandidateInfoTable = psibase::Table<CandidateInfo, &CandidateInfo::account>;
    PSIO_REFLECT_TYPENAME(CandidateInfoTable)
 
@@ -60,7 +60,7 @@ namespace SystemService
       void init();
 
       void setConsensus(psibase::ConsensusData consensus);
-      void setProducers(std::vector<psibase::Producer> prods);
+      void setProducers(std::vector<psibase::Producer> producers);
       void regCandidate(const std::string& endpoint, psibase::Claim claim);
       void unregCand();
 
@@ -114,7 +114,7 @@ namespace SystemService
                 method(init),
                 method(setConsensus, consensus),
                 method(setProducers, producers),
-                method(regCandidate, endpoint, claim),
+                method(regCandidate, attr(endpoint, utf8), claim),
                 method(unregCand),
                 method(getCandidate, account),
                 method(getProducers),

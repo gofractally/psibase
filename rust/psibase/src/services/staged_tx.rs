@@ -1,27 +1,73 @@
 #[crate::service(name = "staged-tx", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
-mod service {
-    use crate::{AccountNumber, Action, Checksum256, Pack, TimePointUSec, Unpack};
+pub mod service {
+    use crate::{AccountNumber, Action, Checksum256, TimePointUSec};
     use async_graphql::SimpleObject;
-    use fracpack::ToSchema;
-    use serde::{Deserialize, Serialize};
 
-    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject)]
-    #[fracpack(fracpack_mod = "fracpack")]
+
+    #[derive(
+        SimpleObject,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
+    )]
     pub struct ActionList {
         pub actions: Vec<Action>,
     }
 
-    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject)]
-    #[fracpack(fracpack_mod = "fracpack")]
+    #[derive(
+        SimpleObject,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
+    )]
+    #[graphql(complex)]
     pub struct StagedTx {
         pub id: u32,
+        #[graphql(skip)]
         pub txid: Checksum256,
         pub propose_block: u32,
         pub propose_date: TimePointUSec,
         pub proposer: AccountNumber,
         pub action_list: ActionList,
         pub auto_exec: bool,
+    }
+
+    /// In GraphQL the bytes are hex text, as in JSON.
+    #[async_graphql::ComplexObject]
+    impl StagedTx {
+        async fn txid(&self) -> String {
+            psio::to_hex(&self.txid)
+        }
+    }
+
+    /// A response to a staged transaction: a row of the service's
+    /// `ResponseTable`.
+    #[derive(
+        Debug,
+        SimpleObject,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
+    )]
+    pub struct Response {
+        /// The ID of the staged transaction
+        pub id: u32,
+        /// The account that responded to the staged transaction
+        pub account: AccountNumber,
+        /// The account's authSequence when the response was made
+        pub seq: u64,
+        /// Whether the response is an acceptance or rejection
+        pub accepted: bool,
     }
 
     /// Initialize the service

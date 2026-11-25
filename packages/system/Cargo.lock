@@ -270,6 +270,7 @@ dependencies = [
  "psibase-system-workspace-hack",
  "psibase_macros",
  "psibase_service",
+ "psio",
  "serde",
  "serde_json",
 ]
@@ -291,6 +292,7 @@ dependencies = [
  "auth-dyn",
  "psibase",
  "psibase-system-workspace-hack",
+ "psio",
  "serde",
  "serde_json",
  "wit-bindgen-rt",
@@ -302,10 +304,12 @@ version = "0.29.0"
 dependencies = [
  "async-graphql",
  "auth-recover-pkg",
+ "p256",
  "psibase",
  "psibase-system-workspace-hack",
  "psibase_macros",
  "psibase_service",
+ "psio",
  "serde",
  "serde_json",
 ]
@@ -327,6 +331,7 @@ dependencies = [
  "psibase",
  "psibase-system-workspace-hack",
  "psibase_plugin",
+ "psio",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -675,6 +680,7 @@ dependencies = [
  "psibase-system-workspace-hack",
  "psibase_macros",
  "psibase_service",
+ "psio",
  "serde",
  "serde_json",
 ]
@@ -695,6 +701,7 @@ dependencies = [
  "credentials",
  "psibase",
  "psibase-system-workspace-hack",
+ "psio",
  "wit-bindgen-rt",
 ]
 
@@ -1007,20 +1014,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fracpack"
-version = "0.29.0"
-dependencies = [
- "custom_error",
- "hex 0.3.2",
- "indexmap",
- "psibase-rust-workspace-hack",
- "psibase_macros",
- "serde",
- "serde-aux",
- "serde_json",
-]
-
-[[package]]
 name = "fs_extra"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1261,12 +1254,6 @@ name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
-
-[[package]]
-name = "hex"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
 
 [[package]]
 name = "hex"
@@ -2112,7 +2099,6 @@ dependencies = [
  "dialoguer",
  "flate2",
  "form_urlencoded",
- "fracpack",
  "futures",
  "getrandom 0.2.16",
  "hmac",
@@ -2132,6 +2118,7 @@ dependencies = [
  "psibase-rust-workspace-hack",
  "psibase_macros",
  "psibase_names",
+ "psio",
  "rand_core 0.6.4",
  "regex",
  "reqwest",
@@ -2166,6 +2153,7 @@ dependencies = [
  "psibase-macros-lib",
  "psibase-rust-workspace-hack",
  "psibase_names",
+ "psio",
  "quote",
  "syn 1.0.109",
  "toml",
@@ -2230,6 +2218,7 @@ dependencies = [
  "graphql_client",
  "psibase",
  "psibase-rust-workspace-hack",
+ "psio",
  "serde",
  "serde_json",
  "wit-bindgen 0.30.0",
@@ -2241,6 +2230,28 @@ version = "0.29.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
+]
+
+[[package]]
+name = "psio"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "chrono",
+ "paste",
+ "psio-macros",
+ "ryu",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "psio-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -2317,6 +2328,7 @@ dependencies = [
  "psibase",
  "psibase-system-workspace-hack",
  "psibase_service",
+ "psio",
  "serde",
  "serde_json",
 ]
@@ -2330,6 +2342,7 @@ dependencies = [
  "psibase",
  "psibase-system-workspace-hack",
  "psibase_service",
+ "psio",
  "serde",
  "serde_json",
 ]
@@ -2348,6 +2361,7 @@ dependencies = [
  "psibase",
  "psibase-system-workspace-hack",
  "psibase_service",
+ "psio",
  "serde",
  "serde_json",
  "staged-tx",
@@ -2930,6 +2944,7 @@ dependencies = [
  "psibase",
  "psibase-system-workspace-hack",
  "psibase_service",
+ "psio",
  "serde",
  "serde_json",
  "sha2",
@@ -2952,6 +2967,7 @@ version = "0.29.0"
 dependencies = [
  "psibase",
  "psibase-system-workspace-hack",
+ "psio",
  "serde",
  "serde_json",
  "staged-tx",
@@ -3520,6 +3536,7 @@ dependencies = [
  "psibase-system-workspace-hack",
  "psibase_macros",
  "psibase_service",
+ "psio",
  "rand",
  "serde",
  "serde-aux",
@@ -3546,6 +3563,7 @@ dependencies = [
  "psibase",
  "psibase-system-workspace-hack",
  "psibase_plugin",
+ "psio",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -4157,10 +4175,11 @@ checksum = "9edde0db4769d2dc68579893f2306b26c6ecfbe0ef499b013d731b7b9247e0b9"
 name = "wsauth"
 version = "0.29.0"
 dependencies = [
- "hex 0.4.3",
+ "hex",
  "psibase",
  "psibase-system-workspace-hack",
  "psibase_service",
+ "psio",
  "serde",
  "serde_json",
  "wsauth-pkg",

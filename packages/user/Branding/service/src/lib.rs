@@ -1,10 +1,9 @@
 #[psibase::service_tables]
 mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{Pack, ToSchema, Unpack};
-    use serde::{Deserialize, Serialize};
+
     #[table(name = "NetworkNameTable")]
-    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct NetworkName {
         pub name: String,
     }
@@ -56,7 +55,7 @@ mod service {
         let created = AuthDelegate::call().newAccount(
             account,
             SERVICE,
-            services::accounts::NewAccountMode::MATCH_EXISTING,
+            services::accounts::NewAccountMode::MatchExisting,
         );
         if !created {
             HttpServer::call_as(account).clearRedirect();
@@ -91,10 +90,11 @@ mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    #[allow(unused_variables)]
     fn serveSys(
         request: HttpRequest,
-        _socket: Option<i32>,
-        _user: Option<AccountNumber>,
+        socket: Option<i32>,
+        user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
         None.or_else(|| serve_graphql(&request, Query))
     }

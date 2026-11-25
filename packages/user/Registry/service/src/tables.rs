@@ -1,12 +1,20 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Pack, ToSchema, Unpack};
-    use serde::{Deserialize, Serialize};
+    use psibase::{AccountNumber};
 
     #[table(name = "AppMetadataTable", index = 0)]
     #[derive(
-        Default, Debug, Clone, Pack, Unpack, ToSchema, Serialize, SimpleObject, Deserialize,
+        Default,
+        Debug,
+        Clone,
+        SimpleObject,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
     )]
     #[serde(rename_all = "camelCase")]
     #[graphql(complex)]
@@ -39,7 +47,7 @@ pub mod tables {
     }
 
     #[table(name = "NextIdTable", index = 1)]
-    #[derive(Default, Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject)]
+    #[derive(Default, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct NextId {
         pub id: u32,
     }
@@ -88,7 +96,16 @@ pub mod tables {
     /// One TagRecord per unique tag
     #[table(name = "TagsTable", index = 2)]
     #[derive(
-        Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, PartialEq,
+        Debug,
+        Clone,
+        SimpleObject,
+        PartialEq,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
     )]
     pub struct TagRecord {
         /// The unique identifier for the tag
@@ -117,7 +134,7 @@ pub mod tables {
     /// This table maps apps to their tags
     /// One AppTag record per app-tag pair
     #[table(name = "AppTagsTable", index = 3)]
-    #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject)]
+    #[derive(Debug, Clone, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct AppTag {
         /// The unique identifier for the app
         pub app_id: AccountNumber,

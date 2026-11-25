@@ -1,3 +1,4 @@
+#include <limits>
 #include <cstdint>
 #include <cstring>
 #include <iterator>
@@ -52,8 +53,8 @@ namespace psibase::zip
    bool readStruct(auto& iter, auto end, T& obj)
    {
       bool ok = true;
-      psio::for_each_member(&obj, (typename psio::reflect<T>::data_members*)nullptr,
-                            [&](auto& member) { ok = ok && read(iter, end, member); });
+      psio::reflect<T>::for_each_field(
+          obj, [&](auto, std::string_view, auto& member) { ok = ok && read(iter, end, member); });
       return ok;
    }
 

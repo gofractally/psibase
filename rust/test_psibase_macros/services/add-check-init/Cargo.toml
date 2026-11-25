@@ -17,6 +17,7 @@ HttpServer = "0.29.0"
 
 [dependencies]
 psibase.workspace = true
+psio.workspace = true
 psibase_service.workspace = true
 psibase_macros.workspace = true
 async-graphql.workspace = true

@@ -103,7 +103,7 @@ struct TempDatabase
        : sharedState{std::make_shared<psibase::SharedState>(
              psibase::SharedDatabase{std::filesystem::temp_directory_path(),
                                      {1ull << 27, 1ull << 27, 1ull << 27, 1ull << 27},
-                                     triedent::open_mode::temporary},
+                                     psibase::storage::open_mode::temporary},
              psibase::WasmCache{16})}
    {
    }
@@ -388,19 +388,19 @@ struct TestBlock
    BlockMessage            block;
    psibase::JointConsensus state;
    operator BlockMessage() const { return block; }
-   psibase::BlockInfo   info() const { return psibase::BlockInfo{block.block->block()}; }
+   psibase::BlockInfo   info() const { return psibase::BlockInfo{block.block->block().header().unpack()}; }
    psibase::Checksum256 id() const { return info().blockId; }
 };
 
 struct BlockArg
 {
-   BlockArg(const TestBlock& block) : info(block.block.block->block()), state(block.state) {}
+   BlockArg(const TestBlock& block) : info(block.block.block->block().header().unpack()), state(block.state) {}
    BlockArg(std::pair<const psibase::BlockHeaderState*, psibase::SystemContext*> head)
        : info(head.first->info), state(head.first->readState(head.second))
    {
    }
    operator psibase::BlockInfo() const { return info; }
-   BlockArg(const psio::shared_view_ptr<psibase::SignedBlock>& block) : info(block->block()) {}
+   BlockArg(const psio::shared_pssz<psibase::SignedBlock>& block) : info(block->block().header().unpack()) {}
    psibase::BlockInfo      info;
    psibase::JointConsensus state;
 };

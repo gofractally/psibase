@@ -3,27 +3,37 @@
 pub mod service {
     use async_graphql::SimpleObject;
     use psibase::*;
-    use serde::{Deserialize, Serialize};
+
     use services::{accounts, auth_sig::SubjectPublicKeyInfo, transact, verify_sig};
     use std::cell::RefCell;
 
-    const RECOVERY_TIME: Seconds = Seconds::new(15 * 60);
+    const RECOVERY_TIME: Seconds = Seconds::from_ticks(15 * 60);
 
-    #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject)]
+    #[derive(Debug, Clone, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct RecoveryKey {
         key: SubjectPublicKeyInfo,
         expiration: TimePointSec,
     }
 
     #[table(name = "AuthTable", index = 0)]
-    #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject)]
+    #[derive(Debug, Clone, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+    #[graphql(complex)]
     pub struct AuthRow {
         #[primary_key]
         pub account: AccountNumber,
         pub pubkey: Option<SubjectPublicKeyInfo>,
+        #[graphql(skip)]
         pub key_fingerprint: Checksum256,
         pub recovery: AccountNumber,
         pub rkey: Option<RecoveryKey>,
+    }
+
+    /// In GraphQL the bytes are hex text, as in JSON.
+    #[async_graphql::ComplexObject]
+    impl AuthRow {
+        async fn key_fingerprint(&self) -> String {
+            psio::to_hex(&self.key_fingerprint)
+        }
     }
 
     impl AuthRow {
@@ -38,8 +48,9 @@ pub mod service {
     }
 
     #[action]
+    #[allow(unused_variables)]
     fn checkAuthSys(
-        _flags: u32,
+        flags: u32,
         sender: AccountNumber,
         action: ServiceMethod,
         claims: Vec<Claim>,
@@ -47,7 +58,7 @@ pub mod service {
         let has_key = |key: &SubjectPublicKeyInfo| {
             claims
                 .iter()
-                .any(|claim| claim.service == verify_sig::SERVICE && claim.rawData.0 == key.0)
+                .any(|claim| claim.service == verify_sig::SERVICE && claim.rawData == key.0)
         };
         let row = AuthTable::read()
             .get_index_pk()
@@ -71,7 +82,7 @@ pub mod service {
         });
         if action.service == get_service() && action.method == method!("setKey") {
             if let Some(rkey) = &row.rkey {
-                let now = transact::Wrapper::call().currentBlock().time.seconds();
+                let now = transact::Wrapper::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
                 if now <= rkey.expiration && has_key(&rkey.key) {
                     return true;
                 }
@@ -89,7 +100,8 @@ pub mod service {
     }
 
     #[action]
-    fn getDlgsSys(_sender: AccountNumber) -> Vec<AccountNumber> {
+    #[allow(unused_variables)]
+    fn getDlgsSys(sender: AccountNumber) -> Vec<AccountNumber> {
         Vec::new()
     }
 
@@ -198,7 +210,7 @@ pub mod service {
             .expect(&format!(
                 "{sender} should be the recovery partner of {account}"
             ));
-        let expiration = transact::Wrapper::call().currentBlock().time.seconds() + RECOVERY_TIME;
+        let expiration = transact::Wrapper::call().currentBlock().time.floor::<psibase::psio::time::Seconds>() + RECOVERY_TIME;
         row.rkey = Some(RecoveryKey {
             key: recovery_key,
             expiration,
@@ -212,7 +224,7 @@ pub mod service {
         accounts::Wrapper::call().newAccount(
             account,
             get_service(),
-            accounts::NewAccountMode::REQUIRE_NEW,
+            accounts::NewAccountMode::RequireNew,
         );
         let key_fingerprint = sha256(&key.0);
         AuthTable::read_write()

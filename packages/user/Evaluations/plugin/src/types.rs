@@ -2,7 +2,7 @@ use crate::bindings::*;
 use crate::errors::ErrorType::*;
 
 use host::types::types as HostTypes;
-use psibase::fracpack::{Pack, Unpack};
+
 use serde::Deserialize;
 
 pub trait TryParseGqlResponse: Sized {
@@ -60,13 +60,13 @@ impl TryFrom<String> for Data {
 }
 
 #[allow(non_snake_case)]
-#[derive(Deserialize, Pack, Unpack, Debug)]
+#[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct UserSetting {
     pub user: String,
     pub key: Vec<u8>,
 }
 
-#[derive(Deserialize, Pack, Unpack, Debug)]
+#[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 #[serde(rename_all = "camelCase")]
 pub struct GetUserSettingsResponse {
     pub get_user_settings: Vec<Option<UserSetting>>,
@@ -82,7 +82,7 @@ impl TryFrom<String> for GetUserSettingsResponse {
         Ok(response_root.data)
     }
 }
-#[derive(Deserialize, Pack, Unpack, Debug)]
+#[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyHistory {
     pub evaluation_id: u32,
@@ -91,18 +91,18 @@ pub struct KeyHistory {
     pub keys: Vec<Vec<u8>>,
 }
 
-#[derive(Deserialize, Pack, Unpack, Debug)]
+#[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct KeyHistoryRoot {
     pub edges: Vec<Edge>,
 }
 
 #[allow(non_snake_case)]
-#[derive(Deserialize, Pack, Unpack, Debug)]
+#[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct Edge {
     pub node: KeyHistory,
 }
 
-#[derive(Deserialize, Pack, Unpack, Debug)]
+#[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyHistoryResponse {
     pub get_group_key: KeyHistoryRoot,
@@ -131,7 +131,7 @@ pub struct GetGroupUsersConnection {
     pub nodes: Vec<UserNode>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Pack, Unpack)]
+#[derive(Debug, Clone, PartialEq, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 #[serde(rename_all = "camelCase")]
 pub struct UserNode {
     pub user: String,

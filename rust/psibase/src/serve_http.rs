@@ -81,7 +81,7 @@ pub fn serve_action_templates<Wrapper: ToServiceSchema>(
 ///
 /// If `request` is a `POST /pack_action/x`, where `x` is an action
 /// on `Wrapper`, then this parses a JSON object containing the arguments
-/// to `x`, packs them using fracpack, and returns the result as an
+/// to `x`, packs them as PSSZ, and returns the result as an
 /// `application/octet-stream`.
 ///
 /// If `request` doesn't match the above, or the action name is not found,
@@ -95,24 +95,30 @@ pub fn serve_pack_action<Wrapper: WithActionStruct>(request: &HttpRequest) -> Op
         type Output = HttpReply;
 
         fn process<
-            Return: serde::Serialize + serde::de::DeserializeOwned,
-            ArgStruct: fracpack::Pack + serde::Serialize + serde::de::DeserializeOwned,
+            Return: psio::json::JsonText,
+            ArgStruct: psio::interface::Method
+                + psio::json::JsonText
+                + serde::Serialize
+                + serde::de::DeserializeOwned,
         >(
             self,
         ) -> Self::Output {
-            let arg_struct = serde_json::from_slice::<ArgStruct>(self.0)
+            // The arguments by name (or the positional array), as I-JSON.
+            let text = std::str::from_utf8(self.0)
+                .unwrap_or_else(|err| panic!("err parsing action args json: {err}"));
+            let arg_struct = psio::from_ijson::<ArgStruct>(text)
                 .unwrap_or_else(|err| panic!("err parsing action args json: {err}"));
             HttpReply {
                 status: 200,
                 contentType: "application/octet-stream".into(),
-                body: arg_struct.packed().into(),
+                body: psio::to_pssz(&arg_struct).into(),
                 headers: allow_cors_with_origin("*"),
             }
         }
     }
 
-    if request.method == "POST" && request.target.starts_with("/pack_action/") {
-        Wrapper::with_action_struct(&request.target[13..], PackAction(&request.body))
+    if request.method == "POST" && request.target.to_string_lossy().starts_with("/pack_action/") {
+        Wrapper::with_action_struct(&request.target.to_string_lossy()[13..], PackAction(&request.body))
     } else {
         None
     }
@@ -131,11 +137,8 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
     request: &HttpRequest,
     query: Query,
 ) -> Option<HttpReply> {
-    let (base, args) = if let Some((b, q)) = request.target.split_once('?') {
-        (b, q)
-    } else {
-        (request.target.as_ref(), "")
-    };
+    let target = request.target.to_string_lossy();
+    let (base, args) = target.split_once('?').unwrap_or((&target, ""));
     if base != "/graphql" || request.method != "GET" && request.method != "POST" {
         return None;
     }
@@ -158,7 +161,7 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
             })
         } else if request.contentType == "application/graphql" {
             let res = schema
-                .execute(std::str::from_utf8(&request.body.0).unwrap())
+                .execute(std::str::from_utf8(&request.body).unwrap())
                 .await;
             Some(HttpReply {
                 status: 200,

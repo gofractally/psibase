@@ -121,16 +121,28 @@ fn parse_header(value: Value) -> Result<Option<BlockHeader>, Error> {
     Ok(Some(header.into()))
 }
 
+/// Whether a block query failed because of what it would return: the answer exceeded a
+/// limit of the query service, or the service could not produce it at all. A query that
+/// the service rejected for any other reason (it did not parse or validate, an argument
+/// was refused) fails without its transactions too.
+fn failed_for_size(error: &Error) -> bool {
+    let rejected = error.message.starts_with("Graphql query error:");
+    !rejected
+        || error.message.contains("Response is larger than the limit allows.")
+        || error.message.contains("Query complexity exceeds the limit")
+}
+
 /// Runs the query built by `graphql` with `transactions` among the block fields. If that
-/// fails, for example because the transactions are too large to return, runs it again
-/// without them; the returned flag says whether the transactions were included.
+/// fails because the transactions are too large to return, runs it again without them;
+/// the returned flag says whether the transactions were included.
 fn query_blocks(
     graphql: impl Fn(&str) -> String,
     transactions: &str,
 ) -> Result<(Value, bool), Error> {
     match query(&graphql(transactions)) {
         Ok(data) => Ok((data, true)),
-        Err(_) => Ok((query(&graphql(""))?, false)),
+        Err(error) if failed_for_size(&error) => Ok((query(&graphql(""))?, false)),
+        Err(error) => Err(error),
     }
 }
 

@@ -53,7 +53,7 @@ pub fn update_attestation_stats(
             subject: AccountNumber::from(0),
             numHighConfAttestations: 0,
             uniqueAttesters: 0,
-            mostRecentAttestation: TimePointSec::from(0),
+            mostRecentAttestation: TimePointSec::from_ticks(0),
         });
     // 2) if this is a new attestation for an existing subject; remove stat that this entry will replace
     if !is_new_unique_attester_for_subj && stats_rec.uniqueAttesters > 0 {

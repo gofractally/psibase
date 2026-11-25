@@ -1,29 +1,48 @@
 #![allow(non_snake_case)]
 
 use crate::AccountNumber;
-use crate::{Pack, ToSchema, Unpack};
-use serde::{Deserialize, Serialize};
-use serde_aux::field_attributes::deserialize_number_from_string;
+
 
 pub const MIN_ALLOWED_ACCOUNT_LENGTH: u8 = 8;
 // TODO: tables
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct Account {
     pub accountNum: AccountNumber,
     pub authService: AccountNumber,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub authSequence: u64,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Pack, Unpack, ToSchema)]
-#[fracpack(fracpack_mod = "fracpack")]
-pub struct NewAccountMode(u8);
-
-impl NewAccountMode {
-    pub const KEEP_EXISTING: NewAccountMode = NewAccountMode(0);
-    pub const MATCH_EXISTING: NewAccountMode = NewAccountMode(1);
-    pub const REQUIRE_NEW: NewAccountMode = NewAccountMode(2);
+/// What `newAccount` does when the account exists (C++
+/// `enum class NewAccountMode : std::uint8_t`, a reflected enum): its
+/// number in PSSZ and in a key, its C++ name in JSON (`"keepExisting"`,
+/// `"matchExisting"`, `"requireNew"`; the number is read too). Any other
+/// number is refused wherever one is read. C++ states that with an
+/// invariant, which names the schema node (`Custom{Enum, "NewAccountMode"}`);
+/// the id is declared here for the same node.
+#[repr(u8)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::ToPsszSchema,
+    psio::Key,
+    psio::JsonText,
+    psio::Serde,
+)]
+#[serde(rename_all = "camelCase")]
+#[psio(custom = "NewAccountMode")]
+pub enum NewAccountMode {
+    /// An existing account will be unchanged.
+    KeepExisting,
+    /// If the account already exists, it must match the parameters that
+    /// are passed to `newAccount`: idempotent account creation.
+    MatchExisting,
+    /// The account must not already exist.
+    RequireNew,
 }
 
 #[crate::service(name = "accounts", dispatch = false, psibase_mod = "crate")]
@@ -53,12 +72,12 @@ mod service {
     }
 
     #[action]
-    fn exists(num: AccountNumber) -> bool {
+    fn exists(name: AccountNumber) -> bool {
         unimplemented!()
     }
 
     #[action]
-    fn getAccount(num: AccountNumber) -> Option<super::Account> {
+    fn getAccount(name: AccountNumber) -> Option<crate::services::accounts::Account> {
         unimplemented!()
     }
 
@@ -68,7 +87,7 @@ mod service {
     }
 
     #[action]
-    fn incAuthSeq(num: AccountNumber) {
+    fn incAuthSeq(name: AccountNumber) {
         unimplemented!()
     }
 

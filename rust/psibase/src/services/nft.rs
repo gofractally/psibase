@@ -1,15 +1,23 @@
 use async_graphql::{InputObject, SimpleObject};
-use fracpack::{Pack, ToSchema, Unpack};
-use serde::{Deserialize, Serialize};
+
 
 use crate::AccountNumber;
 
 pub type NID = u32;
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
+    Debug,
+    Copy,
+    Clone,
+    SimpleObject,
+    InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::JsonText,
+    psio::Serde,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "NftRecordInput")]
 pub struct Nft {
     pub id: NID,
@@ -18,9 +26,18 @@ pub struct Nft {
 }
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
+    Debug,
+    Copy,
+    Clone,
+    SimpleObject,
+    InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::JsonText,
+    psio::Serde,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "NftHolderRecordInput")]
 pub struct NftHolderRecord {
     account: AccountNumber,
@@ -28,9 +45,18 @@ pub struct NftHolderRecord {
 }
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
+    Debug,
+    Copy,
+    Clone,
+    SimpleObject,
+    InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::JsonText,
+    psio::Serde,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "CreditRecordInput")]
 pub struct CreditRecord {
     nftId: NID,
@@ -60,12 +86,12 @@ mod service {
     }
 
     #[action]
-    fn credit(nftId: crate::services::nft::NID, debitor: AccountNumber, memo: Memo) {
+    fn credit(nft_id: crate::services::nft::NID, debitor: AccountNumber, memo: Memo) {
         unimplemented!()
     }
 
     #[action]
-    fn transfer(nftId: crate::services::nft::NID, debitor: AccountNumber, memo: Memo) {
+    fn transfer(nft_id: crate::services::nft::NID, debitor: AccountNumber, memo: Memo) {
         unimplemented!()
     }
 
@@ -85,17 +111,17 @@ mod service {
     }
 
     #[action]
-    fn getNft(nftId: crate::services::nft::NID) -> Option<super::Nft> {
+    fn getNft(nftId: crate::services::nft::NID) -> Option<crate::services::nft::Nft> {
         unimplemented!()
     }
 
     #[action]
-    fn getNftHolder(account: AccountNumber) -> super::NftHolderRecord {
+    fn getNftHolder(account: AccountNumber) -> crate::services::nft::NftHolderRecord {
         unimplemented!()
     }
 
     #[action]
-    fn getCredRecord(nftId: crate::services::nft::NID) -> Option<super::CreditRecord> {
+    fn getCredRecord(nftId: crate::services::nft::NID) -> Option<crate::services::nft::CreditRecord> {
         unimplemented!()
     }
 

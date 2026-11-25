@@ -15,7 +15,7 @@ use exports::producers::plugin::authorized::Guest as Authorized;
 use producers::plugin::types::*;
 
 use psibase::account;
-use psibase::fracpack::Pack;
+
 use psibase::services;
 use serde::Deserialize;
 use services::producers::action_structs as Actions;
@@ -111,24 +111,24 @@ impl ProducersPlugin {
 
     fn set_consensus_internal(consensus_data: psibase::ConsensusData) -> Result<(), Error> {
         let set_consensus = Actions::setConsensus {
-            prods: consensus_data,
+            consensus: consensus_data,
         };
 
-        add_action_to_transaction(Actions::setConsensus::ACTION_NAME, &set_consensus.packed())
+        add_action_to_transaction(<Actions::setConsensus as psio::interface::Method>::NAME, &psio::to_pssz(&set_consensus))
     }
 }
 
 impl Api for ProducersPlugin {
     fn set_cft_consensus(prods: Vec<String>) -> Result<(), Error> {
         assert!(Client::get_sender() == "config");
-        Self::set_consensus_internal(psibase::ConsensusData::CFT(psibase::CftConsensus {
+        Self::set_consensus_internal(psibase::ConsensusData::CftConsensus(psibase::CftConsensus {
             producers: Self::lookup_candidates(&prods)?,
         }))
     }
 
     fn set_bft_consensus(prods: Vec<String>) -> Result<(), Error> {
         assert!(Client::get_sender() == "config");
-        Self::set_consensus_internal(psibase::ConsensusData::BFT(psibase::BftConsensus {
+        Self::set_consensus_internal(psibase::ConsensusData::BftConsensus(psibase::BftConsensus {
             producers: Self::lookup_candidates(&prods)?,
         }))
     }
@@ -136,11 +136,10 @@ impl Api for ProducersPlugin {
     fn set_producers(prods: Vec<String>) -> Result<(), Error> {
         assert!(Client::get_sender() == "config");
         add_action_to_transaction(
-            Actions::setProducers::ACTION_NAME,
-            &Actions::setProducers {
-                prods: Self::lookup_candidates(&prods)?,
-            }
-            .packed(),
+            <Actions::setProducers as psio::interface::Method>::NAME,
+            &psio::to_pssz(&Actions::setProducers {
+                producers: Self::lookup_candidates(&prods)?,
+            }),
         )
     }
 
@@ -164,16 +163,16 @@ impl Api for ProducersPlugin {
         };
 
         add_action_to_transaction(
-            Actions::regCandidate::ACTION_NAME,
-            &Actions::regCandidate { endpoint, claim }.packed(),
+            <Actions::regCandidate as psio::interface::Method>::NAME,
+            &psio::to_pssz(&Actions::regCandidate { endpoint, claim }),
         )
     }
 
     fn unregister_candidate() {
         assert!(Client::get_sender() == "config");
         add_action_to_transaction(
-            Actions::unregCand::ACTION_NAME,
-            &Actions::unregCand {}.packed(),
+            <Actions::unregCand as psio::interface::Method>::NAME,
+            &psio::to_pssz(&Actions::unregCand {}),
         )
         .unwrap();
     }
@@ -181,8 +180,8 @@ impl Api for ProducersPlugin {
     fn set_max_prods(max_prods: u8) -> Result<(), Error> {
         assert!(Client::get_sender() == "config");
         add_action_to_transaction(
-            Actions::setMaxProds::ACTION_NAME,
-            &Actions::setMaxProds { max_prods }.packed(),
+            <Actions::setMaxProds as psio::interface::Method>::NAME,
+            &psio::to_pssz(&Actions::setMaxProds { maxProds: max_prods }),
         )
     }
 }

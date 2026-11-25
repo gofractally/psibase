@@ -23,17 +23,19 @@ namespace UserService
 
       static constexpr auto service = psibase::AccountNumber("nft");
 
-      Nft(psio::shared_view_ptr<psibase::Action> action);
+      Nft(psio::shared_pssz<psibase::Action> action);
 
       void init();
       NID  mint(std::optional<NID> nftId);
       void burn(NID nftId);
-      void credit(NID nftId, psibase::AccountNumber receiver, psio::view<const psibase::Memo> memo);
-      void transfer(NID                             nftId,
-                    psibase::AccountNumber          receiver,
-                    psio::view<const psibase::Memo> memo);
-      void uncredit(NID nftId, psio::view<const psibase::Memo> memo);
-      void debit(NID nftId, psio::view<const psibase::Memo> memo);
+      void credit(NID                              nft_id,
+                  psibase::AccountNumber           debitor,
+                  psio::pssz_view<psibase::Memo> memo);
+      void transfer(NID                              nft_id,
+                    psibase::AccountNumber           debitor,
+                    psio::pssz_view<psibase::Memo> memo);
+      void uncredit(NID nftId, psio::pssz_view<psibase::Memo> memo);
+      void debit(NID nftId, psio::pssz_view<psibase::Memo> memo);
       void setAutoDebit(std::optional<bool> autodebit);
 
       // Read-only:
@@ -46,7 +48,7 @@ namespace UserService
       struct Events
       {
          using Account  = psibase::AccountNumber;
-         using MemoView = psio::view<const psibase::Memo>;
+         using MemoView = psio::pssz_view<psibase::Memo>;
          // clang-format off
          struct History
          {
@@ -61,8 +63,8 @@ namespace UserService
       method(init),
       method(mint, nftId),
       method(burn, nftId),
-      method(credit, nftId, receiver, memo),
-      method(transfer, nftId, receiver, memo),
+      method(credit, nft_id, debitor, memo),
+      method(transfer, nft_id, debitor, memo),
       method(uncredit, nftId, memo),
       method(debit, nftId, memo),
       method(setAutoDebit, autodebit),

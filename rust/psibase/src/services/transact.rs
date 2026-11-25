@@ -1,5 +1,4 @@
-use crate::{self as psibase, AccountNumber, Pack, ToSchema, Unpack};
-use serde::{Deserialize, Serialize};
+use crate::{self as psibase, AccountNumber};
 
 /// Identify a service and method
 ///
@@ -8,8 +7,8 @@ pub use crate::ServiceMethod;
 
 type CallbackType = u32;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
-struct AuthTarget {
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+pub struct AuthTarget {
     sender: AccountNumber,
     action: Option<ServiceMethod>,
 }
@@ -159,8 +158,8 @@ pub mod auth_interface {
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use super::{AuthTarget, CallbackType};
-    use crate::{AccountNumber, Action, Checksum256, Hex, Transaction};
-    use fracpack::Nested;
+    use crate::{AccountNumber, Action, Checksum256, Transaction};
+
 
     /// Only called once, immediately after the boot transaction.
     ///
@@ -193,7 +192,7 @@ mod service {
 
     /// Called by RTransact to execute a transaction speculatively
     #[action]
-    fn execTrx(trx: Nested<Transaction>, speculative: bool) {
+    fn execTrx(transaction: psio::pssz::Nested<Transaction>, speculative: bool) {
         unimplemented!()
     }
 
@@ -218,6 +217,16 @@ mod service {
         unimplemented!()
     }
 
+    /// Sets the most bytes of transactions a block may hold.
+    ///
+    /// A transaction counts for its packed size plus its proofs. A block
+    /// with a single transaction is exempt. This is a consensus rule and
+    /// applies from the next block.
+    #[action]
+    fn setMaxBlockSize(bytes: u32) {
+        unimplemented!()
+    }
+
     /// Adds a callback that will be run whenever the trigger happens.
     /// - onTransaction is run at the end of every transaction
     /// - onBlock runs at the end of every block
@@ -233,12 +242,12 @@ mod service {
     ///
     /// The order in which callbacks are executed is unspecified.
     #[action]
-    fn addCallback(type_: CallbackType, objective: bool, act: Action) {
+    fn addCallback(r#type: CallbackType, objective: bool, action: Action) {
         unimplemented!()
     }
     /// Removes an existing callback
     #[action]
-    fn removeCallback(type_: CallbackType, objective: bool, act: Action) {
+    fn removeCallback(r#type: CallbackType, objective: bool, action: Action) {
         unimplemented!()
     }
 
@@ -270,7 +279,7 @@ mod service {
     fn runAs(
         action: crate::Action,
         allowedActions: Vec<crate::services::transact::ServiceMethod>,
-    ) -> Hex<Vec<u8>> {
+    ) -> Vec<u8> {
         unimplemented!()
     }
 

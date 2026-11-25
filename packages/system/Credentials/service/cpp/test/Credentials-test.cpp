@@ -75,7 +75,7 @@ TEST_CASE("Steal resources")
    auto invRes      = std::uint64_t{10'000'0000};
    auto fingerprint = bobPub.fingerprint();
    auto payload     = InvPayload{.fingerprint{fingerprint.begin(), fingerprint.end()}};
-   auto payloadData = psio::to_frac(payload);
+   auto payloadData = psio::to_pssz(payload);
    REQUIRE(t.from(bob).to<Tokens>().credit(sys, Invite::service, invRes, "").succeeded());
    REQUIRE(t.from(bob)
                .to<Invite>()

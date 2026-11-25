@@ -1,5 +1,4 @@
-use fracpack::{FracInputStream, Pack, ToSchema, Unpack};
-use serde::{Deserialize, Serialize};
+
 
 pub use crate::services::events::EventDb;
 
@@ -9,7 +8,18 @@ pub use crate::services::events::EventDb;
 /// various purposes. This enum identifies which database to
 /// use when invoking those functions.
 #[repr(u32)]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::ToPsszSchema,
+    psio::Key,
+    psio::JsonText,
+    psio::Serde,
+)]
+#[serde(rename_all = "camelCase")]
 pub enum DbId {
     /// Services should store their tables here
     ///
@@ -54,12 +64,6 @@ pub enum DbId {
     #[doc(hidden)]
     PrevAuthServices,
 
-    /// Number of defined databases
-    ///
-    /// This number may grow in the future
-    #[doc(hidden)]
-    NumChainDatabases,
-
     /// Data that is not part of consensus
     ///
     /// Only accessible to subjective services during transactions,
@@ -92,40 +96,4 @@ pub enum DbId {
 }
 
 const BEGIN_INDEPENDENT: u32 = 64;
-const END_INDEPENDENT: u32 = DbId::Temporary as u32 + 1;
 
-impl Pack for DbId {
-    const FIXED_SIZE: u32 = 4;
-
-    const VARIABLE_SIZE: bool = false;
-
-    fn pack(&self, dest: &mut Vec<u8>) {
-        (*self as u32).pack(dest);
-    }
-}
-impl<'a> Unpack<'a> for DbId {
-    const FIXED_SIZE: u32 = 4;
-
-    const VARIABLE_SIZE: bool = false;
-
-    fn unpack(src: &mut FracInputStream<'a>) -> fracpack::Result<Self> {
-        let u32_form = u32::unpack(src)?;
-        if u32_form >= DbId::NumChainDatabases as u32
-            && !(BEGIN_INDEPENDENT..(END_INDEPENDENT as u32)).contains(&u32_form)
-        {
-            return Err(fracpack::Error::BadEnumIndex);
-        }
-        Ok(unsafe { std::mem::transmute(u32_form) })
-    }
-
-    fn verify(src: &mut FracInputStream) -> fracpack::Result<()> {
-        DbId::unpack(src)?;
-        Ok(())
-    }
-}
-
-impl ToSchema for DbId {
-    fn schema(builder: &mut fracpack::SchemaBuilder) -> fracpack::AnyType {
-        u32::schema(builder)
-    }
-}

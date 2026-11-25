@@ -10,12 +10,10 @@ mod crypto;
 mod db;
 mod depgraph;
 mod flags;
-mod from_bin;
 mod graph_ql;
-mod hex;
 mod http;
+mod ip_text;
 pub mod image_content_type;
-mod internal_macros;
 #[cfg(not(target_family = "wasm"))]
 mod local_socket;
 pub mod memo;
@@ -37,7 +35,6 @@ mod table;
 pub mod tester;
 pub mod tester_raw;
 mod time;
-mod to_bin;
 mod to_key;
 mod trace;
 mod transaction_builder;
@@ -54,9 +51,7 @@ pub use crypto::*;
 pub use db::*;
 pub use depgraph::*;
 pub use flags::*;
-pub use from_bin::*;
 pub use graph_ql::*;
-pub use hex::*;
 pub use http::*;
 #[cfg(not(target_family = "wasm"))]
 pub use local_socket::*;
@@ -76,15 +71,15 @@ pub use sha256::*;
 pub use table::*;
 pub use tester::*;
 pub use time::*;
-pub use to_bin::*;
 pub use to_key::*;
 pub use trace::*;
 pub use transaction_builder::*;
 pub use web_services::*;
 
-use internal_macros::*;
 
-pub use fracpack;
+// For what the service macro generates into crates that do not name `psio`
+// in their manifest (`#[psio::interface(crate = "psibase::psio")]`).
+pub use psio;
 pub use psibase_macros::*;
 
 // Re-export these to simplify use of the `trust` macro

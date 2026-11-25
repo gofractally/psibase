@@ -6,7 +6,7 @@
 #include <psibase/nativeTables.hpp>
 #include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio/finally.hpp>
+#include <psibase/finally.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/local/XPackages.hpp>
 
@@ -27,7 +27,7 @@ namespace
       {
          if (flags != 0)
             abortMessage("Invalid flags for HttpSocket: " + std::to_string(flags));
-         auto reply = psio::from_frac<HttpReply>(data);
+         auto reply = psio::from_pssz<HttpReply>(data);
          if (reply.status == HttpStatus::ok)
          {
             okay = true;
@@ -53,8 +53,7 @@ namespace
                               .method      = "POST",
                               .target      = "/register_server",
                               .contentType = "application/json"};
-      psio::vector_stream stream{req.body};
-      to_json(server, stream);
+      psio::to_ijson(server, req.body);
       return req;
    }
 }  // namespace
@@ -84,6 +83,9 @@ void load_local_packages(TransactionContext&           tc,
              .codeHash = codeHash,
          };
          tc.blockContext.db.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);
+         tc.blockContext.systemContext.wasmCache.compileAhead(
+             codeHash, {reinterpret_cast<const char*>(code.data()), code.size()}, tc.vmOptions(),
+             0);
          CodeByHashRow codeByHashRow{
              .codeHash = codeHash,
              .code     = std::move(code),
@@ -129,8 +131,7 @@ void load_local_packages(TransactionContext&           tc,
           .target      = "/postinstall",
           .contentType = "application/json",
       };
-      psio::vector_stream stream(postinstall.body);
-      to_json(
+      psio::to_ijson(
           LocalPackage{
               .name        = package.meta.name,
               .version     = package.meta.version,
@@ -140,7 +141,7 @@ void load_local_packages(TransactionContext&           tc,
               .services    = package.meta.services,
               .sha256      = package.sha256,
           },
-          stream);
+          postinstall.body);
       requests.push_back(std::move(postinstall));
    }
 
@@ -160,7 +161,7 @@ void load_local_packages(TransactionContext&           tc,
       Action action{
           .sender  = AccountNumber(),
           .service = proxyServiceNum,
-          .rawData = psio::convert_to_frac(std::tuple(socket->id, std::move(request))),
+          .rawData = psio::to_pssz(std::tuple(socket->id, std::move(request))),
       };
       socket->okay = false;
       tc.execServe(action, atrace);
@@ -203,10 +204,10 @@ void initialize_database(SystemContext& context, const std::string& template_)
    TransactionContext tc{bc, trx, trace, DbMode::rpc()};
 
    auto cleanup =
-       psio::finally{[&, saved = bc.db.saveSubjective()] { bc.db.restoreSubjective(saved); }};
+       psibase::finally{[&, saved = bc.db.saveSubjective()] { bc.db.restoreSubjective(saved); }};
    bc.db.checkoutSubjective();
 
-   auto key = psio::convert_to_key(codePrefix());
+   auto key = psio::encode(psio::key{}, codePrefix());
    if (!bc.db.kvGreaterEqualRaw(DbId::nativeSubjective, key, key.size()))
    {
       DirectoryRegistry registry{package_path().string()};

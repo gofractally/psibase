@@ -37,7 +37,7 @@ impl Fractal {
             !account.is_subaccount(),
             "fractal account cannot be a subaccount"
         );
-        let now = TransactSvc::call().currentBlock().time.seconds();
+        let now = TransactSvc::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
 
         let max_supply: Quantity = TOKEN_SUPPLY.into();
         let precision: Precision = TOKEN_PRECISION.try_into().unwrap();
@@ -115,7 +115,7 @@ impl Fractal {
     pub fn set_genesis_time(&mut self, new_time: TimePointSec) {
         // Genesis time can only be moved earlier, not later, to prevent abuse / delay of token distribution
         assert!(
-            new_time.seconds < self.genesis_time.seconds,
+            new_time.ticks() < self.genesis_time.ticks(),
             "genesis time can only be moved earlier, not later",
         );
         self.genesis_time = new_time;

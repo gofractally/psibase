@@ -23,7 +23,60 @@ mod tests {
             }
         };
 
-        let _after = service_macro_impl(attr, before);
+        let _after = service_macro_impl(attr, before, &method_number);
+    }
+
+    /// A stand-in for the method-name coder: names of one length collide.
+    fn method_number(name: &str) -> u64 {
+        name.len() as u64
+    }
+
+    #[test]
+    #[should_panic]
+    // Two actions with one method number: only one could be dispatched
+    fn test_two_actions_with_one_method_number_are_refused() {
+        use quote::quote;
+
+        let before = quote! {
+            mod service {
+                #[action]
+                fn add(a: i32, b: i32) -> i32 {
+                    a + b
+                }
+                #[action]
+                fn sub(a: i32, b: i32) -> i32 {
+                    a - b
+                }
+            }
+        };
+
+        let _after = service_macro_impl(quote! {}, before, &method_number);
+    }
+
+    #[test]
+    // Without the collision the same module expands; with `psio` it also
+    // declares the PSIO interface of its actions.
+    fn test_actions_with_distinct_method_numbers_expand() {
+        use quote::quote;
+
+        let before = quote! {
+            mod service {
+                #[action]
+                fn add(a: i32, b: i32) -> i32 {
+                    a + b
+                }
+                #[action]
+                fn negate(a: i32) -> i32 {
+                    -a
+                }
+            }
+        };
+
+        let psio = service_macro_impl(quote! {}, before, &method_number).to_string();
+        assert!(psio.contains("psibase :: psio :: interface"), "{psio}");
+        assert!(psio.contains("pub trait PsioActions__"), "{psio}");
+        assert!(psio.contains("fn add (a : i32 , b : i32) -> i32 ;"), "{psio}");
+        assert!(psio.contains("module = \"psio_actions__"), "{psio}");
     }
 
     #[test]
@@ -46,7 +99,7 @@ mod tests {
             }
         };
 
-        let _after = service_macro_impl(attr, before);
+        let _after = service_macro_impl(attr, before, &method_number);
     }
 
     #[test]
@@ -67,7 +120,7 @@ mod tests {
             }
         };
 
-        service_macro_impl(attr, before);
+        service_macro_impl(attr, before, &method_number);
     }
 
     #[test]

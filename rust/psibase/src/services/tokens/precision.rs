@@ -1,18 +1,45 @@
 use std::str::FromStr;
 
-use fracpack::{FracInputStream, Pack, ToSchema, Unpack};
-use serde::{Deserialize, Serialize};
 
 use crate::services::tokens::TokensError;
-use async_graphql::scalar;
 
-#[derive(PartialEq, Debug, Copy, Clone, Pack, ToSchema, Serialize)]
-#[fracpack(fracpack_mod = "fracpack")]
+/// The number of decimal places of a token amount, 0 to 8.
+///
+/// For PSIO a precision is its number (`transparent`) and the range is an
+/// invariant, so every reader and writer refuses a value above 8.
+#[derive(
+    PartialEq,
+    Debug,
+    Copy,
+    Clone,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::ToPsszSchema,
+    psio::Key,
+    psio::JsonText,
+    psio::Serde,
+)]
+#[psio(transparent, invariant = "Precision::in_range")]
 pub struct Precision(u8);
 
 impl Precision {
+    /// The largest precision.
+    pub const MAX: u8 = 8;
+
+    fn in_range(&self) -> Result<(), String> {
+        if self.0 <= Self::MAX {
+            Ok(())
+        } else {
+            Err(format!(
+                "Value {} outside allowed Precision range: 0 to {}",
+                self.0,
+                Self::MAX
+            ))
+        }
+    }
+
     pub fn new(value: u8) -> Result<Self, TokensError> {
-        if value <= 8 {
+        if value <= Self::MAX {
             Ok(Self(value))
         } else {
             Err(TokensError::PrecisionOverflow)
@@ -46,31 +73,4 @@ impl FromStr for Precision {
     }
 }
 
-impl<'a> Unpack<'a> for Precision {
-    const FIXED_SIZE: u32 = 1;
-
-    const VARIABLE_SIZE: bool = false;
-
-    fn unpack(src: &mut FracInputStream<'a>) -> fracpack::Result<Self> {
-        u8::unpack(src)?
-            .try_into()
-            .map_err(|_| fracpack::Error::BadScalar)
-    }
-
-    fn verify(src: &mut FracInputStream) -> fracpack::Result<()> {
-        Self::unpack(src)?;
-        Ok(())
-    }
-}
-
-impl<'de> Deserialize<'de> for Precision {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let number: u8 = Deserialize::deserialize(deserializer)?;
-        Precision::new(number).map_err(|e| serde::de::Error::custom(e.to_string()))
-    }
-}
-
-scalar!(Precision);
+psio::async_graphql_scalar!(Precision, "Precision");

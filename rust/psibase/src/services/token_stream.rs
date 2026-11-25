@@ -5,11 +5,19 @@ use crate::{
     },
     TimePointSec,
 };
-use fracpack::{Pack, ToSchema, Unpack};
-use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
-#[fracpack(fracpack_mod = "fracpack")]
+
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::JsonText,
+    psio::Serde,
+)]
 pub struct Stream {
     pub nft_id: NID,
     pub token_id: TID,

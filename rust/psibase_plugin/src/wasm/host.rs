@@ -112,13 +112,13 @@ pub mod crypto {
 
 pub mod prompt {
     use crate::wasm::bindings::host::prompt::api as PromptApi;
-    use psibase::fracpack::{Pack, UnpackOwned};
+
 
     /// Retrieves the context data associated with the currently active prompt
-    pub fn get_context<T: UnpackOwned>() -> Option<T> {
+    pub fn get_context<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>>() -> Option<T> {
         PromptApi::get_context()
             .ok()
-            .and_then(|raw| Some(T::unpacked(&raw).expect("Failed to unpack prompt context")))
+            .and_then(|raw| Some(psio::from_pssz::<T>(&raw).expect("Failed to unpack prompt context")))
     }
 
     /// Initiates a procedure that prompts the user with the prompt corresponding to the
@@ -126,11 +126,11 @@ pub mod prompt {
     ///    uses a well-known path parameterized by the prompt name to retrieve the content
     ///    needed to prompt the user.
     ///
-    /// If you provide any context (an object that derives from fracpack::Pack), then it will
+    /// If you provide any context (a PSIO value: `psio::PsszPack`), then it will
     ///    be retrievable by the prompt page. This allows plugins that create prompts to look
     ///    up additional context relevant for handling the prompt.
-    pub fn prompt<C: Pack>(prompt_name: &str, context: Option<&C>) {
-        let packed = context.map(|c| c.packed());
+    pub fn prompt<C: psio::pssz::PsszPack<psio::Pssz>>(prompt_name: &str, context: Option<&C>) {
+        let packed = context.map(|c| psio::to_pssz(c));
         PromptApi::prompt(prompt_name, packed.as_deref())
     }
 }

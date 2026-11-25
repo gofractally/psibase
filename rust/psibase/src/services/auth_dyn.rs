@@ -1,12 +1,20 @@
 pub mod policy {
     use async_graphql::SimpleObject;
-    use fracpack::{Pack, ToSchema, Unpack};
-    use serde::{Deserialize, Serialize};
+
 
     use crate::AccountNumber;
 
-    #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema, SimpleObject)]
-    #[fracpack(fracpack_mod = "fracpack")]
+    #[derive(
+        Debug,
+        Clone,
+        SimpleObject,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
+    )]
     pub struct WeightedAuthorizer {
         pub account: AccountNumber,
         pub weight: u8,
@@ -18,8 +26,17 @@ pub mod policy {
         }
     }
 
-    #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema, SimpleObject)]
-    #[fracpack(fracpack_mod = "fracpack")]
+    #[derive(
+        Debug,
+        Clone,
+        SimpleObject,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+        psio::JsonText,
+        psio::Serde,
+    )]
     pub struct DynamicAuthPolicy {
         pub threshold: u8,
         pub authorizers: Vec<WeightedAuthorizer>,

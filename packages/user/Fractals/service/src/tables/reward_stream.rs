@@ -14,7 +14,7 @@ use psibase::services::tokens::Wrapper as Tokens;
 
 impl RewardStream {
     fn new(fractal: AccountNumber, owner: AccountNumber, token_id: TID, half_life: u32) -> Self {
-        let now = TransactSvc::call().currentBlock().time.seconds();
+        let now = TransactSvc::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
         let stream_id = TokenStream::call().create(half_life, token_id);
         Nft::call().debit(stream_id, "Redeemer NFT of stream".into());
 
@@ -121,7 +121,7 @@ impl RewardStream {
     }
 
     fn check_can_distribute(&mut self) {
-        let now = TransactSvc::call().currentBlock().time.seconds();
+        let now = TransactSvc::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
         let fractal = Fractal::get_assert(self.fractal);
 
         let distribution_interval = if self.fractal == self.owner {
@@ -130,11 +130,11 @@ impl RewardStream {
             DEFAULT_MEMBER_DISTRIBUTION_INTERVAL
         } as i64;
 
-        let genesis = fractal.genesis_time.seconds;
+        let genesis = fractal.genesis_time.ticks();
 
-        let intervals_since_genesis = (now.seconds - genesis) / distribution_interval;
+        let intervals_since_genesis = (now.ticks() - genesis) / distribution_interval;
         let intervals_at_last_dist =
-            (self.last_distributed.seconds - genesis) / distribution_interval;
+            (self.last_distributed.ticks() - genesis) / distribution_interval;
         let whole_intervals_elapsed = intervals_since_genesis - intervals_at_last_dist;
 
         assert!(
@@ -142,7 +142,9 @@ impl RewardStream {
             "must wait for interval period before token distribution",
         );
 
-        self.last_distributed = (genesis + intervals_since_genesis * distribution_interval).into();
+        self.last_distributed = psibase::TimePointSec::from_ticks(
+            genesis + intervals_since_genesis * distribution_interval,
+        );
         self.save();
     }
 }

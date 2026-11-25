@@ -161,7 +161,7 @@ mod tests {
         let err = NameMarket::push_from(&chain, alice)
             .buy(account!("abcd"))
             .trace
-            .error
+            .error_text()
             .expect("buy should fail when market disabled");
         assert!(
             err.contains("market is disabled"),
@@ -249,7 +249,7 @@ mod tests {
                 DEFAULT_CREATE_PPM,
             )
             .trace
-            .error
+            .error_text()
             .expect("duplicate create with mismatched params should fail");
         assert!(
             err.contains("market already exists"),
@@ -295,7 +295,7 @@ mod tests {
                     DEFAULT_CREATE_PPM,
                 )
                 .trace
-                .error
+                .error_text()
                 .unwrap_or_else(|| panic!("create({length}) should fail"));
             let expected = format!(
                 "market name length must be {}-{}",

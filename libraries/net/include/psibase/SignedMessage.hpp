@@ -1,6 +1,8 @@
 #pragma once
 
-#include <psio/fracpack.hpp>
+#include <psio/pssz.hpp>
+#include <psio/buffer.hpp>
+#include <psio/pssz_view.hpp>
 #include <vector>
 
 namespace psibase::net
@@ -10,7 +12,19 @@ namespace psibase::net
    {
       static constexpr auto type = Msg::type;
 
-      psio::shared_view_ptr<Msg> data;
+      SignedMessage() = default;
+      SignedMessage(psio::shared_pssz<Msg> data, std::vector<char> signature = {})
+          : data(std::move(data)), signature(std::move(signature))
+      {
+      }
+      // Packs the message
+      SignedMessage(const Msg& msg, std::vector<char> signature = {})
+          : data(msg), signature(std::move(signature))
+      {
+      }
+
+      // The message as it was signed and as it is sent
+      psio::shared_pssz<Msg> data;
 
       std::vector<char> signature;
       PSIO_REFLECT(SignedMessage, definitionWillNotChange(), data, signature)

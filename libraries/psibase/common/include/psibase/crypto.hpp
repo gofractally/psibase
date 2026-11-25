@@ -1,6 +1,12 @@
 #pragma once
 
-#include <psio/fracpack.hpp>
+#include <psio/pssz.hpp>
+#include <psio/reflect.hpp>
+
+#include <array>
+#include <cstdint>
+#include <span>
+#include <vector>
 
 namespace psibase
 {
@@ -18,7 +24,7 @@ namespace psibase
    template <typename T>
    Checksum256 sha256(const T& obj)
    {
-      auto bin = psio::to_frac(obj);
+      auto bin = psio::to_pssz(obj);
       return sha256(bin.data(), bin.size());
    }
 
@@ -32,7 +38,7 @@ namespace psibase
    // The Merkle class incrementally constructs a merkle tree
    //
    // An empty tree is represented by the zero hash
-   // A leaf node is sha256(00 || frac(value))
+   // A leaf node is sha256(00 || pssz(value))
    // An internal node is sha256(01 || lhs || rhs)
    //
    // The tree has the minimum depth for a given number of elements, and left
@@ -60,8 +66,7 @@ namespace psibase
       static Checksum256 hash_leaf(const T& value)
       {
          std::vector<char>   result{'\0'};
-         psio::vector_stream stream{result};
-         psio::to_frac(value, stream);
+         psio::to_pssz(value, result);
          return sha256(result.data(), result.size());
       }
 

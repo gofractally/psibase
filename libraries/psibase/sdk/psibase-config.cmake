@@ -22,6 +22,17 @@ target_include_directories(boost INTERFACE ${root}/include)
 
 find_package(Catch2 REQUIRED)
 
+# PSIO: header-only for guests (no exceptions, no simdjson).
+add_library(psio INTERFACE)
+add_library(psio::psio ALIAS psio)
+target_include_directories(psio INTERFACE ${root}/include ${root}/include/psio/external)
+# A failed checked decode reports through psibase::abortMessage: PSIO calls
+# psibase_psio_codec_abort (libpsibase, common/src/codecAbort.cpp).
+target_compile_definitions(psio INTERFACE PSIO_EXCEPTIONS_ENABLED=0 PSIO_HAVE_SIMDJSON=0
+    PSIO_CODEC_ABORT_HANDLER=psibase_psio_codec_abort)
+target_compile_features(psio INTERFACE cxx_std_23)
+target_link_libraries(psio INTERFACE boost)
+
 function(add_libs suffix)
 
     if(suffix)
@@ -30,16 +41,6 @@ function(add_libs suffix)
         set(lib-suffix $<$<CONFIG:Debug>:-debug>)
     endif()
 
-    add_library(psio${suffix} INTERFACE)
-    target_include_directories(psio${suffix} INTERFACE ${root}/include)
-    target_link_libraries(psio${suffix} INTERFACE
-        -L${root}/lib
-        -lpsio
-        boost
-        wasm-base${suffix}
-    )
-    target_compile_features(psio${suffix} INTERFACE cxx_std_23)
-
     add_library(psibase${suffix} INTERFACE)
     target_include_directories(psibase${suffix} INTERFACE ${root}/include)
     target_link_libraries(psibase${suffix} INTERFACE
@@ -47,7 +48,7 @@ function(add_libs suffix)
         wasm-base${suffix}
         -lpsibase${lib-suffix}
         -lcrypto
-        psio${suffix}
+        psio::psio
         boost
     )
 
