@@ -1,9 +1,10 @@
-#include <services/system/VerifySig.hpp>
+#include <services/system/VerifyR1.hpp>
 
 #include <psibase/api.hpp>
 #include <psibase/check.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/serviceEntry.hpp>
+#include <psibase/verifier.hpp>
 
 #include <cstring>
 #include <span>
@@ -11,73 +12,34 @@
 extern "C"
 {
 #include <bearssl/bearssl_ec.h>
-#include <secp256k1.h>
 }
 
-// Verifies ECDSA signatures over secp256k1 (K1) and secp256r1 (R1, P-256).
+// Verifies ECDSA signatures over secp256r1 (R1, P-256).
 //
 // A claim is a DER SubjectPublicKeyInfo and a proof is the 64-byte signature
 // r || s over the transaction hash. Only what verification needs is linked:
-// libsecp256k1 for K1 and BearSSL's P-256 for R1. Neither allocates, and their
-// tables are constants in the binary, so there is nothing to set up at start.
-// Both use their 64-bit code, which relies on the wide-arithmetic instructions.
+// BearSSL's P-256 and nothing else. It does not allocate, and its tables are
+// constants in the binary, so there is nothing to set up at start. It uses
+// its 64-bit code, which relies on the wide-arithmetic instructions.
+//
+// Keys of any other type belong to another verifier (psibase/verifier.hpp)
+// and are rejected here.
 //
 // Accepted encodings:
 // - Keys: exactly the DER SubjectPublicKeyInfo for the curve, holding an
 //   uncompressed (04 || X || Y) or compressed (02/03 || X) point. Nothing else
 //   that a general DER parser would tolerate is accepted: no trailing bytes,
 //   no unused bits, no alternative identifier encodings, no hybrid points.
-// - Signatures: only the low-S form, s <= n/2, on both curves. (r, s) and
-//   (r, n - s) are both mathematically valid for the same message, so without
-//   this rule every signature would have a second encoding that anyone could
-//   produce. A signer normalizes with s = n - s when s > n/2.
+// - Signatures: only the low-S form, s <= n/2. (r, s) and (r, n - s) are both
+//   mathematically valid for the same message, so without this rule every
+//   signature would have a second encoding that anyone could produce. A
+//   signer normalizes with s = n - s when s > n/2.
 
 using namespace psibase;
 
 namespace
 {
    using Bytes = std::span<const unsigned char>;
-
-   // AlgorithmIdentifier { id-ecPublicKey, namedCurve }
-   constexpr unsigned char k1Algorithm[] = {0x30, 0x10, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d,
-                                            0x02, 0x01, 0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x0a};
-   constexpr unsigned char r1Algorithm[] = {0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48,
-                                            0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a,
-                                            0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07};
-
-   // If spki is SEQUENCE { algorithm, BIT STRING point } with exactly this
-   // algorithm, returns the encoded point; otherwise an empty span.
-   Bytes pointFor(Bytes spki, Bytes algorithm)
-   {
-      // outer SEQUENCE header, algorithm, BIT STRING header with zero unused bits
-      const std::size_t header = 2 + algorithm.size() + 3;
-      if (spki.size() != header + 65 && spki.size() != header + 33)
-         return {};
-      const std::size_t pointSize = spki.size() - header;
-      if (spki[0] != 0x30 || spki[1] != spki.size() - 2)
-         return {};
-      if (std::memcmp(spki.data() + 2, algorithm.data(), algorithm.size()) != 0)
-         return {};
-      const unsigned char* bits = spki.data() + 2 + algorithm.size();
-      if (bits[0] != 0x03 || bits[1] != pointSize + 1 || bits[2] != 0x00)
-         return {};
-      return spki.subspan(header);
-   }
-
-   void verifyK1(Bytes point, const unsigned char* hash, const unsigned char* signature)
-   {
-      // libsecp256k1 would also take the "hybrid" form (06/07 || X || Y), a
-      // third encoding of the same point.
-      check(point[0] == (point.size() == 65 ? 0x04 : (0x02 | (point[0] & 1))), "invalid public key");
-      const secp256k1_context* ctx = secp256k1_context_static;
-      secp256k1_pubkey         pubkey;
-      check(secp256k1_ec_pubkey_parse(ctx, &pubkey, point.data(), point.size()),
-            "invalid public key");
-      secp256k1_ecdsa_signature sig;
-      check(secp256k1_ecdsa_signature_parse_compact(ctx, &sig, signature), "signature invalid");
-      // libsecp256k1 rejects high-S signatures.
-      check(secp256k1_ecdsa_verify(ctx, &sig, hash, &pubkey), "signature invalid");
-   }
 
    // BearSSL only takes uncompressed points, so a compressed P-256 point is
    // expanded here with BearSSL's modular integer routines. These are internal
@@ -208,12 +170,9 @@ extern "C" void called(AccountNumber thisService, AccountNumber sender)
    auto signature = reinterpret_cast<const unsigned char*>(data.proof.data());
    auto hash      = data.transactionHash.data();
 
-   if (auto point = pointFor(key, r1Algorithm); !point.empty())
-      verifyR1(point, hash, signature);
-   else if (auto point = pointFor(key, k1Algorithm); !point.empty())
-      verifyK1(point, hash, signature);
-   else
-      check(false, "unsupported public key");
+   auto point = verifier::ecPoint(key, KeyType::secp256r1);
+   check(!point.empty(), "unsupported public key");
+   verifyR1(point, hash, signature);
 }
 
 extern "C" void __wasm_call_ctors();
@@ -228,7 +187,7 @@ extern "C" void start(AccountNumber thisService)
 
 int main(int argc, const char* const* argv)
 {
-   return ::psibase::serviceMain<SystemService::VerifySig>(argc, argv);
+   return ::psibase::serviceMain<SystemService::VerifyR1>(argc, argv);
 }
 
 #endif

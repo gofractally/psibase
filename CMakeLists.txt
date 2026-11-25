@@ -87,7 +87,7 @@ endif()
 
 if(DEFINED WASI_SDK_PREFIX)
     ProcessorCount(NUM_PROCS)
-    # This is used by the VerifySig service. The kinds of keys supported need to be configured
+    # This is used by the key libraries of AuthSig (Spki, PrivateKeyInfo). The kinds of keys supported need to be configured
     # here.  We use a minimized build to keep the size of the service down. Static linking is
     # not enough because the algorithms are looked up dynamically.
     #
@@ -114,10 +114,10 @@ if(DEFINED WASI_SDK_PREFIX)
         COMPONENT libpsibase
     )
 
-    # Signature verification (the VerifySig service) uses two small libraries
-    # instead of Botan: libsecp256k1 for secp256k1 and BearSSL's P-256 for
-    # secp256r1. Each is built by its own build system and only the objects the
-    # service references are linked.
+    # Signature verification uses two small libraries instead of Botan, one
+    # per verifier service: libsecp256k1 for secp256k1 (VerifyK1) and BearSSL's
+    # P-256 for secp256r1 (VerifyR1). Each is built by its own build system and
+    # only the objects the service references are linked.
     #
     # Both are built for 64-bit arithmetic, whose 64x64->128 multiply is one
     # wide-arithmetic instruction. (Without -mwide-arithmetic it would be a
@@ -226,7 +226,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate RDynLd REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode
-        Transact VerifySig XAdmin XBasic XDb XHttp XKeys XRun XSites XTimer XTransact
+        Transact VerifyK1 VerifyR1 XAdmin XBasic XDb XHttp XKeys XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
         XPackages XPeers XProxy XSignup XSocketListService WSEcho XDelay ServerId)
@@ -751,12 +751,33 @@ psibase_package(
     SERVICE auth-sig+1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig-schema.json
-    SERVICE verify-sig
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/VerifySig-schema.json
+    DEPENDS wasm
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "VerifyK1(^${PSIBASE_VERSION}.0)" "VerifyR1(^${PSIBASE_VERSION}.0)"
+)
+
+# One verifier service per key type. psibase/verifier.hpp maps a key to its verifier.
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/VerifyK1.psi
+    NAME VerifyK1
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Verifies signatures made with secp256k1 keys"
+    SERVICE verify-k1
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1-schema.json
         FLAGS isVerify
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/VerifyR1.psi
+    NAME VerifyR1
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Verifies signatures made with secp256r1 (P-256) keys"
+    SERVICE verify-r1
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyR1.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/VerifyR1-schema.json
+        FLAGS isVerify
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -1535,7 +1556,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthNone AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG PrivDefault
     Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Favor Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop WsAuth Config
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VerifyK1 VerifyR1 VirtualServer WebCrypto Workshop WsAuth Config
     XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSignup XSites XTimer XTransact)
 
 install(
@@ -1613,6 +1634,8 @@ install(
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
           ${SERVICE_DIR}/TransactService.psi
+          ${SERVICE_DIR}/VerifyK1.psi
+          ${SERVICE_DIR}/VerifyR1.psi
           ${SERVICE_DIR}/VirtualServer.psi
           ${SERVICE_DIR}/WebCrypto.psi
           ${SERVICE_DIR}/Workshop.psi

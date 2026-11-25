@@ -58,7 +58,8 @@ function(add suffix)
         SetCode/include
         StagedTx/service/cpp/include
         Transact/include
-        VerifySig/include
+        VerifyK1/include
+        VerifyR1/include
         VirtualServer/service/cpp/include
         WsAuth/service/cpp/include
     )
@@ -79,7 +80,8 @@ if(DEFINED IS_WASM)
     add_subdirectory(HttpServer)
     add_subdirectory(SetCode)
     add_subdirectory(Transact)
-    add_subdirectory(VerifySig)
+    add_subdirectory(VerifyK1)
+    add_subdirectory(VerifyR1)
 
     add_subdirectory(Credentials/service/cpp/test)
     add_subdirectory(StagedTx/service/cpp/test)

@@ -190,9 +190,6 @@ function(add suffix)
             ../../packages/user/Symbol/include
             ../../packages/user/Tokens/include
         )
-        target_mapped_include_directories(psitestlib${suffix} PRIVATE
-            ../../packages/system/VerifySig/include
-        )
         target_link_options(psitestlib${suffix} PUBLIC
             -Wl,--entry,_start
             -nostdlib
