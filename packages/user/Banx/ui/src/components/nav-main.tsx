@@ -1,0 +1,68 @@
+import {
+    ArrowDownUp,
+    ArrowLeftRight,
+    Banknote,
+    Repeat,
+    Contact,
+    Inbox,
+    ScrollText,
+    UserPlus,
+    Waypoints,
+} from "lucide-react";
+import { NavLink, useLocation } from "react-router-dom";
+
+import {
+    SidebarGroup,
+    SidebarGroupLabel,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+} from "@shared/shadcn/ui/sidebar";
+
+const items: {
+    to: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    end?: boolean;
+}[] = [
+    { to: "/accounts", label: "Accounts", icon: ScrollText },
+    { to: "/swap", label: "Swap", icon: ArrowDownUp },
+    { to: "/network", label: "Network", icon: Waypoints },
+    { to: "/requests", label: "Requests", icon: Inbox },
+    { to: "/payees", label: "Payees", icon: Contact },
+    { to: "/invites", label: "Invites", icon: UserPlus },
+    { to: "/cash", label: "Cash", icon: Banknote },
+    { to: "/trade", label: "Trade", icon: ArrowLeftRight },
+    { to: "/relays", label: "Pools", icon: Repeat },
+];
+
+export function NavMain() {
+    const location = useLocation();
+
+    return (
+        <SidebarGroup>
+            <SidebarGroupLabel>Banx</SidebarGroupLabel>
+            <SidebarMenu>
+                {items.map(({ to, label, icon: Icon, end }) => {
+                    const active = end
+                        ? location.pathname === "/" || location.pathname === ""
+                        : location.pathname.startsWith(to);
+                    return (
+                        <SidebarMenuItem key={to}>
+                            <SidebarMenuButton
+                                asChild
+                                isActive={active}
+                                tooltip={label}
+                            >
+                                <NavLink to={to} end={!!end}>
+                                    <Icon />
+                                    <span>{label}</span>
+                                </NavLink>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    );
+                })}
+            </SidebarMenu>
+        </SidebarGroup>
+    );
+}

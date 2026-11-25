@@ -1,0 +1,550 @@
+package banx:plugin;
+
+interface types {
+    /// Hop used for `path-pay` execution (account + asset only).
+    record path-hop {
+        account: string,
+        asset-id: u16,
+    }
+
+    /// Quoted hop with expected fee breakdown (from `quote-path`).
+    record path-hop-quote {
+        account: string,
+        asset-id: u16,
+        /// Notional drawn on this hop after fees (human decimal, hop asset).
+        amount: string,
+        /// Routing fee on this hop (human decimal, hop asset). `"0"` for hop 0.
+        hop-fee: string,
+        /// FX fixed fee when converting into this hop (human decimal, prior asset).
+        /// `"0"` if no asset change.
+        fx-fee: string,
+        /// Prior asset id when FX convert happened; none otherwise.
+        fx-from-asset: option<u16>,
+    }
+
+    /// Result of off-chain multi-hop path discovery for `path-pay`.
+    record path-quote {
+        hops: list<path-hop-quote>,
+        /// Amount to draw on the first hop (human decimal in first hop asset).
+        amount-in: string,
+        /// Estimated amount_out after fees (human decimal in last hop asset).
+        amount-out: string,
+        /// Suggested min-return for `path-pay` (human decimal in last hop asset).
+        min-return: string,
+    }
+
+    /// Token + id from `create-invite` (token is the claim-URL secret).
+    record created-invite {
+        invite-token: string,
+        invite-id: u32,
+    }
+}
+
+interface helpers {
+    use host:types/types.{error};
+
+    /// Convert a human decimal string (e.g. `"1.45"`) to raw quantity units for `asset-id`.
+    /// Looks up asset precision via Banx GraphQL.
+    /// Fractions may not exceed the asset's precision; shorter fractions are padded.
+    decimal-to-quantity: func(asset-id: u16, amount: string) -> result<u64, error>;
+
+    /// Convert raw quantity units to a decimal string for `asset-id` (e.g. `14500` → `"1.4500"` at 4 dp).
+    quantity-to-decimal: func(asset-id: u16, amount: u64) -> result<string, error>;
+
+    /// Constant-product output. Amounts are raw integer units. Returns none
+    /// when the curve cannot fill. The output is always less than `reserve-out`.
+    quote-curve-out: func(reserve-in: string, reserve-out: string, amount-in: string, fee-ppm: u32) -> result<option<string>, error>;
+
+    /// Smallest raw input such that `quote-curve-out` is at least `amount-out`.
+    quote-curve-in: func(reserve-in: string, reserve-out: string, amount-out: string, fee-ppm: u32) -> result<option<string>, error>;
+}
+
+interface api {
+    use host:types/types.{error};
+    use types.{path-hop, path-hop-quote, path-quote, created-invite};
+
+    /// Creditor posts/updates a credit line to `debtor` in `asset-id`.
+    /// `limit` is a human decimal string (e.g. `"100.00"`).
+    /// `interest-rate-ppm` is APR in ppm (10000 = 1%).
+    /// `grace-seconds` is the interest-free window after a 0→positive cycle
+    /// (`604800` = 7 days). `0` = interest from the first second.
+    set-credit-line: func(
+        debtor: string,
+        asset-id: u16,
+        limit: string,
+        deplete-on-debit: bool,
+        interest-rate-ppm: u32,
+        grace-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Remove the sender's credit line to `debtor`. Limit 0 is still a line
+    /// (known counterparty); this deletes the row.
+    remove-credit-line: func(debtor: string, asset-id: u16) -> result<_, error>;
+
+    /// Debtor (sender) lets `creditor` book deposits onto them, up to
+    /// `remaining` (human decimal). The booked APR must sit in
+    /// `min-interest-rate-ppm..=max-interest-rate-ppm`. A floor of 0 refuses
+    /// decay. `expires-at-seconds` 0 = never.
+    set-book-auth: func(
+        creditor: string,
+        asset-id: u16,
+        remaining: string,
+        max-interest-rate-ppm: u32,
+        min-interest-rate-ppm: s32,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Revoke the sender's book-auth to `creditor`.
+    remove-book-auth: func(creditor: string, asset-id: u16) -> result<_, error>;
+
+    /// Creditor (sender) books `amount` onto `debtor` under their live
+    /// book-auth. `interest-rate-ppm` is a signed APR (`10_000` = 1%,
+    /// negative decays the claim), within ±1_000_000 and the auth's min..=max.
+    /// `memo` max 80 bytes.
+    book: func(
+        debtor: string,
+        asset-id: u16,
+        amount: string,
+        interest-rate-ppm: s32,
+        memo: string,
+    ) -> result<_, error>;
+
+    /// Post a path-forward offer toward a **specific** next hop. Prefer global
+    /// when possible. `fee-fixed` is a human decimal in `asset-id` units.
+    /// `fee-percent-ppm` is ppm (`10_000` = 1%).
+    /// `allow-unknown`: closed (false) requires the poster already know the
+    /// next hop; open (true) lets anyone who lined the poster become their
+    /// creditor. Applied on insert and update.
+    set-forward-offer: func(
+        next-hop: string,
+        asset-id: u16,
+        fee-fixed: string,
+        fee-percent-ppm: u32,
+        max-line-apr-ppm: u32,
+        expires-at-seconds: u32,
+        allow-unknown: bool,
+    ) -> result<_, error>;
+
+    /// Global path-forward offer for this asset (any next hop).
+    /// `allow-unknown` is applied on insert and update; see `set-forward-offer`.
+    set-global-forward-offer: func(
+        asset-id: u16,
+        fee-fixed: string,
+        fee-percent-ppm: u32,
+        max-line-apr-ppm: u32,
+        expires-at-seconds: u32,
+        allow-unknown: bool,
+    ) -> result<_, error>;
+
+    /// Remove a specific path-forward offer.
+    remove-forward-offer: func(next-hop: string, asset-id: u16) -> result<_, error>;
+
+    /// Remove global path-forward offer for this asset.
+    remove-global-forward-offer: func(asset-id: u16) -> result<_, error>;
+
+    /// Post a buy-claim offer for claims on a **specific** debtor.
+    /// `fee-percent-ppm` is a signed spread: positive haircuts the seller,
+    /// negative is a premium (`-50000` = 5% over face).
+    set-buy-claim-offer: func(
+        debtor: string,
+        asset-id: u16,
+        fee-fixed: string,
+        fee-percent-ppm: s32,
+        remaining: string,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Global buy-claim offer for this asset. `remaining` is the face budget
+    /// shared by every debtor. Each take is still capped by the poster's line.
+    set-global-buy-claim-offer: func(
+        asset-id: u16,
+        fee-fixed: string,
+        fee-percent-ppm: s32,
+        remaining: string,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Flag-only `allow-unknown` update on a posted path-forward offer
+    /// (does not re-post fees). Empty `next-hop` (or `"0"`) is the global
+    /// offer. Closed (false): poster must have lined the next hop (limit 0
+    /// is enough). Open (true): anyone who lined the poster can become
+    /// their creditor.
+    set-allow-unknown: func(
+        next-hop: string,
+        asset-id: u16,
+        allow-unknown: bool,
+    ) -> result<_, error>;
+
+    /// Remove a specific buy-claim offer.
+    remove-buy-claim-offer: func(debtor: string, asset-id: u16) -> result<_, error>;
+
+    /// Remove global buy-claim offer for this asset.
+    remove-global-buy-claim-offer: func(asset-id: u16) -> result<_, error>;
+
+    /// Post a sell-claim offer for claims on a **specific** debtor.
+    /// Signed spread: **positive is your profit** (`10000` = 1% over
+    /// face); negative is a discount you will take.
+    set-sell-claim-offer: func(
+        debtor: string,
+        asset-id: u16,
+        fee-fixed: string,
+        fee-percent-ppm: s32,
+        remaining: string,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Global sell-claim offer for this asset (any debtor the poster is owed by).
+    /// `remaining` is the face budget shared by every debtor.
+    set-global-sell-claim-offer: func(
+        asset-id: u16,
+        fee-fixed: string,
+        fee-percent-ppm: s32,
+        remaining: string,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Remove a specific sell-claim offer.
+    remove-sell-claim-offer: func(debtor: string, asset-id: u16) -> result<_, error>;
+
+    /// Remove global sell-claim offer for this asset.
+    remove-global-sell-claim-offer: func(asset-id: u16) -> result<_, error>;
+
+    /// Sell claims on `debtor` to `buyer` under buyer's **buy** offer.
+    /// `amount` is face (human decimal); seller receives face after fees as a
+    /// claim on the buyer. `min-proceeds` is the floor you sign for that
+    /// claim. A positive bound rejects a replaced offer that pays less.
+    /// Zero does not floor. New exposure needs the buyer's credit line to
+    /// `debtor` and is capped by that line.
+    sell-claim: func(
+        buyer: string,
+        debtor: string,
+        asset-id: u16,
+        amount: string,
+        min-proceeds: string,
+    ) -> result<_, error>;
+
+    /// Buy claims on `debtor` from `seller` under seller's **sell** offer.
+    /// `max-cost` is the cap you sign on the claim you will owe the seller.
+    /// A positive bound rejects a replaced offer that costs more. Zero does
+    /// not cap. New exposure needs your credit line to `debtor` and is
+    /// capped by that line.
+    buy-claim: func(
+        seller: string,
+        debtor: string,
+        asset-id: u16,
+        amount: string,
+        max-cost: string,
+    ) -> result<_, error>;
+
+    /// Post one side of a from→to quote. Others take it with `convert`.
+    /// `poster-is-creditor` true: the quote applies when they owe you
+    /// `from-asset`. The fee is added. False: it applies when you owe them.
+    /// The fee comes off. The other direction is a second post.
+    /// Path pay uses only the true side, and subtracts the fee onward.
+    /// Fee and `remaining` are human decimals in **from-asset** units.
+    /// `remaining` is how much from-asset this side still accepts; saving
+    /// again replaces what is left. `to-rate` is how many **to-asset** units
+    /// for 1 full **from-asset** unit (e.g. `"0.45"`). The plugin converts
+    /// this to the chain `fx_rate` (RATE_SCALE fixed-point), including precisions.
+    set-fx-offer: func(
+        from-asset: u16,
+        to-asset: u16,
+        poster-is-creditor: bool,
+        fee-fixed: string,
+        to-rate: string,
+        to-interest-rate-ppm: u32,
+        remaining: string,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Post a two-way market quote. `market-rate` is how many units of
+    /// `asset-b` equal 1 unit of `asset-a`. `spread-ppm` comes off that rate
+    /// and off the fair inverse, so each direction is worse for the taker.
+    /// 5% of 1.20 is 1.14 one way. Fee is zero. Each direction is posted for
+    /// both debt sides (they owe you, and you owe them). `remaining-a` and
+    /// `remaining-b` are the budgets, in that asset, copied onto both sides.
+    set-exchange-quotes: func(
+        asset-a: u16,
+        asset-b: u16,
+        market-rate: string,
+        spread-ppm: u32,
+        remaining-a: string,
+        remaining-b: string,
+        to-interest-rate-ppm: u32,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Remove one side of a from→to quote.
+    remove-fx-offer: func(
+        from-asset: u16,
+        to-asset: u16,
+        poster-is-creditor: bool,
+    ) -> result<_, error>;
+
+    /// Invoice (`kind` = 1): you are the payee; `counterparty` is who was
+    /// billed (empty / `"0"` = anyone with a path may pay). Please-book
+    /// (`kind` = 2): you ask `counterparty` (creditor) to deposit you.
+    /// `amount` is a human decimal. `memo` max 80 bytes.
+    create-request: func(
+        kind: u8,
+        counterparty: string,
+        asset-id: u16,
+        amount: string,
+        memo: string,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Cancel an open request. Poster only.
+    cancel-request: func(id: u32) -> result<_, error>;
+
+    /// Book a deposit: sender receives value and credits `depositor`, then auto-nets.
+    /// `amount` is a human decimal string.
+    /// `request-id` 0 = none; otherwise a please-book you are fulfilling.
+    deposit: func(
+        depositor: string,
+        asset-id: u16,
+        amount: string,
+        interest-rate-ppm: u32,
+        request-id: u32,
+    ) -> result<_, error>;
+
+    /// Net mutual obligations with `counterparty` for `asset-id`.
+    /// `max-amount` is a human decimal string.
+    net: func(counterparty: string, asset-id: u16, max-amount: string) -> result<_, error>;
+
+    /// Write off claims the sender holds on `debtor` (one-sided; debtor does
+    /// not sign). `amount` is a human decimal, capped on chain at live
+    /// exposure. Partial does not reset grace; principal to 0 closes the cycle.
+    forgive: func(debtor: string, asset-id: u16, amount: string) -> result<_, error>;
+
+    /// Take the counterparty's currency-policy offer and rebook leftover
+    /// from-asset on this pair into to-asset. Amounts are human decimals.
+    convert: func(
+        counterparty: string,
+        from-asset: u16,
+        to-asset: u16,
+        amount-from: string,
+        min-to: string,
+        interest-rate: u32,
+    ) -> result<_, error>;
+
+    /// Take the clicked from→to order. `poster-is-creditor` is that row.
+    /// A buy rebooks from-asset you already owe them, then opens the rest.
+    /// Their claim on you in that asset does not switch this to the sell.
+    /// `to-bound` is the taker's to-asset net for this call, as a signed
+    /// human decimal. It is not stored. Positive floors a receipt, negative
+    /// caps a debt, and zero rejects finishing in debt. A buy with nothing
+    /// already owed rejects a debt cap.
+    take-fx: func(
+        poster: string,
+        from-asset: u16,
+        to-asset: u16,
+        poster-is-creditor: bool,
+        amount-from: string,
+        to-bound: string,
+        interest-rate: u32,
+    ) -> result<_, error>;
+
+    /// Multi-hop path payment. Each hop is (account, asset-id).
+    /// Amounts are human decimal strings in the first/last hop assets respectively.
+    /// `request-id` 0 = none; otherwise an invoice you are fulfilling (last hop
+    /// must be the payee).
+    path-pay: func(
+        hops: list<path-hop>,
+        amount: string,
+        min-return: string,
+        request-id: u32,
+    ) -> result<_, error>;
+
+    /// Pay a live invoice: walk hops backward from remaining, send the
+    /// smallest amount that clears the bill if that is ≤ `max-spend`.
+    /// `max-spend` is a human decimal in the first hop's asset. Last hop
+    /// must be the payee; any account with a path may pay.
+    pay-inv: func(
+        hops: list<path-hop>,
+        max-spend: string,
+        request-id: u32,
+    ) -> result<_, error>;
+
+    /// Repeating path payment. Sender is the payer. Amounts are human
+    /// decimals in `asset-id`. Times are unix seconds. `ends-at-seconds`
+    /// 0 means no scheduled end. `max-interest-rate-ppm` caps the first
+    /// hop's credit line (0 is 0% only, 1000000 is 100%). The id is
+    /// allocated on chain; refetch `payAuths` after the transaction.
+    set-pay-auth: func(
+        payee: string,
+        asset-id: u16,
+        amount: string,
+        max-spend: string,
+        max-interest-rate-ppm: u32,
+        period-seconds: u32,
+        next-due-seconds: u32,
+        ends-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Pay the oldest due period. Last hop is the payee. Every hop uses
+    /// the series asset. Caller is the payer or the payee. The stored
+    /// payer is drawn.
+    run-pay-auth: func(id: u32, hops: list<path-hop>) -> result<_, error>;
+
+    /// Delete a repeating payment. Payer or payee. `force-cancel` false
+    /// throws when a period is payable. True deletes anyway and does not pay.
+    cancel-pay-auth: func(id: u32, force-cancel: bool) -> result<_, error>;
+
+    /// Post a cash quote: Banx `asset-id` ↔ Tokens `token-id`.
+    /// `is-out` true: taker draws Banx, receives tokens. False: taker sends
+    /// tokens, books Banx onto the poster.
+    /// `fee-fixed` is a human decimal in Banx units (out) or token units (in).
+    /// `to-rate` is how many **to** units per 1 **from** unit (same as
+    /// `set-fx-offer`).
+    set-cash-quote: func(
+        asset-id: u16,
+        token-id: u32,
+        is-out: bool,
+        fee-fixed: string,
+        to-rate: string,
+        remaining: string,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Remove a cash quote.
+    remove-cash-quote: func(asset-id: u16, token-id: u32, is-out: bool) -> result<_, error>;
+
+    /// Move tokens already credited to Banx into `{sender}/{token-id}`.
+    /// The UI credits Banx first, then calls this.
+    cash-fund: func(token-id: u32, amount: string) -> result<_, error>;
+
+    /// Withdraw tokens from `{sender}/{token-id}` on Banx.
+    cash-withdraw: func(token-id: u32, amount: string) -> result<_, error>;
+
+    /// Draw Banx on `cashier`'s line; receive tokens from their vault.
+    /// `amount-banx` / `min-tokens` are human decimals.
+    cash-out: func(
+        cashier: string,
+        asset-id: u16,
+        token-id: u32,
+        amount-banx: string,
+        min-tokens: string,
+    ) -> result<_, error>;
+
+    /// Send tokens from the sender's `{sender}/{token-id}` vault (filled by
+    /// `cash-fund`) at `cashier`'s in quote.
+    /// `amount-tokens` / `min-banx` are human decimals.
+    cash-in: func(
+        cashier: string,
+        asset-id: u16,
+        token-id: u32,
+        amount-tokens: string,
+        min-banx: string,
+    ) -> result<_, error>;
+
+    /// Post a constant-product relay between two Banx assets. Reserves are
+    /// virtual weights, one row for both directions. Saving again replaces
+    /// them. `reserve-a` and `reserve-b` are human decimals. The curve has
+    /// no fee. A path that continues pays the forward fee.
+    set-relay: func(
+        asset-a: u16,
+        asset-b: u16,
+        reserve-a: string,
+        reserve-b: string,
+    ) -> result<_, error>;
+
+    /// Delete the sender's relay for this pair. Claims already drawn stay.
+    remove-relay: func(asset-a: u16, asset-b: u16) -> result<_, error>;
+
+    /// Post a Banx↔token relay. `reserve-banx` is the virtual Banx weight.
+    /// `reserve-tokens` is pulled from the sender's credit to Banx into
+    /// `{sender}/{asset-id}/{token-id}`. The same pair cannot be posted twice.
+    /// The curve has no fee. A direct swap pays the owner's global forward.
+    set-token-relay: func(
+        asset-id: u16,
+        token-id: u32,
+        reserve-banx: string,
+        reserve-tokens: string,
+    ) -> result<_, error>;
+
+    /// Delete the sender's token relay. Tokens still in the pair return to the sender.
+    remove-token-relay: func(asset-id: u16, token-id: u32) -> result<_, error>;
+
+    /// Draw Banx on `owner`'s relay and receive tokens from their pair.
+    token-relay-out: func(
+        owner: string,
+        asset-id: u16,
+        token-id: u32,
+        amount-banx: string,
+        min-tokens: string,
+    ) -> result<_, error>;
+
+    /// Send tokens from the sender's cash vault into `owner`'s pair. The curve
+    /// prices the full amount. A live global forward on that IOU is taken off
+    /// the Banx `owner` owes. Fund the cash vault first.
+    token-relay-in: func(
+        owner: string,
+        asset-id: u16,
+        token-id: u32,
+        amount-tokens: string,
+        min-banx: string,
+    ) -> result<_, error>;
+
+    /// Path-pay that ends by selling the last hop's Banx for that account's
+    /// tokens. The last hop must have posted a token relay for that asset.
+    /// They pay `recipient` the tokens and do not also owe them the Banx
+    /// asset. A one-hop path is a direct swap: the last hop's global forward
+    /// is extra Banx the sender owes. `amount` is a human decimal in the first
+    /// hop's asset. `min-tokens` floors the token output.
+    path-cash: func(
+        hops: list<path-hop>,
+        amount: string,
+        token-id: u32,
+        recipient: string,
+        min-tokens: string,
+    ) -> result<_, error>;
+
+    /// Discover a multi-hop path from `from-account` to `to-account` (TokenSwap-style
+    /// max amount_out search over credit lines / forward offers / FX). Uses a scoped GraphQL
+    /// subgraph around the two endpoints — not a full-network dump.
+    ///
+    /// - `exact-out = false` (default): `amount` is what you send (`from-asset`);
+    ///   fees reduce what the payee receives.
+    /// - `exact-out = true`: `amount` is what the payee should receive (requires
+    ///   `to-asset`); quote finds the minimum send so you absorb hop/FX fees.
+    ///
+    /// `to-asset` empty/none → any final asset (exact-in only); otherwise require
+    /// that asset on the last hop. `from-account` and `to-account` may be the
+    /// same when `to-asset` differs from `from-asset`: the sender is the last hop.
+    quote-path: func(
+        from-account: string,
+        to-account: string,
+        amount: string,
+        from-asset: u16,
+        to-asset: option<u16>,
+        max-hops: u8,
+        exact-out: bool,
+    ) -> result<path-quote, error>;
+
+    /// Create a single-use network+Banx invite that extends a credit line to the claimee.
+    /// `limit` is a human decimal. Returns the invite token for the claim URL.
+    create-invite: func(
+        asset-id: u16,
+        limit: string,
+        deplete-on-debit: bool,
+        interest-rate-ppm: u32,
+        grace-seconds: u32,
+    ) -> result<created-invite, error>;
+
+    /// Revoke a Banx invite. Inviter only.
+    delete-invite: func(invite-id: u32) -> result<_, error>;
+
+    /// Register a new Banx asset. Anyone may call. `symbol` is a chain name
+    /// (1–10 chars). `precision` is 0–8 decimal places. `description` max 80 bytes.
+    add-asset: func(
+        symbol: string,
+        precision: u8,
+        description: string,
+    ) -> result<_, error>;
+}
+
+world imports {
+    import api;
+    import helpers;
+}

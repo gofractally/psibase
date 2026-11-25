@@ -289,7 +289,7 @@ include(libraries/psibase/sdk/rs-components.cmake)
 add_rs_component(packages/user/CommonApi/common/packages/component-parser:ComponentParser component_parser.wasm wasm32-unknown-unknown)
 add_dependencies(CommonApiCommonLib_js ComponentParser)
 
-add_rs_component_workspace(packages/:Plugins 
+add_rs_component_workspace(packages/:Plugins
     accounts
     accounts-query
     aes
@@ -583,6 +583,13 @@ cargo_psibase_package(
     TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Banx.psi
+    PATH packages/user/Banx
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+    DEPENDS ${Banx_js_DEP}
+)
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Fractals.psi
@@ -1057,15 +1064,15 @@ psibase_package(
     NAME Workshop
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "A dashboard for developers to create and manage apps"
-    PACKAGE_DEPENDS 
+    PACKAGE_DEPENDS
         "AuthDelegate(^${PSIBASE_VERSION}.0)"
         "Host(^${PSIBASE_VERSION}.0)"
-        "HttpServer(^${PSIBASE_VERSION}.0)" 
-        "Sites(^${PSIBASE_VERSION}.0)" 
-        "Accounts(^${PSIBASE_VERSION}.0)" 
-        "CommonApi(^${PSIBASE_VERSION}.0)" 
-        "Registry(^${PSIBASE_VERSION}.0)" 
-        "StagedTx(^${PSIBASE_VERSION}.0)" 
+        "HttpServer(^${PSIBASE_VERSION}.0)"
+        "Sites(^${PSIBASE_VERSION}.0)"
+        "Accounts(^${PSIBASE_VERSION}.0)"
+        "CommonApi(^${PSIBASE_VERSION}.0)"
+        "Registry(^${PSIBASE_VERSION}.0)"
+        "StagedTx(^${PSIBASE_VERSION}.0)"
         "Transact(^${PSIBASE_VERSION}.0)"
         "SetCode(^${PSIBASE_VERSION}.0)"
         "Chainmail(^${PSIBASE_VERSION}.0)"
@@ -1088,11 +1095,11 @@ psibase_package(
         "Branding(^${PSIBASE_VERSION})"
         "Host(^${PSIBASE_VERSION})"
         "HttpServer(^${PSIBASE_VERSION})"
-        "Sites(^${PSIBASE_VERSION})" 
-        "Accounts(^${PSIBASE_VERSION})" 
-        "CommonApi(^${PSIBASE_VERSION})" 
-        "Registry(^${PSIBASE_VERSION})" 
-        "StagedTx(^${PSIBASE_VERSION})" 
+        "Sites(^${PSIBASE_VERSION})"
+        "Accounts(^${PSIBASE_VERSION})"
+        "CommonApi(^${PSIBASE_VERSION})"
+        "Registry(^${PSIBASE_VERSION})"
+        "StagedTx(^${PSIBASE_VERSION})"
         "Packages(^${PSIBASE_VERSION})"
         "NameMarket(^${PSIBASE_VERSION})"
         "Producers(^${PSIBASE_VERSION})"
@@ -1117,15 +1124,15 @@ psibase_package(
     NAME FractalCore
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Vanilla fractal instance deployment"
-    PACKAGE_DEPENDS 
+    PACKAGE_DEPENDS
         "Guilds(^${PSIBASE_VERSION})"
         "Host(^${PSIBASE_VERSION})"
-        "HttpServer(^${PSIBASE_VERSION})" 
-        "Sites(^${PSIBASE_VERSION})" 
-        "Accounts(^${PSIBASE_VERSION})" 
-        "CommonApi(^${PSIBASE_VERSION})" 
+        "HttpServer(^${PSIBASE_VERSION})"
+        "Sites(^${PSIBASE_VERSION})"
+        "Accounts(^${PSIBASE_VERSION})"
+        "CommonApi(^${PSIBASE_VERSION})"
         "Permissions(^${PSIBASE_VERSION})"
-        "StagedTx(^${PSIBASE_VERSION})" 
+        "StagedTx(^${PSIBASE_VERSION})"
         "Transact(^${PSIBASE_VERSION})"
         "Fractals(^${PSIBASE_VERSION})"
     SERVICE fractal-cr
@@ -1141,7 +1148,7 @@ psibase_package(
     NAME TokenUsers
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Creates accounts alice & bob, and gives each some system tokens. Not for production use."
-    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "FaucetTok(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" 
+    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "FaucetTok(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Tokens/src/TokenUsers.json
 )
 
@@ -1360,7 +1367,7 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with development-only apps, insecure authentication, and no governance."
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthNone AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthNone Banx AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HostLoginPrompt HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
 )
@@ -1443,7 +1450,7 @@ function(write_package_index target dir reserve)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR} 1
-    Accounts AccountsService Aes AuthAny AuthNone AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG PrivDefault
+    Accounts AccountsService Aes AuthAny AuthNone AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthSig AuthSigService Banx Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG PrivDefault
     Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop WsAuth Config
     XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
@@ -1462,6 +1469,7 @@ install(
           ${SERVICE_DIR}/AuthSig.psi
           ${SERVICE_DIR}/AuthSigService.psi
           ${SERVICE_DIR}/Base64.psi
+          ${SERVICE_DIR}/Banx.psi
           ${SERVICE_DIR}/Branding.psi
           ${SERVICE_DIR}/BrotliCodec.psi
           ${SERVICE_DIR}/BrotliSvc.psi

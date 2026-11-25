@@ -1,0 +1,46 @@
+import { createBrowserRouter, Navigate } from "react-router-dom";
+
+import { Layout } from "@/components/layout";
+import { LoginGate } from "@/components/login-gate";
+import { CashPage } from "@/pages/cash";
+import { InvitePage } from "@/pages/invite";
+import { InvitesPage } from "@/pages/invites";
+import { AccountDetailPage } from "@/pages/account-detail";
+import { NetworkPage } from "@/pages/network";
+import { ObligationsPage } from "@/pages/obligations";
+import { PayeesPage } from "@/pages/payees";
+import { PoliciesPage } from "@/pages/policies";
+import { RelaysPage } from "@/pages/relays";
+import { RequestsPage } from "@/pages/requests";
+import { SwapPage } from "@/pages/swap";
+
+function withGate(page: React.ReactNode) {
+    return <LoginGate>{page}</LoginGate>;
+}
+
+export const router = createBrowserRouter([
+    {
+        path: "/",
+        element: <Layout />,
+        children: [
+            { index: true, element: <Navigate to="/accounts" replace /> },
+            { path: "accounts", element: withGate(<ObligationsPage />) },
+            { path: "swap", element: withGate(<SwapPage />) },
+            { path: "network", element: withGate(<NetworkPage />) },
+            {
+                path: "accounts/:account",
+                element: withGate(<AccountDetailPage />),
+            },
+            { path: "history", element: <Navigate to="/accounts" replace /> },
+            { path: "payees", element: withGate(<PayeesPage />) },
+            { path: "invites", element: withGate(<InvitesPage />) },
+            { path: "invite", element: <InvitePage /> },
+            { path: "requests", element: withGate(<RequestsPage />) },
+            { path: "cash", element: withGate(<CashPage />) },
+            { path: "trade", element: withGate(<PoliciesPage />) },
+            { path: "policies", element: <Navigate to="/trade" replace /> },
+            { path: "relays", element: withGate(<RelaysPage />) },
+            { path: "assets", element: <Navigate to="/accounts" replace /> },
+        ],
+    },
+]);

@@ -1,0 +1,1316 @@
+import { useCallback } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { BANX_SERVICE } from "@/lib/constants";
+import { QueryKey } from "@/lib/query-keys";
+
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { supervisor } from "@shared/lib/supervisor";
+import { toast } from "@shared/shadcn/ui/sonner";
+
+/** Balances and lines. Skips activity queries so a feed poll cannot refetch itself. */
+export function useInvalidateLedger() {
+    const qc = useQueryClient();
+    const { data: user } = useCurrentUser();
+    return useCallback(() => {
+        void qc.invalidateQueries({ queryKey: QueryKey.assets() });
+        if (!user) return;
+        void qc.invalidateQueries({ queryKey: QueryKey.creditLines(user) });
+        void qc.invalidateQueries({ queryKey: QueryKey.networkLines() });
+        void qc.invalidateQueries({
+            queryKey: QueryKey.networkForwardOffers(),
+        });
+        void qc.invalidateQueries({ queryKey: QueryKey.bookAuths(user) });
+        void qc.invalidateQueries({ queryKey: QueryKey.obligations(user) });
+        void qc.invalidateQueries({
+            queryKey: QueryKey.forwardOffers(user),
+        });
+        void qc.invalidateQueries({
+            queryKey: QueryKey.claimOffers(user),
+        });
+        void qc.invalidateQueries({
+            queryKey: ["banx", "fxOffers"],
+        });
+        void qc.invalidateQueries({
+            queryKey: QueryKey.requests(user),
+        });
+        void qc.invalidateQueries({
+            queryKey: QueryKey.payAuths(user),
+        });
+        void qc.invalidateQueries({ queryKey: QueryKey.invites(user) });
+        void qc.invalidateQueries({ queryKey: ["banx", "cashQuotes"] });
+        void qc.invalidateQueries({ queryKey: ["banx", "banxRelays"] });
+        void qc.invalidateQueries({ queryKey: ["banx", "tokenRelays"] });
+        void qc.invalidateQueries({
+            queryKey: QueryKey.cashVault(user),
+        });
+    }, [qc, user]);
+}
+
+function useInvalidateBanx() {
+    const qc = useQueryClient();
+    const { data: user } = useCurrentUser();
+    const invalidateLedger = useInvalidateLedger();
+    return () => {
+        invalidateLedger();
+        if (!user) return;
+        void qc.invalidateQueries({
+            queryKey: QueryKey.activityFeed(user),
+        });
+        void qc.invalidateQueries({ queryKey: ["banx", "activityWith"] });
+        void qc.invalidateQueries({ queryKey: ["banx", "activity"] });
+    };
+}
+
+async function banxCall(method: string, params: unknown[]) {
+    await supervisor.functionCall({
+        service: BANX_SERVICE,
+        intf: "api",
+        method,
+        params,
+    });
+}
+
+export function useSetCreditLine() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            debtor: string;
+            assetId: number;
+            /** Human decimal, e.g. `"100.00"` */
+            limit: string;
+            depleteOnDebit: boolean;
+            interestRatePpm: number;
+            /** Interest-free window in seconds after 0→positive. */
+            graceSeconds: number;
+        }) =>
+            banxCall("setCreditLine", [
+                p.debtor,
+                p.assetId,
+                p.limit,
+                p.depleteOnDebit,
+                p.interestRatePpm,
+                p.graceSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Credit line saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveCreditLine() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { debtor: string; assetId: number }) =>
+            banxCall("removeCreditLine", [p.debtor, p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Credit line removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetBookAuth() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            creditor: string;
+            assetId: number;
+            remaining: string;
+            maxInterestRatePpm: number;
+            minInterestRatePpm: number;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setBookAuth", [
+                p.creditor,
+                p.assetId,
+                p.remaining,
+                p.maxInterestRatePpm,
+                p.minInterestRatePpm,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Book-auth saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveBookAuth() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { creditor: string; assetId: number }) =>
+            banxCall("removeBookAuth", [p.creditor, p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Book-auth removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useBook() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            debtor: string;
+            assetId: number;
+            amount: string;
+            interestRatePpm: number;
+            memo: string;
+        }) =>
+            banxCall("book", [
+                p.debtor,
+                p.assetId,
+                p.amount,
+                p.interestRatePpm,
+                p.memo,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Expense booked");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useDeposit() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            depositor: string;
+            assetId: number;
+            amount: string;
+            interestRatePpm: number;
+            requestId?: number;
+        }) =>
+            banxCall("deposit", [
+                p.depositor,
+                p.assetId,
+                p.amount,
+                p.interestRatePpm,
+                p.requestId ?? 0,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Deposit booked (and netted if possible)");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useCreateRequest() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            kind: number;
+            counterparty: string;
+            assetId: number;
+            amount: string;
+            memo: string;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("createRequest", [
+                p.kind,
+                p.counterparty,
+                p.assetId,
+                p.amount,
+                p.memo,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Request posted");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useCancelRequest() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (id: number) => banxCall("cancelRequest", [id]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Request cancelled");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useNet() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            counterparty: string;
+            assetId: number;
+            maxAmount: string;
+        }) => banxCall("net", [p.counterparty, p.assetId, p.maxAmount]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Netting applied");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useForgive() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            debtor: string;
+            assetId: number;
+            amount: string;
+        }) => banxCall("forgive", [p.debtor, p.assetId, p.amount]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Claim written off");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function usePathPay() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            hops: { account: string; assetId: number }[];
+            amount: string;
+            minReturn: string;
+            requestId?: number;
+        }) =>
+            banxCall("pathPay", [
+                p.hops.map((h) => ({
+                    account: h.account,
+                    assetId: h.assetId,
+                })),
+                p.amount,
+                p.minReturn,
+                p.requestId ?? 0,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Transfer succeeded");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetPayAuth() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            payee: string;
+            assetId: number;
+            amount: string;
+            maxSpend: string;
+            maxInterestRatePpm: number;
+            periodSeconds: number;
+            nextDueSeconds: number;
+            endsAtSeconds: number;
+        }) =>
+            banxCall("setPayAuth", [
+                p.payee,
+                p.assetId,
+                p.amount,
+                p.maxSpend,
+                p.maxInterestRatePpm,
+                p.periodSeconds,
+                p.nextDueSeconds,
+                p.endsAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Repeating payment saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRunPayAuth() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            id: number;
+            hops: { account: string; assetId: number }[];
+        }) =>
+            banxCall("runPayAuth", [
+                p.id,
+                p.hops.map((h) => ({
+                    account: h.account,
+                    assetId: h.assetId,
+                })),
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Repeating payment collected");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useCancelPayAuth() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { id: number; forceCancel: boolean }) =>
+            banxCall("cancelPayAuth", [p.id, p.forceCancel]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Repeating payment deleted");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function usePayInvoice() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            hops: { account: string; assetId: number }[];
+            maxSpend: string;
+            requestId: number;
+        }) =>
+            banxCall("payInv", [
+                p.hops.map((h) => ({
+                    account: h.account,
+                    assetId: h.assetId,
+                })),
+                p.maxSpend,
+                p.requestId,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Invoice paid");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export type PathHopQuote = {
+    account: string;
+    assetId: number;
+    /** Notional drawn on this hop after fees (hop asset). */
+    amount: string;
+    /** Routing fee on this hop (hop asset). `"0"` for hop 0. */
+    hopFee: string;
+    /** FX fixed fee into this hop (prior asset). `"0"` if no convert. */
+    fxFee: string;
+    /** Prior asset when FX convert happened. */
+    fxFromAsset?: number;
+};
+
+export type PathQuote = {
+    hops: PathHopQuote[];
+    /** Amount to draw on first hop (from-asset). */
+    amountIn: string;
+    /** Residual after fees (last-hop asset). */
+    amountOut: string;
+    /** Suggested path_pay min-return (last-hop asset). */
+    minReturn: string;
+};
+
+type RawHop = {
+    account: string;
+    assetId?: number;
+    asset_id?: number;
+    amount?: string;
+    hopFee?: string;
+    hop_fee?: string;
+    fxFee?: string;
+    fx_fee?: string;
+    fxFromAsset?: number | null;
+    fx_from_asset?: number | null;
+};
+
+/** Curve output or required input. The plugin calls the service math. */
+export function useCurveQuote(
+    reserveIn: bigint,
+    reserveOut: bigint,
+    amount: bigint,
+    feePpm: number,
+    exactOut: boolean,
+) {
+    const enabled =
+        reserveIn > 0n &&
+        reserveOut > 0n &&
+        amount > 0n &&
+        feePpm >= 0 &&
+        feePpm < 1_000_000;
+    return useQuery({
+        queryKey: [
+            "banx",
+            "curveQuote",
+            exactOut ? "in" : "out",
+            reserveIn.toString(),
+            reserveOut.toString(),
+            amount.toString(),
+            feePpm,
+        ],
+        enabled,
+        staleTime: Infinity,
+        queryFn: async (): Promise<bigint | null> => {
+            const res = await supervisor.functionCall({
+                service: BANX_SERVICE,
+                intf: "helpers",
+                method: exactOut ? "quoteCurveIn" : "quoteCurveOut",
+                params: [
+                    reserveIn.toString(),
+                    reserveOut.toString(),
+                    amount.toString(),
+                    feePpm,
+                ],
+            });
+            if (res == null || res === "") return null;
+            return BigInt(String(res));
+        },
+    });
+}
+
+/** Off-chain path discovery (scoped graph + TokenSwap-style search). */
+export function useQuotePath() {
+    return useMutation({
+        mutationFn: async (p: {
+            fromAccount: string;
+            toAccount: string;
+            amount: string;
+            fromAsset: number;
+            /** Final hop must be in this asset. */
+            toAsset: number;
+            maxHops: number;
+            /**
+             * false: `amount` is what you send (fees reduce receive).
+             * true: `amount` is what payee receives (you absorb hop/FX fees).
+             */
+            exactOut?: boolean;
+        }): Promise<PathQuote> => {
+            // Always pass a real boolean (some bridges drop/omit `false`).
+            const exactOut = p.exactOut === true;
+            const res = (await supervisor.functionCall({
+                service: BANX_SERVICE,
+                intf: "api",
+                method: "quotePath",
+                params: [
+                    p.fromAccount,
+                    p.toAccount,
+                    p.amount,
+                    p.fromAsset,
+                    p.toAsset,
+                    p.maxHops,
+                    exactOut,
+                ],
+            })) as Record<string, unknown> & {
+                hops: RawHop[];
+            };
+            // Prefer camelCase (jco); fall back to snake_case if present.
+            const amountIn = String(
+                res.amountIn ?? res.amount_in ?? p.amount,
+            );
+            const amountOut = String(res.amountOut ?? res.amount_out ?? "");
+            const minReturn = String(
+                res.minReturn ?? res.min_return ?? amountOut,
+            );
+            return {
+                hops: (res.hops ?? []).map((h) => {
+                    const fxFrom =
+                        h.fxFromAsset ?? h.fx_from_asset ?? undefined;
+                    return {
+                        account: h.account,
+                        assetId: Number(h.assetId ?? h.asset_id),
+                        amount: String(h.amount ?? ""),
+                        hopFee: String(h.hopFee ?? h.hop_fee ?? "0"),
+                        fxFee: String(h.fxFee ?? h.fx_fee ?? "0"),
+                        fxFromAsset:
+                            fxFrom === null || fxFrom === undefined
+                                ? undefined
+                                : Number(fxFrom),
+                    };
+                }),
+                amountIn,
+                amountOut,
+                minReturn,
+            };
+        },
+    });
+}
+
+export function useSetForwardOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            nextHop: string;
+            assetId: number;
+            feeFixed: string;
+            feePercentPpm: number;
+            maxLineAprPpm: number;
+            expiresAtSeconds: number;
+            allowUnknown: boolean;
+        }) => {
+            await banxCall("setForwardOffer", [
+                p.nextHop,
+                p.assetId,
+                p.feeFixed,
+                p.feePercentPpm,
+                p.maxLineAprPpm,
+                p.expiresAtSeconds,
+                p.allowUnknown,
+            ]);
+        },
+        onSuccess: () => {
+            invalidate();
+            toast.success("Path-forward offer saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetGlobalForwardOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetId: number;
+            feeFixed: string;
+            feePercentPpm: number;
+            maxLineAprPpm: number;
+            expiresAtSeconds: number;
+            allowUnknown: boolean;
+        }) => {
+            await banxCall("setGlobalForwardOffer", [
+                p.assetId,
+                p.feeFixed,
+                p.feePercentPpm,
+                p.maxLineAprPpm,
+                p.expiresAtSeconds,
+                p.allowUnknown,
+            ]);
+        },
+        onSuccess: () => {
+            invalidate();
+            toast.success("Global path-forward offer saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveForwardOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { nextHop: string; assetId: number }) =>
+            banxCall("removeForwardOffer", [p.nextHop, p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Path-forward offer removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveGlobalForwardOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { assetId: number }) =>
+            banxCall("removeGlobalForwardOffer", [p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Global path-forward offer removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetBuyClaimOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            debtor: string;
+            assetId: number;
+            feeFixed: string;
+            feePercentPpm: number;
+            remaining: string;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setBuyClaimOffer", [
+                p.debtor,
+                p.assetId,
+                p.feeFixed,
+                p.feePercentPpm,
+                p.remaining,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Buy-claim offer saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetGlobalBuyClaimOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetId: number;
+            feeFixed: string;
+            feePercentPpm: number;
+            remaining: string;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setGlobalBuyClaimOffer", [
+                p.assetId,
+                p.feeFixed,
+                p.feePercentPpm,
+                p.remaining,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Global buy-claim offer saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveBuyClaimOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { debtor: string; assetId: number }) =>
+            banxCall("removeBuyClaimOffer", [p.debtor, p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Buy-claim offer removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveGlobalBuyClaimOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { assetId: number }) =>
+            banxCall("removeGlobalBuyClaimOffer", [p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Global buy-claim offer removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetSellClaimOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            debtor: string;
+            assetId: number;
+            feeFixed: string;
+            feePercentPpm: number;
+            remaining: string;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setSellClaimOffer", [
+                p.debtor,
+                p.assetId,
+                p.feeFixed,
+                p.feePercentPpm,
+                p.remaining,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Sell-claim offer saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetGlobalSellClaimOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetId: number;
+            feeFixed: string;
+            feePercentPpm: number;
+            remaining: string;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setGlobalSellClaimOffer", [
+                p.assetId,
+                p.feeFixed,
+                p.feePercentPpm,
+                p.remaining,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Global sell-claim offer saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveSellClaimOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { debtor: string; assetId: number }) =>
+            banxCall("removeSellClaimOffer", [p.debtor, p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Sell-claim offer removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveGlobalSellClaimOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { assetId: number }) =>
+            banxCall("removeGlobalSellClaimOffer", [p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Global sell-claim offer removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSellClaim() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            buyer: string;
+            debtor: string;
+            assetId: number;
+            amount: string;
+            minProceeds: string;
+        }) =>
+            banxCall("sellClaim", [
+                p.buyer,
+                p.debtor,
+                p.assetId,
+                p.amount,
+                p.minProceeds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Claim sold");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useBuyClaim() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            seller: string;
+            debtor: string;
+            assetId: number;
+            amount: string;
+            maxCost: string;
+        }) =>
+            banxCall("buyClaim", [
+                p.seller,
+                p.debtor,
+                p.assetId,
+                p.amount,
+                p.maxCost,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Claim bought");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetFxOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            fromAsset: number;
+            toAsset: number;
+            /** True when they owe you the from-asset. False when you owe them. */
+            posterIsCreditor: boolean;
+            feeFixed: string;
+            /** Human to-asset units per 1 from-asset unit, e.g. `"0.45"`. */
+            toRate: string;
+            toInterestRatePpm: number;
+            /** From-asset still accepted on this side. Saving replaces what is left. */
+            remaining: string;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setFxOffer", [
+                p.fromAsset,
+                p.toAsset,
+                p.posterIsCreditor,
+                p.feeFixed,
+                p.toRate,
+                p.toInterestRatePpm,
+                p.remaining,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("FX offer saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetExchangeQuotes() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetA: number;
+            assetB: number;
+            /** Human units of B per 1 A. The real market rate. */
+            marketRate: string;
+            /** Percent taken off each direction, in ppm. 5% is 50_000. */
+            spreadPpm: number;
+            remainingA: string;
+            remainingB: string;
+            toInterestRatePpm: number;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setExchangeQuotes", [
+                p.assetA,
+                p.assetB,
+                p.marketRate,
+                p.spreadPpm,
+                p.remainingA,
+                p.remainingB,
+                p.toInterestRatePpm,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Both rates saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveFxOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            fromAsset: number;
+            toAsset: number;
+            posterIsCreditor: boolean;
+        }) =>
+            banxCall("removeFxOffer", [
+                p.fromAsset,
+                p.toAsset,
+                p.posterIsCreditor,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("FX offer removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetCashQuote() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetId: number;
+            tokenId: number;
+            isOut: boolean;
+            feeFixed: string;
+            toRate: string;
+            remaining: string;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setCashQuote", [
+                p.assetId,
+                p.tokenId,
+                p.isOut,
+                p.feeFixed,
+                p.toRate,
+                p.remaining,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Rate saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveCashQuote() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetId: number;
+            tokenId: number;
+            isOut: boolean;
+        }) => banxCall("removeCashQuote", [p.assetId, p.tokenId, p.isOut]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Rate removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+async function tokensCredit(
+    tokenId: number,
+    amount: string,
+    memo = "csh_fund",
+) {
+    await supervisor.functionCall({
+        service: "tokens",
+        intf: "user",
+        method: "credit",
+        params: [tokenId, BANX_SERVICE, amount, memo],
+    });
+}
+
+async function tokensUncredit(
+    tokenId: number,
+    amount: string,
+    memo = "csh_fund",
+) {
+    await supervisor.functionCall({
+        service: "tokens",
+        intf: "user",
+        method: "uncredit",
+        params: [tokenId, BANX_SERVICE, amount, memo],
+    });
+}
+
+export function useCashFund() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { tokenId: number; amount: string }) => {
+            await tokensCredit(p.tokenId, p.amount);
+            try {
+                await banxCall("cashFund", [p.tokenId, p.amount]);
+            } catch (e) {
+                try {
+                    await tokensUncredit(p.tokenId, p.amount);
+                } catch {
+                    throw new Error(
+                        `The vault move did not finish. Tokens are still credited to ${BANX_SERVICE} and the rollback failed.`,
+                    );
+                }
+                throw e;
+            }
+        },
+        onSuccess: () => {
+            invalidate();
+            toast.success("Tokens added");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useCashWithdraw() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { tokenId: number; amount: string }) =>
+            banxCall("cashWithdraw", [p.tokenId, p.amount]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Tokens withdrawn");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useCashOut() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            cashier: string;
+            assetId: number;
+            tokenId: number;
+            amountBanx: string;
+            minTokens: string;
+        }) =>
+            banxCall("cashOut", [
+                p.cashier,
+                p.assetId,
+                p.tokenId,
+                p.amountBanx,
+                p.minTokens,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Tokens received");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useCashIn() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            cashier: string;
+            assetId: number;
+            tokenId: number;
+            amountTokens: string;
+            minBanx: string;
+        }) =>
+            banxCall("cashIn", [
+                p.cashier,
+                p.assetId,
+                p.tokenId,
+                p.amountTokens,
+                p.minBanx,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("IOU received");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useCreateInvite() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetId: number;
+            limit: string;
+            depleteOnDebit: boolean;
+            interestRatePpm: number;
+            graceSeconds: number;
+        }): Promise<{ inviteId: number; inviteToken: string }> => {
+            const res = (await supervisor.functionCall({
+                service: BANX_SERVICE,
+                intf: "api",
+                method: "createInvite",
+                params: [
+                    p.assetId,
+                    p.limit,
+                    p.depleteOnDebit,
+                    p.interestRatePpm,
+                    p.graceSeconds,
+                ],
+            })) as Record<string, unknown>;
+            const inviteId = Number(res.inviteId ?? res.invite_id);
+            const inviteToken = String(
+                res.inviteToken ?? res.invite_token ?? "",
+            );
+            if (!Number.isFinite(inviteId) || !inviteToken) {
+                throw new Error("Invite plugin returned an empty token");
+            }
+            return { inviteId, inviteToken };
+        },
+        onSuccess: () => {
+            invalidate();
+            toast.success("Invite created");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useAddAsset() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            symbol: string;
+            precision: number;
+            description: string;
+        }) => banxCall("addAsset", [p.symbol, p.precision, p.description]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Asset registered");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useDeleteInvite() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { inviteId: number }) =>
+            banxCall("deleteInvite", [p.inviteId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Invite revoked");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useConvert() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            counterparty: string;
+            fromAsset: number;
+            toAsset: number;
+            amountFrom: string;
+            minTo: string;
+            interestRatePpm: number;
+        }) =>
+            banxCall("convert", [
+                p.counterparty,
+                p.fromAsset,
+                p.toAsset,
+                p.amountFrom,
+                p.minTo,
+                p.interestRatePpm,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Convert succeeded");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useTakeFx() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            poster: string;
+            fromAsset: number;
+            toAsset: number;
+            posterIsCreditor: boolean;
+            amountFrom: string;
+            /** Signed human to-asset. Positive floors a receipt. Negative caps a debt. */
+            toBound: string;
+            interestRatePpm: number;
+        }) =>
+            banxCall("takeFx", [
+                p.poster,
+                p.fromAsset,
+                p.toAsset,
+                p.posterIsCreditor,
+                p.amountFrom,
+                p.toBound,
+                p.interestRatePpm,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Trade taken");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetRelay() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetA: number;
+            assetB: number;
+            reserveA: string;
+            reserveB: string;
+        }) =>
+            banxCall("setRelay", [
+                p.assetA,
+                p.assetB,
+                p.reserveA,
+                p.reserveB,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Pool posted");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveRelay() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { assetA: number; assetB: number }) =>
+            banxCall("removeRelay", [p.assetA, p.assetB]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Pool removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetTokenRelay() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetId: number;
+            tokenId: number;
+            reserveBanx: string;
+            reserveTokens: string;
+        }) => {
+            // The service debits this credit into `{sender}/{asset}/{token}`.
+            await tokensCredit(p.tokenId, p.reserveTokens, "relay");
+            try {
+                await banxCall("setTokenRelay", [
+                    p.assetId,
+                    p.tokenId,
+                    p.reserveBanx,
+                    p.reserveTokens,
+                ]);
+            } catch (e) {
+                try {
+                    await tokensUncredit(p.tokenId, p.reserveTokens, "relay");
+                } catch {
+                    throw new Error(
+                        `The pool was not posted. Tokens are still credited to ${BANX_SERVICE} and the rollback failed.`,
+                    );
+                }
+                throw e;
+            }
+        },
+        onSuccess: () => {
+            invalidate();
+            toast.success("Token pool posted");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveTokenRelay() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { assetId: number; tokenId: number }) =>
+            banxCall("removeTokenRelay", [p.assetId, p.tokenId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Token pool removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function usePathCash() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            hops: { account: string; assetId: number }[];
+            amount: string;
+            tokenId: number;
+            recipient: string;
+            minTokens: string;
+        }) =>
+            banxCall("pathCash", [
+                p.hops.map((h) => ({
+                    account: h.account,
+                    assetId: h.assetId,
+                })),
+                p.amount,
+                p.tokenId,
+                p.recipient,
+                p.minTokens,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Swap succeeded");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
