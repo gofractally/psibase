@@ -62,6 +62,12 @@ psinode - The psibase blockchain server
 
   When creating new database, the package and all its dependencies will be installed. If the database directory already exists, this option will have no effect.
 
+- `--debug-services`
+
+  Runs services with debugging support. When a call to a service fails, the node logs the WebAssembly functions the service was in, innermost first, as a warning. Compiled services are also registered with a debugger attached to `psinode` (`gdb`, or `lldb` after `settings set plugin.jit-loader.gdb.enable on`), by function name. Source files and lines are not available yet.
+
+  This is a setting of the node and not of the chain: a node that debugs computes exactly what the other nodes compute, so one node of a network can turn it on. It makes services slower to compile and to fail. It needs the wasmtime execution engine, is only read from the command line, and can also be turned on with the environment variable `PSIBASE_DEBUG_SERVICES=1`.
+
 ### P2P Network Options
 
 - `--p2p`

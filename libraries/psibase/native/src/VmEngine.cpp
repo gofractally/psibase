@@ -70,6 +70,18 @@ namespace psibase::vm
              }()};
          return result;
       }
+
+      std::atomic<bool>& debugging()
+      {
+         static std::atomic<bool> result{[]
+                                         {
+                                            const char* value =
+                                                std::getenv("PSIBASE_DEBUG_SERVICES");
+                                            return value && *value &&
+                                                   std::string_view(value) != "0";
+                                         }()};
+         return result;
+      }
    }  // namespace
 
    std::span<const Engine* const> engines()
@@ -89,6 +101,16 @@ namespace psibase::vm
          throw std::runtime_error("no execution engine named " + std::string(name) +
                                   " in this build (" + known() + ")");
       choice().store(engine);
+   }
+
+   bool serviceDebugging()
+   {
+      return debugging().load();
+   }
+
+   void setServiceDebugging(bool enabled)
+   {
+      debugging().store(enabled);
    }
 }  // namespace psibase::vm
 
@@ -134,6 +156,10 @@ namespace psibase
    WasmCache::WasmCache(uint32_t cacheSize, const std::filesystem::path& nativeArtifactPath)
    {
       auto& engine = vm::selected();
+      // Asked to debug, an engine that cannot must not quietly run without.
+      if (vm::serviceDebugging() && !engine.serviceDebugging)
+         throw std::runtime_error("execution engine " + std::string(engine.name) +
+                                  " cannot debug services");
       impl         = std::make_shared<WasmCacheImpl>(
           WasmCacheImpl{&engine, engine.makeCache(cacheSize, nativeArtifactPath)});
    }

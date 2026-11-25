@@ -1,10 +1,15 @@
 # Reassembles the psizam test fixtures and compares them with the checked-in
 # modules. Run by the PsizamFixtureTests test.
 file(MAKE_DIRECTORY "${WORK_DIR}")
-foreach(fixture policy service)
+foreach(fixture policy service debug-service)
     set(built "${WORK_DIR}/psizam-${fixture}.wasm")
+    # The debugging tests look for the service's function names.
+    set(names)
+    if(fixture STREQUAL "debug-service")
+        set(names --debug-names)
+    endif()
     execute_process(
-        COMMAND "${WAT2WASM}" "${SOURCE_DIR}/psizam-${fixture}.wat" -o "${built}"
+        COMMAND "${WAT2WASM}" ${names} "${SOURCE_DIR}/psizam-${fixture}.wat" -o "${built}"
         RESULT_VARIABLE result)
     if(NOT result EQUAL 0)
         message(FATAL_ERROR "wat2wasm failed on psizam-${fixture}.wat")
@@ -15,6 +20,6 @@ foreach(fixture policy service)
     if(NOT result EQUAL 0)
         message(FATAL_ERROR
             "psizam-${fixture}.wasm does not match psizam-${fixture}.wat; reassemble it with "
-            "wat2wasm psizam-${fixture}.wat -o psizam-${fixture}.wasm")
+            "wat2wasm ${names} psizam-${fixture}.wat -o psizam-${fixture}.wasm")
     endif()
 endforeach()
