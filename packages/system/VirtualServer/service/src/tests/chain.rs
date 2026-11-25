@@ -8,7 +8,6 @@ use psibase::{
         invite::{self, InvPayload},
         nft::Wrapper as Nft,
         tokens::{self, Decimal, Precision, Quantity, Wrapper as Tokens},
-        verify_sig,
     },
     *,
 };
@@ -774,7 +773,7 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
                 .into(),
         }],
         claims: vec![Claim {
-            service: verify_sig::Wrapper::SERVICE,
+            service: psibase::verifier_for(&inv_pubkey_der).unwrap(),
             rawData: inv_pubkey_der.clone().into(),
         }],
     };
@@ -785,7 +784,7 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let signature: Signature = signing_key
         .sign_prehash(&psibase::sha256(&tx_packed))
         .map_err(|e| psibase::Error::new(e))?;
-    // verify-sig only accepts the low-S form.
+    // The verifiers only accept the low-S form.
     let signature = signature.normalize_s().unwrap_or(signature);
     let strx = SignedTransaction {
         transaction: psio::pssz::Nested::unchecked(tx_packed),

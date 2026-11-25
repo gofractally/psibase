@@ -77,9 +77,9 @@ pub mod service {
         }
 
         assert_eq!(
-            claim.service,
-            psibase::services::verify_sig::SERVICE,
-            "Claim must use verify-sig",
+            Some(claim.service),
+            psibase::verifier_for(&claim.rawData),
+            "Claim must name the verifier for its key",
         );
 
         assert_eq!(

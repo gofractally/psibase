@@ -5,13 +5,13 @@
 
 use p256::pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePublicKey, LineEnding};
 
-/// A private key on one of the curves verify-sig accepts.
+/// A private key on one of the curves that have a verifier service.
 pub enum PrivateKey {
     P256(p256::ecdsa::SigningKey),
     K256(k256::ecdsa::SigningKey),
 }
 
-/// A public key on one of the curves verify-sig accepts.
+/// A public key on one of the curves that have a verifier service.
 pub enum PublicKey {
     P256(p256::ecdsa::VerifyingKey),
     K256(k256::ecdsa::VerifyingKey),
@@ -41,7 +41,7 @@ impl PrivateKey {
     }
 
     /// Signs a message digest and returns the 64-byte signature r || s in
-    /// the low-S form (s <= n/2), the only form verify-sig accepts. A signer
+    /// the low-S form (s <= n/2), the only form the verifiers accept. A signer
     /// may produce either s; (r, n - s) is the same signature in its other
     /// encoding.
     pub fn sign_prehash(&self, hashed_message: &[u8]) -> Result<Vec<u8>, String> {

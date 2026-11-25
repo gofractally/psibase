@@ -152,7 +152,8 @@ impl Api for ProducersPlugin {
                         .map_err(|e| InvalidResponse(format!("Invalid PEM: {}", e)))?;
 
                 psibase::Claim {
-                    service: account!("verify-sig"),
+                    service: psibase::verifier_for(&spki.0)
+                        .ok_or_else(|| InvalidResponse("Unsupported public key".to_string()))?,
                     rawData: spki.0.into(),
                 }
             }

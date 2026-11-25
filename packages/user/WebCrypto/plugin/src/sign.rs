@@ -2,7 +2,7 @@ use crate::keys::PrivateKey;
 
 /// Signs a message digest with a PKCS #8 P-256 or secp256k1 private key and
 /// returns the 64-byte signature r || s in the low-S form (s <= n/2), the
-/// only form verify-sig accepts.
+/// only form the verifiers accept.
 pub fn sign_prehashed(hashed_message: &[u8], private_key: &[u8]) -> Result<Vec<u8>, String> {
     PrivateKey::from_pkcs8_der(private_key)?.sign_prehash(hashed_message)
 }

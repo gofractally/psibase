@@ -8,7 +8,7 @@
 
 use p256::pkcs8::DecodePublicKey;
 
-/// A public key on one of the curves verify-sig accepts.
+/// A public key on one of the curves that have a verifier service.
 #[derive(PartialEq, Eq, Debug)]
 pub enum AccountKey {
     P256(p256::PublicKey),

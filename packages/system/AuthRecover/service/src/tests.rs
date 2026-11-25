@@ -75,7 +75,7 @@ mod tests {
         let claims = keys
             .iter()
             .map(|k| Claim {
-                service: services::verify_sig::SERVICE,
+                service: psibase::verifier_for(&k.public_key().0).unwrap(),
                 rawData: k.public_key().0.into(),
             })
             .collect();
@@ -94,7 +94,7 @@ mod tests {
                     .signing_key()
                     .sign_prehash(&digest)
                     .map_err(Error::new)?;
-                // verify-sig only accepts the low-S form.
+                // The verifiers only accept the low-S form.
                 let signature = signature.normalize_s().unwrap_or(signature);
                 Ok(signature.to_bytes().to_vec().into())
             })

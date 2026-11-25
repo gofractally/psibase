@@ -17,7 +17,9 @@ impl Api for Credentials {
         let pubkey_der = HostCrypto::to_der(&pubkey_pem).expect("host:crypto::to_der failed");
 
         let claim = Claim {
-            verify_service: psibase::services::verify_sig::SERVICE.to_string(),
+            verify_service: psibase::verifier_for(&pubkey_der)
+                .expect("unsupported public key")
+                .to_string(),
             raw_data: pubkey_der,
         };
         Transact::add_signature(&claim).expect("transact::add_signature failed");

@@ -32,9 +32,13 @@ pub fn get_pubkey(account_name: &str) -> Result<Pem, CommonTypes::Error> {
     Ok(summary_val.data.account.pubkey)
 }
 
+/// The claim for a key given as a DER SubjectPublicKeyInfo. The key decides
+/// which service verifies it.
 pub fn to_claim(pubkey: Vec<u8>) -> Claim {
     Claim {
-        verify_service: psibase::services::verify_sig::SERVICE.to_string(),
+        verify_service: psibase::verifier_for(&pubkey)
+            .expect("unsupported public key")
+            .to_string(),
         raw_data: pubkey,
     }
 }

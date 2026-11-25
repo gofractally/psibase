@@ -1,4 +1,6 @@
-#[crate::service(name = "verify-sig", dispatch = false, psibase_mod = "crate")]
+/// Verifies signatures made with secp256k1 keys. Use
+/// `psibase::verifier_for` to find the verifier for a key.
+#[crate::service(name = "verify-k1", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::{Checksum256, Claim};

@@ -25,12 +25,7 @@ fn parse_public_key_pem(public_key_pem: Option<String>) -> Result<Option<AnyPubl
             spki::SubjectPublicKeyInfoRef::try_from(data.contents())
                 .map_err(|e| format!("Invalid SPKI format: {}", e))?;
 
-            Ok(AnyPublicKey {
-                key: crate::Claim {
-                    service: AccountNumber::from_str("verify-sig").unwrap(),
-                    rawData: data.contents().to_vec().into(),
-                },
-            })
+            AnyPublicKey::from_spki(data.contents().to_vec()).map_err(|e| e.to_string())
         })
         .transpose()
 }

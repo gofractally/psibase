@@ -1,5 +1,5 @@
 use crate::services::{
-    accounts, auth_delegate, auth_sig, http_server, producers, setcode, verify_sig,
+    accounts, auth_delegate, auth_sig, http_server, producers, setcode,
 };
 use crate::{
     account_raw, method_raw, AccountNumber, Action, AnyPublicKey, MethodNumber, ServiceWrapper,
@@ -35,7 +35,7 @@ pub fn new_account_key_action(
     account: AccountNumber,
     key: &AnyPublicKey,
 ) -> Action {
-    if key.key.service == verify_sig::SERVICE {
+    if crate::verified_key_type(key.key.service).is_some() {
         auth_sig::Wrapper::pack_from(sender).newAccount(account, key.key.rawData.clone().into())
     } else {
         panic!("unknown verify service {}", key.key.service)
@@ -55,7 +55,7 @@ pub fn new_account_owned_action(
 }
 
 pub fn set_key_action(account: AccountNumber, key: &AnyPublicKey) -> Action {
-    if key.key.service == account!("verify-sig") {
+    if crate::verified_key_type(key.key.service).is_some() {
         auth_sig::Wrapper::pack_from(account).setKey(key.key.rawData.to_vec().into())
     } else {
         panic!("unknown account service");

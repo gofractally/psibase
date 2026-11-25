@@ -89,7 +89,7 @@ const OID_NIST_P256: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10
 impl Signer for PKCS8PrivateKeyK1 {
     fn get_claim(&self) -> crate::Claim {
         crate::Claim {
-            service: AccountNumber::new(account_raw!("verify-sig")),
+            service: claim_service(&self.pubkey),
             rawData: self.pubkey.clone().into(),
         }
     }
@@ -100,6 +100,22 @@ impl Signer for PKCS8PrivateKeyK1 {
             .serialize_compact()
             .into()
     }
+}
+
+/// The verifier for a key that a signer holds. Signers are only created for
+/// keys that have one (see `check_supported`).
+#[cfg(not(target_family = "wasm"))]
+fn claim_service(pubkey: &[u8]) -> AccountNumber {
+    crate::verifier_for(pubkey).expect("signer holds a key that no verifier accepts")
+}
+
+/// Refuses a key that no verifier accepts, so that it fails where it is
+/// loaded and not when a transaction signed with it is rejected.
+#[cfg(not(target_family = "wasm"))]
+fn check_supported(pubkey: &[u8]) -> Result<(), Error> {
+    crate::verifier_for(pubkey)
+        .map(|_| ())
+        .ok_or(Error::KeyTypeNotSupported)
 }
 
 /// The group order n of a curve, big-endian, if `spki` is a public key on
@@ -129,7 +145,7 @@ fn group_order(spki: &[u8]) -> Option<[u8; 32]> {
 }
 
 /// Rewrites a 64-byte r || s ECDSA signature into the low-S form, s <= n/2.
-/// verify-sig accepts no other form. (r, n - s) is the same signature with
+/// The verifiers accept no other form. (r, n - s) is the same signature with
 /// the other of its two encodings.
 #[cfg(not(target_family = "wasm"))]
 fn normalize_signature(mut signature: Vec<u8>, pubkey: &[u8]) -> Vec<u8> {
@@ -171,7 +187,7 @@ fn get_system_random() -> &'static ring::rand::SystemRandom {
 impl Signer for EcdsaPrivateKey {
     fn get_claim(&self) -> crate::Claim {
         crate::Claim {
-            service: AccountNumber::new(account_raw!("verify-sig")),
+            service: claim_service(&self.pubkey),
             rawData: self.pubkey.clone(),
         }
     }
@@ -244,7 +260,7 @@ fn lookup_public_key(session: &Session, key: ObjectHandle) -> Result<ObjectHandl
 impl Signer for PKCS11PrivateKey {
     fn get_claim(&self) -> crate::Claim {
         crate::Claim {
-            service: AccountNumber::new(account_raw!("verify-sig")),
+            service: claim_service(&self.pubkey),
             rawData: self.pubkey.clone(),
         }
     }
@@ -598,10 +614,12 @@ fn load_pkcs11_private_key(key: &str) -> Result<Arc<dyn Signer>, anyhow::Error> 
             login(context, &session, &uri, slot, true)?;
 
             for obj in session.find_objects(&attrs)? {
+                let pubkey = get_public_key_der(&session, lookup_public_key(&session, obj)?)?;
+                check_supported(&pubkey)?;
                 let result = PKCS11PrivateKey {
                     session: session_mutex.clone(),
                     key: obj,
-                    pubkey: get_public_key_der(&session, lookup_public_key(&session, obj)?)?,
+                    pubkey,
                 };
                 return Ok(Arc::new(result));
             }
@@ -632,6 +650,7 @@ pub fn load_private_key(key: &str) -> Result<Arc<dyn Signer>, anyhow::Error> {
                     &pubkey.ok_or(Error::PublicKeyRequired)?,
                 )?,
             })?;
+            check_supported(&pubkey_info)?;
             match oid {
                 OID_SECP256K1 => Ok(Arc::new(PKCS8PrivateKeyK1 {
                     key: secp256k1::SecretKey::from_slice(
@@ -704,8 +723,20 @@ pub struct AnyPublicKey {
 }
 
 impl AnyPublicKey {
+    /// The claim for a key given as a DER SubjectPublicKeyInfo. Fails if no
+    /// verifier accepts the key.
+    pub fn from_spki(spki: Vec<u8>) -> Result<Self, Error> {
+        let service = crate::verifier_for(&spki).ok_or(Error::KeyTypeNotSupported)?;
+        Ok(Self {
+            key: crate::Claim {
+                service,
+                rawData: spki.into(),
+            },
+        })
+    }
+
     pub fn auth_service(&self) -> AccountNumber {
-        if self.key.service == AccountNumber::new(account_raw!("verify-sig")) {
+        if crate::verified_key_type(self.key.service).is_some() {
             AccountNumber::new(account_raw!("auth-sig"))
         } else {
             panic!("Unknown verify service: {}", self.key.service.to_string());
@@ -718,23 +749,13 @@ impl FromStr for AnyPublicKey {
     fn from_str(key: &str) -> Result<Self, Self::Err> {
         #[cfg(not(target_family = "wasm"))]
         if key.starts_with("pkcs11:") {
-            return Ok(Self {
-                key: crate::Claim {
-                    service: AccountNumber::new(account_raw!("verify-sig")),
-                    rawData: load_pkcs11_public_key(key)?.into(),
-                },
-            });
+            return Ok(Self::from_spki(load_pkcs11_public_key(key)?)?);
         }
 
         let data = read_key_file(key, "PUBLIC KEY", Error::ExpectedPublicKey)?;
 
         data.decode_msg::<spki::SubjectPublicKeyInfo<AnyRef, BitStringRef>>()?;
-        Ok(Self {
-            key: crate::Claim {
-                service: AccountNumber::new(account_raw!("verify-sig")),
-                rawData: data.into_vec().into(),
-            },
-        })
+        Ok(Self::from_spki(data.into_vec())?)
     }
 }
 

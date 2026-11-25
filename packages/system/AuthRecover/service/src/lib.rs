@@ -4,7 +4,7 @@ pub mod service {
     use async_graphql::SimpleObject;
     use psibase::*;
 
-    use services::{accounts, auth_sig::SubjectPublicKeyInfo, transact, verify_sig};
+    use services::{accounts, auth_sig::SubjectPublicKeyInfo, transact};
     use std::cell::RefCell;
 
     const RECOVERY_TIME: Seconds = Seconds::from_ticks(15 * 60);
@@ -56,9 +56,11 @@ pub mod service {
         claims: Vec<Claim>,
     ) -> bool {
         let has_key = |key: &SubjectPublicKeyInfo| {
+            // A claim counts only if it names the verifier for this key's type.
+            let verifier = psibase::verifier_for(&key.0);
             claims
                 .iter()
-                .any(|claim| claim.service == verify_sig::SERVICE && claim.rawData == key.0)
+                .any(|claim| Some(claim.service) == verifier && claim.rawData == key.0)
         };
         let row = AuthTable::read()
             .get_index_pk()
