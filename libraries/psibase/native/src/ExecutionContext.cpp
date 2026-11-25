@@ -17,6 +17,7 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/PsizamPolicy.hpp>
 #include <psibase/NativeAotCache.hpp>
+#include <psibase/NativeHostFunctions.hpp>
 #include <psibase/db.hpp>
 #include <psibase/finally.hpp>
 #include <psibase/NativeVM.hpp>
@@ -518,38 +519,19 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
 
    static void registerHostFunctions()
    {
-      // TODO: enable linking to disabled functions below after we finalize
-      //       their interfaces. Disabling now simplifies future upgrades.
-
-      rhf_t::add<&ExecutionContextImpl::getResult>("env", "getResult");
-      rhf_t::add<&ExecutionContextImpl::getKey>("env", "getKey");
-      rhf_t::add<&ExecutionContextImpl::writeConsole>("env", "writeConsole");
-      rhf_t::add<&ExecutionContextImpl::abortMessage>("env", "abortMessage");
-      rhf_t::add<&ExecutionContextImpl::clockTimeGet>("env", "clockTimeGet");
-      rhf_t::add<&ExecutionContextImpl::getRandom>("env", "getRandom");
-      rhf_t::add<&ExecutionContextImpl::setMaxCpuTime>("env", "setMaxCpuTime");
-      rhf_t::add<&ExecutionContextImpl::getCurrentAction>("env", "getCurrentAction");
-      rhf_t::add<&ExecutionContextImpl::call>("env", "call");
-      rhf_t::add<&ExecutionContextImpl::setRetval>("env", "setRetval");
-      rhf_t::add<&ExecutionContextImpl::kvOpen>("env", "kvOpen");
-      rhf_t::add<&ExecutionContextImpl::kvOpenAt>("env", "kvOpenAt");
-      rhf_t::add<&ExecutionContextImpl::kvClose>("env", "kvClose");
-      rhf_t::add<&ExecutionContextImpl::exportHandles>("env", "exportHandles");
-      rhf_t::add<&ExecutionContextImpl::importHandles>("env", "importHandles");
-      rhf_t::add<&ExecutionContextImpl::kvPut>("env", "kvPut");
-      rhf_t::add<&ExecutionContextImpl::kvRemove>("env", "kvRemove");
-      rhf_t::add<&ExecutionContextImpl::kvGet>("env", "kvGet");
-      rhf_t::add<&ExecutionContextImpl::kvGreaterEqual>("env", "kvGreaterEqual");
-      rhf_t::add<&ExecutionContextImpl::kvLessThan>("env", "kvLessThan");
-      rhf_t::add<&ExecutionContextImpl::kvMax>("env", "kvMax");
-      // rhf_t::add<&ExecutionContextImpl::kvGetTransactionUsage>("env", "kvGetTransactionUsage");
-      rhf_t::add<&ExecutionContextImpl::checkoutSubjective>("env", "checkoutSubjective");
-      rhf_t::add<&ExecutionContextImpl::commitSubjective>("env", "commitSubjective");
-      rhf_t::add<&ExecutionContextImpl::abortSubjective>("env", "abortSubjective");
-      rhf_t::add<&ExecutionContextImpl::socketOpen>("env", "socketOpen");
-      rhf_t::add<&ExecutionContextImpl::socketSend>("env", "socketSend");
-      rhf_t::add<&ExecutionContextImpl::socketSetFlags>("env", "socketSetFlags");
-      rhf_t::add<&ExecutionContextImpl::readFile>("env", "readFile");
+      // The list every engine registers and admission checks imports
+      // against (NativeHostFunctions.hpp).
+#define PSIBASE_HOST_FUNCTION(name) rhf_t::add<&ExecutionContextImpl::name>("env", #name);
+      PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+#undef PSIBASE_HOST_FUNCTION
+      // What was registered is exactly the admission table, or the node
+      // does not start.
+      auto& registered = rhf_t::mappings::get();
+      for (const auto& [import, index] : registered.named_mapping)
+         checkNativeHostFunction(PSIBASE_VM_ENGINE_NAME, import.second,
+                                 registered.host_functions[index].params,
+                                 registered.host_functions[index].ret);
+      checkNativeHostFunctionCount(PSIBASE_VM_ENGINE_NAME, registered.named_mapping.size());
    }
 
    std::uint32_t ExecutionContextImpl::remainingStack() const

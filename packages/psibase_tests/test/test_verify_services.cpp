@@ -168,6 +168,14 @@ TEST_CASE("SetCode: code that is not admissible fails the transaction that store
        {wasm({2, 7, 1, 0, 0, 2, 0, 1, 0}), "native WASM permits function imports only"},
        // 513 pages of memory on a chain that allows 512.
        {wasm({5, 4, 1, 0, 0x81, 0x04}), "native WASM initial resource exceeds chain policy"},
+       // An import the node has no host function for: (import "env" "nosuch" (func)).
+       {wasm({1,   4,   1, 0x60, 0,   0,   2,   14,  1,   3, 'e',
+              'n', 'v', 6, 'n',  'o', 's', 'u', 'c', 'h', 0, 0}),
+        "native WASM imports env.nosuch, which is not a host function"},
+       // A host function with the wrong signature: env.kvClose takes an i32.
+       {wasm({1,   4, 1,   0x60, 0,   0,   2,   15,  1,   3, 'e', 'n',
+              'v', 7, 'k', 'v',  'C', 'l', 'o', 's', 'e', 0, 0}),
+        "native WASM imports env.kvClose with a signature that is not the host function's"},
    };
    auto stored = [&](const std::vector<char>& code)
    {
