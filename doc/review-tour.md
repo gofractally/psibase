@@ -66,7 +66,7 @@ Visible in traces but not consensus: action trace time, the transaction limit an
 
 **Where to look.**
 - Most of it is in the separate repository [gofractally/psizam](https://github.com/gofractally/psizam) (public, `main`): the engines, the wasmtime shim (`wasmtime/shim`, Rust; its `Cargo.toml` pins the wasmtime fork by revision), the wide-arithmetic support, and the memory16 profile (`docs/memory16.md`).
-- In this repository: `libraries/psibase/native/src/ExecutionContext.cpp`, `ExecutionContextWasmtime.cpp`, `VmEngine.cpp`, `PsizamPolicy.cpp`, `NativeAotCache.cpp`, and `external/psizam-core.cmake` for the pin and the engine selection options.
+- In this repository: `libraries/psibase/native/src/ExecutionContext.cpp`, `ExecutionContextWasmtime.cpp`, `VmEngine.cpp`, `PsizamPolicy.cpp` (the chain policy and `admitNativeWasm`, the admission rule run when code is stored), the compiled-module cache (`NativeAotCache.hpp`: the verified front `NativeArtifactCache.cpp`, the directory store `NativeAotCache.cpp` the tools share, and `NativeAotDatabase.cpp`, the psitri database a node keeps in `<data>/cache/modules`), and `external/psizam-core.cmake` for the pin and the engine selection options.
 - Commits: f00d3507e (psizam for node and tests), 6199b528c (LLVM AOT and artifact cache), 09e1f9075 (float profile per code version), 9dea98a8d and 8768429ef (wasmtime, several engines), d3aec135e (wasmtime default), 5ccd89a8e and edfff6ed0 (shared and background compilation), 8b09a8776 (wide arithmetic), ff905f61a and bc22a3953 (instance pool), c3397f9c7 (watchdog-only CPU budget).
 
 **Questions for the reviewer.**

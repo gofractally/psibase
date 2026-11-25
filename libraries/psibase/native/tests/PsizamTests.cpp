@@ -447,9 +447,7 @@ namespace
       TempDirectory              directory;
       psibase::SharedDatabase    database{directory.path,
                                           {64ull << 20, 64ull << 20, 64ull << 20, 64ull << 20}};
-      // Compiled modules go to `artifacts`, or to the user's cache if empty.
-      std::filesystem::path      artifacts;
-      psibase::WasmCache         cache{4, artifacts};
+      psibase::WasmCache         cache;
       psibase::SystemContext     system{database,
                                         cache,
                                         {},
@@ -461,7 +459,18 @@ namespace
       psibase::SignedTransaction signedTransaction;
       psibase::TransactionTrace  trace;
 
-      explicit NativeService(std::filesystem::path artifacts = {}) : artifacts(std::move(artifacts))
+      // Compiled modules go to the directory `artifacts`, or to the user's
+      // cache if it is empty.
+      explicit NativeService(const std::filesystem::path& artifacts = {}) : cache{4, artifacts}
+      {
+         initialize();
+      }
+      explicit NativeService(std::shared_ptr<psibase::NativeAotCache> artifacts)
+          : cache{4, std::move(artifacts)}
+      {
+         initialize();
+      }
+      void initialize()
       {
          REQUIRE(service.str() == "vm-test");
          REQUIRE(peer.str() == "vm-peer");
@@ -1210,6 +1219,42 @@ TEST_CASE("A damaged stored artifact is discarded and the service compiled again
       CHECK(cache.discarded() == 1);
       CHECK(std::filesystem::is_empty(directory));
    }
+}
+
+TEST_CASE("A node's compiled modules survive a restart in their own database")
+{
+   if (!isWasmtime())
+      SKIP("counts compiles, which only the wasmtime engine reports");
+   TempDirectory data;
+   const auto    directory = data.path / "cache" / "modules";
+   auto          run       = [&](bool expectUsable = true)
+   {
+      // A node: its chain state in one database, its modules in another.
+      auto artifacts = std::make_shared<psibase::NativeAotCache>(
+          std::make_unique<psibase::NativeAotDatabase>(directory));
+      CHECK(artifacts->usable() == expectUsable);
+      NativeService               fixture{artifacts};
+      psibase::TransactionContext transaction{fixture.block, fixture.signedTransaction,
+                                              fixture.trace, psibase::DbMode::transaction()};
+      CHECK(NativeService::value(fixture.run(transaction)) == 8);
+      return fixture.cache.stats();
+   };
+   auto stats = run();
+   CHECK(stats.compiled == 1);
+   CHECK(stats.loaded == 0);
+   // Restarted: the module is loaded, not compiled.
+   stats = run();
+   CHECK(stats.compiled == 0);
+   CHECK(stats.loaded == 1);
+   CHECK(stats.discarded == 0);
+   // The database is deleted while the node is down: one compile, and it is back.
+   std::filesystem::remove_all(directory);
+   stats = run();
+   CHECK(stats.compiled == 1);
+   CHECK(stats.loaded == 0);
+   stats = run();
+   CHECK(stats.compiled == 0);
+   CHECK(stats.loaded == 1);
 }
 
 TEST_CASE("Storing code bills the same with and without a compiled module")

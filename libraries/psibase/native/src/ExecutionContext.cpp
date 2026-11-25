@@ -99,10 +99,11 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
       BackendContainer   backends;
       std::shared_ptr<NativeAotCache> nativeArtifacts;
 
-      WasmCacheImpl(uint32_t cacheSize, const std::filesystem::path& path)
+      WasmCacheImpl(uint32_t cacheSize, std::shared_ptr<NativeAotCache> artifacts)
           : cacheSize{cacheSize},
-            nativeArtifacts(path.empty() ? nativeAotCacheFromEnvironment()
-                                         : std::make_shared<NativeAotCache>(path)) {}
+            nativeArtifacts(artifacts ? std::move(artifacts) : nativeAotCacheFromEnvironment())
+      {
+      }
 
       // Compiling a service to native code takes seconds. It starts when the
       // code is stored, on these threads, so it overlaps the rest of the
@@ -608,8 +609,9 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
       static const vm::Engine result{
           PSIBASE_VM_ENGINE_NAME,
           &registerHostFunctions,
-          +[](std::uint32_t cacheSize, const std::filesystem::path& path) -> std::shared_ptr<vm::Cache>
-          { return std::make_shared<WasmCacheImpl>(cacheSize, path); },
+          +[](std::uint32_t                   cacheSize,
+              std::shared_ptr<NativeAotCache> artifacts) -> std::shared_ptr<vm::Cache>
+          { return std::make_shared<WasmCacheImpl>(cacheSize, std::move(artifacts)); },
           +[]() -> std::unique_ptr<vm::Memory> { return std::make_unique<ExecutionMemoryImpl>(); },
           +[](TransactionContext& transactionContext, const VMOptions& vmOptions,
               vm::Memory& memory, vm::Cache& cache,

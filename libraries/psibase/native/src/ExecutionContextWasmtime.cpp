@@ -158,10 +158,9 @@ namespace psibase::vm_wasmtime
       std::atomic<std::uint64_t>                   compiled{0};
       std::atomic<std::uint64_t>                   loaded{0};
 
-      WasmCacheImpl(std::uint32_t cacheSize, const std::filesystem::path& path)
+      WasmCacheImpl(std::uint32_t cacheSize, std::shared_ptr<NativeAotCache> store)
           : cacheSize{cacheSize},
-            artifacts(path.empty() ? nativeAotCacheFromEnvironment()
-                                   : std::make_shared<NativeAotCache>(path))
+            artifacts(store ? std::move(store) : nativeAotCacheFromEnvironment())
       {
       }
 
@@ -208,6 +207,9 @@ namespace psibase::vm_wasmtime
                   auto module = vmRuntime(profile).load(std::span(
                       reinterpret_cast<const std::uint8_t*>(stored->data()), stored->size()));
                   ++loaded;
+                  PSIBASE_LOG(loggers::generic::get(), debug)
+                      << "Service code " << loggers::to_string(hash) << " (vmVersion "
+                      << unsigned(vmVersion) << ") loaded from the compiled-module cache";
                   return module;
                }
                catch (const std::exception&)
@@ -220,12 +222,18 @@ namespace psibase::vm_wasmtime
          const auto                          costs = admitNativeWasm(wasm, vmOptions, vmVersion);
          auto module = vmRuntime(profile).compile_metered(wasm, costs);
          ++compiled;
+         std::size_t stored = 0;
          if (artifacts)
          {
             auto artifact = module.serialize();
+            stored        = artifact.size();
             artifacts->store(
                 key, std::span(reinterpret_cast<const char*>(artifact.data()), artifact.size()));
          }
+         PSIBASE_LOG(loggers::generic::get(), debug)
+             << "Service code " << loggers::to_string(hash) << " (vmVersion " << unsigned(vmVersion)
+             << ") compiled: " << wasm.size() << " bytes of wasm, " << stored
+             << " bytes of native code";
          return module;
       }
 
@@ -658,8 +666,9 @@ namespace psibase::vm_wasmtime
       static const vm::Engine result{
           "wasmtime",
           &registerHostFunctions,
-          +[](std::uint32_t cacheSize, const std::filesystem::path& path) -> std::shared_ptr<vm::Cache>
-          { return std::make_shared<WasmCacheImpl>(cacheSize, path); },
+          +[](std::uint32_t                   cacheSize,
+              std::shared_ptr<NativeAotCache> artifacts) -> std::shared_ptr<vm::Cache>
+          { return std::make_shared<WasmCacheImpl>(cacheSize, std::move(artifacts)); },
           +[]() -> std::unique_ptr<vm::Memory> { return std::make_unique<ExecutionMemoryImpl>(); },
           +[](TransactionContext& transactionContext, const VMOptions& vmOptions, vm::Memory&,
               vm::Cache& cache, AccountNumber service) -> std::unique_ptr<vm::Context>

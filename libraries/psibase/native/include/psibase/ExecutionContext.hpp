@@ -24,12 +24,18 @@ namespace psibase
       std::uint64_t discarded = 0;  ///< stored artifacts that failed verification
    };
 
+   class NativeAotCache;
    struct WasmCacheImpl;
    struct WasmCache
    {
       std::shared_ptr<WasmCacheImpl> impl;
 
+      /// Compiled modules are kept between runs in the directory
+      /// `nativeArtifactPath`; if it is empty, where a process that
+      /// configures nothing keeps them (nativeAotCacheFromEnvironment).
       WasmCache(uint32_t cacheSize, const std::filesystem::path& nativeArtifactPath = {});
+      /// Compiled modules are kept between runs in `artifacts`.
+      WasmCache(uint32_t cacheSize, std::shared_ptr<NativeAotCache> artifacts);
       WasmCache(const WasmCache&);
       WasmCache(WasmCache&&);
       ~WasmCache();

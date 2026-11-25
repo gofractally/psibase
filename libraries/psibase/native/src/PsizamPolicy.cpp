@@ -82,6 +82,20 @@ namespace psibase
       return processNativeAotCache();
    }
 
+   std::shared_ptr<NativeAotCache> nodeNativeAotCache(const std::filesystem::path& dataDirectory)
+   {
+      if (auto path = nativeAotCachePath({}); !path.empty())
+         return std::make_shared<NativeAotCache>(path);
+      std::uint64_t maxBytes = NativeAotDatabase::defaultMaxBytes;
+      if (const char* text = std::getenv("PSIBASE_NATIVE_AOT_CACHE_MB"); text && *text)
+         maxBytes = std::strtoull(text, nullptr, 10) << 20;
+      auto cache = std::make_shared<NativeAotCache>(
+          std::make_unique<NativeAotDatabase>(dataDirectory / "cache" / "modules", maxBytes));
+      // A database that cannot be opened has been reported; the node still
+      // keeps what it compiles, where a process that configures nothing does.
+      return cache->usable() ? cache : nativeAotCacheFromEnvironment();
+   }
+
    std::optional<psizam::float_profile> nativeFloatProfile(std::uint8_t vmVersion)
    {
       switch (vmVersion)

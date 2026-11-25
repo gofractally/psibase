@@ -120,6 +120,12 @@ target_link_libraries(NativeAotCacheTests PRIVATE Threads::Threads)
 add_test(NAME NativeAotCacheTests COMMAND NativeAotCacheTests)
 set_tests_properties(NativeAotCacheTests PROPERTIES TIMEOUT 30 PROCESSORS 2)
 
+add_executable(NativeAotDatabaseTests NativeAotDatabaseTests.cpp)
+target_link_directories(NativeAotDatabaseTests PRIVATE ${ICU_LIBRARY_DIR})
+target_link_libraries(NativeAotDatabaseTests PRIVATE psibase Catch2::Catch2WithMain Threads::Threads)
+add_test(NAME NativeAotDatabaseTests COMMAND NativeAotDatabaseTests)
+set_tests_properties(NativeAotDatabaseTests PROPERTIES TIMEOUT 120 PROCESSORS 4)
+
 if(PSIBASE_VM_BACKEND STREQUAL "LLVM_AOT")
     add_executable(VmSdkConstructorDiagnostic VmSdkConstructorDiagnostic.cpp)
     target_link_directories(VmSdkConstructorDiagnostic PRIVATE ${ICU_LIBRARY_DIR})

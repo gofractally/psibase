@@ -17,6 +17,11 @@
 #include <string_view>
 #include <vector>
 
+namespace psibase
+{
+   class NativeAotCache;
+}
+
 namespace psibase::vm
 {
    // Compiled services, shared by the transactions of one SystemContext.
@@ -66,8 +71,10 @@ namespace psibase::vm
    {
       std::string_view name;
       void (*registerHostFunctions)();
-      std::shared_ptr<Cache> (*makeCache)(std::uint32_t                cacheSize,
-                                          const std::filesystem::path& nativeArtifactPath);
+      // artifacts: where compiled modules are kept between runs; if null,
+      // the cache a process that configures none uses.
+      std::shared_ptr<Cache> (*makeCache)(std::uint32_t                   cacheSize,
+                                          std::shared_ptr<NativeAotCache> artifacts);
       std::unique_ptr<Memory> (*makeMemory)();
       // memory and cache are ones this engine made.
       std::unique_ptr<Context> (*makeContext)(TransactionContext& transactionContext,

@@ -4,6 +4,7 @@
 #include <psibase/VmEngine.hpp>
 
 #include <psibase/BlockContext.hpp>
+#include <psibase/NativeAotCache.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/db.hpp>
 
@@ -132,10 +133,17 @@ namespace psibase
    };
 
    WasmCache::WasmCache(uint32_t cacheSize, const std::filesystem::path& nativeArtifactPath)
+       : WasmCache(cacheSize,
+                   nativeArtifactPath.empty()
+                       ? nullptr
+                       : std::make_shared<NativeAotCache>(nativeArtifactPath))
+   {
+   }
+   WasmCache::WasmCache(uint32_t cacheSize, std::shared_ptr<NativeAotCache> artifacts)
    {
       auto& engine = vm::selected();
       impl         = std::make_shared<WasmCacheImpl>(
-          WasmCacheImpl{&engine, engine.makeCache(cacheSize, nativeArtifactPath)});
+          WasmCacheImpl{&engine, engine.makeCache(cacheSize, std::move(artifacts))});
    }
    WasmCache::WasmCache(const WasmCache& src) : impl{src.impl} {}
    WasmCache::WasmCache(WasmCache&& src) : impl{std::move(src.impl)} {}
