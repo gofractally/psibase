@@ -17,6 +17,7 @@
 #include <optional>
 #include <psibase/ActionContext.hpp>
 #include <psibase/NativeAotCache.hpp>
+#include <psibase/NativeHostFunctions.hpp>
 #include <psibase/PsizamPolicy.hpp>
 #include <psibase/VmEngine.hpp>
 #include <psibase/crypto.hpp>
@@ -573,37 +574,39 @@ namespace psibase::vm_wasmtime
                 runtimes.push_back(&vmRuntime(profile));
                 runtimes.push_back(&unpooledRuntime(profile));
              }
+             // The list every engine registers and admission checks imports
+             // against (NativeHostFunctions.hpp). The signature wasmtime
+             // derives for each must be the admission table's, or the node
+             // does not start.
+             auto check = [](const wt::abi::PzwtImport& import)
+             {
+                auto encoded = [](const std::uint8_t* types, std::size_t count)
+                {
+                   // wasmtime_backend.hpp numbers i32, i64, f32, f64 from 0;
+                   // a module encodes them as 0x7f down to 0x7c.
+                   std::vector<std::uint8_t> result;
+                   for (std::size_t i = 0; i < count; ++i)
+                      result.push_back(static_cast<std::uint8_t>(0x7f - types[i]));
+                   return result;
+                };
+                checkNativeHostFunction("wasmtime", {import.name, import.name_len},
+                                        encoded(import.params, import.params_len),
+                                        encoded(import.results, import.results_len));
+             };
+             std::size_t count = 0;
+#define PSIBASE_HOST_FUNCTION(name)                                                          \
+   check(wt::detail::make_import<ExecutionContextImpl, &ExecutionContextImpl::name>(         \
+       &ExecutionContextImpl::name, "env", #name));                                          \
+   ++count;
+             PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+#undef PSIBASE_HOST_FUNCTION
+             checkNativeHostFunctionCount("wasmtime", count);
              for (auto* runtime : runtimes)
              {
                 auto& rt = *runtime;
-                rt.add<&ExecutionContextImpl::getResult>("env", "getResult");
-                rt.add<&ExecutionContextImpl::getKey>("env", "getKey");
-                rt.add<&ExecutionContextImpl::writeConsole>("env", "writeConsole");
-                rt.add<&ExecutionContextImpl::abortMessage>("env", "abortMessage");
-                rt.add<&ExecutionContextImpl::clockTimeGet>("env", "clockTimeGet");
-                rt.add<&ExecutionContextImpl::getRandom>("env", "getRandom");
-                rt.add<&ExecutionContextImpl::setMaxCpuTime>("env", "setMaxCpuTime");
-                rt.add<&ExecutionContextImpl::getCurrentAction>("env", "getCurrentAction");
-                rt.add<&ExecutionContextImpl::call>("env", "call");
-                rt.add<&ExecutionContextImpl::setRetval>("env", "setRetval");
-                rt.add<&ExecutionContextImpl::kvOpen>("env", "kvOpen");
-                rt.add<&ExecutionContextImpl::kvOpenAt>("env", "kvOpenAt");
-                rt.add<&ExecutionContextImpl::kvClose>("env", "kvClose");
-                rt.add<&ExecutionContextImpl::exportHandles>("env", "exportHandles");
-                rt.add<&ExecutionContextImpl::importHandles>("env", "importHandles");
-                rt.add<&ExecutionContextImpl::kvPut>("env", "kvPut");
-                rt.add<&ExecutionContextImpl::kvRemove>("env", "kvRemove");
-                rt.add<&ExecutionContextImpl::kvGet>("env", "kvGet");
-                rt.add<&ExecutionContextImpl::kvGreaterEqual>("env", "kvGreaterEqual");
-                rt.add<&ExecutionContextImpl::kvLessThan>("env", "kvLessThan");
-                rt.add<&ExecutionContextImpl::kvMax>("env", "kvMax");
-                rt.add<&ExecutionContextImpl::checkoutSubjective>("env", "checkoutSubjective");
-                rt.add<&ExecutionContextImpl::commitSubjective>("env", "commitSubjective");
-                rt.add<&ExecutionContextImpl::abortSubjective>("env", "abortSubjective");
-                rt.add<&ExecutionContextImpl::socketOpen>("env", "socketOpen");
-                rt.add<&ExecutionContextImpl::socketSend>("env", "socketSend");
-                rt.add<&ExecutionContextImpl::socketSetFlags>("env", "socketSetFlags");
-                rt.add<&ExecutionContextImpl::readFile>("env", "readFile");
+#define PSIBASE_HOST_FUNCTION(name) rt.add<&ExecutionContextImpl::name>("env", #name);
+                PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+#undef PSIBASE_HOST_FUNCTION
                 rt.link();
              }
           });

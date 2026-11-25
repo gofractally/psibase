@@ -83,16 +83,17 @@ namespace psibase
    void validateNativeWasm(std::span<const std::uint8_t> code, const NativeVMOptions& options);
 
    /// The chain's admission rule for service code, the same on every engine:
-   /// the version names a float profile, validateNativeWasm, then psizam's
-   /// parser and validator under NativeVMOptions. It reads nothing but its
-   /// arguments, so every node decides alike. It runs when a code row is
+   /// the version names a float profile, validateNativeWasm, psizam's parser
+   /// and validator under NativeVMOptions, and every import is a host
+   /// function of NativeHostFunctions.hpp with that function's signature. It
+   /// reads nothing but its arguments and that fixed table, so every node
+   /// decides alike. It runs when a code row is
    /// written (failure aborts the transaction) and again before an engine
    /// compiles the code (the limits may have changed since it was stored).
    ///
-   /// Not covered: whether the imports name host functions that exist, and
-   /// limits of an engine's own compiler. Those surface when the code is
-   /// first executed; a compiler that refuses admitted code is a fault of
-   /// that node's engine, never a property of the transaction.
+   /// Not covered: limits of an engine's own compiler. Those surface when the
+   /// code is first executed; a compiler that refuses admitted code is a
+   /// fault of that node's engine, never a property of the transaction.
    ///
    /// Returns psizam's stack byte cost of each defined function, in order
    /// (what wasmtime's metered compile needs). Throws std::runtime_error with

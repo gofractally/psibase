@@ -2,6 +2,8 @@
 #include <limits>
 #include <psibase/PsizamPolicy.hpp>
 #include <psibase/NativeAotCache.hpp>
+#include <psibase/NativeFunctions.hpp>
+#include <psibase/NativeHostFunctions.hpp>
 #include <psibase/crypto.hpp>
 #include <cstdlib>
 #include <filesystem>
@@ -254,6 +256,89 @@ namespace psibase
          }
       }
    }
+   const std::vector<NativeHostFunction>& nativeHostFunctions()
+   {
+      // psizam derives each wasm signature from the C++ member function, the
+      // same way for this table as for the psizam engines' own registration.
+      static const std::vector<NativeHostFunction> table = []
+      {
+         using Derive = psizam::registered_host_functions<NativeFunctions>;
+#define PSIBASE_HOST_FUNCTION(name) Derive::add<&NativeFunctions::name>("env", #name);
+         PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+#undef PSIBASE_HOST_FUNCTION
+         auto&                           derived = Derive::mappings::get();
+         std::vector<NativeHostFunction> result;
+#define PSIBASE_HOST_FUNCTION(name)                                              \
+   {                                                                             \
+      const auto& types = derived.host_functions[derived.named_mapping.at({"env", #name})]; \
+      result.push_back({"env", #name, types.params, types.ret});                 \
+   }
+         PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+#undef PSIBASE_HOST_FUNCTION
+         return result;
+      }();
+      return table;
+   }
+
+   void checkNativeHostFunction(std::string_view              engine,
+                                std::string_view              name,
+                                std::span<const std::uint8_t> params,
+                                std::span<const std::uint8_t> results)
+   {
+      for (const auto& function : nativeHostFunctions())
+         if (function.name == name)
+         {
+            if (!std::ranges::equal(function.params, params) ||
+                !std::ranges::equal(function.results, results))
+               throw std::runtime_error("the " + std::string(engine) +
+                                        " engine's signature of host function " +
+                                        std::string(name) + " is not the admission table's");
+            return;
+         }
+      throw std::runtime_error("the " + std::string(engine) + " engine registers host function " +
+                               std::string(name) + ", which is not in the admission table");
+   }
+
+   void checkNativeHostFunctionCount(std::string_view engine, std::size_t registered)
+   {
+      if (registered != nativeHostFunctions().size())
+         throw std::runtime_error("the " + std::string(engine) + " engine registers " +
+                                  std::to_string(registered) + " host functions; the admission " +
+                                  "table has " + std::to_string(nativeHostFunctions().size()));
+   }
+
+   namespace
+   {
+      // Every import must be a function the node provides, with the node's
+      // signature. (validateNativeWasm has already refused imports that are
+      // not functions.) Importing a function more than once is allowed.
+      void checkImports(const psizam::module& module)
+      {
+         auto text = [](const std::vector<std::uint8_t>& bytes)
+         { return std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()); };
+         for (const auto& import : module.imports)
+         {
+            const auto name = std::string(text(import.module_str)) + "." +
+                              std::string(text(import.field_str));
+            if (import.kind != psizam::external_kind::Function)
+               throw std::runtime_error("native WASM permits function imports only: " + name);
+            const NativeHostFunction* found = nullptr;
+            for (const auto& function : nativeHostFunctions())
+               if (function.module == text(import.module_str) &&
+                   function.name == text(import.field_str))
+                  found = &function;
+            if (!found)
+               throw std::runtime_error("native WASM imports " + name +
+                                        ", which is not a host function");
+            const auto& type = module.types.at(import.type.func_t);
+            if (!std::ranges::equal(found->params, type.param_types) ||
+                !std::ranges::equal(found->results, type.return_types))
+               throw std::runtime_error("native WASM imports " + name +
+                                        " with a signature that is not the host function's");
+         }
+      }
+   }  // namespace
+
    std::vector<std::uint32_t> admitNativeWasm(std::span<const std::uint8_t> code,
                                               const VMOptions&              options,
                                               std::uint8_t                  vmVersion)
@@ -262,9 +347,19 @@ namespace psibase
       validateNativeWasm(code, policy);
       try
       {
-         // The parser takes the module by mutable reference.
+         // The parser takes the module by mutable reference. This is
+         // psizam::wasmtime::validate_and_cost, keeping the parsed module
+         // long enough to check its imports.
          psizam::wasm_code bytes(code.begin(), code.end());
-         return psizam::wasmtime::validate_and_cost(bytes, policy);
+         psizam::backend<std::nullptr_t, psizam::null_backend, NativeVMOptions> validator(
+             bytes, nullptr, policy);
+         const auto& module = validator.get_module();
+         checkImports(module);
+         std::vector<std::uint32_t> costs;
+         costs.reserve(module.code.size());
+         for (const auto& body : module.code)
+            costs.push_back(body.byte_stack_usage);
+         return costs;
       }
       catch (const psizam::exception& e)
       {

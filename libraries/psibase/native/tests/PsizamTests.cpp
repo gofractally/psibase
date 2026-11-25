@@ -7,6 +7,7 @@
 #include <psibase/PsizamPolicy.hpp>
 #include <psibase/NativeAotCache.hpp>
 #include <psibase/NativeFunctions.hpp>
+#include <psibase/NativeHostFunctions.hpp>
 #include <psibase/ActionContext.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/Watchdog.hpp>
@@ -1116,21 +1117,188 @@ TEST_CASE("Code the engine's compiler refuses after admission is stored, not a t
    }
 }
 
-TEST_CASE("An import no host function satisfies is not an admission error")
+namespace
 {
-   // Admission does not know the host functions (gofractally/psibase#2256):
-   // the code is stored, and fails to link when it is first executed.
-   const auto code = wasmModule(
-       {1, 4, 1, 0x60, 0, 0, 2, 14, 1, 3, 'e', 'n', 'v', 6, 'n', 'o', 's', 'u', 'c', 'h', 0, 0});
-   TempDirectory artifacts;
-   NativeService fixture{artifacts.path / "modules"};
+   struct Import
+   {
+      std::string               module, name;
+      std::vector<std::uint8_t> params, results;
+      std::uint8_t              kind = 0;  // 0 function, 1 table, 2 memory, 3 global
+   };
+   // A module that only imports: one function type per function import.
+   std::vector<std::uint8_t> importing(const std::vector<Import>& imports)
+   {
+      std::vector<std::uint8_t> types, section;
+      std::uint32_t             functions = 0;
+      leb(section, imports.size());
+      for (const auto& import : imports)
+      {
+         leb(section, import.module.size());
+         section.insert(section.end(), import.module.begin(), import.module.end());
+         leb(section, import.name.size());
+         section.insert(section.end(), import.name.begin(), import.name.end());
+         section.push_back(import.kind);
+         switch (import.kind)
+         {
+            case 0:
+               types.push_back(0x60);
+               leb(types, import.params.size());
+               types.insert(types.end(), import.params.begin(), import.params.end());
+               leb(types, import.results.size());
+               types.insert(types.end(), import.results.begin(), import.results.end());
+               leb(section, functions++);
+               break;
+            case 1:
+               section.insert(section.end(), {0x70, 0, 0});  // funcref, no maximum, 0 elements
+               break;
+            case 2:
+               section.insert(section.end(), {0, 1});  // no maximum, 1 page
+               break;
+            default:
+               section.insert(section.end(), {0x7f, 0});  // i32, immutable
+         }
+      }
+      auto result = wasmModule({});
+      if (functions)
+      {
+         std::vector<std::uint8_t> count;
+         leb(count, functions);
+         result.push_back(1);
+         leb(result, count.size() + types.size());
+         result.insert(result.end(), count.begin(), count.end());
+         result.insert(result.end(), types.begin(), types.end());
+      }
+      result.push_back(2);
+      leb(result, section.size());
+      result.insert(result.end(), section.begin(), section.end());
+      return result;
+   }
+   constexpr std::uint8_t i32 = 0x7f, i64 = 0x7e;
+}  // namespace
+
+TEST_CASE("The host functions a service may import are a fixed table")
+{
+   // A consensus rule: this list changes only with the chain's rules.
+   // name(params)->results, in the order of NativeHostFunctions.hpp.
+   std::string table;
+   for (const auto& function : psibase::nativeHostFunctions())
+   {
+      auto types = [](const std::vector<std::uint8_t>& list)
+      {
+         std::string text;
+         for (auto type : list)
+            text += type == 0x7f   ? "i"
+                    : type == 0x7e ? "I"
+                    : type == 0x7d ? "f"
+                    : type == 0x7c ? "F"
+                                   : "?";
+         return text;
+      };
+      table += std::string(function.module) + "." + std::string(function.name) + "(" +
+               types(function.params) + ")" + types(function.results) + " ";
+   }
+   // i is i32, I is i64.
+   CHECK(table ==
+         "env.getResult(iii)i env.getKey(ii)i env.writeConsole(ii) env.abortMessage(ii) "
+         "env.clockTimeGet(ii)i env.getRandom(ii) env.setMaxCpuTime(I) env.getCurrentAction()i "
+         "env.call(iiI)i env.setRetval(ii) env.kvOpen(iiii)i env.kvOpenAt(iiii)i env.kvClose(i) "
+         "env.exportHandles(ii) env.importHandles()i env.kvPut(iiiii) env.kvRemove(iii) "
+         "env.kvGet(iii)i env.kvGreaterEqual(iiii)i env.kvLessThan(iiii)i env.kvMax(iii)i "
+         "env.checkoutSubjective() env.commitSubjective()i env.abortSubjective() "
+         "env.socketOpen(ii)i env.socketSend(iiii)i env.socketSetFlags(iii)i env.readFile(ii)i ");
+
+   // A module that imports every one of them, as the table has it, is
+   // admitted; so is one that imports the same function twice.
+   std::vector<Import> all;
+   for (const auto& function : psibase::nativeHostFunctions())
+      all.push_back({std::string(function.module), std::string(function.name), function.params,
+                     function.results});
+   CHECK(all.size() == 28);
+   CHECK_NOTHROW(psibase::admitNativeWasm(importing(all), {}, 0));
+   all.push_back(all.front());
+   all.push_back(all.back());
+   CHECK_NOTHROW(psibase::admitNativeWasm(importing(all), {}, 0));
+
+   // And the engine this node runs links and instantiates that module: the
+   // engine provides what admission promises.
+   NativeService fixture;
    CodeWriter    writer{fixture};
+   auto          code = importing(all);
    CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
-   CHECK(writer.stored(psibase::DbId::native, code));
-   const psibase::AccountNumber account{"vm-import"};
-   psibase::CodeRow             row{.codeNum = account, .codeHash = CodeWriter::row(code).codeHash};
+   const psibase::AccountNumber account{"vm-imports"};
+   psibase::CodeRow row{.codeNum = account, .codeHash = CodeWriter::row(code).codeHash};
    fixture.block.db.kvPut(row.db, row.key(), row);
-   CHECK_THROWS(fixture.called(writer.transaction, account));
+   // It has no entry points, so calling it fails, but only once it is linked.
+   CHECK_THROWS_WITH(fixture.called(writer.transaction, account),
+                     !Catch::Matchers::ContainsSubstring("import") &&
+                         !Catch::Matchers::ContainsSubstring("mapping"));
+}
+
+TEST_CASE("Code that imports what the node does not provide is refused when it is stored")
+{
+   struct Refused
+   {
+      const char*         what;
+      std::vector<Import> imports;
+      std::string         reason;
+   };
+   const Import setRetval{"env", "setRetval", {i32, i32}, {}};
+   const std::vector<Refused> refused = {
+       {"unknown name",
+        {setRetval, {"env", "nosuch", {i32}, {}}},
+        "native WASM imports env.nosuch, which is not a host function"},
+       {"wrong parameter types",
+        {{"env", "setRetval", {i32, i64}, {}}},
+        "native WASM imports env.setRetval with a signature that is not the host function's"},
+       {"missing parameter",
+        {{"env", "setRetval", {i32}, {}}},
+        "native WASM imports env.setRetval with a signature that is not the host function's"},
+       {"wrong result type",
+        {{"env", "setRetval", {i32, i32}, {i32}}},
+        "native WASM imports env.setRetval with a signature that is not the host function's"},
+       {"another module",
+        {{"wasi_snapshot_preview1", "setRetval", {i32, i32}, {}}},
+        "native WASM imports wasi_snapshot_preview1.setRetval, which is not a host function"},
+       {"a memory", {{"env", "memory", {}, {}, 2}}, "native WASM permits function imports only"},
+       {"a table", {{"env", "table", {}, {}, 1}}, "native WASM permits function imports only"},
+       {"a global", {{"env", "global", {}, {}, 3}}, "native WASM permits function imports only"},
+   };
+   for (const auto& [what, imports, reason] : refused)
+   {
+      INFO(what);
+      CHECK_THROWS_WITH(psibase::admitNativeWasm(importing(imports), {}, 0),
+                        Catch::Matchers::ContainsSubstring(reason));
+   }
+
+   // Through the write of the code row, in every execution mode.
+   struct Mode
+   {
+      const char*     name;
+      psibase::DbMode mode;
+      bool            producing;
+      psibase::DbId   db;
+   };
+   for (auto [name, mode, producing, db] :
+        {Mode{"block being produced", psibase::DbMode::transaction(), true, psibase::DbId::native},
+         Mode{"block being applied", psibase::DbMode::transaction(), false, psibase::DbId::native},
+         Mode{"speculative", psibase::DbMode::speculative(), true, psibase::DbId::native},
+         Mode{"node-local", psibase::DbMode::callback(), true, psibase::DbId::nativeSubjective}})
+   {
+      NativeService fixture;
+      fixture.block.isProducing = producing;
+      CodeWriter writer{fixture, mode};
+      for (const auto& [what, imports, reason] : refused)
+      {
+         INFO(name << ", " << what);
+         const auto code = importing(imports);
+         CHECK_THROWS_WITH(writer.put(db, code), Catch::Matchers::ContainsSubstring(reason));
+         CHECK_FALSE(writer.stored(db, code));
+      }
+      CHECK(writer.compiled() == 0);
+      const auto good = importing({setRetval, setRetval});
+      CHECK_NOTHROW(writer.put(db, good));
+      CHECK(writer.stored(db, good));
+   }
 }
 
 TEST_CASE("A damaged stored artifact is discarded and the service compiled again")
