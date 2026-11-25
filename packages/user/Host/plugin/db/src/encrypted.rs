@@ -42,7 +42,7 @@ impl EncryptedStore {
 
     pub(crate) fn get(&self, duration: u8, plaintext_key: &str) -> Option<Vec<u8>> {
         let storage_key = self.storage_key(plaintext_key);
-        let stored = HostDb::get(duration, &storage_key)?;
+        let stored = HostDb::get(duration, &storage_key, plaintext_key)?;
         Some(
             with_key::decrypt(
                 &aes256_key(&self.keys.aes_key),
@@ -60,14 +60,14 @@ impl EncryptedStore {
             value,
             storage_key.as_bytes(),
         );
-        HostDb::set(duration, &storage_key, &stored);
+        HostDb::set(duration, &storage_key, &stored, plaintext_key);
     }
 
     pub(crate) fn remove(&self, duration: u8, plaintext_key: &str) {
-        HostDb::remove(duration, &self.storage_key(plaintext_key));
+        HostDb::remove(duration, &self.storage_key(plaintext_key), plaintext_key);
     }
 
     pub(crate) fn exists(&self, duration: u8, plaintext_key: &str) -> bool {
-        HostDb::get(duration, &self.storage_key(plaintext_key)).is_some()
+        HostDb::get(duration, &self.storage_key(plaintext_key), plaintext_key).is_some()
     }
 }
