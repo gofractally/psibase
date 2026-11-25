@@ -382,9 +382,14 @@ TEST_CASE("a fold interrupted at any point leaves every nested session as it was
    REQUIRE_FALSE(interrupted);
 }
 
-TEST_CASE("psitri subjective OCC retries preserve callbacks and independent writes",
+TEST_CASE("a section that falls behind runs once more on what was published, with its callbacks",
           "[storage][psitri]")
 {
+   // gofractally/psibase#2276. A section takes the node-local databases'
+   // write lock at its first change. If another writer published between
+   // the section's start and that moment, what the section read may be out
+   // of date: its commit fails once, it is run again on the published
+   // state with the lock held, and that run is published.
    SharedDatabase    shared(directory("occ"), config, psibase::storage::open_mode::create_new);
    auto              writer = shared.createWriter();
    DatabaseCallbacks callbacks;
@@ -399,13 +404,16 @@ TEST_CASE("psitri subjective OCC retries preserve callbacks and independent writ
    first.checkoutSubjective();
    second.checkoutSubjective();
    REQUIRE(value(first, DbId::subjective, "a") == "<missing>");
-   put(first, DbId::subjective, "first", "b");
-   first.setCallbackFlags(DatabaseCallbacks::nextTransactionFlag);
    put(second, DbId::subjective, "second", "a");
    REQUIRE(second.commitSubjective(sockets, closing));
+   // The first section still reads what it started from.
+   REQUIRE(value(first, DbId::subjective, "a") == "<missing>");
+   put(first, DbId::subjective, "first", "b");
+   first.setCallbackFlags(DatabaseCallbacks::nextTransactionFlag);
    REQUIRE_FALSE(first.commitSubjective(sockets, closing));
    REQUIRE(called == 0);
    REQUIRE(value(first, DbId::subjective, "a") == "second");
+   REQUIRE(value(first, DbId::subjective, "b") == "<missing>");
    put(first, DbId::subjective, "retry", "b");
    REQUIRE(first.commitSubjective(sockets, closing));
    REQUIRE(called == 1);
@@ -416,6 +424,73 @@ TEST_CASE("psitri subjective OCC retries preserve callbacks and independent writ
    REQUIRE(b);
    REQUIRE(std::string(a->begin(), a->end()) == "second");
    REQUIRE(std::string(b->begin(), b->end()) == "retry");
+}
+
+TEST_CASE("sections on several threads lose no update and readers are not held",
+          "[storage][psitri]")
+{
+   SharedDatabase     shared(directory("sections"), config, psibase::storage::open_mode::create_new);
+   Sockets            sockets(shared);
+   constexpr unsigned threads = 6, rounds = 300;
+   std::atomic<unsigned>    retries{0};
+   std::atomic<bool>        done{false};
+   std::vector<std::thread> workers;
+   for (unsigned t = 0; t < threads; ++t)
+      workers.emplace_back(
+          [&, t]
+          {
+             SocketAutoCloseSet closing;
+             Database           db(shared, shared.emptyRevision());
+             auto               session = db.startWrite(shared.createWriter());
+             for (unsigned i = 0; i < rounds; ++i)
+             {
+                db.checkoutSubjective();
+                for (;;)
+                {
+                   // One row every thread reads and rewrites, one of its own.
+                   auto count = value(db, DbId::subjective, "count");
+                   auto next  = std::to_string(count == "<missing>" ? 1 : std::stoul(count) + 1);
+                   put(db, DbId::subjective, next, "count");
+                   put(db, DbId::subjective, std::to_string(i), "own" + std::to_string(t));
+                   if (db.commitSubjective(sockets, closing))
+                      break;
+                   ++retries;
+                }
+             }
+          });
+   // A reader takes no lock: it finishes sections while the writers run.
+   unsigned    reads = 0;
+   std::thread reader(
+       [&]
+       {
+          Database db(shared, shared.emptyRevision());
+          auto     session = db.startRead();
+          while (!done)
+          {
+             db.checkoutSubjective();
+             (void)value(db, DbId::subjective, "count");
+             db.abortSubjective();
+             ++reads;
+          }
+       });
+   for (auto& worker : workers)
+      worker.join();
+   done = true;
+   reader.join();
+   auto writer = shared.createWriter();
+   auto count  = shared.kvGetSubjective(*writer, DbId::subjective, span("count"));
+   REQUIRE(count);
+   REQUIRE(std::string(count->begin(), count->end()) == std::to_string(threads * rounds));
+   for (unsigned t = 0; t < threads; ++t)
+   {
+      auto own = shared.kvGetSubjective(*writer, DbId::subjective, span("own" + std::to_string(t)));
+      REQUIRE(own);
+      REQUIRE(std::string(own->begin(), own->end()) == std::to_string(rounds - 1));
+   }
+   REQUIRE(reads > 0);
+   // Each failed commit is followed by a run that holds the lock from its
+   // start, so a section runs at most twice.
+   REQUIRE(retries <= threads * rounds);
 }
 
 TEST_CASE("psitri subjective writes and queries run beside block publication",

@@ -33,30 +33,14 @@ namespace psibase
 
    using DbPtr = storage::shared_root;
 
-   struct DbChangeSet
-   {
-      struct Range
-      {
-         std::vector<unsigned char> lower;
-         std::vector<unsigned char> upper;
-         bool                       write;
-      };
-      std::vector<Range> ranges;
-      void               onRead(std::span<const char> value);
-      void               onGreaterEqual(std::span<const char> key,
-                                        std::size_t           prefixLen,
-                                        bool                  found,
-                                        std::span<const char> result);
-      void               onLessThan(std::span<const char> key,
-                                    std::size_t           prefixLen,
-                                    bool                  found,
-                                    std::span<const char> result);
-      void               onMax(std::span<const char> key, bool found, std::span<const char> result);
-      void               onWrite(std::span<const char> key);
-   };
-
    using IndependentRevision  = std::array<DbPtr, numIndependentDatabases>;
-   using IndependentChangeSet = std::array<DbChangeSet, numIndependentDatabases>;
+   // The roots of the node-local databases and how many times they had been
+   // published when the roots were taken.
+   struct SubjectiveSnapshot
+   {
+      IndependentRevision roots;
+      std::uint64_t       version = 0;
+   };
 
    // Certain rows may trigger callbacks when they are written.
    //
@@ -143,14 +127,21 @@ namespace psibase
                                                        std::span<const char> key);
 
       IndependentRevision getSubjective();
-      bool                commitSubjective(Writer&                writer,
-                                           IndependentRevision&   original,
-                                           IndependentRevision    updated,
-                                           IndependentChangeSet&& changes,
-                                           SocketChangeSet&&      socketChanges,
-                                           Sockets&               sockets,
-                                           SocketAutoCloseSet&    closing,
-                                           const std::function<void()>& afterPublish = {});
+      SubjectiveSnapshot  snapshotSubjective();
+      // The write lock of the node-local databases, for a section
+      // (Database::checkoutSubjective ... commitSubjective). lockSubjective
+      // waits for it and returns whether nothing has been published since
+      // `version`; publishSubjective, with the lock held, replaces the
+      // published roots and applies the socket changes (false if they
+      // cannot be applied; nothing is published then).
+      bool lockSubjective(std::uint64_t version);
+      void unlockSubjective();
+      bool publishSubjective(Writer&                      writer,
+                             IndependentRevision          updated,
+                             SocketChangeSet&&            socketChanges,
+                             Sockets&                     sockets,
+                             SocketAutoCloseSet&          closing,
+                             const std::function<void()>& afterPublish = {});
 
       std::optional<bool>                isSlow() const;
       std::filesystem::path             directory() const;
