@@ -85,7 +85,10 @@ fn cors_headers(origin: &str) -> Vec<HttpHeader> {
 }
 
 fn preflight_cors_headers(request: &HttpRequest) -> Vec<HttpHeader> {
-    let mut headers = vec![HttpHeader::new("Access-Control-Allow-Methods", "GET, POST")];
+    let mut headers = vec![HttpHeader::new(
+        "Access-Control-Allow-Methods",
+        "GET, POST, PUT",
+    )];
     if let Some(requested) = request.get_header("access-control-request-headers") {
         headers.push(HttpHeader::new("Access-Control-Allow-Headers", requested));
     }
