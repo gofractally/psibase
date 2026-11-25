@@ -17,7 +17,6 @@
 #include <map>
 #include <mutex>
 #include <optional>
-#include <regex>
 #include <psibase/ActionContext.hpp>
 #include <psibase/NativeAotCache.hpp>
 #include <psibase/PsizamPolicy.hpp>
@@ -157,27 +156,6 @@ namespace psibase::vm_wasmtime
 
       // Made at first use, so a node that never debugs has no debugging engines.
       Runtimes& runtimes(bool debug);
-
-      // With backtraces on, wasmtime writes the frames in front of what a trap
-      // otherwise says: "<frames>: wasm trap: <reason>", or for a fault in
-      // linear memory "<frames>: memory fault at <where>: wasm trap: <reason>".
-      // The text a service call fails with goes into the transaction trace,
-      // which must not depend on whether this node debugs, so the frames are
-      // taken off again. The text is found from its end, because the frames
-      // hold function names, which are the service author's to choose.
-      std::string trapText(const std::string& what)
-      {
-         auto own = what.rfind(": wasm trap: ");
-         if (own == what.npos)
-            return what;
-         static const std::regex faultText{"memory fault at wasm address 0x[0-9a-f]+ in linear "
-                                           "memory of size 0x[0-9a-f]+"};
-         auto fault = what.rfind(": memory fault at wasm address 0x", own);
-         if (fault != what.npos &&
-             std::regex_match(what.begin() + fault + 2, what.begin() + own, faultText))
-            own = fault;
-         return what.substr(own + 2);
-      }
 
       // psizam reports the reason separately from the kind of error.
       template <typename F>
@@ -538,15 +516,6 @@ namespace psibase::vm_wasmtime
             // watchdog thread has delivered asyncTimeout to this VM.
             throw TimeoutException{};
          }
-         catch (const wt::trap& e)
-         {
-            logFailureBacktrace();
-            if (timedOut)
-               throw TimeoutException{};
-            if (cache.debug)
-               throw wt::trap(e.kind, trapText(e.what()));
-            throw;
-         }
          catch (...)
          {
             logFailureBacktrace();
@@ -557,7 +526,7 @@ namespace psibase::vm_wasmtime
       }
 
       // Tells the developer at this node where in the service the call that
-      // just failed was. Each service on the call path logs its own frames as
+      // just failed was (psizam keeps no frames of an earlier call). Each service on the call path logs its own frames as
       // the failure passes through it, the one that failed first. This goes to
       // the log and nowhere else: traces and state are compared between nodes,
       // and most of them do not debug.

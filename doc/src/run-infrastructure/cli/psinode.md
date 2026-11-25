@@ -64,7 +64,7 @@ psinode - The psibase blockchain server
 
 - `--debug-services`
 
-  Runs services with debugging support. When a call to a service fails, the node logs the WebAssembly functions the service was in, innermost first, as a warning. Compiled services are also registered with a debugger attached to `psinode` (`gdb`, or `lldb` after `settings set plugin.jit-loader.gdb.enable on`), by function name. Source files and lines are not available yet.
+  Runs services with debugging support. When a call to a service fails, the node logs the WebAssembly functions the service was in, innermost first, as a warning. Compiled services are also registered with a debugger attached to `psinode` (`gdb`, or `lldb` after `settings set plugin.jit-loader.gdb.enable on`), by function name. Where a service carries debug information (DWARF) and the engine compiles its code as deployed, the logged frames also give the source file and line and a debugger can set breakpoints by file and line; a service the engine has to rewrite first (the strict float profile, or `PSIBASE_WASMTIME_STACK=rewrite`) gets function names only.
 
   This is a setting of the node and not of the chain: a node that debugs computes exactly what the other nodes compute, so one node of a network can turn it on. It makes services slower to compile and to fail. It needs the wasmtime execution engine, is only read from the command line, and can also be turned on with the environment variable `PSIBASE_DEBUG_SERVICES=1`.
 

@@ -17,6 +17,7 @@
 #include <psio/pssz.hpp>
 #include <psizam/utils.hpp>
 
+#include <regex>
 #include <set>
 #include <sstream>
 #include "TempDirectory.hpp"
@@ -48,7 +49,23 @@ namespace
    using namespace psibase;
    namespace replay = psibase::vm_consensus_replay;
 
-   // What the fixture service does; see psizam-debug-service.wat.
+   // The transaction service of a chain. Both do what `Mode` says. The first
+   // is assembled from psizam-debug-service.wat and has function names only.
+   // The second is compiled from C with DWARF, and deployed under the VM
+   // version whose code the engine compiles as deployed, so that the DWARF
+   // still describes it.
+   enum class Service
+   {
+      names,
+      dwarf,
+   };
+   // As its DWARF names the source: the compilation directory and the file.
+   const char* const dwarfSource = "./psizam-debug-dwarf-service.c";
+   // Lines of psizam-debug-dwarf-service.c.
+   constexpr int recurseLine = 73, abortLine = 84, divideLine = 91, callPeerLine = 93,
+                 middleLine = 104, outerLine = 110, entryLine = 117;
+
+   // What a fixture service does; see psizam-debug-service.wat.
    enum Mode : char
    {
       write = 1,
@@ -155,7 +172,9 @@ namespace
       std::vector<TransactionTrace> traces;
       std::vector<Checksum256>      blockIds;
 
-      explicit Chain(bool debugging, const std::filesystem::path& artifacts = {})
+      explicit Chain(bool                         debugging,
+                     Service                      transact  = Service::names,
+                     const std::filesystem::path& artifacts = {})
           : mode(debugging), cache(16, artifacts)
       {
          static const bool registered = []
@@ -165,7 +184,11 @@ namespace
          }();
          (void)registered;
 
-         auto code = psizam::read_wasm(PSIBASE_PSIZAM_DEBUG_SERVICE_WASM);
+         // The peer is always the service with names only.
+         auto names = psizam::read_wasm(PSIBASE_PSIZAM_DEBUG_SERVICE_WASM);
+         auto code  = transact == Service::names
+                          ? names
+                          : psizam::read_wasm(PSIBASE_PSIZAM_DEBUG_DWARF_SERVICE_WASM);
          // The actions the service sends its peer, as the SDK serializes them.
          auto patch = [&](std::string_view marker, Mode mode, char argument)
          {
@@ -184,12 +207,18 @@ namespace
          patch("DEBUG_PEER_WRITE_ACTION", Mode::write, 'p');
 
          GenesisActionData genesis;
-         for (auto account : {transactionServiceNum, peer})
+         auto              install =
+             [&](AccountNumber account, std::uint8_t vmVersion, const std::vector<std::uint8_t>& code)
+         {
             genesis.services.push_back(
-                {.service = account,
-                 .flags   = CodeRow::isPrivileged,
-                 .code    = {reinterpret_cast<const char*>(code.data()),
-                             reinterpret_cast<const char*>(code.data()) + code.size()}});
+                {.service   = account,
+                 .flags     = CodeRow::isPrivileged,
+                 .vmVersion = vmVersion,
+                 .code      = {reinterpret_cast<const char*>(code.data()),
+                               reinterpret_cast<const char*>(code.data()) + code.size()}});
+         };
+         install(transactionServiceNum, transact == Service::dwarf ? 1 : 0, code);
+         install(peer, 0, names);
          startBlock();
          Transaction transaction;
          transaction.actions.push_back(Action{.rawData = psio::to_pssz(genesis)});
@@ -347,13 +376,31 @@ TEST_CASE("The default engine can debug services")
    }
    // The images go when the services compiled for debugging do.
    CHECK(registeredImages() == before);
+   {
+      // A service with DWARF is handed over with it: line tables, and the
+      // name of its source file.
+      Chain chain(true, Service::dwarf);
+      chain.startBlock();
+      CHECK(error(chain.push(Mode::write, 'a')) == "");
+      CHECK(newImagesNaming(before, "debug_middle") >= 1);
+      CHECK(newImagesNaming(before, ".debug_line") >= 1);
+      CHECK(newImagesNaming(before, "psizam-debug-dwarf-service.c") >= 1);
+   }
+   {
+      Chain chain(false, Service::dwarf);
+      chain.startBlock();
+      CHECK(error(chain.push(Mode::write, 'a')) == "");
+      CHECK(registeredImages() == before);
+   }
 }
 
 TEST_CASE("A node that debugs services computes what a node that does not computes")
 {
-   Chain plain(false);
+   auto service = GENERATE(Service::names, Service::dwarf);
+   INFO("transaction service " << (service == Service::names ? "with names" : "with DWARF"));
+   Chain plain(false, service);
    runBlocks(plain);
-   Chain debugging(true);
+   Chain debugging(true, service);
    runBlocks(debugging);
 
    // What the transactions did, so that equal results are not equal failures
@@ -370,7 +417,12 @@ TEST_CASE("A node that debugs services computes what a node that does not comput
    for (auto trap : traps)
    {
       INFO("trap mode " << int(trap));
-      CHECK_THAT(error(*step++), Catch::Matchers::ContainsSubstring("wasm trap: "));
+      // The C service has two of the traps and does nothing for the others.
+      if (service == Service::names || trap == Mode::unreachable || trap == Mode::divideByZero)
+         CHECK_THAT(error(*step), Catch::Matchers::ContainsSubstring("wasm trap: "));
+      else
+         CHECK(error(*step) == "");
+      ++step;
    }
    // The peer's failure is the transaction's, recorded on the peer's action.
    CHECK(error(*step) == peerAborted);
@@ -446,6 +498,59 @@ TEST_CASE("A node that debugs services logs where a failed service was")
       }
    }
    {
+      // A service with DWARF: each frame also says where in the source it is.
+      Chain chain(true, Service::dwarf);
+      chain.startBlock();
+      auto where = [](int line)
+      { return " at " + std::string(dwarfSource) + ":" + std::to_string(line); };
+      auto frame = [&](int index, const char* function, int line)
+      {
+         // "<index>: <function> (<wasm index>) +0x<offset> at <file>:<line>"
+         return std::regex(std::to_string(index) + ": " + function +
+                           " \\([0-9]+\\) \\+0x[0-9a-f]+ at \\./psizam-debug-dwarf-service\\.c:" +
+                           std::to_string(line) + "\n");
+      };
+      auto requireFrames = [&](const std::string& log, const char* innermost, int line,
+                               const char* entry = "processTransaction")
+      {
+         INFO(log);
+         CHECK(std::regex_search(log, frame(0, innermost, line)));
+         CHECK(std::regex_search(log, frame(1, "debug_middle", middleLine)));
+         CHECK(std::regex_search(log, frame(2, "debug_outer", outerLine)));
+         CHECK(log.find(std::string("3: ") + entry + " (") != std::string::npos);
+      };
+      {
+         LogCapture  log;
+         const auto& trace = chain.push(Mode::abort);
+         CHECK(error(trace) == transactAborted);
+         requireFrames(log.text() + "\n", "debug_inner", abortLine);
+         CHECK(log.text().find("3: processTransaction") != std::string::npos);
+         CHECK(log.text().find(where(entryLine)) != std::string::npos);
+         CHECK(psio::to_ijson(trace).find(dwarfSource) == std::string::npos);
+      }
+      {
+         LogCapture log;
+         CHECK(error(chain.push(Mode::divideByZero)) == "wasm trap: integer divide by zero");
+         requireFrames(log.text() + "\n", "debug_inner", divideLine);
+      }
+      {
+         // The peer has no DWARF and logs names; the caller logs the line
+         // of its call.
+         LogCapture log;
+         CHECK(error(chain.push(Mode::peerAborts)) == peerAborted);
+         requireInOrder(log.text(), {"service debug-peer failed here", "0: debug_inner (12) +0x",
+                                     "service transact failed here"});
+         requireFrames(log.text() + "\n", "debug_inner", callPeerLine);
+      }
+      {
+         LogCapture log;
+         CHECK(error(chain.push(Mode::recurse)) == "stack overflow");
+         INFO(log.text());
+         CHECK(log.text().find("debug_recurse") != std::string::npos);
+         CHECK(log.text().find(where(recurseLine)) != std::string::npos);
+      }
+   }
+   {
       Chain      chain(false);
       LogCapture log;
       chain.startBlock();
@@ -468,7 +573,7 @@ TEST_CASE("Services compiled for debugging are stored apart from those that are 
    };
    const auto before = registeredImages();
    {
-      Chain chain(true, artifacts.path);
+      Chain chain(true, Service::names, artifacts.path);
       chain.startBlock();
       CHECK(error(chain.push(Mode::write, 'a')) == "");
    }
@@ -477,7 +582,7 @@ TEST_CASE("Services compiled for debugging are stored apart from those that are 
    {
       // The same service, the same limits, the same directory: the node that
       // does not debug compiles its own code and keeps it next to the other.
-      Chain chain(false, artifacts.path);
+      Chain chain(false, Service::names, artifacts.path);
       chain.startBlock();
       CHECK(error(chain.push(Mode::write, 'a')) == "");
       CHECK(registeredImages() == before);
@@ -485,7 +590,7 @@ TEST_CASE("Services compiled for debugging are stored apart from those that are 
    CHECK(stored() == 2 * debugged);
    {
       // And a node that debugs gets the code compiled for debugging back.
-      Chain chain(true, artifacts.path);
+      Chain chain(true, Service::names, artifacts.path);
       chain.startBlock();
       CHECK(error(chain.push(Mode::write, 'a')) == "");
       CHECK(newImagesNaming(before, "debug_inner") >= 1);

@@ -81,7 +81,8 @@ endif()
 if(vm_default_engine STREQUAL "WASMTIME")
     add_executable(ServiceDebugTests ServiceDebugTests.cpp)
     target_compile_definitions(ServiceDebugTests PRIVATE
-        PSIBASE_PSIZAM_DEBUG_SERVICE_WASM="${CMAKE_CURRENT_SOURCE_DIR}/psizam-debug-service.wasm")
+        PSIBASE_PSIZAM_DEBUG_SERVICE_WASM="${CMAKE_CURRENT_SOURCE_DIR}/psizam-debug-service.wasm"
+        PSIBASE_PSIZAM_DEBUG_DWARF_SERVICE_WASM="${CMAKE_CURRENT_SOURCE_DIR}/psizam-debug-dwarf-service.wasm")
     target_link_directories(ServiceDebugTests PRIVATE ${ICU_LIBRARY_DIR})
     target_link_libraries(ServiceDebugTests psibase Catch2::Catch2WithMain Threads::Threads)
     add_test(NAME ServiceDebugTests COMMAND ServiceDebugTests)
