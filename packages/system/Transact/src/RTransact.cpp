@@ -108,13 +108,17 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
       {
          flushTransactions(reverify, invalidated, verifyId);
       }
-      nextSequence = std::max(nextSequence, invalidated.endSequence);
-      auto table   = Subjective{}.open<PendingTransactionTable>();
-      auto index   = table.getIndex<1>();
-      for (auto iter = index.lower_bound(nextSequence), end = index.end(); iter != end; ++iter)
+      // Every pass of the body starts from the sequence that was read
+      // before it and from no result: a second pass must not start after
+      // the transaction the first one found.
+      result.reset();
+      auto sequence = std::max(nextSequence, invalidated.endSequence);
+      auto table    = Subjective{}.open<PendingTransactionTable>();
+      auto index    = table.getIndex<1>();
+      for (auto iter = index.lower_bound(sequence), end = index.end(); iter != end; ++iter)
       {
-         auto item    = *iter;
-         nextSequence = item.sequence + 1;
+         auto item = *iter;
+         sequence  = item.sequence + 1;
          if (!included.get(std::tuple(item.expiration, item.id)))
          {
             auto trxData = Subjective{}.open<TransactionDataTable>();
@@ -124,7 +128,7 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
             break;
          }
       }
-      unapplied.put({nextSequence});
+      unapplied.put({sequence});
       if (!result)
       {
          to<XTransact>().removeCallback(TransactionCallbackType::nextTransaction,
@@ -400,6 +404,11 @@ namespace
 
          PSIBASE_SUBJECTIVE_TX
          {
+            // The body may run again (a commit that cannot apply a socket
+            // change returns false): each pass starts with nothing claimed,
+            // or a socket would be listed, and answered, once per pass.
+            json_clients.clear();
+            bin_clients.clear();
             if (auto row_opt = clients.get(id))
             {
                auto& row = *row_opt;
@@ -615,15 +624,18 @@ namespace
          }
          else
          {
+            // The body only takes the row; what depends on it (the count)
+            // is done once, after the commit.
             PSIBASE_SUBJECTIVE_TX
             {
-               if (auto tx = failedTxs.getView(id))
-               {
-                  traceView.emplace((*tx)->trace());
-                  failedTxs.remove(**tx);
-                  failedStorage = std::move(tx);
-                  ++stats.failed;
-               }
+               failedStorage = failedTxs.getView(id);
+               if (failedStorage)
+                  failedTxs.remove(**failedStorage);
+            }
+            if (failedStorage)
+            {
+               traceView.emplace((*failedStorage)->trace());
+               ++stats.failed;
             }
          }
 
@@ -880,6 +892,8 @@ void RTransact::onBlock()
 
    PSIBASE_SUBJECTIVE_TX
    {
+      // Each pass of the body starts from the successful ones alone
+      txids.resize(nSuccessful);
       // Get all expired transactions
       for (auto pendingTx : pendingTxTable.getIndex<3>())
       {
@@ -896,13 +910,13 @@ void RTransact::onBlock()
    std::size_t                       i = 0;
    for (auto id : txids)
    {
+      // Set by every pass of the body; the list is appended to once, after
+      // the commit.
+      bool hasClient = false;
       PSIBASE_SUBJECTIVE_TX
       {
-         if (auto client = clientTable.get(id))
-         {
-            needsReply.push_back(id);
-         }
-         else
+         hasClient = clientTable.get(id).has_value();
+         if (!hasClient)
          {  // Stop tracking a finalized tx if no client is waiting for a reply.
             if (auto pending = pendingTxTable.get(id))
             {
@@ -922,6 +936,8 @@ void RTransact::onBlock()
             statsTable.put(stats);
          }
       }
+      if (hasClient)
+         needsReply.push_back(id);
       ++i;
    }
 
@@ -954,7 +970,7 @@ void RTransact::onVerify(std::uint64_t                      id,
             if (auto* vid = std::get_if<std::uint64_t>(&v))
             {
                if (*vid == id)
-                  v = std::move(token.value());
+                  v = token.value();  // a copy: the body may run again
                else
                   ready = false;
             }

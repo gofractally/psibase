@@ -22,6 +22,7 @@ namespace
          std::vector<OriginServerRow> result;
          PSIBASE_SUBJECTIVE_TX
          {
+            result.clear();
             auto table = XProxy{}.open<OriginServerTable>();
             for (auto row : table.getIndex<0>())
                result.push_back(std::move(row));
@@ -212,15 +213,20 @@ void XProxy::onReply(std::int32_t socket, psibase::HttpReply reply)
 {
    check(getSender() == XHttp::service, "Wrong sender");
    auto table = open<ProxyTable>();
+   // The reply is sent once, after the commit: a send is not undone when the
+   // body runs again.
+   std::optional<ProxyRow> row;
    PSIBASE_SUBJECTIVE_TX
    {
-      if (auto row = table.get(socket))
+      row = table.get(socket);
+      if (row)
       {
          to<XHttp>().autoClose(row->socket2, true);
-         to<XHttp>().sendReply(row->socket2, std::move(reply));
          table.remove(*row);
       }
    }
+   if (row)
+      to<XHttp>().sendReply(row->socket2, std::move(reply));
 }
 
 void XProxy::onAccept(std::int32_t socket, psibase::HttpReply reply)
@@ -260,15 +266,19 @@ void XProxy::onError(std::int32_t socket, std::optional<psibase::HttpReply> repl
       std::string_view msg{"Bad Gateway"};
       reply = makeError(HttpStatus::badGateway, msg);
    }
+   // As in onReply: the reply is sent once, after the commit.
+   std::optional<ProxyRow> row;
    PSIBASE_SUBJECTIVE_TX
    {
-      if (auto row = table.get(socket))
+      row = table.get(socket);
+      if (row)
       {
          to<XHttp>().autoClose(row->socket2, true);
-         to<XHttp>().sendReply(row->socket2, std::move(*reply));
          table.remove(*row);
       }
    }
+   if (row)
+      to<XHttp>().sendReply(row->socket2, std::move(*reply));
 }
 
 void XProxy::close(std::int32_t socket)

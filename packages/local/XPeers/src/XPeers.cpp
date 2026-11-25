@@ -184,13 +184,16 @@ namespace
          request.host = "x-peers.psibase.localhost";
          endpoint     = LocalEndpoint{peer};
       }
-      auto authTable = XPeers{}.open<UrlAuthTable>();
+      auto                      authTable = XPeers{}.open<UrlAuthTable>();
+      std::optional<UrlAuthRow> auth;
       PSIBASE_SUBJECTIVE_TX
       {
-         if (auto auth = authTable.get(peer))
-         {
-            request.headers.push_back({"Authorization", "Bearer " + auth->token});
-         }
+         auth = authTable.get(peer);
+      }
+      // Outside the body: the header is added once however often it runs
+      if (auth)
+      {
+         request.headers.push_back({"Authorization", "Bearer " + auth->token});
       }
       std::int32_t socket = to<XHttp>().websocket(request, std::move(tls), std::move(endpoint));
 
@@ -208,15 +211,16 @@ namespace
             to<XHttp>().autoClose(*requestSocket, false);
          }
 
+         // hosts and peer are copied, not moved: the body may run again
          peers.put({.socket     = socket,
                     .peerSocket = -1,
                     .nodeId     = 0,
                     .urls       = std::vector{peer},
-                    .hosts      = std::move(hosts),
+                    .hosts      = hosts,
                     .secure     = secure,
                     .local      = local,
                     .outgoing   = true});
-         addUrl(std::move(peer));
+         addUrl(peer);
       }
       return socket;
    }
@@ -369,6 +373,7 @@ namespace
       std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
       PSIBASE_SUBJECTIVE_TX
       {
+         messages.clear();
          auto row       = table.get(socket).value();
          row.peerSocket = msg.connectionId;
          row.nodeId     = msg.nodeId;
@@ -397,10 +402,12 @@ namespace
       bool                                                             outgoing;
       PSIBASE_SUBJECTIVE_TX
       {
+         messages.clear();
          auto row = table.get(socket).value();
          if (!row.fixedHosts())
          {
-            updateHosts(hostIds, row, std::move(msg.hosts));
+            // A copy, not a move: the body may run again
+            updateHosts(hostIds, row, std::vector<std::string>{msg.hosts});
             table.put(row);
             getDuplicates(table, hostIds, row, messages);
          }
@@ -425,6 +432,7 @@ namespace
       std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
       PSIBASE_SUBJECTIVE_TX
       {
+         messages.clear();
          auto row = table.get(socket).value();
          getDuplicates(table, hostIds, row, messages);
       }
@@ -729,6 +737,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       auto                        peers = open<PeerConnectionTable>();
       PSIBASE_SUBJECTIVE_TX
       {
+         result.clear();
          for (auto row : peers.getIndex<0>())
          {
             result.push_back(std::move(row));
@@ -744,6 +753,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       auto                urls = open<UrlTable>();
       PSIBASE_SUBJECTIVE_TX
       {
+         result.clear();
          for (auto row : urls.getIndex<0>())
          {
             result.push_back(std::move(row));
@@ -775,6 +785,7 @@ void XPeers::onConfig()
    std::vector<std::string> newConnections;
    PSIBASE_SUBJECTIVE_TX
    {
+      newConnections.clear();
       auto options    = to<XAdmin>().options();
       auto oldOptions = opts.get({}).value_or(AdminOptionsRow{});
       // Unset autoconnect for urls that are no longer in peers

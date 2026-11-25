@@ -1049,6 +1049,7 @@ namespace LocalService
             std::vector<AccountNumber> result;
             PSIBASE_SUBJECTIVE_TX
             {
+               result.clear();
                for (auto row : adminAccounts.getIndex<0>())
                {
                   result.push_back(row.account);
