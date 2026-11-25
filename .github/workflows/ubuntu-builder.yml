@@ -63,7 +63,7 @@ jobs:
             $ubuntu-${{ matrix.ubuntu-version }}-caches-
       - name: Build
         env:
-          BUILDER_IMAGE_2204: a6d8868fe80fb0935858f542f9f8f86124dae3e1
+          BUILDER_IMAGE_2204: wide-arithmetic-783968a
           BUILDER_IMAGE_2404: a6d8868fe80fb0935858f542f9f8f86124dae3e1
           BUILDER_IMAGE_2604: a6d8868fe80fb0935858f542f9f8f86124dae3e1
         run: |
