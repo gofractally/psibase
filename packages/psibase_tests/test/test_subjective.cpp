@@ -9,7 +9,6 @@
 #include <services/test/XSudo.hpp>
 
 using namespace psibase;
-using namespace psio;
 using namespace SystemService;
 using namespace TestService;
 
@@ -110,7 +109,7 @@ TEST_CASE("local service sudo")
    t.from(sudo).to<HttpServer>().registerServer(sudo);
    t.startBlock();
    {
-      auto reply = t.post(sudo, "/", FracPackBody{Action{.sender = callee, .service = callee}});
+      auto reply = t.post(sudo, "/", PsszBody{Action{.sender = callee, .service = callee}});
       CHECK((int)reply.status == 500);
       CHECK_THAT(std::string(reply.body.data(), reply.body.size()),
                  Catch::Matchers::ContainsSubstring("cannot sudo"));
@@ -122,7 +121,7 @@ TEST_CASE("local service sudo")
    registerLocalServer(t, XSudo::service);
    {
       auto reply =
-          t.post(XSudo::service, "/", FracPackBody{Action{.sender = callee, .service = callee}});
+          t.post(XSudo::service, "/", PsszBody{Action{.sender = callee, .service = callee}});
       CHECK((int)reply.status == 200);
    }
 }

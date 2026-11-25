@@ -111,6 +111,35 @@ struct TestNode : node_type
    boost::asio::io_context& ctx;
 };
 
+TEST_CASE("deferred messages select every payload for exactly one peer and block")
+{
+   boost::asio::io_context ctx;
+   TestNode                node(ctx, "deferred");
+   using DeferredMessage = shortest_path_routing<node_type>::DeferredMessage;
+   Checksum256 first{};
+   Checksum256 second{};
+   second.back() = 1;
+   auto& messages = node.network().deferredMessages;
+   messages.insert({1, first, {'a'}});
+   messages.insert({1, first, {'b'}});
+   messages.insert({1, second, {'c'}});
+   messages.insert({2, first, {'d'}});
+   messages.insert({2, second, {'e'}});
+
+   auto [begin, end] = messages.equal_range(DeferredMessage::MessageKey{1, first});
+   REQUIRE(std::distance(begin, end) == 2);
+   CHECK(begin->message == std::vector<char>{'a'});
+   CHECK(std::next(begin)->message == std::vector<char>{'b'});
+   messages.erase(begin, end);
+   auto remaining = messages.equal_range(DeferredMessage::MessageKey{1, first});
+   CHECK(remaining.first == remaining.second);
+   CHECK(messages.size() == 3);
+   auto peer = messages.equal_range(peer_id{1});
+   REQUIRE(std::distance(peer.first, peer.second) == 1);
+   CHECK(peer.first->blockid == second);
+   CHECK(peer.first->message == std::vector<char>{'c'});
+}
+
 void connect(TestNode& node1, TestNode& node2)
 {
    connect(node1.ctx, node1, node2);
@@ -226,6 +255,7 @@ int main(int argc, const char* const* argv)
    if (int res = session.applyCommandLine(argc, argv))
       return res;
 
-   loggers::configure(psio::convert_from_json<loggers::Config>(psio::convert_to_json(logConfig)));
+   loggers::configure(
+       loggers::Config::fromJson(psio::from_ijson<psio::json_value>(psio::to_ijson(logConfig))));
    return session.run();
 }

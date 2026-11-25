@@ -288,7 +288,9 @@ function(psibase_package)
                 set(wasm ${_WASM_${service}})
                 list(APPEND zip-deps ${wasm})
             endif()
-            list(APPEND copy-contents COMMAND ln -f ${wasm} ${outdir}/service/${service-basename}.wasm)
+            list(APPEND copy-contents
+                COMMAND ${CMAKE_COMMAND} -E rm -f ${outdir}/service/${service-basename}.wasm
+                COMMAND ln ${wasm} ${outdir}/service/${service-basename}.wasm)
             list(APPEND contents service/${service-basename}.wasm service/${service-basename}.json)
         endif()
         if(_DATA_${service})
@@ -356,7 +358,8 @@ function(psibase_package)
             json_append_key(postinstall sender ${service})
             json_append_key(postinstall service ${service})
             json_append_key(postinstall method init)
-            json_append_key(postinstall rawData "0000")
+            # init takes no arguments
+            string(APPEND postinstall ",\"data\":{}")
             string(APPEND postinstall "}")
         endforeach()
         string(APPEND postinstall "]")
@@ -366,7 +369,8 @@ function(psibase_package)
     elseif(_POSTINSTALL)
         list(APPEND copy-contents
             COMMAND ${CMAKE_COMMAND} -E make_directory ${outdir}/script
-            COMMAND ln -f ${_POSTINSTALL} ${outdir}/script/postinstall.json)
+            COMMAND ${CMAKE_COMMAND} -E rm -f ${outdir}/script/postinstall.json
+            COMMAND ln ${_POSTINSTALL} ${outdir}/script/postinstall.json)
         list(APPEND contents script/postinstall.json)
         list(APPEND zip-deps ${_POSTINSTALL})
     endif()
@@ -393,7 +397,21 @@ function(psibase_package)
         ${copy-contents}
         COMMAND cd ${outdir} && ${CMAKE_COMMAND} -E tar cf ${_OUTPUT} --format=zip ${contents}
     )
-    add_custom_target(${_NAME} ALL DEPENDS ${_OUTPUT})
+    # The package target is normally named after the package. If a service target
+    # has the same name in a different case ("Example" packaging "example"), the
+    # two share one CMakeFiles/<target>.dir on a case-insensitive filesystem and
+    # the Makefile generators overwrite each other's rules there.
+    set(package_target ${_NAME})
+    string(TOLOWER "${_NAME}" lower_name)
+    foreach(service IN LISTS _SERVICES)
+        if(_TARGET_${service})
+            string(TOLOWER "${_TARGET_${service}}" lower_target)
+            if(lower_target STREQUAL lower_name AND NOT _TARGET_${service} STREQUAL _NAME)
+                set(package_target ${_NAME}-package)
+            endif()
+        endif()
+    endforeach()
+    add_custom_target(${package_target} ALL DEPENDS ${_OUTPUT})
 endfunction()
 
 # Description:              - Use this function when you want to add additional details to a package that is 

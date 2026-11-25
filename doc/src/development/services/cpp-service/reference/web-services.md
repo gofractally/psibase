@@ -26,10 +26,9 @@ These help implement basic functionality:
 - [psibase::serveActionTemplates]
 - [psibase::servePackAction]
 - [psibase::serveGraphQL]
-- [psibase::makeConnection]
-  - [psibase::PageInfo]
-  - [psibase::Edge]
-  - [psibase::Connection]
+- [psibase::IndexView]
+  - [psibase::IndexArgs]
+  - [psibase::WithBlockContext]
 - [psibase::EventQuery]
 
 Here's a common pattern for using these functions:
@@ -60,8 +59,7 @@ std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
 {{#cpp-doc ::psibase::serveActionTemplates}}
 {{#cpp-doc ::psibase::servePackAction}}
 {{#cpp-doc ::psibase::serveGraphQL}}
-{{#cpp-doc ::psibase::makeConnection}}
-{{#cpp-doc ::psibase::PageInfo}}
-{{#cpp-doc ::psibase::Edge}}
-{{#cpp-doc ::psibase::Connection}}
+{{#cpp-doc ::psibase::IndexView}}
+{{#cpp-doc ::psibase::IndexArgs}}
+{{#cpp-doc ::psibase::WithBlockContext}}
 {{#cpp-doc ::psibase::EventQuery}}

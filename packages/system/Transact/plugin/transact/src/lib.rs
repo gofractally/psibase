@@ -23,9 +23,9 @@ use exports::transact::plugin::{
 };
 
 use crate::trust::*;
-use psibase::fracpack::Pack;
+
 use psibase::services::transact::action_structs::setSnapTime;
-use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction};
+use psibase::{SignedTransaction, Tapos, TimePointSec, Transaction};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
@@ -35,12 +35,12 @@ psibase::define_trust! {
         Medium => "",
         High => "
             - alter which of your accounts is being used
-        
+
         Warning: This will grant the caller the ability to control which of your accounts takes requested actions, including the capability to make unintended use of any of your accounts! Make sure you completely trust the caller's legitimacy.
         ",
     }
     functions {
-        None => [add_signature, unhook_actions_sender, add_action_to_transaction],
+        None => [add_evidence, add_signature, unhook_actions_sender, add_action_to_transaction, register_pre_publish_hook],
         Low => [],
         High => [hook_actions_sender],
         Max => [set_propose_latch, propose, set_snapshot_time, get_query_token],
@@ -76,19 +76,27 @@ fn validate_action_name(action_name: &str) -> Result<(), HostTypes::Error> {
 }
 
 fn get_action_sender(service: &str, method: &str) -> Result<String, HostTypes::Error> {
+    if OpenTx::publication_started() {
+        return Err(PrePublishHook("cannot add actions during publication callbacks").into());
+    }
+    OpenTx::check_connection(bindings::host::accounts::api::get_current_user())
+        .map_err(ConnectionChanged)?;
     if let Some(sender) = OpenTx::latch_sender() {
         return Ok(sender);
     }
     if let Some(plugin) = OpenTx::sender_hook() {
-        if let Some(s) = on_actions_sender(
+        let sender = on_actions_sender(
             PluginRef::new(plugin.as_str(), "plugin", "transact-hook-actions-sender"),
             service,
             method,
-        )? {
+        )?;
+        OpenTx::validate_connection(bindings::host::accounts::api::get_current_user())
+            .map_err(ConnectionChanged)?;
+        if let Some(s) = sender {
             return Ok(s);
         }
     }
-    if let Some(sender) = bindings::host::accounts::api::get_current_user() {
+    if let Some(sender) = OpenTx::connection_user() {
         return Ok(sender);
     }
 
@@ -123,17 +131,21 @@ fn pack_staged_propose(actions: Vec<ImportAction>, auto_exec: bool) -> (String, 
     let inner: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
     (
         psibase::services::staged_tx::SERVICE.to_string(),
-        psibase::services::staged_tx::action_structs::propose::ACTION_NAME.to_string(),
-        psibase::services::staged_tx::action_structs::propose {
+        <psibase::services::staged_tx::action_structs::propose as psio::interface::Method>::NAME.to_string(),
+        psio::to_pssz(&psibase::services::staged_tx::action_structs::propose {
             actions: inner,
             auto_exec,
-        }
-        .packed(),
+        }),
     )
 }
 
 fn flush_propose_latch() -> Result<(), HostTypes::Error> {
-    OpenTx::flush_latch(bindings::host::accounts::api::get_current_user().as_deref())
+    if !OpenTx::latch_is_active() {
+        return Ok(());
+    }
+    OpenTx::check_connection(bindings::host::accounts::api::get_current_user())
+        .map_err(ConnectionChanged)?;
+    OpenTx::flush_latch(OpenTx::connection_user().as_deref())
         .map_err(|_| NotLoggedIn("flush_propose_latch").into())
 }
 
@@ -171,12 +183,18 @@ impl From<ImportClaim> for psibase::Claim {
     fn from(claim: ImportClaim) -> Self {
         psibase::Claim {
             service: claim.verify_service.parse().unwrap(),
-            rawData: Hex::from(claim.raw_data.clone()),
+            rawData: claim.raw_data.clone(),
         }
     }
 }
 
 impl Hooks for TransactPlugin {
+    fn register_pre_publish_hook() -> Result<(), HostTypes::Error> {
+        // Host supplies the caller principal; callers cannot register a peer or
+        // remove another plugin's publication guard.
+        OpenTx::register_pre_publish_hook(&Client::get_sender())
+            .map_err(|e| PrePublishHook(e).into())
+    }
     fn hook_actions_sender() {
         assert_authorized_with_whitelist(FunctionName::hook_actions_sender, vec!["invite".into()])
             .unwrap();
@@ -212,9 +230,16 @@ impl Api for TransactPlugin {
     fn add_signature(claim: ExportClaim) -> Result<(), HostTypes::Error> {
         OpenTx::add_claim(psibase::Claim {
             service: claim.verify_service.parse().unwrap(),
-            rawData: psibase::Hex::from(claim.raw_data),
+            rawData: claim.raw_data,
         });
         Ok(())
+    }
+
+    fn add_evidence(claim: ExportClaim, proof: Vec<u8>) -> Result<(), HostTypes::Error> {
+        OpenTx::check_connection(bindings::host::accounts::api::get_current_user()).map_err(ConnectionChanged)?;
+        let service = claim.verify_service.parse().map_err(|_| BadResponse("invalid evidence verifier"))?;
+        OpenTx::add_evidence(psibase::Claim { service, rawData: claim.raw_data.into() }, proof.into())
+            .map_err(|e| BadResponse(e).into())
     }
 
     fn set_propose_latch(account: Option<String>) -> Result<(), HostTypes::Error> {
@@ -259,10 +284,10 @@ impl Network for TransactPlugin {
     fn set_snapshot_time(seconds: u32) -> Result<(), HostTypes::Error> {
         assert_authorized_with_whitelist(FunctionName::set_snapshot_time, vec!["config".into()])?;
 
-        let packed_args = setSnapTime { seconds }.packed();
+        let packed_args = psio::to_pssz(&setSnapTime { seconds });
         schedule_action(
             psibase::services::transact::SERVICE.to_string(),
-            setSnapTime::ACTION_NAME.to_string(),
+            <setSnapTime as psio::interface::Method>::NAME.to_string(),
             packed_args,
         )
     }
@@ -285,7 +310,7 @@ impl Auth for TransactPlugin {
             sender: user.clone(),
             service: app,
             method: "loginSys".to_string(),
-            raw_data: (root_host,).packed(),
+            raw_data: psio::to_pssz(&(root_host,)),
         }];
 
         let claims: Vec<ImportClaim> = user_auth_claim(&user)?.into_iter().collect();
@@ -293,7 +318,7 @@ impl Auth for TransactPlugin {
         let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
         let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
 
-        let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
+        let expiration = TimePointSec::from_chrono_floor(chrono::Utc::now() + chrono::Duration::seconds(3)).unwrap();
         let tapos = Tapos {
             expiration,
             refBlockSuffix: 0,
@@ -306,13 +331,13 @@ impl Auth for TransactPlugin {
             actions,
             claims,
         };
-        let proofs: Vec<Hex<Vec<u8>>> =
-            user_auth_proof(&user, &Sha256::digest(&tx.packed()).into())?
+        let proofs: Vec<Vec<u8>> =
+            user_auth_proof(&user, &Sha256::digest(&psio::to_pssz(&tx)).into())?
                 .into_iter()
-                .map(|proof| Hex::from(proof.signature))
+                .map(|proof| proof.signature)
                 .collect();
         let signed_tx = SignedTransaction {
-            transaction: Hex::from(tx.packed()),
+            transaction: psio::pssz::Nested::new(&tx).unwrap(),
             proofs,
             subjectiveData: None,
         };
@@ -322,7 +347,7 @@ impl Auth for TransactPlugin {
 
         let response = Server::post(&HostTypes::PostRequest {
             endpoint: "/login".to_string(),
-            body: HostTypes::BodyTypes::Bytes(signed_tx.packed()),
+            body: HostTypes::BodyTypes::Bytes(psio::to_pssz(&signed_tx)),
         })?;
 
         let reply = match response {

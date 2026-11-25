@@ -16,7 +16,7 @@
 #include <psibase/db.hpp>
 #include <psibase/peer_manager.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio/finally.hpp>
+#include <psibase/finally.hpp>
 #include <span>
 #include <string>
 #include "close.hpp"
@@ -51,6 +51,9 @@ namespace psibase::http
       enum class StateType : std::uint8_t
       {
          normal,
+         // Close requested while messages were still queued: no new messages
+         // are accepted, the queued ones are written, then the close starts.
+         draining,
          closing,
          error,
       };
@@ -303,22 +306,37 @@ namespace psibase::http
              [self = std::move(self), code]() mutable
              {
                 callClose(self->server, self->logger, *self);
+                auto ptr = static_cast<WebSocketImpl*>(self->impl.get());
                 {
                    std::lock_guard l{self->mutex};
                    if (self->state != WebSocket::StateType::normal)
                       return;
+                   // Messages already accepted for this socket are delivered
+                   // before the close frame. Closing at once discarded them
+                   // (a proxied client lost the last messages of an origin
+                   // that sent and closed), and started a close while a
+                   // write was in flight, which the stream does not allow.
+                   if (!self->outbox.empty())
+                   {
+                      self->state    = WebSocket::StateType::draining;
+                      ptr->closeCode = code;
+                      return;
+                   }
                    self->state = WebSocket::StateType::closing;
                 }
-                auto ptr = static_cast<WebSocketImpl*>(self->impl.get());
-                ptr->stream.async_close(
-                    code,
-                    [self = std::move(self)](const std::error_code& ec)
-                    {
-                       if (ec)
-                          self->error(ec);
-                       else
-                          self->error(make_error_code(boost::beast::websocket::error::closed));
-                    });
+                ptr->startClose(std::move(self), code);
+             });
+      }
+      void startClose(std::shared_ptr<WebSocket>&& self, boost::beast::websocket::close_code code)
+      {
+         stream.async_close(
+             code,
+             [self = std::move(self)](const std::error_code& ec)
+             {
+                if (ec)
+                   self->error(ec);
+                else
+                   self->error(make_error_code(boost::beast::websocket::error::closed));
              });
       }
       void writeLoop(std::shared_ptr<WebSocket>&& self)
@@ -326,7 +344,8 @@ namespace psibase::http
          const WebSocket::QueueItem* item;
          {
             std::unique_lock l{self->mutex};
-            if (self->state != WebSocket::StateType::normal)
+            if (self->state != WebSocket::StateType::normal &&
+                self->state != WebSocket::StateType::draining)
             {
                auto outbox = std::move(self->outbox);
                l.unlock();
@@ -347,6 +366,8 @@ namespace psibase::http
                                       std::size_t            bytes_transferred) mutable
              {
                 bool                                        last;
+                bool                                        closeNow = false;
+                boost::beast::websocket::close_code         closeCode{};
                 std::function<void(const std::error_code&)> callback;
                 {
                    std::unique_lock l{self->mutex};
@@ -367,12 +388,23 @@ namespace psibase::http
                       self->outbox.pop_front();
                    }
                    last = self->outbox.empty();
+                   if (last && self->state == WebSocket::StateType::draining)
+                   {
+                      self->state = WebSocket::StateType::closing;
+                      closeNow    = true;
+                      closeCode   = static_cast<WebSocketImpl*>(self->impl.get())->closeCode;
+                   }
                 }
                 if (callback)
                 {
                    callback(ec);
                 }
-                if (!last)
+                if (closeNow)
+                {
+                   static_cast<WebSocketImpl*>(self->impl.get())
+                       ->startClose(std::move(self), closeCode);
+                }
+                else if (!last)
                 {
                    static_cast<WebSocketImpl*>(self->impl.get())->writeLoop(std::move(self));
                 }
@@ -416,6 +448,9 @@ namespace psibase::http
                            });
       }
       Stream stream;
+      // The code to close with once the outbox drains. Guarded by the
+      // socket's mutex; meaningful only in the draining state.
+      boost::beast::websocket::close_code closeCode{};
    };
 
 }  // namespace psibase::http

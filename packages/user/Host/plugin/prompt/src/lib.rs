@@ -2,6 +2,7 @@
 mod bindings;
 use bindings::*;
 
+mod context_policy;
 mod errors;
 use errors::ErrorType;
 
@@ -38,6 +39,9 @@ impl Api for HostPrompt {
 
     fn get_context() -> Result<Vec<u8>, Error> {
         let prompt = ActivePrompts::get().unwrap();
+        if !context_policy::can_read_context(&get_sender(), &prompt.prompt_app) {
+            return Err(ErrorType::ContextAppMismatch.into());
+        }
         prompt
             .packed_context
             .ok_or_else(|| Error::from(ErrorType::PromptContextNotFound(prompt.prompt_name)))

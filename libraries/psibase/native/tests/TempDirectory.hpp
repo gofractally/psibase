@@ -12,7 +12,10 @@ struct TempDirectory
    {
       constexpr int                              max_tries = 8;
       constexpr int                              len       = 24;
-      auto                                       root      = std::filesystem::temp_directory_path();
+      // Canonical, so absolute links written by tests name the same path a
+      // mount resolves to (the system temporary directory is itself a
+      // symbolic link on macOS).
+      auto root = std::filesystem::canonical(std::filesystem::temp_directory_path());
       std::string_view                           chars     = "abcdefghijklmnopqrstuvwxyz1234567890";
       std::uniform_int_distribution<std::size_t> dist(0, chars.size() - 1);
       std::random_device                         rng;

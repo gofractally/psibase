@@ -1,9 +1,21 @@
 package tokens:plugin;
 
+/// Tokens' own confirmation UI. Foreign apps cannot invoke these methods.
+interface transfer-admin {
+    use host:types/types.{error};
+    get-context: func() -> result<string, error>;
+    approve: func(request-id: string, remember: bool) -> result<_, error>;
+    deny: func(request-id: string) -> result<_, error>;
+}
+
 world impl {
+    include host:accounts/imports;
+    include transact:plugin/hook-pre-publish;
     export types;
     export issuer;
     export user;
+    export transfer;
+    export transfer-admin;
     export user-config;
     export helpers;
     export admin;

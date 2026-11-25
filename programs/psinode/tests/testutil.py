@@ -15,7 +15,7 @@ MIN_ACCOUNT_LENGTH = 10
 
 def psinode_test(f):
     def result(self):
-        with Cluster(executable=args.psinode, log_filter=args.log_filter, log_format=args.log_format, database_cache_size=256*1024*1024) as cluster:
+        with Cluster(executable=args.psinode, log_filter=args.log_filter, log_format=args.log_format, database_cache_policy='disabled') as cluster:
             try:
                 try:
                     result = f(self, cluster)
@@ -99,7 +99,11 @@ def run_test_wasm(command):
     test_wasms = args.test_wasms
     if test_wasms is None:
         test_wasms = dirname
-    return subprocess.run([psitest, os.path.join(test_wasms, command[0])] + command[1:], check=True)
+    # Test WASMs load their companion modules using paths relative to this directory.
+    test_wasms = os.path.abspath(test_wasms)
+    psitest = os.path.abspath(psitest) if os.path.dirname(psitest) else psitest
+    return subprocess.run([psitest, os.path.join(test_wasms, command[0])] + command[1:],
+                          cwd=test_wasms, check=True)
 
 def main(argv=sys.argv):
     parser = argparse.ArgumentParser()

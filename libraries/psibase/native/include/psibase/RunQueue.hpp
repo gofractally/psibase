@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstddef>
+#include <chrono>
 #include <memory>
+#include <optional>
 
 namespace psibase
 {
@@ -10,7 +12,9 @@ namespace psibase
    class RunQueue
    {
      public:
-      explicit RunQueue(std::shared_ptr<SharedState>);
+      // Operator policy for asynchronous context-free proof admission only.
+      explicit RunQueue(std::shared_ptr<SharedState>,
+                        std::optional<std::chrono::microseconds> proofTimeout = std::nullopt);
       ~RunQueue();
       // Tell any thread pools to check for rows to execute
       void notify();

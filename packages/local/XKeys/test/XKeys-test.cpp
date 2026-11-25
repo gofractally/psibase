@@ -51,7 +51,7 @@ TEST_CASE("create account and sign")
    t.startBlock(
        std::chrono::time_point_cast<BlockTime::duration>(std::chrono::system_clock::now()));
 
-   auto tx = t.post<FracPackBody<SignedTransaction>>(
+   auto tx = t.post<PsszBody<SignedTransaction>>(
                   XKeysCaller::service, "/sign",
                   JsonBody{std::vector{Action{
                       .sender = alice, .service = Nop::service, .method = MethodNumber{"nop"}}}})

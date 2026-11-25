@@ -2,6 +2,8 @@
 mod bindings;
 
 mod errors;
+mod transfer;
+mod transfer_policy;
 use errors::ErrorType;
 
 use bindings::exports::tokens::plugin as Exports;

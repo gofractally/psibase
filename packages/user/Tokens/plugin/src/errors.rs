@@ -13,4 +13,6 @@ pub enum ErrorType {
     IconTooBig(usize),
     #[error("Icon content type not allowed: {0}. Use PNG, JPEG, or WebP")]
     InvalidIconContentType(String),
+    #[error("Transfer permission denied: {0}")]
+    TransferPermission(String),
 }

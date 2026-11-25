@@ -24,6 +24,7 @@ import { getClientKeyBytes } from "./client-key";
 import { getRecoverableError } from "./plugin/errors";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
+import { withTransactionLock } from "./transaction-lock";
 import {
     OriginationData,
     assert,
@@ -455,6 +456,24 @@ export class Supervisor implements AppInterface {
 
     // This is an entrypoint for apps to call into plugins.
     async entry(
+        callerOrigin: string,
+        id: string,
+        args: QualifiedFunctionCallArgs,
+    ): Promise<any> {
+        try {
+            return await withTransactionLock(() => this.lockedEntry(callerOrigin, id, args));
+        } catch (error) {
+            // Lock acquisition happens before a call context exists. Reply to
+            // the validated origin captured by the message handler, without
+            // touching another queued context's mutable origination state.
+            window.parent.postMessage(buildFunctionCallResponse(id, new PluginErrorObject(
+                { service: "host", plugin: "client" },
+                error instanceof Error ? error.message : String(error),
+            )), callerOrigin);
+        }
+    }
+
+    private async lockedEntry(
         callerOrigin: string,
         id: string,
         args: QualifiedFunctionCallArgs,

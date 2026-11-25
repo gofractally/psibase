@@ -1,6 +1,8 @@
 #[allow(warnings)]
 mod bindings;
 
+mod prompt_scope;
+mod trust_policy;
 mod types;
 use types::*;
 
@@ -34,23 +36,37 @@ fn assert_admin() {
     assert_eq!(get_sender(), get_receiver())
 }
 
+fn checked_context() -> PackablePromptContext {
+    assert_admin();
+    // Host additionally enforces that only the app which created the prompt
+    // may read its context. An arbitrary initiator cannot forge these fields.
+    let context = HostPrompt::get_context::<PackablePromptContext>()
+        .expect("permission request no longer available; start a fresh review");
+    assert!(
+        prompt_scope::matches_scope(
+            &context.user,
+            HostAccounts::get_current_user().as_deref(),
+            &context.active_app,
+            &get_active_app()
+        ),
+        "permission request account or application changed; start a fresh review"
+    );
+    context
+}
+
 impl PermsAdmin for PermissionsPlugin {
     fn get_context() -> PromptContext {
-        assert_admin();
-        HostPrompt::get_context::<PackablePromptContext>()
-            .unwrap()
-            .into()
+        checked_context().into()
     }
 
     fn approve(duration: ApprovalDuration) {
-        assert_admin();
-        let context = HostPrompt::get_context::<PackablePromptContext>().unwrap();
+        let context = checked_context();
 
         Permissions::set(
             &context.user,
             &context.caller,
             &context.callee,
-            context.level,
+            context.level.into(),
             match duration {
                 ApprovalDuration::Session => StorageDuration::Session,
                 ApprovalDuration::Permanent => StorageDuration::Persistent,
@@ -60,7 +76,7 @@ impl PermsAdmin for PermissionsPlugin {
 }
 
 fn is_already_authorized(user: &str, caller: &str, callee: &str, trust: TrustLevel) -> bool {
-    Permissions::get(user, caller, callee).map_or(false, |perm| perm >= trust)
+    Permissions::get(user, caller, callee).map_or(false, |perm| trust_at_least(perm, trust))
 }
 
 fn validate_caller(caller: &str) -> bool {
@@ -169,8 +185,9 @@ impl Api for PermissionsPlugin {
                 user: user.to_string(),
                 caller: caller.clone(),
                 callee: callee.clone(),
-                level,
+                level: level.into(),
                 descriptions,
+                active_app: get_active_app(),
             }),
         );
 

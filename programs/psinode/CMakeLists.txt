@@ -10,7 +10,6 @@ add_executable(psinode main.cpp init.cpp)
 target_link_libraries(psinode
     services_system
     psibase_http
-    debug_eos_vm
     psibase_net
 )
 target_link_directories( psinode PUBLIC ${ICU_LIBRARY_DIR} )
@@ -29,32 +28,63 @@ target_include_directories(psinode PUBLIC
     ../../packages/psibase_tests)
 set_target_properties(psinode PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 
+# Fills the native artifact cache from package files; see precompile.cpp.
+add_executable(psibase-precompile precompile.cpp)
+target_link_libraries(psibase-precompile psibase)
+target_link_directories(psibase-precompile PUBLIC ${ICU_LIBRARY_DIR})
+set_target_properties(psibase-precompile PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+
 find_package(Python COMPONENTS Interpreter)
 if(Python_Interpreter_FOUND)
+    # These tests would otherwise fail one by one with ModuleNotFoundError.
+    execute_process(
+        COMMAND ${Python_EXECUTABLE} -c "import requests, urllib3, websockets, cryptography"
+        RESULT_VARIABLE psinode_test_modules_missing OUTPUT_QUIET ERROR_VARIABLE psinode_test_modules_error)
+    if(psinode_test_modules_missing)
+        string(REGEX MATCH "No module named '[^']+'" psinode_test_module "${psinode_test_modules_error}")
+        message(WARNING
+            "The psinode tests will fail: ${Python_EXECUTABLE} is missing Python modules "
+            "(${psinode_test_module}). Install them with\n"
+            "  ${Python_EXECUTABLE} -m pip install -r ${CMAKE_CURRENT_SOURCE_DIR}/tests/requirements.txt\n"
+            "or configure with -DPython_EXECUTABLE=<a python that has them>.")
+    endif()
+    if(NOT LIBSOFTHSM2)
+        find_library(LIBSOFTHSM2 libsofthsm2.so PATH_SUFFIXES softhsm)
+    endif()
+    find_program(SOFTHSM2_UTIL softhsm2-util)
+    if(NOT LIBSOFTHSM2 OR NOT SOFTHSM2_UTIL)
+        message(WARNING
+            "SoftHSM 2 was not found (softhsm2-util and libsofthsm2.so): the psinode tests that "
+            "sign with a hardware key (test_crash, test_psibase) will fail.")
+    endif()
     find_library(LIBSOFTHSM2 libsofthsm2.so PATH_SUFFIXES softhsm)
     if(LIBSOFTHSM2)
         set(LIBSOFTHSM2_ARG --libsofthsm2=${LIBSOFTHSM2})
     else()
         set(LIBSOFTHSM2_ARG)
     endif()
+    # The tests pack and read with PSIO's Python package, from the pinned checkout.
+    set(PSINODE_TEST_PYTHONPATH ${PSIBASE_PSIO_SOURCE_DIR}/python/src)
     function(add_psinode_test name)
         add_test(
             NAME psinode_${name}
             COMMAND ${Python_EXECUTABLE} ${name}.py --psinode=$<TARGET_FILE:psinode> ${ARGN}
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+        set_tests_properties(psinode_${name} PROPERTIES
+            ENVIRONMENT PYTHONPATH=${PSINODE_TEST_PYTHONPATH})
     endfunction()
-    add_test(
-        NAME py_test_fracpack
-        COMMAND ${Python_EXECUTABLE} test_fracpack.py
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     add_test(
         NAME py_test_name
         COMMAND ${Python_EXECUTABLE} test_name.py
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    set_tests_properties(py_test_name PROPERTIES
+        ENVIRONMENT PYTHONPATH=${PSINODE_TEST_PYTHONPATH})
     add_test(
         NAME py_test_psibase_types
         COMMAND ${Python_EXECUTABLE} test_psibase_types.py
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    set_tests_properties(py_test_psibase_types PROPERTIES
+        ENVIRONMENT PYTHONPATH=${PSINODE_TEST_PYTHONPATH})
     add_psinode_test(test_connect)
     add_psinode_test(test_routing)
     set_tests_properties(psinode_test_routing PROPERTIES PROCESSORS 7)
