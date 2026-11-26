@@ -80,7 +80,7 @@ TEST_CASE("an annotated result: the schema")
    CHECK(!psio::pssz_ir::validate_pssz(strict.types, node, std::span<const char>{long9}).ok());
 }
 
-TEST_CASE("an annotated result: the caller checks what it receives")
+TEST_CASE("an annotated result: the caller checks what it receives, the callee writes fast")
 {
    DefaultTestChain t;
    t.addService(TestResult::service, "TestResult.wasm");
@@ -110,23 +110,57 @@ TEST_CASE("an annotated result: the caller checks what it receives")
    CHECK(svc.relayNames(strict, 0).returnVal().empty());
    CHECK(svc.relayNamesView(strict, 4).returnVal().size() == 4);
 
-   // A callee does not write a result outside its own returns(...): the
-   // action aborts, called directly or by another service.
-   CHECK(svc.relay(strict, 1).failed("length_bound"));
-   CHECK(svc.symbol(1).failed("length_bound"));
-   CHECK(svc.symbol(2).failed("utf8"));
-   CHECK(svc.names(5).failed("length_bound"));
+   // A callee writes its result with the fast write, whatever its own
+   // returns(...) says: the action succeeds, and what refuses the result is
+   // the caller that reads it. Here the caller is a service ...
+   const std::string_view refused = "value returned from symbol was not serialized as expected";
+   const std::string_view refusedNames =
+       "value returned from names was not serialized as expected";
+   CHECK(svc.relay(strict, 1).failed(refused));
+   CHECK(svc.relay(strict, 2).failed(refused));
+   CHECK(svc.relayView(strict, 1).failed(refused));
+   CHECK(svc.relayView(strict, 2).failed(refused));
+   CHECK(svc.relayNames(strict, 5).failed(refusedNames));
+   CHECK(svc.relayNamesView(strict, 5).failed(refusedNames));
+   // ... and here it is the test, which reads the result of the action it
+   // pushed as the method declares it.
+   {
+      auto ok = svc.symbol(0);
+      CHECK(ok.succeeded());
+      CHECK(!ok.resultError());
+      CHECK(ok.returnVal() == "USD");
+      // One-byte offsets, as returns(max<4> | element(max<16>)) lays it out
+      CHECK(svc.names(2).returnVal() == two);
+
+      auto tooLong = svc.symbol(1);
+      CHECK(tooLong.succeeded());
+      REQUIRE(tooLong.resultError());
+      CHECK(tooLong.resultError()->find("length_bound") != std::string::npos);
+      auto notUtf8 = svc.symbol(2);
+      CHECK(notUtf8.succeeded());
+      REQUIRE(notUtf8.resultError());
+      CHECK(notUtf8.resultError()->find("utf8") != std::string::npos);
+      auto tooMany = svc.names(5);
+      CHECK(tooMany.succeeded());
+      REQUIRE(tooMany.resultError());
+      CHECK(tooMany.resultError()->find("length_bound") != std::string::npos);
+   }
+   // The validated write of a result is asked for by name.
+   {
+      std::vector<char> out;
+      CHECK(psio::encode_method_result_checked<TestResult, 0>(std::string{"USD"}, out).ok());
+      CHECK(!psio::encode_method_result_checked<TestResult, 0>(testSymbol(1), out).ok());
+      CHECK(!psio::encode_method_result_checked<TestResult, 0>(testSymbol(2), out).ok());
+      CHECK(!psio::encode_method_result_checked<TestResult, 1>(testNames(5), out).ok());
+   }
 
    // The caller refuses one from a callee that promises less: nine bytes,
    // bytes that are not UTF-8, and a list packed with the offsets of the
    // plain type (any count: it is another encoding).
-   const std::string_view refused = "value returned from symbol was not serialized as expected";
    CHECK(svc.relay(loose, 1).failed(refused));
    CHECK(svc.relay(loose, 2).failed(refused));
    CHECK(svc.relayView(loose, 1).failed(refused));
    CHECK(svc.relayView(loose, 2).failed(refused));
-   const std::string_view refusedNames =
-       "value returned from names was not serialized as expected";
    CHECK(svc.relayNames(loose, 2).failed(refusedNames));
    CHECK(svc.relayNamesView(loose, 2).failed(refusedNames));
    CHECK(svc.relayNames(loose, 5).failed(refusedNames));

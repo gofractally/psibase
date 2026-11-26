@@ -133,9 +133,11 @@ pub fn set_retval<T: PsszPack<Pssz>>(val: &T) {
 
 /// Set the return value of the currently-executing action, the method `M`
 /// of a service: the result as the method declares it (its
-/// `#[psio(returns(...))]` applied). A value outside that declaration has
-/// no encoding and aborts the action. Used by what `#[psibase::service]`
-/// generates.
+/// `#[psio(returns(...))]` applied). This is the fast write: a value
+/// outside that declaration is written as it is, and the caller, which
+/// validates what it receives (`Method::result_from_pssz`), refuses it.
+/// Only a value the layout cannot hold has no encoding and aborts the
+/// action. Used by what `#[psibase::service]` generates.
 pub fn set_method_retval<M: psio::interface::Method>(val: &M::Result) {
     let bytes = M::result_to_pssz(val).unwrap_or_else(|e| {
         abort_message(&format!("the result of {} has no encoding: {e}", M::NAME))

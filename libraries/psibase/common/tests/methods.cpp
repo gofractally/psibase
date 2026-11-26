@@ -921,11 +921,13 @@ TEST_CASE("methods: a string declared UTF-8 refuses other bytes", "[methods][utf
    const auto badArgs = psio::to_pssz(std::tuple{std::int32_t{7}, notUtf8});
    CHECK(!psio::validate_method_args<Notes, 0>(badArgs).ok());
    CHECK(psio::validate_method_args<Notes, 1>(psio::to_pssz(std::tuple{notUtf8})).ok());
-   // The argument tuple written by the ordinary write is those bytes: what
-   // refuses them is the dispatcher. psio::method_args_to_pssz, which the
-   // action builders use, is still a validated write (PSIO be3376b).
+   // A caller packs such an argument (the fast write, as every action
+   // builder and Actor does): the bytes are the ones the dispatcher refuses.
+   // The validated write refuses the argument at the caller.
+   CHECK(psio::method_args_to_pssz<Notes, 0>(7, notUtf8) == badArgs);
    CHECK(psio::to_pssz(psio::reflect<Notes>::method_arg_tuple<0>{7, notUtf8}) == badArgs);
 #ifndef COMPILING_WASM
-   CHECK_THROWS_AS((psio::method_args_to_pssz<Notes, 0>(7, notUtf8)), psio::codec_exception);
+   CHECK_THROWS_AS((psio::method_args_to_pssz_checked<Notes, 0>(7, notUtf8)),
+                   psio::codec_exception);
 #endif
 }

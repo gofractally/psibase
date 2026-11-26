@@ -88,11 +88,39 @@ namespace psibase
       TransactionTrace _t;
    };
 
+   /// The trace of an action and the value it returned
+   ///
+   /// The test is the caller of the action: it reads the result as a caller
+   /// does, validated. A service writes its result with the fast write, so
+   /// what refuses a result outside the method's `returns(...)` is this
+   /// read. A refused result leaves the transaction as it was (it
+   /// succeeded): `resultError()` says why the value was refused and
+   /// `returnVal()` aborts.
    template <typename ReturnType>
    class Result : public TraceResult
    {
      public:
-      Result(TransactionTrace&& t)
+      /// Validates `bytes` and decodes them into the value
+      using Decode = psio::codec_status (*)(std::span<const char> bytes, ReturnType& value);
+
+      /// The result as the plain type: for a trace whose method is not known
+      static psio::codec_status decodePlain(std::span<const char> bytes, ReturnType& value)
+      {
+         if (auto status = psio::validate_pssz<ReturnType>(bytes); !status.ok())
+            return status;
+         value = psio::from_pssz<ReturnType>(psio::trusted{bytes});
+         return psio::codec_ok();
+      }
+      /// The result of method `I` of `T`, with everything its `returns(...)`
+      /// states (`psio::decode_method_result`)
+      template <typename T, std::size_t I>
+         requires std::same_as<ReturnType, psio::method_result_t<T, I>>
+      static psio::codec_status decodeMethod(std::span<const char> bytes, ReturnType& value)
+      {
+         return psio::decode_method_result<T, I>(bytes, value);
+      }
+
+      Result(TransactionTrace&& t, Decode decode = &decodePlain)
           : TraceResult(std::forward<TransactionTrace>(t)), _return(std::nullopt)
       {
          if (!_t.error.has_value())
@@ -100,9 +128,18 @@ namespace psibase
             // Every value has an encoding, and an empty optional's is no
             // bytes at all: the size says nothing about whether the action
             // returned.
-            _return = psio::from_pssz<ReturnType>(getTopAction(t, 0).rawRetval);
+            ReturnType value{};
+            if (auto status = decode(getTopAction(_t, 0).rawRetval, value); status.ok())
+               _return = std::move(value);
+            else
+               _resultError = std::string("value returned was not serialized as expected: ") +
+                              std::string(status.error().what);
          }
       }
+
+      /// Why the returned bytes are not a result of the method; empty if they
+      /// are one, or if the action failed
+      const std::optional<std::string>& resultError() const { return _resultError; }
 
       ReturnType returnVal()
       {
@@ -117,13 +154,15 @@ namespace psibase
          }
          else
          {
-            check(false, "Action aborted, no return value");
+            check(false, _resultError ? *_resultError
+                                      : std::string("Action aborted, no return value"));
             return ReturnType();  // Silence compiler warning
          }
       }
 
      private:
-      std::optional<ReturnType> _return;
+      std::optional<ReturnType>  _return;
+      std::optional<std::string> _resultError;
    };
 
    template <>
@@ -678,7 +717,15 @@ namespace psibase
                chain.startBlock(0);
             }
 
-            return Result<result_type>(chain.trace(act, keys));
+            using Class = MethodClass<MemberPtr>;
+            if constexpr (std::is_void_v<result_type>)
+               return Result<result_type>(chain.trace(act, keys));
+            else if constexpr (std::same_as<result_type, psio::method_result_t<Class, I>>)
+               return Result<result_type>(
+                   chain.trace(act, keys),
+                   &Result<result_type>::template decodeMethod<Class, I>);
+            else
+               return Result<result_type>(chain.trace(act, keys));
          }
       };
 

@@ -52,6 +52,10 @@ TEST_CASE("two modes: an action argument outside its declaration is refused at d
    CHECK(push(psio::to_pssz(Args{"caf\xc3\xa9"})).succeeded());
    CHECK(push(psio::to_pssz(Args{tooLong})).failed(refused));
    CHECK(push(psio::to_pssz(Args{notUtf8})).failed(refused));
+   // The action builders (the tester here, transactor, Actor) pack with the
+   // fast write too: the same refusal, from the dispatcher.
+   CHECK(svc.declared(tooLong).failed(refused));
+   CHECK(svc.declared(notUtf8).failed(refused));
    // The validated write of the same values refuses them at the caller.
    std::vector<char> out;
    CHECK(psio::encode_pssz_checked(psio::pssz{}, Args{fits}, out).ok());
