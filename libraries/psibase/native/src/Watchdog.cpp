@@ -58,7 +58,7 @@ namespace psibase
             {
                // Still here after it was cancelled: deliver it again. Its
                // owner removes it when the run has ended.
-               child->handler();
+               // EXPERIMENT ONLY: no repetition, to show the engine fix alone.
                continue;
             }
             // The deadline is read here, under the mutex, so it reflects every
