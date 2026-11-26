@@ -22,6 +22,7 @@ function(add suffix)
     service(TestImport "${suffix}" src/TestImport.cpp)
 
     service(AbortService "${suffix}" src/AbortService.cpp)
+    service(Recurse "${suffix}" src/Recurse.cpp)
     service(EmitEvents "${suffix}" src/EmitEvents.cpp)
     service(RemoveCode "${suffix}" src/RemoveCode.cpp)
     service(SubjectiveDb "${suffix}" src/SubjectiveDb.cpp)

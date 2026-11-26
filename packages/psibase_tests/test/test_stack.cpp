@@ -9,18 +9,18 @@ using namespace TestService;
 namespace
 {
    // The test module's own recursion: runs `f` with `depth` of the test
-   // module's frames above it on the native stack.
+   // module's frames above it on the native stack. Kept shallow by its
+   // caller: a test module's own linear-memory stack is small.
    template <typename F>
-   [[clang::noinline]] std::uint64_t below(std::uint32_t depth, F& f)
+   [[clang::noinline]] std::uint64_t below(std::uint64_t depth, F& f)
    {
-      volatile char frame[256];
-      frame[depth % sizeof(frame)] = static_cast<char>(depth);
       if (depth == 0)
       {
          f();
-         return frame[0];
+         return 0;
       }
-      return below(depth - 1, f) + frame[depth % sizeof(frame)];
+      auto rest = below(depth - 1, f);
+      return ((rest << 7) | (rest >> 57)) * 31 + depth;
    }
 }  // namespace
 
@@ -44,24 +44,26 @@ TEST_CASE("A service that recurses without bound fails by the stack budget")
    // Without bound.
    expect(push(~std::uint64_t(0)), overflow);
 
-   // It is the budget that ends it, not the native stack: 20,000 levels need
-   // at least 5 MB of the 1 MiB budget, and far less than the native stack
-   // wasmtime would let the service have (128 MiB).
-   const WasmConfigRow config =
+   // It is the budget that ends it, not the native stack. Every call takes
+   // at least 16 bytes of the budget, so this many levels cannot fit in it;
+   // they are a few megabytes of native stack, of which wasmtime would let
+   // the service have 128 MiB.
+   const auto config =
        t.kvGet<WasmConfigRow>(WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable))
            .value_or(WasmConfigRow{});
-   REQUIRE(std::uint64_t(20'000) * Recurse::frameBytes > config.vmOptions.max_stack_bytes);
-   expect(push(20'000), overflow);
+   const std::uint64_t tooDeep = config.vmOptions.max_stack_bytes / 16 + 1;
+   REQUIRE(tooDeep < 1'000'000);
+   expect(push(tooDeep), overflow);
 
    // The failures left the chain and the tester usable.
-   expect(push(100));
+   expect(push(101));
 
    // The same from deep inside the test module's own recursion.
    auto nested = [&]
    {
-      expect(push(100));
+      expect(push(102));
       expect(push(~std::uint64_t(0)), overflow);
-      expect(push(100));
+      expect(push(103));
    };
-   below(20'000, nested);
+   CHECK(below(1'000, nested) != 0);
 }

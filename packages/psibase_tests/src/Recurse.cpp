@@ -6,15 +6,15 @@ using namespace TestService;
 
 namespace
 {
-   // Not a tail call, and every level keeps a buffer live across the call
-   // below it, so no compiler turns this into a loop.
+   // Not a tail call, and the result is not an accumulation a compiler can
+   // turn into a loop. Nothing here has its address taken, so a level uses
+   // the wasm call stack only, not the service's linear memory.
    [[clang::noinline]] std::uint64_t level(std::uint64_t depth, std::uint64_t limit)
    {
-      volatile char frame[Recurse::frameBytes];
-      frame[depth % sizeof(frame)] = static_cast<char>(depth);
       if (depth == limit)
-         return frame[depth % sizeof(frame)];
-      return level(depth + 1, limit) + frame[depth % sizeof(frame)];
+         return depth;
+      auto below = level(depth + 1, limit);
+      return ((below << 7) | (below >> 57)) * 31 + depth;
    }
 }  // namespace
 
