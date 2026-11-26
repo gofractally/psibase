@@ -1,3 +1,6 @@
+#include <psibase/Watchdog.hpp>
+#include <string>
+#include <cstdio>
 #include <psibase/NativeFunctions.hpp>
 
 #include <atomic>
@@ -694,6 +697,29 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
 
    void ExecutionContextImpl::asyncTimeout()
    {
+      if (psibaseWatchdogDiagReport)
+      {
+         // What protection the module's code has now, from the kernel's map.
+         const auto  span  = backend.backend->get_module().allocator.get_code_span();
+         const auto  begin = reinterpret_cast<std::uintptr_t>(span.data());
+         std::string perms = "?";
+         if (std::FILE* maps = std::fopen("/proc/self/maps", "r"))
+         {
+            char line[512];
+            while (std::fgets(line, sizeof line, maps))
+            {
+               unsigned long lo = 0, hi = 0;
+               char          p[8] = {};
+               if (std::sscanf(line, "%lx-%lx %7s", &lo, &hi, p) == 3 && begin >= lo && begin < hi)
+                  perms = p;
+            }
+            std::fclose(maps);
+         }
+         std::fprintf(stderr, "JIT2-DIAG ctx service=%s timedOut=%d initialized=%d code=%p+%zu perms=%s\n",
+                      code.codeNum.str().c_str(), int(timedOut.load()), int(initialized),
+                      (void*)span.data(), span.size(), perms.c_str());
+         return;
+      }
       timedOut = true;
       backend.backend->get_module().allocator.disable_code();
    }

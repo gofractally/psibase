@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -33,6 +34,7 @@ namespace psibase
    };
 
    class Watchdog;
+   extern std::atomic<bool> psibaseWatchdogDiagReport;
 
    // One thread that cancels whichever watchdog's deadline has passed. The
    // threads being watched never evaluate their own limits.
@@ -118,6 +120,7 @@ namespace psibase
       // Its deadline has passed and it has been cancelled; from then on it
       // is cancelled again on every look.
       bool cancelled = false;
+      RunClock::time_point diagCancelledAt{};
    };
 
 }  // namespace psibase

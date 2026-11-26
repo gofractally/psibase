@@ -646,6 +646,10 @@ namespace psibase
    void TransactionContextImpl::asyncTimeout()
    {
       std::lock_guard<std::mutex> guard{mutex};
+      if (psibaseWatchdogDiagReport)
+         std::fprintf(stderr, "JIT2-DIAG tx: timedOut=%d threadFlag=%d contexts=%zu alt=%zu altMode=%d\n",
+                      int(timedOut), int(vmTimedOut.load()), executionContexts.size(),
+                      altExecContexts.size(), int(altMode));
       timedOut   = true;
       vmTimedOut = true;
       // Each context is told once. On wasmtime that is enough even though

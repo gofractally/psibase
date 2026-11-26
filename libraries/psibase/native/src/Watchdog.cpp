@@ -2,9 +2,13 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdlib>
+#include <cstdio>
+#include <atomic>
 
 namespace psibase
 {
+   std::atomic<bool> psibaseWatchdogDiagReport{false};
    namespace
    {
       auto toSteady(RunClock::time_point time)
@@ -58,7 +62,18 @@ namespace psibase
             {
                // Still here after it was cancelled: deliver it again. Its
                // owner removes it when the run has ended.
-               // EXPERIMENT ONLY: no repetition, to show the engine fix alone.
+               // DIAGNOSTIC (gofractally/psibase#2263): single delivery; a run
+               // still alive 8 s after it was cancelled reports its state
+               // (the handler is called once more, in report mode) and the
+               // process stops.
+               if (child->diagCancelledAt.time_since_epoch().count() != 0 &&
+                   now - child->diagCancelledAt > std::chrono::seconds(8))
+               {
+                  psibaseWatchdogDiagReport = true;
+                  child->handler();
+                  std::fflush(stderr);
+                  std::abort();
+               }
                continue;
             }
             // The deadline is read here, under the mutex, so it reflects every
@@ -67,7 +82,8 @@ namespace psibase
             const auto deadline = child->deadline();
             if (deadline && *deadline <= now)
             {
-               child->cancelled = true;
+               child->cancelled       = true;
+               child->diagCancelledAt = now;
                child->interrupt();
             }
             else if (deadline && *deadline < look)
