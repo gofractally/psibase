@@ -63,7 +63,7 @@ impl HookUserAuth for AuthSig {
         let record = get_key_record(&account_name)?;
         Ok(Some(Claim {
             verify_service: record.verifier,
-            raw_data: AuthSig::to_der(record.pubkey)?,
+            raw_data: AuthSig::to_der(record.key)?,
         }))
     }
 
@@ -132,10 +132,17 @@ impl Actions for AuthSig {
             vec!["host".into(), "namemarket".into(), "homepage".into()],
         )?;
 
+        // This plugin holds one key per account: it is both the owner and
+        // the active key. This stores it for an account that does not use
+        // auth-sig yet. An account that does is refused by the service: its
+        // keys change through setActive and requestOwnerChange, which this
+        // plugin does not offer yet.
+        let spec = psibase::services::auth_sig::KeySpec::of(AuthSig::to_der(public_key)?.into());
         Transact::add_action_to_transaction(
-            <MyService::setKey as psio::interface::Method>::NAME,
-            &psio::to_pssz(&MyService::setKey {
-                key: AuthSig::to_der(public_key)?.into(),
+            <MyService::setKeys as psio::interface::Method>::NAME,
+            &psio::to_pssz(&MyService::setKeys {
+                owner: spec.clone(),
+                active: spec,
             }),
         )?;
 
@@ -153,9 +160,11 @@ impl Actions for AuthSig {
 
         Transact::add_action_to_transaction(
             <MyService::newAccount as psio::interface::Method>::NAME,
+            // One key: it is both the owner and the active key.
             &psio::to_pssz(&MyService::newAccount {
                 name,
-                key: key.into(),
+                owner: psibase::services::auth_sig::KeySpec::of(key.clone().into()),
+                active: psibase::services::auth_sig::KeySpec::of(key.into()),
             }),
         )?;
 

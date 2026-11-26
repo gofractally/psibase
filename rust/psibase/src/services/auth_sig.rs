@@ -1,5 +1,3 @@
-use async_graphql::{InputObject, SimpleObject};
-
 /// A public key: the DER bytes of an X.509 SubjectPublicKeyInfo.
 ///
 /// Wherever it is packed it is its bytes (`transparent`); they are not
@@ -179,54 +177,153 @@ impl From<Vec<u8>> for SubjectPublicKeyInfo {
     }
 }
 
-#[derive(
-    Debug,
-    Clone,
-    SimpleObject,
-    InputObject,
-    psio::PsszPack,
-    psio::PsszUnpack,
-    psio::PsszView,
-    psio::ToPsszSchema,
-    psio::JsonText,
-    psio::Serde,
-)]
-#[graphql(input_name = "AuthRecord")]
-/// A record containing the authorization claims needed for an account using this auth service.
-pub struct AuthRecord {
-    /// The account whose transactions will be required to contain the specified public key.
-    pub account: crate::AccountNumber,
-
-    /// The public key included in the claims for each transaction sent by this account.
-    pub pubkey: SubjectPublicKeyInfo,
-
-    /// The service that verifies signatures made with the key: the service the
-    /// account's claims must name. One of the verifiers allowed for the key's
-    /// type (`psibase::allowed_verifiers`); the default for the type unless the
-    /// account chose another with `setKeyVerifier`.
-    pub verifier: crate::AccountNumber,
+/// A key as a caller supplies it (C++ `SystemService::AuthSig::KeySpec`).
+#[derive(Debug, Clone, PartialEq, Eq, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+pub struct KeySpec {
+    /// The public key
+    pub key: SubjectPublicKeyInfo,
+    /// The sequence value the key was derived with. Opaque to the chain: it
+    /// is stored so that a device can derive the key again.
+    pub seq: u64,
+    /// The service that verifies signatures made with the key: one of the
+    /// verifiers allowed for the key's type (`psibase::allowed_verifiers`).
+    /// The default for the type if absent.
+    pub verifier: Option<crate::AccountNumber>,
 }
 
-/// The `auth-sig` service is an auth service that can be used to authenticate actions for accounts.
-///
-/// Any account using this auth service must store in this service a public key that they own.
-/// This service will ensure that the specified public key is included in the transaction claims for any
-/// transaction sent by this account.
-///
-/// This service supports K1 or R1 keys (Secp256K1 or Secp256R1) keys.
+impl KeySpec {
+    /// For a caller that has one key and no sequence values: used as both
+    /// the owner and the active key, it gives an account that the one key
+    /// controls completely.
+    pub fn of(key: SubjectPublicKeyInfo) -> Self {
+        KeySpec { key, seq: 0, verifier: None }
+    }
+}
+
+/// A key of an account
+#[derive(Debug, Clone, PartialEq, Eq, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+pub struct AuthKey {
+    /// The service that verifies signatures made with the key. A claim
+    /// counts for this key only if it names this service.
+    pub verifier: crate::AccountNumber,
+    pub key: SubjectPublicKeyInfo,
+    /// See `KeySpec::seq`
+    pub seq: u64,
+}
+
+/// An owner key that was replaced without the recovery partner's
+/// confirmation. Until `expires` it may pause the account once and may
+/// freeze it.
+#[derive(Debug, Clone, PartialEq, Eq, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+pub struct PriorOwnerKey {
+    pub verifier: crate::AccountNumber,
+    pub key: SubjectPublicKeyInfo,
+    pub seq: u64,
+    /// The end of the key's freeze window
+    pub expires: crate::TimePointSec,
+    /// Whether the key has used its one pause
+    pub paused: bool,
+}
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::Key, psio::JsonText, psio::Serde)]
+#[serde(rename_all = "camelCase")]
+#[psio(custom = "AccountState")]
+pub enum AccountState {
+    /// Active authorizes ordinary actions, owner everything
+    Normal,
+    /// Nothing is authorized, except that an owner key may freeze
+    Paused,
+    /// Nothing is authorized; only the recovery partner releases it
+    Frozen,
+}
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::Key, psio::JsonText, psio::Serde)]
+#[serde(rename_all = "camelCase")]
+#[psio(custom = "ChangeKind")]
+pub enum ChangeKind {
+    OwnerKeys,
+    Partner,
+    Delays,
+}
+
+/// A change that was requested and has not taken effect. The account is
+/// paused while it is pending.
+#[derive(Debug, Clone, PartialEq, Eq, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+pub struct PendingChange {
+    pub kind: ChangeKind,
+    /// ownerKeys: the new keys
+    pub owner: Option<AuthKey>,
+    pub active: Option<AuthKey>,
+    /// partner: the new recovery partner, or nothing for none
+    pub partner: Option<crate::AccountNumber>,
+    /// delays: the new pause length and freeze window, in seconds
+    pub pauseSeconds: Option<u32>,
+    pub freezeSeconds: Option<u32>,
+    /// When it was requested
+    pub requested: crate::TimePointSec,
+}
+
+/// The record of an account, as stored. See C++
+/// `SystemService::AuthSig::AuthRecord`: transitions that are due are not
+/// applied in what is stored; the service's queries report the record as of
+/// the current block.
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+pub struct AuthRecord {
+    pub account: crate::AccountNumber,
+    /// Authorizes everything, and is the only key accepted for the actions
+    /// that change who controls the account
+    pub owner: AuthKey,
+    /// Authorizes ordinary actions
+    pub active: AuthKey,
+    /// The account that may confirm or reject a pending change, end a pause,
+    /// and release a freeze
+    pub partner: Option<crate::AccountNumber>,
+    /// How long a pause lasts, in seconds
+    pub pauseSeconds: u32,
+    /// For how long a replaced owner key may still freeze the account, in seconds
+    pub freezeSeconds: u32,
+    pub state: AccountState,
+    /// When the pause or freeze began
+    pub stateSince: Option<crate::TimePointSec>,
+    /// When the pause ends by itself. A freeze has no end.
+    pub stateUntil: Option<crate::TimePointSec>,
+    /// At most one
+    pub pending: Option<PendingChange>,
+    /// Replaced owner keys still in their freeze windows
+    pub priorOwners: Vec<PriorOwnerKey>,
+    /// The id the next recovery request of this account gets
+    pub nextRequestId: u32,
+}
+
+/// Keys proposed for a frozen account by a holder of one of its owner keys
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+pub struct RecoveryRequest {
+    pub account: crate::AccountNumber,
+    pub id: u32,
+    pub owner: AuthKey,
+    pub active: AuthKey,
+    /// The owner key, current or replaced, that signed the proposal
+    pub signedBy: AuthKey,
+    pub time: crate::TimePointSec,
+}
+
+/// The `auth-sig` service authenticates the actions of accounts that are
+/// controlled by keys: an active key for ordinary actions and an owner key
+/// for everything, with changes of control that are pending, pausable and
+/// freezable. The authority is the C++ service
+/// (`packages/system/AuthSig/include/services/system/AuthSig.hpp`); see it
+/// for the rules.
 #[crate::service(name = "auth-sig", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use super::SubjectPublicKeyInfo;
+    use super::KeySpec;
     use crate::{services::transact::ServiceMethod, AccountNumber, Claim};
 
-    /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]
-    ///
-    /// This action is automatically called by `transact` when an account using this auth service submits a
-    /// transaction.
-    ///
-    /// This action verifies that the transaction contains a claim for the user's public key
-    /// that names the verifier stored with the key.
+    /// Decides whether the claims of a transaction authorize `action` for
+    /// `sender`, from the strongest key the claims count for, the state of
+    /// the account, and the action.
     #[action]
     fn checkAuthSys(
         flags: u32,
@@ -237,76 +334,141 @@ mod service {
         unimplemented!()
     }
 
-    /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]
-    ///
-    /// This action is automatically called by `accounts` when an account is configured to use this auth service.
-    ///
-    /// Verifies that a particular user is allowed to use a particular auth service.
-    ///
-    /// This action allows any user who has already set a public key using `AuthSig::setKey`.
+    /// Allows any user who has keys in this service.
     #[action]
     fn canAuthUserSys(user: AccountNumber) {
         unimplemented!()
     }
 
-    /// Set the sender's public key
-    ///
-    /// This is the public key that must be claimed by the transaction whenever a sender using this auth service
-    /// submits a transaction. Signatures are verified by the default verifier for the key's type.
+    /// Create a new account using this auth service, with the specified
+    /// keys. The sender becomes the account's recovery partner. A caller
+    /// that has a single key passes it as both (`KeySpec::of`).
     #[action]
-    fn setKey(key: SubjectPublicKeyInfo) {
+    fn newAccount(name: AccountNumber, owner: KeySpec, active: KeySpec) {
         unimplemented!()
     }
 
-    /// Set the sender's public key and choose the service that verifies its signatures
-    ///
-    /// `verifier` must be one of the verifiers allowed for the key's type; see
-    /// `psibase::allowed_verifiers`. From then on the sender's claims must name `verifier`,
-    /// and claims that name any other service are refused, including the default
-    /// verifier for the key's type.
+    /// Store the sender's keys, for an account that does not use this auth
+    /// service: `setKeys`, then `accounts::setAuthServ`.
     #[action]
-    fn setKeyVerifier(verifier: AccountNumber, key: SubjectPublicKeyInfo) {
+    fn setKeys(owner: KeySpec, active: KeySpec) {
         unimplemented!()
     }
 
-    /// Get the accounts this auth service delegates authority to for a sender.
+    /// Replace the sender's active key. Owner key only. Immediate.
     #[action]
-    fn getDlgsSys(sender: AccountNumber) -> Vec<AccountNumber> {
+    fn setActive(active: KeySpec) {
         unimplemented!()
     }
 
-    /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
-    /// transaction from a specified sender.
-    ///
-    /// * `sender`: The sender account for the transaction potentially being authorized.
-    /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
-    ///
-    /// Returns:
-    /// * `true`: If the sender is among the authorizers
-    /// * `false`: If the sender is not among the authorizers
+    /// Request new owner and active keys for the sender. Owner key only.
+    /// The account is paused and the change is pending.
     #[action]
-    fn isAuthSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
+    fn requestOwnerChange(owner: KeySpec, active: KeySpec) {
         unimplemented!()
     }
 
-    /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
-    /// transaction from a specified sender.
-    ///
-    /// * `sender`: The sender account for the transaction potentially being rejected.
-    /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
-    ///
-    /// Returns:
-    /// * `true`: If the sender is among the rejecters
-    /// * `false`: If the sender is not among the rejecters
+    /// Request a new recovery partner for the sender, or none. Owner key
+    /// only. Pending in the same way as an owner-key change.
     #[action]
-    fn isRejectSys(sender: AccountNumber, rejecters: Vec<AccountNumber>) -> bool {
+    fn requestPartnerChange(partner: Option<AccountNumber>) {
         unimplemented!()
     }
 
-    /// Create a new account using this auth service configured with the specified public key.
-    /// Signatures are verified by the default verifier for the key's type.
+    /// Request a new pause length and freeze window for the sender, in
+    /// seconds. Owner key only. Pending in the same way.
     #[action]
-    fn newAccount(name: AccountNumber, key: SubjectPublicKeyInfo) {
+    fn requestDelays(pauseSeconds: u32, freezeSeconds: u32) {
+        unimplemented!()
+    }
+
+    /// Pause the sender. With the owner key, or once with a replaced owner
+    /// key still in its freeze window.
+    #[action]
+    fn pause() {
+        unimplemented!()
+    }
+
+    /// Freeze the sender. With the owner key or a replaced owner key still
+    /// in its freeze window.
+    #[action]
+    fn freeze() {
+        unimplemented!()
+    }
+
+    /// Propose new keys for the sender, which must be frozen. Returns the
+    /// id of the recovery request.
+    #[action]
+    fn proposeRecovery(owner: KeySpec, active: KeySpec) -> u32 {
+        unimplemented!()
+    }
+
+    /// By the recovery partner: the pending change takes effect now.
+    #[action]
+    fn confirm(account: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// By the recovery partner: the pending change is dropped.
+    #[action]
+    fn reject(account: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// By the recovery partner: end a pause that has no pending change.
+    #[action]
+    fn endPause(account: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// By the recovery partner: install the keys of a recovery request.
+    #[action]
+    fn unfreeze(account: AccountNumber, requestId: u32) {
+        unimplemented!()
+    }
+
+    /// By the recovery partner: drop a recovery request.
+    #[action]
+    fn rejectRecovery(account: AccountNumber, requestId: u32) {
+        unimplemented!()
+    }
+
+    /// By the recovery partner of a frozen account: install these keys.
+    #[action]
+    fn unfreezeWith(account: AccountNumber, owner: KeySpec, active: KeySpec) {
+        unimplemented!()
+    }
+
+    /// Write the account's record as it is now. Anyone may call it.
+    #[action]
+    fn refresh(account: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Get the accounts this auth service delegates authority to for a sender: none.
+    #[action]
+    fn getDlgsSys(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
+        unimplemented!()
+    }
+
+    /// `true` only if the sender is among the authorizers, the account is
+    /// in its normal state, and `method` is not a control action.
+    #[action]
+    fn isAuthSys(
+        sender: AccountNumber,
+        authorizers: Vec<AccountNumber>,
+        method: Option<ServiceMethod>,
+    ) -> bool {
+        unimplemented!()
+    }
+
+    /// `true` if the sender is among the rejecters.
+    #[action]
+    fn isRejectSys(
+        sender: AccountNumber,
+        rejecters: Vec<AccountNumber>,
+        method: Option<ServiceMethod>,
+    ) -> bool {
         unimplemented!()
     }
 }

@@ -246,7 +246,7 @@ class PrivateKey:
     verifier = None
     def with_verifier(self, verifier):
         """The same key, signing for an account that chose verifier for it
-        (auth-sig's setKeyVerifier) in place of the default for its type"""
+        (the verifier stored with the key in auth-sig) in place of the default for its type"""
         import copy
         result = copy.copy(self)
         result.verifier = verifier

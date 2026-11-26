@@ -2,10 +2,17 @@ use crate::bindings::host::types::types::Pem;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
-pub struct AuthRecord {
-    pub pubkey: Pem,
-    /// The service the account's claims must name
+pub struct AuthKey {
+    pub key: Pem,
+    /// The service a claim for this key must name
     pub verifier: String,
+}
+
+/// The part of an account's record that this plugin uses: the active key,
+/// which is the key a device holds and signs transactions with.
+#[derive(Deserialize, Debug)]
+pub struct AuthRecord {
+    pub active: AuthKey,
 }
 
 #[derive(Deserialize, Debug)]

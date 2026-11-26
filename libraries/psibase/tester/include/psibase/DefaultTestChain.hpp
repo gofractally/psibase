@@ -39,11 +39,15 @@ namespace psibase
          }
       }
 
+      /// Makes `name` an auth-sig account that `pubkey` controls completely:
+      /// it is both the owner and the active key.
       template <typename AuthService>
       void setAuth(AccountNumber name, const auto& pubkey)
       {
+         using SystemService::AuthSig::KeySpec;
          auto n  = name.str();
-         auto t1 = this->from(name).to<AuthService>().setKey(pubkey);
+         auto t1 = this->from(name).to<AuthService>().setKeys(KeySpec::of(pubkey),
+                                                             KeySpec::of(pubkey));
          check(psibase::show(false, t1.trace()) == "", "Failed to setkey for " + n);
          auto t2 = this->from(name).to<SystemService::Accounts>().setAuthServ(AuthService::service);
          check(psibase::show(false, t2.trace()) == "", "Failed to setAuthServ for " + n);

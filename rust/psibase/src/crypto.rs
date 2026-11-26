@@ -745,7 +745,7 @@ fn split_verifier(s: &str) -> (Option<AccountNumber>, &str) {
 #[cfg(not(target_family = "wasm"))]
 impl AnyPrivateKey {
     /// The same key, signing for an account that chose `verifier` for it
-    /// (auth-sig's setKeyVerifier): its claims name `verifier` instead of
+    /// (the verifier stored with the key in auth-sig): its claims name `verifier` instead of
     /// the default for the key's type. Fails unless `verifier` is one of the
     /// verifiers allowed for the key.
     pub fn with_verifier(&self, verifier: AccountNumber) -> Result<Self, Error> {

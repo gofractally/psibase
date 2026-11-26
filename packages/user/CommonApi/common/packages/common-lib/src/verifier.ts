@@ -7,7 +7,7 @@
 // and psibase::verifier (Rust); the three must agree.
 //
 // A claim for an account must name the verifier the account stored with its
-// key (auth-sig's `account(name) { pubkey verifier }`); verifierFor is only
+// key (auth-sig's `account(name) { active { key verifier } }`); verifierFor is only
 // the default.
 
 export type VerifiedKeyType = "secp256k1" | "secp256r1";

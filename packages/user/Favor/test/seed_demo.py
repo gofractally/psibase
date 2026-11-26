@@ -140,7 +140,7 @@ def main():
         else:
             if info["authService"] != "auth-sig":
                 raise RuntimeError("Refusing to change an existing account's authority: " + account)
-            actual = query("auth-sig", "{account(name:" + json.dumps(account) + "){pubkey}}")['account']['pubkey']
+            actual = query("auth-sig", "{account(name:" + json.dumps(account) + "){active{key}}}")['account']['active']['key']
             if actual.strip() != public[account].read_text().strip():
                 raise RuntimeError("Existing account uses another signing key: " + account)
 

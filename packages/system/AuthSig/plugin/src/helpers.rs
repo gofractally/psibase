@@ -3,39 +3,39 @@ use crate::bindings::host::client::api as Client;
 use crate::bindings::host::types::types as CommonTypes;
 use crate::bindings::host::types::types::Pem;
 use crate::errors::ErrorType::*;
-use crate::types::{AccWithKeyResponse, AuthRecord, OptionalResponse, Response};
+use crate::types::{AccWithKeyResponse, AuthKey, OptionalResponse, Response};
 
-/// The account's key and the verifier stored with it: what a claim for the
-/// account is made of. The verifier is the account's choice (auth-sig's
-/// setKeyVerifier), so it is read from the chain and not derived from the key.
-pub fn get_key_record(account_name: &str) -> Result<AuthRecord, CommonTypes::Error> {
+/// The account's active key and the verifier stored with it: what a claim
+/// for the account is made of. The verifier is the account's choice, so it is
+/// read from the chain and not derived from the key.
+pub fn get_key_record(account_name: &str) -> Result<AuthKey, CommonTypes::Error> {
     let user_key_json = Server::post_graphql_get_json(&format!(
-        "query {{ account(name: \"{}\") {{ pubkey verifier }} }}",
+        "query {{ account(name: \"{}\") {{ active {{ key verifier }} }} }}",
         account_name
     ))?;
 
     let summary_val = serde_json::from_str::<Response>(&user_key_json)
         .map_err(|e| JsonDecodeError(e.to_string()))?;
 
-    Ok(summary_val.data.account)
+    Ok(summary_val.data.account.active)
 }
 
 pub fn get_pubkey(account_name: &str) -> Result<Pem, CommonTypes::Error> {
-    Ok(get_key_record(account_name)?.pubkey)
+    Ok(get_key_record(account_name)?.key)
 }
 
 pub fn find_pubkey(account_name: &str) -> Result<Option<Pem>, CommonTypes::Error> {
     let name = psibase::AccountNumber::from_exact(account_name)
         .map_err(|_| InvalidAccountName(account_name))?;
     let json = Server::post_graphql_get_json(&format!(
-        "query {{ account(name: \"{}\") {{ pubkey verifier }} }}",
+        "query {{ account(name: \"{}\") {{ active {{ key verifier }} }} }}",
         name
     ))?;
 
     let response = serde_json::from_str::<OptionalResponse>(&json)
         .map_err(|e| JsonDecodeError(e.to_string()))?;
 
-    Ok(response.data.account.map(|record| record.pubkey))
+    Ok(response.data.account.map(|record| record.active.key))
 }
 
 pub fn get_accounts_with_key(public_key: &str) -> Result<Vec<String>, CommonTypes::Error> {

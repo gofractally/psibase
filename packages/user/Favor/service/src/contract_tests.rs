@@ -1226,7 +1226,10 @@ fn signed_transactions_require_the_senders_key_and_valid_signature() {
     };
     for (user, key) in [(A, &alice), (B, &bob), (Wrapper::SERVICE, &admin)] {
         f.ok(vec![
-            services::auth_sig::Wrapper::pack_from(user).setKey(public(key).into()),
+            services::auth_sig::Wrapper::pack_from(user).setKeys(
+                services::auth_sig::KeySpec::of(public(key).into()),
+                services::auth_sig::KeySpec::of(public(key).into()),
+            ),
             services::accounts::Wrapper::pack_from(user).setAuthServ(services::auth_sig::SERVICE),
         ]);
     }

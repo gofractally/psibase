@@ -56,9 +56,12 @@ class AuthSig(Service):
     def set_key(self, account, key, set_auth=True):
         if isinstance(key, PrivateKey):
             key = key.spki_der()
-        self.push_action(account, 'setKey', {"key": key})
+        # One key: it is both the owner and the active key of the account.
+        spec = {"key": key, "seq": 0, "verifier": None}
+        keys = {"owner": spec, "active": spec}
+        self.push_action(account, 'setKeys', keys)
 
-        actions = [Action(account, self.service, 'setKey', {"key": key})]
+        actions = [Action(account, self.service, 'setKeys', keys)]
         if set_auth:
             actions += [Action(account, Accounts.service, 'setAuthServ', {'authService': self.service})]
         self.api.push_transaction(Transaction(self.api.get_tapos(), actions=actions, claims=[]))

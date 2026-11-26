@@ -118,11 +118,12 @@ struct AccountArgs {
     #[arg(value_parser = AccountNumber::from_exact)]
     owner: Option<AccountNumber>,
 
-    /// Set the account to authenticate using this key.
-    /// When modifying an account, VERIFIER=KEY chooses a verify service
+    /// Set the account to authenticate using this key, as both its owner
+    /// and its active key. For an account that does not use auth-sig yet;
+    /// one that does changes its keys with auth-sig's setActive and
+    /// requestOwnerChange actions. VERIFIER=KEY chooses a verify service
     /// other than the default for the key (e.g. verify-br1=alice.pub);
-    /// the account then signs with -s VERIFIER=KEY. The change itself is
-    /// signed both ways: -s KEY -s VERIFIER=KEY.
+    /// the account then signs with -s VERIFIER=KEY.
     #[clap(short = 'k', long, value_name = "KEY")]
     key: Option<AnyPublicKey>,
 

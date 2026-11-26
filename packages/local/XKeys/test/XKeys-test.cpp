@@ -44,7 +44,7 @@ TEST_CASE("create account and sign")
           JsonBody{RegisteredServiceRow{XKeysCaller::service, XKeysCaller::service}});
 
    auto key = t.post<SpkiBody>(XKeysCaller::service, "/new", EmptyBody{}).value;
-   REQUIRE(t.to<AuthSig>().newAccount(alice, key).succeeded());
+   REQUIRE(t.to<AuthSig>().newAccount(alice, KeySpec::of(key), KeySpec::of(key)).succeeded());
 
    // The service uses wall-clock time to set the expiration, so
    // we need to sync the chain's time.

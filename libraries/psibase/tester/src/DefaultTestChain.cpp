@@ -294,7 +294,8 @@ AccountNumber DefaultTestChain::addAccount(AccountNumber                        
 
    auto trace = pushTransaction(makeTransaction({
        accounts.newAccount(name, AuthAny::service, NewAccountMode::requireNew),
-       authsig.from(name).setKey(public_key),
+       authsig.from(name).setKeys(AuthSig::KeySpec::of(public_key),
+                                  AuthSig::KeySpec::of(public_key)),
        accounts.from(name).setAuthServ(AuthSig::AuthSig::service),
    }));
 

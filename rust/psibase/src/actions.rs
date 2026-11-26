@@ -30,23 +30,29 @@ pub fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Acti
     )
 }
 
+/// The one key of a caller that has a single key, as auth-sig takes it: it
+/// is used as both the owner and the active key (sequence value 0), which
+/// gives an account that the one key controls completely.
+fn single_key(key: &AnyPublicKey) -> auth_sig::KeySpec {
+    if crate::verified_key_type(key.key.service).is_none() {
+        panic!("unknown verify service {}", key.key.service)
+    }
+    auth_sig::KeySpec {
+        key: key.key.rawData.to_vec().into(),
+        seq: 0,
+        // Named only when it is not the default for the key's type
+        verifier: (!key.has_default_verifier()).then_some(key.key.service),
+    }
+}
+
+/// Creates `account` with `key` as its owner and its active key. `sender`
+/// becomes its recovery partner.
 pub fn new_account_key_action(
     sender: AccountNumber,
     account: AccountNumber,
     key: &AnyPublicKey,
 ) -> Action {
-    if crate::verified_key_type(key.key.service).is_none() {
-        panic!("unknown verify service {}", key.key.service)
-    }
-    // A new account gets the default verifier for its key. Another one is
-    // chosen by the account itself, once it exists (set_key_action).
-    if !key.has_default_verifier() {
-        panic!(
-            "a new account uses the default verify service for its key; choose {} afterwards by setting the key again",
-            key.key.service
-        )
-    }
-    auth_sig::Wrapper::pack_from(sender).newAccount(account, key.key.rawData.clone().into())
+    auth_sig::Wrapper::pack_from(sender).newAccount(account, single_key(key), single_key(key))
 }
 
 pub fn new_account_owned_action(
@@ -61,17 +67,11 @@ pub fn new_account_owned_action(
     )
 }
 
+/// Stores `key` as the owner and the active key of `account`, which must
+/// not be using auth-sig yet. An account that already uses auth-sig changes
+/// its keys with auth-sig's setActive and requestOwnerChange.
 pub fn set_key_action(account: AccountNumber, key: &AnyPublicKey) -> Action {
-    if crate::verified_key_type(key.key.service).is_none() {
-        panic!("unknown account service");
-    }
-    if key.has_default_verifier() {
-        auth_sig::Wrapper::pack_from(account).setKey(key.key.rawData.to_vec().into())
-    } else {
-        // The account chooses another verifier allowed for its key.
-        auth_sig::Wrapper::pack_from(account)
-            .setKeyVerifier(key.key.service, key.key.rawData.to_vec().into())
-    }
+    auth_sig::Wrapper::pack_from(account).setKeys(single_key(key), single_key(key))
 }
 
 pub fn set_owner_action(account: AccountNumber, owner: AccountNumber) -> Action {

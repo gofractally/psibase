@@ -221,7 +221,9 @@ void Invite::createAccount(AccountNumber newAccount, Spki newAccountKey)
    auto new_account_key = keyFingerprint(newAccountKey);
 
    check(credential_key != new_account_key, needUniquePubkey.data());
-   to<AuthSig::AuthSig>().newAccount(newAccount, newAccountKey);
+   // The invited user has one key: it is both the owner and the active key.
+   to<AuthSig::AuthSig>().newAccount(newAccount, AuthSig::KeySpec::of(newAccountKey),
+                                     AuthSig::KeySpec::of(newAccountKey));
 
    if (to<VirtualServer>().is_billing_enabled())
    {

@@ -48,8 +48,8 @@ async function wallet(){
  if(account){
   const row=await callPlugin('accounts','api','getAccount',[account],'query',false);
   if(row?.authService!=='auth-sig'){account='';recipient='';recipientState=null;renderContacts();await load();throw Error('Connect an account secured with auth-sig signing keys.');}
-  const keyResponse=await request(siblingUrl(null,'auth-sig','/graphql'),{method:'POST',headers:{'Content-Type':'application/graphql'},body:`{account(name:${JSON.stringify(account)}){pubkey}}`});
-  const publicKey=keyResponse.data?.account?.pubkey;
+  const keyResponse=await request(siblingUrl(null,'auth-sig','/graphql'),{method:'POST',headers:{'Content-Type':'application/graphql'},body:`{account(name:${JSON.stringify(account)}){active{key}}}`});
+  const publicKey=keyResponse.data?.account?.active?.key;
   if(!publicKey)throw Error('This account has no registered signing key.');
   el('account-public-key').textContent=publicKey;
   const der=Uint8Array.from(atob(publicKey.replace(/-----[^\n]+-----|\s/g,'')),c=>c.charCodeAt(0));

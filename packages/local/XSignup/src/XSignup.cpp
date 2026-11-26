@@ -791,7 +791,11 @@ namespace
       Action create{.sender  = config.sponsor,
                     .service = AuthSig::AuthSig::service,
                     .method  = MethodNumber{"newAccount"},
-                    .rawData = psio::to_pssz(std::tuple{name, key})};
+                    // The guest has one key: it is both the owner and the
+                    // active key. The sponsor, as the sender, becomes the
+                    // account's recovery partner.
+                    .rawData = psio::to_pssz(std::tuple{name, AuthSig::KeySpec::of(key),
+                                                        AuthSig::KeySpec::of(key)})};
       auto   trx = to<XKeys>().signTxFor(std::vector<Action>{std::move(create)}, creationSeconds);
       return json(req, CreateReply{psio::to_pssz(trx), creationSeconds});
    }
