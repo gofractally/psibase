@@ -72,12 +72,101 @@ export function sortGroups(groups: GroupedAccount[]): GroupedAccount[] {
     });
 }
 
-export function filterGroups(
-    groups: GroupedAccount[],
-    hideEmptyFacilities: boolean,
-): GroupedAccount[] {
-    if (!hideEmptyFacilities) return groups;
-    return groups.filter((g) => !isFacilityOnly(g));
+/** One counterparty in one currency: what they owe you and what you owe them. */
+export type CounterpartyRow = {
+    key: string;
+    counterparty: string;
+    assetId: number;
+    /** What they owe you, raw units. */
+    owedToYou: bigint;
+    /** What you owe them, raw units. */
+    youOwe: bigint;
+    /** `owedToYou - youOwe`: positive means they owe you. */
+    net: bigint;
+    /** False for a pure credit line with no open balance. */
+    hasBalance: boolean;
+    /** The line you extended to them. */
+    lineToThem?: CreditLine;
+    /** The line they extended to you. */
+    lineFromThem?: CreditLine;
+};
+
+/**
+ * One row per counterparty and currency. Pairs auto-net on chain, so only one
+ * of the two sides normally holds a balance; the other side only adds a line.
+ */
+export function mergeCounterparties(
+    savings: GroupedAccount[],
+    loans: GroupedAccount[],
+): CounterpartyRow[] {
+    const rows = new Map<string, CounterpartyRow>();
+    const rowFor = (g: GroupedAccount) => {
+        let row = rows.get(g.key);
+        if (!row) {
+            row = {
+                key: g.key,
+                counterparty: g.counterparty,
+                assetId: g.assetId,
+                owedToYou: 0n,
+                youOwe: 0n,
+                net: 0n,
+                hasBalance: false,
+            };
+            rows.set(g.key, row);
+        }
+        return row;
+    };
+    for (const g of savings) {
+        const row = rowFor(g);
+        row.owedToYou += g.total;
+        row.lineToThem = g.creditLine;
+        row.hasBalance ||= !isFacilityOnly(g);
+    }
+    for (const g of loans) {
+        const row = rowFor(g);
+        row.youOwe += g.total;
+        row.lineFromThem = g.creditLine;
+        row.hasBalance ||= !isFacilityOnly(g);
+    }
+    for (const row of rows.values()) row.net = row.owedToYou - row.youOwe;
+    return [...rows.values()].sort((a, b) => {
+        if (a.hasBalance !== b.hasBalance) return a.hasBalance ? -1 : 1;
+        const byParty = a.counterparty.localeCompare(b.counterparty);
+        return byParty !== 0 ? byParty : a.assetId - b.assetId;
+    });
+}
+
+/**
+ * How much you could still draw on a line extended to you: `limit - owed`,
+ * and no more than what is left when the line depletes. `undefined` when
+ * there is no line.
+ */
+export function drawableRaw(
+    line: CreditLine | undefined,
+    owed: bigint,
+    precision: number,
+): bigint | undefined {
+    if (!line) return undefined;
+    const limit = humanToRaw(line.limit || "0", precision);
+    let room = limit > owed ? limit - owed : 0n;
+    if (line.depleteOnDebit) {
+        const left = humanToRaw(line.remaining || "0", precision);
+        if (left < room) room = left;
+    }
+    return room;
+}
+
+/** Currencies other than `selected` in which you have an open balance. */
+export function otherCurrenciesWithBalance(
+    savings: GroupedAccount[],
+    loans: GroupedAccount[],
+    selected: number | undefined,
+): number[] {
+    const ids = new Set<number>();
+    for (const g of [...savings, ...loans]) {
+        if (g.assetId !== selected && !isFacilityOnly(g)) ids.add(g.assetId);
+    }
+    return [...ids].sort((a, b) => a - b);
 }
 
 /** One currency. `undefined` leaves the list unscoped. */

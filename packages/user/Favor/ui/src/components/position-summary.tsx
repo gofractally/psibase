@@ -41,6 +41,14 @@ export function PositionSummary({
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <dl className="grid min-w-0 flex-1 grid-cols-3 items-start gap-x-3 sm:gap-x-6">
                     <Stat
+                        label="Assets"
+                        amount={held}
+                        precision={precision}
+                        symbol={symbol}
+                        isLoading={isLoading}
+                        amountClass="text-emerald-800 dark:text-emerald-300"
+                    />
+                    <Stat
                         label="Liabilities"
                         amount={owed}
                         limit={hasLimit ? limit : undefined}
@@ -48,14 +56,6 @@ export function PositionSummary({
                         symbol={symbol}
                         isLoading={isLoading}
                         amountClass="text-amber-900 dark:text-amber-300"
-                    />
-                    <Stat
-                        label="Assets"
-                        amount={held}
-                        precision={precision}
-                        symbol={symbol}
-                        isLoading={isLoading}
-                        amountClass="text-emerald-800 dark:text-emerald-300"
                     />
                     <Stat
                         label="Net position"

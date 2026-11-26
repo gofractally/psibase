@@ -6,7 +6,8 @@ import { CashPage } from "@/pages/cash";
 import { InvitePage } from "@/pages/invite";
 import { InvitesPage } from "@/pages/invites";
 import { AccountDetailPage } from "@/pages/account-detail";
-import { ObligationsPage } from "@/pages/obligations";
+import { AccountsPage } from "@/pages/accounts";
+import { HistoryPage } from "@/pages/history";
 import { PayeesPage } from "@/pages/payees";
 import { PoliciesPage } from "@/pages/policies";
 import { RelaysPage } from "@/pages/relays";
@@ -23,14 +24,14 @@ export const router = createBrowserRouter([
         element: <Layout />,
         children: [
             { index: true, element: <Navigate to="/accounts" replace /> },
-            { path: "accounts", element: withGate(<ObligationsPage />) },
+            { path: "accounts", element: withGate(<AccountsPage />) },
             { path: "swap", element: withGate(<SwapPage />) },
             { path: "network", element: <Navigate to="/accounts" replace /> },
             {
                 path: "accounts/:account",
                 element: withGate(<AccountDetailPage />),
             },
-            { path: "history", element: <Navigate to="/accounts" replace /> },
+            { path: "history", element: withGate(<HistoryPage />) },
             { path: "payees", element: withGate(<PayeesPage />) },
             { path: "invites", element: withGate(<InvitesPage />) },
             { path: "invite", element: <InvitePage /> },

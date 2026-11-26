@@ -20,6 +20,7 @@ import {
 
 const titles: Record<string, string> = {
     "/accounts": "Accounts",
+    "/history": "History",
     "/swap": "Swap",
     "/requests": "Requests",
     "/payees": "Payees",

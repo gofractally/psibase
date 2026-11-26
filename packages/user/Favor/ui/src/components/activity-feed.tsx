@@ -42,10 +42,15 @@ const FILTERS: { id: ActivityFilter; label: string }[] = [
 export function ActivityFeed({
     counterparty,
     assetId,
+    limit,
+    showFilters = true,
 }: {
     counterparty?: string;
     /** When set, only events in this currency (including FX that touches it). */
     assetId?: number;
+    /** Show only the newest N rows. */
+    limit?: number;
+    showFilters?: boolean;
 } = {}) {
     const { data: user } = useCurrentUser();
     const { symbolOf, precisionOf } = useAssetMap();
@@ -68,6 +73,10 @@ export function ActivityFeed({
                     (assetId === undefined || eventTouchesAsset(e, assetId)),
             ),
         [events, filter, assetId],
+    );
+    const shown = useMemo(
+        () => (limit === undefined ? rows : rows.slice(0, limit)),
+        [rows, limit],
     );
     const currencyEmpty =
         assetId !== undefined &&
@@ -108,19 +117,21 @@ export function ActivityFeed({
 
     return (
         <div>
-            <div className="mb-4 flex flex-wrap gap-2">
-                {FILTERS.map((f) => (
-                    <Button
-                        key={f.id}
-                        type="button"
-                        size="sm"
-                        variant={filter === f.id ? "default" : "outline"}
-                        onClick={() => setFilter(f.id)}
-                    >
-                        {f.label}
-                    </Button>
-                ))}
-            </div>
+            {showFilters ? (
+                <div className="mb-4 flex flex-wrap gap-2">
+                    {FILTERS.map((f) => (
+                        <Button
+                            key={f.id}
+                            type="button"
+                            size="sm"
+                            variant={filter === f.id ? "default" : "outline"}
+                            onClick={() => setFilter(f.id)}
+                        >
+                            {f.label}
+                        </Button>
+                    ))}
+                </div>
+            ) : null}
             {isLoading ? (
                 <p className="text-muted-foreground text-sm">Loading history…</p>
             ) : isError ? (
@@ -141,7 +152,7 @@ export function ActivityFeed({
             ) : (
                 <>
                     <ul className="space-y-2 sm:hidden">
-                        {rows.map((e, i) => {
+                        {shown.map((e, i) => {
                             const { title, detail } = describeEvent(
                                 e,
                                 user ?? "",
@@ -218,7 +229,7 @@ export function ActivityFeed({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {rows.map((e, i) => {
+                                {shown.map((e, i) => {
                                     const { title, detail } = describeEvent(
                                         e,
                                         user ?? "",
