@@ -194,7 +194,7 @@ const RAW_RUNTIME_STATE =
           ["rollup", "npm:4.62.0"],\
           ["root-workspace-0b6124", "workspace:."],\
           ["sonner", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:2.0.5"],\
-          ["svgo", "npm:3.3.3"],\
+          ["svgo", "npm:3.3.5"],\
           ["tailwind-merge", "npm:3.6.0"],\
           ["tailwindcss", "npm:4.3.1"],\
           ["tailwindcss-animate", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.0.7"],\
@@ -15829,7 +15829,7 @@ const RAW_RUNTIME_STATE =
           ["rollup", "npm:4.62.0"],\
           ["root-workspace-0b6124", "workspace:."],\
           ["sonner", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:2.0.5"],\
-          ["svgo", "npm:3.3.3"],\
+          ["svgo", "npm:3.3.5"],\
           ["tailwind-merge", "npm:3.6.0"],\
           ["tailwindcss", "npm:4.3.1"],\
           ["tailwindcss-animate", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.0.7"],\
@@ -16450,8 +16450,8 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["svgo", [\
-      ["npm:3.3.3", {\
-        "packageLocation": "../.caches/yarn/svgo-npm-3.3.3-f4851edd74-06568c6b04.zip/node_modules/svgo/",\
+      ["npm:3.3.5", {\
+        "packageLocation": "../.caches/yarn/svgo-npm-3.3.5-6f74a80f32-c4772b2f5f.zip/node_modules/svgo/",\
         "packageDependencies": [\
           ["commander", "npm:7.2.0"],\
           ["css-select", "npm:5.2.2"],\
@@ -16460,7 +16460,7 @@ const RAW_RUNTIME_STATE =
           ["csso", "npm:5.0.5"],\
           ["picocolors", "npm:1.1.1"],\
           ["sax", "npm:1.6.0"],\
-          ["svgo", "npm:3.3.3"]\
+          ["svgo", "npm:3.3.5"]\
         ],\
         "linkType": "HARD"\
       }],\
