@@ -16,8 +16,6 @@ const zBookAuth = z.object({
     creditor: z.string(),
     assetId: z.number(),
     remaining: z.string(),
-    maxInterestRatePpm: z.number(),
-    minInterestRatePpm: z.number(),
     expiresAt: z.number(),
 });
 
@@ -27,25 +25,17 @@ const zCreditLine = z.object({
     assetId: z.number(),
     limit: z.string(),
     depleteOnDebit: z.boolean(),
-    interestRatePpm: z.number(),
-    graceSeconds: z.number(),
-    cycleStartedAt: z.number(),
-    cycleGraceSeconds: z.number(),
     exposure: z.string(),
     /// When depleting; "0" on revolving lines.
     remaining: z.string(),
 });
 
+/** What `debtor` owes `creditor` in `assetId`. One row per pair direction. */
 const zObligation = z.object({
-    id: z.number(),
     creditor: z.string(),
     debtor: z.string(),
     assetId: z.number(),
-    remainingPrincipal: z.string(),
-    accruedInterest: z.string(),
-    interestRatePpm: z.number(),
-    createdAt: z.number(),
-    lastInterestAccrual: z.number(),
+    amount: z.string(),
 });
 
 const zForwardOffer = z.object({
@@ -54,7 +44,6 @@ const zForwardOffer = z.object({
     assetId: z.number(),
     feeFixed: z.string(),
     feePercentPpm: z.number(),
-    maxLineAprPpm: z.number(),
     expiresAt: z.number(),
     isGlobal: z.boolean(),
     allowUnknown: z.boolean(),
@@ -118,7 +107,6 @@ const zFxOffer = z.object({
     posterIsCreditor: z.boolean(),
     feeFixed: z.string(),
     fxRate: z.string(),
-    toInterestRatePpm: z.number(),
     remaining: z.string(),
     expiresAt: z.number(),
 });
@@ -143,7 +131,6 @@ const zPayAuth = z.object({
     assetId: z.number(),
     amount: z.string(),
     maxSpend: z.string(),
-    maxInterestRatePpm: z.number(),
     periodSeconds: z.number(),
     nextDue: z.number(),
     endsAt: z.number(),
@@ -158,8 +145,6 @@ const zBanxInvite = z.object({
     assetId: z.number(),
     limit: z.string(),
     depleteOnDebit: z.boolean(),
-    interestRatePpm: z.number(),
-    graceSeconds: z.number(),
     createdAt: z.number(),
     expiry: z.number(),
     claimedBy: z.string().nullish(),
@@ -208,7 +193,7 @@ export async function fetchAssets(): Promise<Asset[]> {
     }));
 }
 
-const bookAuthFields = `debtor creditor assetId remaining maxInterestRatePpm minInterestRatePpm expiresAt`;
+const bookAuthFields = `debtor creditor assetId remaining expiresAt`;
 
 export async function fetchBookAuths(account: string): Promise<BookAuth[]> {
     const data = await gql<{ bookAuths: BookAuth[] }>(
@@ -220,8 +205,7 @@ export async function fetchBookAuths(account: string): Promise<BookAuth[]> {
 export async function fetchCreditLines(account: string): Promise<CreditLine[]> {
     const data = await gql<{ creditLines: CreditLine[] }>(
         `{ creditLines(account: "${account}") {
-            creditor debtor assetId limit depleteOnDebit interestRatePpm
-            graceSeconds cycleStartedAt cycleGraceSeconds exposure remaining
+            creditor debtor assetId limit depleteOnDebit exposure remaining
         } }`,
     );
     return zCreditLine.array().parse(data.creditLines);
@@ -230,14 +214,13 @@ export async function fetchCreditLines(account: string): Promise<CreditLine[]> {
 export async function fetchNetworkLines(): Promise<CreditLine[]> {
     const data = await gql<{ networkLines: CreditLine[] }>(
         `{ networkLines {
-            creditor debtor assetId limit depleteOnDebit interestRatePpm
-            graceSeconds cycleStartedAt cycleGraceSeconds exposure remaining
+            creditor debtor assetId limit depleteOnDebit exposure remaining
         } }`,
     );
     return zCreditLine.array().parse(data.networkLines);
 }
 
-const forwardOfferFields = `poster nextHop assetId feeFixed feePercentPpm maxLineAprPpm expiresAt isGlobal allowUnknown`;
+const forwardOfferFields = `poster nextHop assetId feeFixed feePercentPpm expiresAt isGlobal allowUnknown`;
 
 export async function fetchNetworkForwardOffers(): Promise<ForwardOffer[]> {
     const data = await gql<{ networkForwardOffers: ForwardOffer[] }>(
@@ -249,8 +232,7 @@ export async function fetchNetworkForwardOffers(): Promise<ForwardOffer[]> {
 export async function fetchObligations(account: string): Promise<Obligation[]> {
     const data = await gql<{ obligations: Obligation[] }>(
         `{ obligations(account: "${account}") {
-            id creditor debtor assetId remainingPrincipal accruedInterest
-            interestRatePpm createdAt lastInterestAccrual
+            creditor debtor assetId amount
         } }`,
     );
     return zObligation.array().parse(data.obligations);
@@ -284,7 +266,7 @@ export async function fetchBuyClaimOffers(
     return all.filter((o) => o.isBuy);
 }
 
-const inviteFields = `id inviter assetId limit depleteOnDebit interestRatePpm graceSeconds createdAt expiry claimedBy`;
+const inviteFields = `id inviter assetId limit depleteOnDebit createdAt expiry claimedBy`;
 
 export async function fetchInvites(inviter: string): Promise<BanxInvite[]> {
     const data = await gql<{ invites: BanxInvite[] }>(
@@ -312,7 +294,7 @@ export async function fetchRequests(account: string): Promise<PayRequest[]> {
     return zPayRequest.array().parse(data.requests);
 }
 
-const payAuthFields = `id payer payee assetId amount maxSpend maxInterestRatePpm periodSeconds nextDue endsAt`;
+const payAuthFields = `id payer payee assetId amount maxSpend periodSeconds nextDue endsAt`;
 
 export async function fetchPayAuths(account: string): Promise<PayAuth[]> {
     const data = await gql<{ payAuths: PayAuth[] }>(
@@ -370,7 +352,7 @@ export async function fetchFxOffers(
 ): Promise<FxOffer[]> {
     const data = await gql<{ fxOffers: FxOffer[] }>(
         `{ fxOffers(poster: "${account}") {
-            poster fromAsset toAsset posterIsCreditor feeFixed fxRate toInterestRatePpm remaining expiresAt
+            poster fromAsset toAsset posterIsCreditor feeFixed fxRate remaining expiresAt
         } }`,
     );
     return zFxOffer.array().parse(data.fxOffers);

@@ -202,7 +202,7 @@ impl CashQuote {
         );
         Self::from_sub(taker, self.token_id, amount_tokens);
         Self::to_sub(self.poster, self.token_id, amount_tokens);
-        let netted = Connection::get_live(taker, self.poster, self.asset_id).deposit(banx_amt, 0);
+        let netted = Connection::get_live(taker, self.poster, self.asset_id).deposit(banx_amt);
         emit_pair_activity(
             taker,
             taker,

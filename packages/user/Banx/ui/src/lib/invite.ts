@@ -12,8 +12,6 @@ export type PendingReciprocal = {
     assetId: number;
     limit: string;
     depleteOnDebit: boolean;
-    interestRatePpm: number;
-    graceSeconds: number;
 };
 
 const zPendingReciprocal = z.object({
@@ -21,8 +19,6 @@ const zPendingReciprocal = z.object({
     assetId: z.number().int().nonnegative(),
     limit: z.string().min(1),
     depleteOnDebit: z.boolean(),
-    interestRatePpm: z.number().int().nonnegative(),
-    graceSeconds: z.number().int().nonnegative(),
 });
 
 export function inviteClaimUrl(token: string): string {

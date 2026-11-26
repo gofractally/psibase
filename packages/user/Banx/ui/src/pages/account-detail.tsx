@@ -69,7 +69,6 @@ import {
 import {
     liveBookAuth,
     spendableBookAuth,
-    totalRaw,
     type GroupedAccount,
 } from "@/lib/account-groups";
 import {
@@ -79,7 +78,6 @@ import {
     moneyFormatOptions,
     rawToNumber,
 } from "@/lib/amount";
-import { formatGracePeriod, ppmToPercent } from "@/lib/constants";
 import {
     REQUEST_INVOICE,
     REQUEST_PLEASE_BOOK,
@@ -884,23 +882,6 @@ function AssetRelationCard({
                                     · non-revolving
                                 </span>
                             ) : null}
-                            {creditLine.graceSeconds > 0 ||
-                            creditLine.cycleStartedAt ? (
-                                <>
-                                    <span className="mx-1.5 opacity-40">
-                                        ·
-                                    </span>
-                                    Interest-free{" "}
-                                    {formatGracePeriod(
-                                        creditLine.cycleStartedAt
-                                            ? creditLine.cycleGraceSeconds
-                                            : creditLine.graceSeconds,
-                                    )}
-                                    {creditLine.cycleStartedAt
-                                        ? " (this cycle)"
-                                        : ""}
-                                </>
-                            ) : null}
                         </p>
                     ) : null}
                 </div>
@@ -1030,43 +1011,6 @@ function AssetRelationCard({
                     />
                 ) : null}
             </div>
-
-            {g.obligations.length > 0 ? (
-                <ul className="divide-border mt-3 divide-y rounded-lg border">
-                    {g.obligations.map((o) => {
-                        const principal = formatRawAmount(
-                            o.remainingPrincipal,
-                            precision,
-                        );
-                        const interest = formatRawAmount(
-                            o.accruedInterest,
-                            precision,
-                        );
-                        const lineTotal = formatRawAmount(
-                            totalRaw(
-                                o.remainingPrincipal,
-                                o.accruedInterest,
-                                precision,
-                            ).toString(),
-                            precision,
-                        );
-                        return (
-                            <li key={o.id} className="px-3 py-2">
-                                <p className="font-mono text-sm font-medium tabular-nums">
-                                    #{o.id}
-                                    <span className="text-muted-foreground ml-2 font-sans font-normal">
-                                        {lineTotal} {symbol}
-                                    </span>
-                                </p>
-                                <p className="text-muted-foreground text-xs">
-                                    Principal {principal} · Interest {interest}{" "}
-                                    · {ppmToPercent(o.interestRatePpm)} APR
-                                </p>
-                            </li>
-                        );
-                    })}
-                </ul>
-            ) : null}
         </div>
     );
 }

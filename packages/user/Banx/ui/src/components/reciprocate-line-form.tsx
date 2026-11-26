@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Handshake } from "lucide-react";
 
-import { GracePeriodField } from "@/components/form-fields";
+
 import { NicknameContactField } from "@/components/nickname-contact-field";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useBanxContacts } from "@/hooks/use-banx-contacts";
@@ -13,23 +13,7 @@ import {
 } from "@/hooks/use-banx-mutations";
 import { useSaveContact } from "@/hooks/use-save-contact";
 import { displayAmount } from "@/lib/amount";
-import {
-    formatGracePeriod,
-    graceSecondsFromFields,
-    graceSecondsToPreset,
-    ppmToPercent,
-    ppmToPercentInput,
-    type GracePreset,
-} from "@/lib/constants";
-import {
-    MAX_PERCENT,
-    MIN_PERCENT_STEP,
-    PPM_SCALE,
-    amountFieldValidator,
-    percentFieldValidator,
-    percentStringToPpm,
-    useAppForm,
-} from "@/lib/form";
+import { amountFieldValidator, useAppForm } from "@/lib/form";
 import type { PendingReciprocal } from "@/lib/invite";
 
 import { Button } from "@shared/shadcn/ui/button";
@@ -73,47 +57,31 @@ export function ReciprocateLineForm({
     );
     const symbol = symbolOf(terms.assetId);
     const received = displayAmount(terms.limit);
-    const grace = graceSecondsToPreset(terms.graceSeconds);
+
 
     const form = useAppForm({
         defaultValues: {
             limit: received,
-            interestPct: ppmToPercentInput(terms.interestRatePpm),
             deplete: terms.depleteOnDebit,
-            gracePreset: grace.preset,
-            graceDays: grace.days,
             allowBook: true,
             allowForward: true,
             nickname: "",
         },
         onSubmit: async ({ value }) => {
             if (!skipLine) {
-                const graceSeconds = graceSecondsFromFields(
-                    value.gracePreset,
-                    value.graceDays,
-                );
-                if (graceSeconds === null) return;
+
                 await setLine.mutateAsync({
                     debtor: terms.inviter,
                     assetId: terms.assetId,
                     limit: value.limit.trim(),
                     depleteOnDebit: value.deplete,
-                    interestRatePpm: percentStringToPpm(
-                        value.interestPct,
-                        PPM_SCALE,
-                    ),
-                    graceSeconds,
                 });
                 if (value.allowBook) {
                     await setBookAuth.mutateAsync({
                         creditor: terms.inviter,
                         assetId: terms.assetId,
                         remaining: value.limit.trim(),
-                        maxInterestRatePpm: percentStringToPpm(
-                            value.interestPct,
-                            PPM_SCALE,
-                        ),
-                        minInterestRatePpm: 0,
+
                         expiresAtSeconds: 0,
                     });
                 }
@@ -122,7 +90,7 @@ export function ReciprocateLineForm({
                         assetId: terms.assetId,
                         feeFixed: "0",
                         feePercentPpm: 0,
-                        maxLineAprPpm: 0,
+
                         expiresAtSeconds: 0,
                         allowUnknown: false,
                     });
@@ -139,13 +107,9 @@ export function ReciprocateLineForm({
     });
 
     useEffect(() => {
-        const next = graceSecondsToPreset(terms.graceSeconds);
         form.reset({
             limit: displayAmount(terms.limit),
-            interestPct: ppmToPercentInput(terms.interestRatePpm),
             deplete: terms.depleteOnDebit,
-            gracePreset: next.preset,
-            graceDays: next.days,
             allowBook: true,
             allowForward: true,
             nickname: "",
@@ -208,14 +172,7 @@ export function ReciprocateLineForm({
                     <dd className="text-foreground text-right font-mono">
                         {received} {symbol}
                     </dd>
-                    <dt>APR</dt>
-                    <dd className="text-foreground text-right">
-                        {ppmToPercent(terms.interestRatePpm)}
-                    </dd>
-                    <dt>Interest-free</dt>
-                    <dd className="text-foreground text-right">
-                        {formatGracePeriod(terms.graceSeconds)}
-                    </dd>
+
                     <dt>Limit shrinks</dt>
                     <dd className="text-foreground text-right">
                         {terms.depleteOnDebit ? "yes" : "no"}
@@ -232,7 +189,7 @@ export function ReciprocateLineForm({
                 >
                     {skipLine ? null : (
                     <>
-                    <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+                    <div className="grid gap-2">
                         <form.AppField
                             name="limit"
                             validators={{
@@ -253,46 +210,7 @@ export function ReciprocateLineForm({
                                 />
                             )}
                         />
-                        <form.AppField
-                            name="interestPct"
-                            validators={{
-                                onChange: percentFieldValidator(MAX_PERCENT),
-                                onSubmit: percentFieldValidator(MAX_PERCENT),
-                            }}
-                            children={(field) => (
-                                <field.TextField
-                                    label="Interest APR %"
-                                    inputMode="decimal"
-                                    min={0}
-                                    max={MAX_PERCENT}
-                                    step={MIN_PERCENT_STEP}
-                                />
-                            )}
-                        />
                     </div>
-                    <form.Subscribe
-                        selector={(s) => ({
-                            preset: s.values.gracePreset,
-                            days: s.values.graceDays,
-                        })}
-                        children={({ preset, days }) => (
-                            <GracePeriodField
-                                preset={preset}
-                                days={days}
-                                onPresetChange={(p: GracePreset) => {
-                                    form.setFieldValue("gracePreset", p);
-                                    if (p === "none") {
-                                        form.setFieldValue("graceDays", "0");
-                                    } else if (p !== "custom") {
-                                        form.setFieldValue("graceDays", p);
-                                    }
-                                }}
-                                onDaysChange={(d) =>
-                                    form.setFieldValue("graceDays", d)
-                                }
-                            />
-                        )}
-                    />
                     <form.AppField
                         name="deplete"
                         children={(field) => (

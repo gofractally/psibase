@@ -1,21 +1,21 @@
 use psibase::{services::tokens::Quantity, AccountNumber};
 
 use super::{apply_rate, emit_path_draw};
-use crate::tables::tables::{CreditLine, Obligation};
+use crate::tables::tables::{Line, Pair};
 
 /// Directed pair in one asset: the creditor's line to the debtor (if any)
-/// plus both claims. Virtual — not a table.
+/// plus both claims. A snapshot of one [`Pair`] row, not a table.
 ///
 /// A path hop is this object: `debtor` draws on `creditor`. The reverse
 /// claim (creditor already owes debtor) is unwind capacity and does not
 /// need a line. Sending 1000 against a 400 reverse claim is unwind 400 +
-/// new_draw 600; after net the debtor owes 600.
+/// new_draw 600; after the write the debtor owes 600.
 #[derive(Clone, Debug)]
 pub struct Connection {
     pub creditor: AccountNumber,
     pub debtor: AccountNumber,
     pub asset_id: u16,
-    line: Option<CreditLine>,
+    line: Option<Line>,
     /// Debtor already owes creditor.
     forward: Quantity,
     /// Creditor already owes debtor (unwind).
@@ -23,19 +23,20 @@ pub struct Connection {
 }
 
 impl Connection {
-    /// Snapshot line + live exposures. Does not persist interest.
+    /// Snapshot line + live exposures.
     pub fn get_live(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Self {
+        let (line, forward, reverse) = Pair::snapshot(creditor, debtor, asset_id);
         Self {
             creditor,
             debtor,
             asset_id,
-            line: CreditLine::get(creditor, debtor, asset_id),
-            forward: Obligation::exposure(creditor, debtor, asset_id),
-            reverse: Obligation::exposure(debtor, creditor, asset_id),
+            line,
+            forward,
+            reverse,
         }
     }
 
-    pub fn line(&self) -> Option<&CreditLine> {
+    pub fn line(&self) -> Option<&Line> {
         self.line.as_ref()
     }
 
@@ -80,66 +81,36 @@ impl Connection {
         connection.line.is_some() || connection.reverse.value > 0
     }
 
-    /// Credit this directed claim, then auto-net. Returns the amount netted.
-    fn credit_and_net(&self, amount: Quantity, interest_rate: i32) -> Quantity {
-        Obligation::credit_pair(
-            self.creditor,
-            self.debtor,
-            self.asset_id,
-            amount,
-            interest_rate,
-        );
-        Obligation::net_pair(self.creditor, self.debtor, self.asset_id, u64::MAX.into())
-    }
-
-    /// Accrue, full-net, return the leftover directed connection.
-    pub fn net_leftover(a: AccountNumber, b: AccountNumber, asset_id: u16) -> Option<Self> {
-        Obligation::net_pair(a, b, asset_id, u64::MAX.into());
-        let ab = Obligation::exposure(a, b, asset_id).value;
-        let ba = Obligation::exposure(b, a, asset_id).value;
-        if ab > 0 {
+    /// The direction that is owed between `a` and `b`, if either is.
+    pub fn leftover(a: AccountNumber, b: AccountNumber, asset_id: u16) -> Option<Self> {
+        if Pair::exposure(a, b, asset_id).value > 0 {
             Some(Self::get_live(a, b, asset_id))
-        } else if ba > 0 {
+        } else if Pair::exposure(b, a, asset_id).value > 0 {
             Some(Self::get_live(b, a, asset_id))
         } else {
             None
         }
     }
 
-    /// Book a deposit: this creditor is owed `amount` by this debtor, then
-    /// auto-net. No line required.
-    /// Debtor-signed deposit. The rate cannot be negative: the creditor does
-    /// not sign, and a negative rate would shrink their claim.
-    pub fn deposit(self, amount: Quantity, interest_rate: u32) -> Quantity {
+    /// Book a deposit: this creditor is owed `amount` by this debtor. No
+    /// line required. Returns what the reverse claim absorbed.
+    pub fn deposit(self, amount: Quantity) -> Quantity {
         assert!(amount.value > 0, "deposit amount must be positive");
-        self.credit_and_net(amount, interest_rate as i32)
+        Pair::credit(self.creditor, self.debtor, self.asset_id, amount)
     }
 
-    /// Creditor-signed credit. A negative rate is the creditor agreeing that
-    /// this claim decays.
-    pub fn credit_at_rate(self, amount: Quantity, interest_rate: i32) -> Quantity {
-        assert!(amount.value > 0, "credit amount must be positive");
-        self.credit_and_net(amount, interest_rate)
-    }
-
-    /// Book `amount` on this directed pair at `interest_rate`, then auto-net.
+    /// Book `amount` on this directed pair for a trade.
     ///
-    /// Same capacity rules as a path draw. The rate is the order's, not the
-    /// line's. Does not emit a path hop: the caller records the trade.
-    pub fn book_at_rate(mut self, amount: Quantity, interest_rate: i32) {
+    /// Same capacity rules as a path draw. Does not emit a path hop: the
+    /// caller records the trade.
+    pub fn book(self, amount: Quantity) {
         assert!(amount.value > 0, "trade amount must be positive");
         assert!(
             amount.value <= self.capacity(),
             "insufficient path capacity (line + reverse claim)"
         );
         let new_draw = self.new_draw(amount);
-        if new_draw > 0 {
-            self.line
-                .as_mut()
-                .expect("credit line required for new trade draw")
-                .consume_remaining(Quantity::new(new_draw));
-        }
-        self.credit_and_net(amount, interest_rate);
+        Pair::apply(self.creditor, self.debtor, self.asset_id, amount, new_draw);
     }
 
     /// To-asset a rebook of `take` would book, without moving claims.
@@ -165,8 +136,7 @@ impl Connection {
         apply_rate(priced, fee, fx_rate)
     }
 
-    /// Reduce this leftover claim by `take` and credit the same pair in
-    /// `to_asset`. Caller must already have netted `from_asset`.
+    /// Reduce this claim by `take` and book the same pair in `to_asset`.
     ///
     /// `add_fee` prices the poster's fee on top of `take` (they are owed the
     /// from-asset): `apply_rate` sees `take + fee` and a zero fee. Otherwise
@@ -184,10 +154,9 @@ impl Connection {
         fee_fixed: Quantity,
         fx_rate: u64,
         add_fee: bool,
-        to_interest_rate: u32,
     ) -> Quantity {
         assert!(take.value > 0, "convert amount must be positive");
-        Obligation::apply_reduction(self.creditor, self.debtor, self.asset_id, take.value);
+        Pair::reduce(self.creditor, self.debtor, self.asset_id, take);
         let to_qty = self.priced(take, fee_fixed, fx_rate, add_fee);
         if add_fee {
             // A floor would accept a replaced higher rate: the taker owes more
@@ -198,24 +167,18 @@ impl Connection {
         } else {
             assert!(to_qty.value >= min_to.value, "convert output below min_to");
         }
-        Obligation::credit_pair(
-            self.creditor,
-            self.debtor,
-            to_asset,
-            to_qty,
-            to_interest_rate as i32,
-        );
-        Obligation::net_pair(self.creditor, self.debtor, to_asset, u64::MAX.into());
+        Pair::credit(self.creditor, self.debtor, to_asset, to_qty);
         to_qty
     }
 
     /// Buyer (this creditor) taking `amount` of `seller`'s claim on this
-    /// debtor. Offers set the rate; this line is the facility. New exposure
-    /// needs a buyer line and is capped like [`Self::draw`] (`capacity` =
-    /// reverse + headroom). Remaining is consumed only on [`Self::new_draw`].
-    /// A take that only unwinds a reverse claim needs no line.
-    pub fn accept_claim(mut self, seller: AccountNumber, amount: Quantity) {
+    /// debtor. New exposure needs a buyer line and is capped like
+    /// [`Self::draw`] (`capacity` = reverse + headroom). Remaining is consumed
+    /// only on [`Self::new_draw`]. A take that only unwinds a reverse claim
+    /// needs no line.
+    pub fn accept_claim(self, seller: AccountNumber, amount: Quantity) {
         assert!(amount.value > 0, "claim transfer amount must be positive");
+        assert!(seller != self.creditor, "cannot transfer claims to self");
         let new_draw = self.new_draw(amount);
         if new_draw > 0 {
             assert!(self.line.is_some(), "buyer has no credit line to debtor");
@@ -223,45 +186,25 @@ impl Connection {
                 amount.value <= self.capacity(),
                 "buyer credit line capacity insufficient for claim"
             );
-            self.line
-                .as_mut()
-                .unwrap()
-                .consume_remaining(new_draw.into());
         }
-        Obligation::transfer_claims(
-            seller,
-            self.creditor,
-            self.debtor,
-            self.asset_id,
-            amount.value,
+        assert!(
+            Pair::exposure(seller, self.debtor, self.asset_id).value >= amount.value,
+            "insufficient claim exposure to transfer"
         );
-        Obligation::net_pair(self.creditor, self.debtor, self.asset_id, u64::MAX.into());
+        Pair::reduce(seller, self.debtor, self.asset_id, amount);
+        Pair::apply(self.creditor, self.debtor, self.asset_id, amount, new_draw);
     }
 
     /// Unwind reverse claim, then new line capacity. Remaining is
     /// consumed only for [`Self::new_draw`]. Returns amount netted.
-    pub(crate) fn apply_draw(mut self, amount: Quantity) -> Quantity {
+    pub(crate) fn apply_draw(self, amount: Quantity) -> Quantity {
         assert!(amount.value > 0, "path debit amount must be positive");
         assert!(
             amount.value <= self.capacity(),
             "insufficient path capacity (line + reverse claim)"
         );
-
         let new_draw = self.new_draw(amount);
-        let rate = if new_draw > 0 {
-            let line = self
-                .line
-                .as_mut()
-                .expect("credit line required for new path draw");
-            line.consume_remaining(Quantity::new(new_draw));
-            line.interest_rate as i32
-        } else {
-            self.line
-                .as_ref()
-                .map(|l| l.interest_rate as i32)
-                .unwrap_or(0)
-        };
-        self.credit_and_net(amount, rate)
+        Pair::apply(self.creditor, self.debtor, self.asset_id, amount, new_draw)
     }
 
     /// Draw for `path_pay`. `payer` started the path. This connection's

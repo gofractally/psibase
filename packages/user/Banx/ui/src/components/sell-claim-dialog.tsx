@@ -70,13 +70,6 @@ function applyTakeFee(
     return out > 0n ? out : null;
 }
 
-function obligationRaw(o: Obligation, precision: number): bigint {
-    return (
-        humanToRaw(o.remainingPrincipal || "0", precision) +
-        humanToRaw(o.accruedInterest || "0", precision)
-    );
-}
-
 /** `Connection::knows(debtor, buyer)`: the debtor lined the buyer, or the debtor already owes the buyer. */
 function debtorKnowsBuyer(
     lines: CreditLine[],
@@ -101,7 +94,7 @@ function debtorKnowsBuyer(
             o.assetId === assetId &&
             o.creditor === buyer &&
             o.debtor === debtor &&
-            obligationRaw(o, precision) > 0n,
+            humanToRaw(o.amount || "0", precision) > 0n,
     );
 }
 
@@ -120,7 +113,7 @@ function reverseClaimRaw(
             o.creditor === debtor &&
             o.debtor === buyer
         ) {
-            sum += obligationRaw(o, precision);
+            sum += humanToRaw(o.amount || "0", precision);
         }
     }
     return sum;
@@ -188,7 +181,7 @@ function claimHeldRaw(
             o.debtor === debtor &&
             o.assetId === assetId
         ) {
-            sum += obligationRaw(o, precision);
+            sum += humanToRaw(o.amount || "0", precision);
         }
     }
     return sum;

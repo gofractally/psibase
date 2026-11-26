@@ -1,79 +1,5 @@
 export const BANX_SERVICE = "banx-app" as const;
 
-export const SECONDS_PER_DAY = 86_400;
-
-/** Default interest-free window on a new credit line (7 days). */
-export const DEFAULT_GRACE_SECONDS = 7 * SECONDS_PER_DAY;
-
-/** Preset interest-free periods offered in the UI (days). */
-export const GRACE_PRESET_DAYS = [1, 7, 30] as const;
-
-export type GracePreset =
-    | "none"
-    | `${(typeof GRACE_PRESET_DAYS)[number]}`
-    | "custom";
-
-/** Whole non-negative day count. Null for empty, fractional, or non-numeric text. */
-export function parseGraceDays(text: string): number | null {
-    const t = text.trim();
-    if (!/^\d+$/.test(t)) return null;
-    const n = Number(t);
-    if (!Number.isSafeInteger(n)) return null;
-    return n;
-}
-
-/**
- * Grace seconds for a preset. Custom text must be a whole day count;
- * invalid custom text returns null so the form does not submit `0`.
- */
-export function graceSecondsFromFields(
-    preset: GracePreset,
-    customDays: string,
-): number | null {
-    if (preset === "none") return 0;
-    if (preset === "custom") {
-        const days = parseGraceDays(customDays);
-        if (days === null) return null;
-        return days * SECONDS_PER_DAY;
-    }
-    const days = Number(preset);
-    if (!Number.isInteger(days) || days < 0) return null;
-    return days * SECONDS_PER_DAY;
-}
-
-export function graceSecondsToDays(seconds: number): number {
-    if (!Number.isFinite(seconds) || seconds <= 0) return 0;
-    return seconds / SECONDS_PER_DAY;
-}
-
-/** Map stored seconds to a select preset + custom days field. */
-export function graceSecondsToPreset(seconds: number): {
-    preset: GracePreset;
-    days: string;
-} {
-    if (!Number.isFinite(seconds) || seconds <= 0) {
-        return { preset: "none", days: "0" };
-    }
-    const whole = seconds / SECONDS_PER_DAY;
-    const days = Number.isInteger(whole) ? whole : Math.round(whole);
-    if (
-        Number.isInteger(whole) &&
-        (GRACE_PRESET_DAYS as readonly number[]).includes(days)
-    ) {
-        return { preset: String(days) as GracePreset, days: String(days) };
-    }
-    return { preset: "custom", days: String(Math.max(0, days)) };
-}
-
-export function formatGracePeriod(seconds: number): string {
-    if (seconds <= 0) return "none";
-    const days = seconds / SECONDS_PER_DAY;
-    if (Number.isInteger(days)) {
-        return days === 1 ? "1 day" : `${days} days`;
-    }
-    return `${seconds} seconds`;
-}
-
 /**
  * Chain rate scale: `PPM_SCALE` = 100%.
  * 1% = 10_000 ppm; smallest unit is **1 ppm** = **0.0001%**.
@@ -155,10 +81,4 @@ export function percentStringToPpm(
 export function clampHopFeePercent(percent: number): number {
     if (!Number.isFinite(percent) || percent <= 0) return 0;
     return Math.min(MAX_HOP_FEE_PERCENT, percent);
-}
-
-/** Clamp a percent number for APR / max-accept (0 … 100). */
-export function clampAprPercent(percent: number): number {
-    if (!Number.isFinite(percent) || percent <= 0) return 0;
-    return Math.min(MAX_PERCENT, percent);
 }

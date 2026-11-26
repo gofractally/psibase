@@ -14,7 +14,7 @@ import {
     useTokenPrecisionMap,
 } from "@/hooks/use-banx-data";
 import { displayAmount, formatFxToRate } from "@/lib/amount";
-import { ppmToPercent } from "@/lib/constants";
+
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
@@ -106,9 +106,7 @@ export function AccountTrades({
                                 <TableHead className="text-right">
                                     Fee
                                 </TableHead>
-                                <TableHead className="text-right">
-                                    Interest
-                                </TableHead>
+
                                 <TableHead className="text-right">
                                     Expires
                                 </TableHead>
@@ -145,9 +143,7 @@ export function AccountTrades({
                                         {displayAmount(p.feeFixed)}{" "}
                                         {symbolOf(p.fromAsset)}
                                     </TableCell>
-                                    <TableCell className="text-right">
-                                        {ppmToPercent(p.toInterestRatePpm)}
-                                    </TableCell>
+
                                     <TableCell className="text-right text-sm">
                                         {formatExpiresAt(p.expiresAt)}
                                     </TableCell>
@@ -213,9 +209,7 @@ export function AccountTrades({
                                             {displayAmount(q.feeFixed)}{" "}
                                             {q.isOut ? banxLabel : tokenLabel}
                                         </TableCell>
-                                        <TableCell className="text-right">
-                                            —
-                                        </TableCell>
+
                                         <TableCell className="text-right text-sm">
                                             {formatExpiresAt(q.expiresAt)}
                                         </TableCell>

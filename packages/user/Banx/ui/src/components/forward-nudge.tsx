@@ -55,7 +55,7 @@ export function ForwardNudge() {
                     assetId,
                     feeFixed: "0",
                     feePercentPpm: 0,
-                    maxLineAprPpm: 0,
+
                     expiresAtSeconds: 0,
                     allowUnknown: true,
                 },

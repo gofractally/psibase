@@ -35,7 +35,6 @@ struct GqlCreditLine {
     capacity: Decimal,
     reverse_claim: Decimal,
     exposure: Decimal,
-    interest_rate_ppm: u32,
     is_line: bool,
 }
 
@@ -47,7 +46,6 @@ struct GqlForward {
     asset_id: u16,
     fee_fixed: Decimal,
     fee_percent_ppm: u32,
-    max_line_apr_ppm: u32,
     expires_at: i64,
     allow_unknown: bool,
 }
@@ -98,10 +96,10 @@ pub fn fetch_path_graph(
             pathGraph(from: "{from}", to: "{to}", maxHops: {max_hops}) {{
                 now
                 creditLines {{
-                    creditor debtor assetId capacity reverseClaim exposure interestRatePpm isLine
+                    creditor debtor assetId capacity reverseClaim exposure isLine
                 }}
                 forwardOffers {{
-                    poster nextHop assetId feeFixed feePercentPpm maxLineAprPpm
+                    poster nextHop assetId feeFixed feePercentPpm
                     expiresAt allowUnknown
                 }}
                 fxOffers {{
@@ -132,7 +130,6 @@ pub fn fetch_path_graph(
             capacity,
             reverse_claim: l.reverse_claim.quantity.value,
             exposure: l.exposure.quantity.value,
-            interest_rate_ppm: l.interest_rate_ppm,
             is_line: l.is_line,
         });
     }
@@ -145,7 +142,6 @@ pub fn fetch_path_graph(
             asset_id: r.asset_id,
             hop_fee_fixed: r.fee_fixed.quantity.value,
             hop_fee_percent_ppm: r.fee_percent_ppm,
-            max_accept_rate_ppm: r.max_line_apr_ppm,
             expires_at: r.expires_at,
             allow_unknown: r.allow_unknown,
         });

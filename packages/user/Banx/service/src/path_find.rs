@@ -28,7 +28,6 @@ pub struct LineEdge {
     pub reverse_claim: u64,
     /// What the debtor already owes this creditor (same-direction claim).
     pub exposure: u64,
-    pub interest_rate_ppm: u32,
     /// True if a real credit-line row exists (not a reverse-claim-only edge).
     pub is_line: bool,
 }
@@ -41,7 +40,6 @@ pub struct RoutingEdge {
     pub asset_id: u16,
     pub hop_fee_fixed: u64,
     pub hop_fee_percent_ppm: u32,
-    pub max_accept_rate_ppm: u32,
     /// Unix seconds; `0` = never.
     pub expires_at: i64,
     /// If false, the poster must have a credit line to the next hop.
@@ -868,9 +866,6 @@ fn sequence_fits(
             {
                 return false;
             }
-            if new_draw > 0 && line.is_line && line.interest_rate_ppm > policy.max_accept_rate_ppm {
-                return false;
-            }
             true
         });
         if !ok {
@@ -923,15 +918,11 @@ fn expand_hops(
         if draw > line.capacity {
             continue;
         }
-        // APR cap is only on new line capacity, not a pure unwind.
         let new_draw = draw.saturating_sub(line.reverse_claim);
         if !rpol.allow_unknown
             && new_draw > 0
             && !known.contains(&(debtor, line.creditor, hop_asset))
         {
-            continue;
-        }
-        if new_draw > 0 && line.is_line && line.interest_rate_ppm > rpol.max_accept_rate_ppm {
             continue;
         }
 
@@ -1022,7 +1013,6 @@ mod tests {
             capacity,
             reverse_claim: 0,
             exposure: 0,
-            interest_rate_ppm: 0,
             is_line: true,
         }
     }
@@ -1035,7 +1025,6 @@ mod tests {
             capacity: headroom + reverse,
             reverse_claim: reverse,
             exposure: 0,
-            interest_rate_ppm: 0,
             is_line: true,
         }
     }
@@ -1048,42 +1037,7 @@ mod tests {
             capacity: reverse,
             reverse_claim: reverse,
             exposure: 0,
-            interest_rate_ppm: 0,
             is_line: false,
-        }
-    }
-
-    fn line_apr(c: &str, d: &str, asset: u16, capacity: u64, apr_ppm: u32) -> LineEdge {
-        LineEdge {
-            interest_rate_ppm: apr_ppm,
-            ..line(c, d, asset, capacity)
-        }
-    }
-
-    fn line_with_reverse_apr(
-        c: &str,
-        d: &str,
-        asset: u16,
-        headroom: u64,
-        reverse: u64,
-        apr_ppm: u32,
-    ) -> LineEdge {
-        LineEdge {
-            interest_rate_ppm: apr_ppm,
-            ..line_with_reverse(c, d, asset, headroom, reverse)
-        }
-    }
-
-    fn global_rte_cap(debtor: &str, asset: u16, max_apr: u32, allow_unknown: bool) -> RoutingEdge {
-        RoutingEdge {
-            creditor: AccountNumber::new(0),
-            debtor: acct(debtor),
-            asset_id: asset,
-            hop_fee_fixed: 0,
-            hop_fee_percent_ppm: 0,
-            max_accept_rate_ppm: max_apr,
-            expires_at: 0,
-            allow_unknown,
         }
     }
 
@@ -1094,7 +1048,6 @@ mod tests {
             asset_id: asset,
             hop_fee_fixed: 0,
             hop_fee_percent_ppm: fee_pct_ppm,
-            max_accept_rate_ppm: PPM_SCALE,
             expires_at: 0,
             allow_unknown: true,
         }
@@ -1326,7 +1279,6 @@ mod tests {
             asset_id: 1,
             hop_fee_fixed: 10,
             hop_fee_percent_ppm: 0,
-            max_accept_rate_ppm: PPM_SCALE,
             expires_at: 0,
             allow_unknown: true,
         }];
@@ -1366,7 +1318,6 @@ mod tests {
                 asset_id: 1,
                 hop_fee_fixed: 100,
                 hop_fee_percent_ppm: 0,
-                max_accept_rate_ppm: PPM_SCALE,
                 expires_at: 0,
                 allow_unknown: true,
             },
@@ -1595,86 +1546,6 @@ mod tests {
         assert_eq!(q.amount_out, 100);
     }
 
-    /// Mirrors `test_max_line_apr_allows_unwind`: high APR on the next hop
-    /// does not block a hop that only unwinds a reverse claim.
-    #[test]
-    fn max_line_apr_allows_unwind() {
-        let usd = 1u16;
-        let lines = vec![
-            line("gary", "alice", usd, 10_000),
-            line_with_reverse_apr("steve", "gary", usd, 10_000, 100, 20_000),
-        ];
-        let routing = vec![global_rte_cap("gary", usd, 10_000, false)];
-        let q = find(
-            &lines,
-            &routing,
-            &[],
-            "alice",
-            "steve",
-            100,
-            usd,
-            Some(usd),
-            4,
-            0,
-        )
-        .expect("unwind path despite APR over cap");
-        assert_eq!(q.hops.len(), 2);
-        assert_eq!(q.hops[0].account, acct("gary"));
-        assert_eq!(q.hops[1].account, acct("steve"));
-        assert_eq!(q.amount_in, 100);
-        assert_eq!(q.amount_out, 100);
-    }
-
-    /// Mirrors `test_max_line_apr_rejects_forward`.
-    #[test]
-    fn max_line_apr_rejects_new_draw() {
-        let usd = 1u16;
-        let lines = vec![
-            line("gary", "alice", usd, 10_000),
-            line_apr("steve", "gary", usd, 10_000, 20_000),
-        ];
-        let routing = vec![global_rte_cap("gary", usd, 10_000, true)];
-        assert!(find(
-            &lines,
-            &routing,
-            &[],
-            "alice",
-            "steve",
-            100,
-            usd,
-            Some(usd),
-            4,
-            0,
-        )
-        .is_none());
-    }
-
-    #[test]
-    fn max_line_apr_rejects_mixed_unwind_and_new_draw() {
-        let usd = 1u16;
-        let lines = vec![
-            line("gary", "alice", usd, 10_000),
-            line_with_reverse_apr("steve", "gary", usd, 10_000, 100, 20_000),
-        ];
-        let routing = vec![global_rte_cap("gary", usd, 10_000, false)];
-        assert!(
-            find(
-                &lines,
-                &routing,
-                &[],
-                "alice",
-                "steve",
-                101,
-                usd,
-                Some(usd),
-                4,
-                0,
-            )
-            .is_none(),
-            "new_draw over reverse claim is still capped"
-        );
-    }
-
     /// Same setup as `test_expired_specific_falls_back_to_global`.
     #[test]
     fn expired_specific_does_not_beat_live_global() {
@@ -1689,7 +1560,6 @@ mod tests {
                 asset_id: 1,
                 hop_fee_fixed: 0,
                 hop_fee_percent_ppm: 0,
-                max_accept_rate_ppm: PPM_SCALE,
                 expires_at: 1,
                 allow_unknown: true,
             },
@@ -1699,7 +1569,6 @@ mod tests {
                 asset_id: 1,
                 hop_fee_fixed: 10,
                 hop_fee_percent_ppm: 0,
-                max_accept_rate_ppm: PPM_SCALE,
                 expires_at: 0,
                 allow_unknown: true,
             },
@@ -2026,7 +1895,6 @@ mod tests {
             capacity: 0,
             reverse_claim: 0,
             exposure: 0,
-            interest_rate_ppm: 0,
             is_line: true,
         });
         let q = find(
@@ -2059,7 +1927,6 @@ mod tests {
             asset_id: 1,
             hop_fee_fixed: 0,
             hop_fee_percent_ppm: PPM_SCALE / 100,
-            max_accept_rate_ppm: PPM_SCALE,
             expires_at: 0,
             allow_unknown: false,
         };

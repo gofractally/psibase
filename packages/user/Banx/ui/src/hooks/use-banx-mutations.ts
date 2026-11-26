@@ -80,17 +80,12 @@ export function useSetCreditLine() {
             /** Human decimal, e.g. `"100.00"` */
             limit: string;
             depleteOnDebit: boolean;
-            interestRatePpm: number;
-            /** Interest-free window in seconds after 0→positive. */
-            graceSeconds: number;
         }) =>
             banxCall("setCreditLine", [
                 p.debtor,
                 p.assetId,
                 p.limit,
                 p.depleteOnDebit,
-                p.interestRatePpm,
-                p.graceSeconds,
             ]),
         onSuccess: () => {
             invalidate();
@@ -120,16 +115,12 @@ export function useSetBookAuth() {
             creditor: string;
             assetId: number;
             remaining: string;
-            maxInterestRatePpm: number;
-            minInterestRatePpm: number;
             expiresAtSeconds: number;
         }) =>
             banxCall("setBookAuth", [
                 p.creditor,
                 p.assetId,
                 p.remaining,
-                p.maxInterestRatePpm,
-                p.minInterestRatePpm,
                 p.expiresAtSeconds,
             ]),
         onSuccess: () => {
@@ -160,14 +151,12 @@ export function useBook() {
             debtor: string;
             assetId: number;
             amount: string;
-            interestRatePpm: number;
             memo: string;
         }) =>
             banxCall("book", [
                 p.debtor,
                 p.assetId,
                 p.amount,
-                p.interestRatePpm,
                 p.memo,
             ]),
         onSuccess: () => {
@@ -185,19 +174,17 @@ export function useDeposit() {
             depositor: string;
             assetId: number;
             amount: string;
-            interestRatePpm: number;
             requestId?: number;
         }) =>
             banxCall("deposit", [
                 p.depositor,
                 p.assetId,
                 p.amount,
-                p.interestRatePpm,
                 p.requestId ?? 0,
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Deposit booked (and netted if possible)");
+            toast.success("Deposit booked");
         },
         onError: (e: Error) => toast.error(e.message),
     });
@@ -237,22 +224,6 @@ export function useCancelRequest() {
         onSuccess: () => {
             invalidate();
             toast.success("Request cancelled");
-        },
-        onError: (e: Error) => toast.error(e.message),
-    });
-}
-
-export function useNet() {
-    const invalidate = useInvalidateBanx();
-    return useMutation({
-        mutationFn: async (p: {
-            counterparty: string;
-            assetId: number;
-            maxAmount: string;
-        }) => banxCall("net", [p.counterparty, p.assetId, p.maxAmount]),
-        onSuccess: () => {
-            invalidate();
-            toast.success("Netting applied");
         },
         onError: (e: Error) => toast.error(e.message),
     });
@@ -308,7 +279,6 @@ export function useSetPayAuth() {
             assetId: number;
             amount: string;
             maxSpend: string;
-            maxInterestRatePpm: number;
             periodSeconds: number;
             nextDueSeconds: number;
             endsAtSeconds: number;
@@ -318,7 +288,6 @@ export function useSetPayAuth() {
                 p.assetId,
                 p.amount,
                 p.maxSpend,
-                p.maxInterestRatePpm,
                 p.periodSeconds,
                 p.nextDueSeconds,
                 p.endsAtSeconds,
@@ -545,7 +514,6 @@ export function useSetForwardOffer() {
             assetId: number;
             feeFixed: string;
             feePercentPpm: number;
-            maxLineAprPpm: number;
             expiresAtSeconds: number;
             allowUnknown: boolean;
         }) => {
@@ -554,7 +522,6 @@ export function useSetForwardOffer() {
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
-                p.maxLineAprPpm,
                 p.expiresAtSeconds,
                 p.allowUnknown,
             ]);
@@ -574,7 +541,6 @@ export function useSetGlobalForwardOffer() {
             assetId: number;
             feeFixed: string;
             feePercentPpm: number;
-            maxLineAprPpm: number;
             expiresAtSeconds: number;
             allowUnknown: boolean;
         }) => {
@@ -582,7 +548,6 @@ export function useSetGlobalForwardOffer() {
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
-                p.maxLineAprPpm,
                 p.expiresAtSeconds,
                 p.allowUnknown,
             ]);
@@ -838,7 +803,6 @@ export function useSetFxOffer() {
             feeFixed: string;
             /** Human to-asset units per 1 from-asset unit, e.g. `"0.45"`. */
             toRate: string;
-            toInterestRatePpm: number;
             /** From-asset still accepted on this side. Saving replaces what is left. */
             remaining: string;
             expiresAtSeconds: number;
@@ -849,7 +813,6 @@ export function useSetFxOffer() {
                 p.posterIsCreditor,
                 p.feeFixed,
                 p.toRate,
-                p.toInterestRatePpm,
                 p.remaining,
                 p.expiresAtSeconds,
             ]),
@@ -873,7 +836,6 @@ export function useSetExchangeQuotes() {
             spreadPpm: number;
             remainingA: string;
             remainingB: string;
-            toInterestRatePpm: number;
             expiresAtSeconds: number;
         }) =>
             banxCall("setExchangeQuotes", [
@@ -883,7 +845,6 @@ export function useSetExchangeQuotes() {
                 p.spreadPpm,
                 p.remainingA,
                 p.remainingB,
-                p.toInterestRatePpm,
                 p.expiresAtSeconds,
             ]),
         onSuccess: () => {
@@ -1082,8 +1043,6 @@ export function useCreateInvite() {
             assetId: number;
             limit: string;
             depleteOnDebit: boolean;
-            interestRatePpm: number;
-            graceSeconds: number;
         }): Promise<{ inviteId: number; inviteToken: string }> => {
             const res = (await supervisor.functionCall({
                 service: BANX_SERVICE,
@@ -1093,8 +1052,6 @@ export function useCreateInvite() {
                     p.assetId,
                     p.limit,
                     p.depleteOnDebit,
-                    p.interestRatePpm,
-                    p.graceSeconds,
                 ],
             })) as Record<string, unknown>;
             const inviteId = Number(res.inviteId ?? res.invite_id);
@@ -1152,7 +1109,6 @@ export function useConvert() {
             toAsset: number;
             amountFrom: string;
             minTo: string;
-            interestRatePpm: number;
         }) =>
             banxCall("convert", [
                 p.counterparty,
@@ -1160,7 +1116,6 @@ export function useConvert() {
                 p.toAsset,
                 p.amountFrom,
                 p.minTo,
-                p.interestRatePpm,
             ]),
         onSuccess: () => {
             invalidate();
@@ -1181,7 +1136,6 @@ export function useTakeFx() {
             amountFrom: string;
             /** Signed human to-asset. Positive floors a receipt. Negative caps a debt. */
             toBound: string;
-            interestRatePpm: number;
         }) =>
             banxCall("takeFx", [
                 p.poster,
@@ -1190,7 +1144,6 @@ export function useTakeFx() {
                 p.posterIsCreditor,
                 p.amountFrom,
                 p.toBound,
-                p.interestRatePpm,
             ]),
         onSuccess: () => {
             invalidate();

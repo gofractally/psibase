@@ -34,13 +34,10 @@ import {
     formatToPrecision,
     invertQuotedRate,
 } from "@/lib/amount";
-import { ppmToPercent } from "@/lib/constants";
 import {
     MAX_HOP_FEE_PERCENT,
     MAX_HOP_FEE_PPM,
-    MAX_PERCENT,
     MIN_PERCENT_STEP,
-    PPM_SCALE,
     amountFieldValidator,
     percentFieldValidator,
     percentStringToPpm,
@@ -235,7 +232,6 @@ export function PoliciesPage() {
             feeFixed: "0",
             toRate: "1",
             spreadPct: "",
-            aprPct: "0",
             remaining: "",
             remainingOther: "",
             expiresAtSeconds: 0,
@@ -293,10 +289,6 @@ export function PoliciesPage() {
                 setOrderOpen(false);
                 return;
             }
-            const toInterestRatePpm = percentStringToPpm(
-                value.aprPct,
-                PPM_SCALE,
-            );
             if (value.quoteMode === "both") {
                 if (!value.remainingOther.trim() || !value.toRate.trim()) {
                     toast.error(
@@ -319,7 +311,6 @@ export function PoliciesPage() {
                             spreadPpm,
                             remainingA: value.remaining.trim(),
                             remainingB: value.remainingOther.trim(),
-                            toInterestRatePpm,
                             expiresAtSeconds: value.expiresAtSeconds,
                         },
                         {
@@ -343,7 +334,6 @@ export function PoliciesPage() {
                         posterIsCreditor: value.quoteMode === "they",
                         feeFixed: value.feeFixed.trim(),
                         toRate: value.toRate.trim(),
-                        toInterestRatePpm,
                         remaining: value.remaining.trim(),
                         expiresAtSeconds: value.expiresAtSeconds,
                     },
@@ -411,9 +401,6 @@ export function PoliciesPage() {
                                     Fee
                                 </TableHead>
                                 <TableHead className="text-right">
-                                    Interest
-                                </TableHead>
-                                <TableHead className="text-right">
                                     Expires
                                 </TableHead>
                                 <TableHead />
@@ -424,7 +411,7 @@ export function PoliciesPage() {
                             cashQuotes.length === 0 ? (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={8}
+                                        colSpan={7}
                                         className="text-muted-foreground text-sm"
                                     >
                                         None yet.
@@ -459,9 +446,6 @@ export function PoliciesPage() {
                                         <TableCell className="text-right font-mono">
                                             {displayAmount(p.feeFixed)}{" "}
                                             {symbolOf(p.fromAsset)}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {ppmToPercent(p.toInterestRatePpm)}
                                         </TableCell>
                                         <TableCell className="text-right text-sm">
                                             {formatExpiresAt(p.expiresAt)}
@@ -1358,8 +1342,8 @@ export function PoliciesPage() {
                                                 {mixed
                                                     ? "Fee and expiry"
                                                     : bothWays
-                                                      ? "Interest and expiry"
-                                                      : "Fee, interest, and expiry"}
+                                                      ? "Expiry"
+                                                      : "Fee and expiry"}
                                                 <ChevronDown
                                                     className={cn(
                                                         "size-4 transition-transform duration-200",
@@ -1429,30 +1413,6 @@ export function PoliciesPage() {
                                                         />
                                                     )}
                                                 />
-                                            )}
-                                            {mixed ? null : (
-                                            <currencyForm.AppField
-                                                name="aprPct"
-                                                validators={{
-                                                    onChange:
-                                                        percentFieldValidator(
-                                                            MAX_PERCENT,
-                                                        ),
-                                                    onSubmit:
-                                                        percentFieldValidator(
-                                                            MAX_PERCENT,
-                                                        ),
-                                                }}
-                                                children={(field) => (
-                                                    <field.TextField
-                                                        label="Interest on the new debt %"
-                                                        inputMode="decimal"
-                                                        min={0}
-                                                        max={MAX_PERCENT}
-                                                        step={MIN_PERCENT_STEP}
-                                                    />
-                                                )}
-                                            />
                                             )}
                                             <currencyForm.Field
                                                 name="expiresAtSeconds"

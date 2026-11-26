@@ -5,9 +5,8 @@ mod service {
     use banx::tables::{
         relay_sub, Asset, AssetTable, BanxInvite, BanxInviteTable, BanxRelay, BanxRelayTable,
         BookAuth, BookAuthTab, CashQuote, CashQuoteTab, ClaimOffer, ClaimOfferTab, Connection,
-        CreditLine, CreditLineTable, FxOffer, FxOfferTab, ForwardOffer,
-        ForwardOfferTab, Obligation, ObligationTable, PairCycle, PayAuth, PayAuthTab, PayRequest,
-        RequestTab, TokenRelayTable, PPM_SCALE, RATE_SCALE,
+        ForwardOffer, ForwardOfferTab, FxOffer, FxOfferTab, Line, Pair, PairTable, PayAuth,
+        PayAuthTab, PayRequest, RequestTab, TokenRelayTable, PPM_SCALE, RATE_SCALE,
     };
     use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens};
     use psibase::*;
@@ -50,14 +49,7 @@ mod service {
         assetId: u16,
         limit: Decimal,
         depleteOnDebit: bool,
-        interestRatePpm: u32,
-        /// Posted interest-free window (seconds) for the next cycle.
-        graceSeconds: u32,
-        /// When the open cycle started (`0` = none).
-        cycleStartedAt: i64,
-        /// Grace snapshotted at cycle open.
-        cycleGraceSeconds: u32,
-        /// Outstanding principal + interest for this directed pair/asset.
+        /// What the debtor owes the creditor for this directed pair/asset.
         exposure: Decimal,
         /// When depleting; 0 on revolving lines.
         remaining: Decimal,
@@ -85,10 +77,6 @@ mod service {
                 assetId: asset_id,
                 limit: zero,
                 depleteOnDebit: false,
-                interestRatePpm: 0,
-                graceSeconds: 0,
-                cycleStartedAt: 0,
-                cycleGraceSeconds: 0,
                 exposure: zero,
                 remaining: zero,
                 capacity: claim,
@@ -97,66 +85,93 @@ mod service {
             }
         }
 
-        fn from_line(line: CreditLine) -> Self {
-            let p = asset_precision(line.asset_id);
-            let exposure = Obligation::exposure(line.creditor, line.debtor, line.asset_id);
-            let reverse = Obligation::exposure(line.debtor, line.creditor, line.asset_id);
-            let cycle = PairCycle::get(line.creditor, line.debtor, line.asset_id);
+        fn from_line(
+            creditor: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
+            line: Line,
+        ) -> Self {
+            let p = asset_precision(asset_id);
+            let connection = Connection::get_live(creditor, debtor, asset_id);
             Self {
-                creditor: line.creditor,
-                debtor: line.debtor,
-                assetId: line.asset_id,
+                creditor,
+                debtor,
+                assetId: asset_id,
                 limit: Decimal::new(line.limit, p),
                 depleteOnDebit: line.deplete_on_debit,
-                interestRatePpm: line.interest_rate,
-                graceSeconds: cycle.as_ref().map(|c| c.grace_seconds).unwrap_or(0),
-                cycleStartedAt: cycle
-                    .as_ref()
-                    .map(|c| time_sec(c.cycle_started_at))
-                    .unwrap_or(0),
-                cycleGraceSeconds: cycle.as_ref().map(|c| c.cycle_grace_seconds).unwrap_or(0),
-                exposure: Decimal::new(exposure, p),
+                exposure: Decimal::new(connection.forward(), p),
                 remaining: Decimal::new(line.remaining, p),
-                capacity: Decimal::new(
-                    Connection::get_live(line.creditor, line.debtor, line.asset_id)
-                        .capacity()
-                        .into(),
-                    p,
-                ),
-                reverseClaim: Decimal::new(reverse, p),
+                capacity: Decimal::new(connection.capacity().into(), p),
+                reverseClaim: Decimal::new(connection.reverse(), p),
                 isLine: true,
             }
         }
     }
 
+    /// Lines on a `Pair` row: `(creditor, debtor, asset_id, line)`. The low side's line
+    /// comes first.
+    fn pair_lines(row: &Pair) -> Vec<(AccountNumber, AccountNumber, u16, Line)> {
+        let mut lines = Vec::new();
+        if let Some(line) = row.low_line {
+            lines.push((row.low, row.high, row.asset_id, line));
+        }
+        if let Some(line) = row.high_line {
+            lines.push((row.high, row.low, row.asset_id, line));
+        }
+        lines
+    }
+
+    /// The owed direction of a `Pair` row: `(creditor, debtor, amount)`.
+    fn pair_owed(row: &Pair) -> Option<(AccountNumber, AccountNumber, u64)> {
+        match row.balance {
+            0 => None,
+            b if b > 0 => Some((row.low, row.high, b.unsigned_abs())),
+            b => Some((row.high, row.low, b.unsigned_abs())),
+        }
+    }
+
+    fn all_pairs() -> Vec<Pair> {
+        PairTable::with_service(banx::SERVICE)
+            .get_index_pk()
+            .iter()
+            .collect()
+    }
+
+    /// Every row with `account` on either side.
+    fn pairs_involving(account: AccountNumber) -> Vec<Pair> {
+        let lo = AccountNumber::new(0);
+        let hi = AccountNumber::new(u64::MAX);
+        let table = PairTable::with_service(banx::SERVICE);
+        let mut rows: Vec<Pair> = table
+            .get_index_pk()
+            .range((account, lo, 0)..=(account, hi, u16::MAX))
+            .collect();
+        rows.extend(
+            table
+                .get_index_by_high()
+                .range((account, lo, 0)..=(account, hi, u16::MAX)),
+        );
+        rows
+    }
+
     #[derive(SimpleObject)]
     struct ObligationView {
-        id: u32,
         creditor: AccountNumber,
         debtor: AccountNumber,
         assetId: u16,
-        remainingPrincipal: Decimal,
-        accruedInterest: Decimal,
-        interestRatePpm: i32,
-        createdAt: i64,
-        lastInterestAccrual: i64,
+        /// What the debtor owes the creditor (human decimal for the asset).
+        amount: Decimal,
     }
 
-    impl From<Obligation> for ObligationView {
-        fn from(o: Obligation) -> Self {
-            let p = asset_precision(o.asset_id);
-            let (principal, accrued) = o.live_parts();
-            Self {
-                id: o.id,
-                creditor: o.creditor,
-                debtor: o.debtor,
-                assetId: o.asset_id,
-                remainingPrincipal: Decimal::new(principal, p),
-                accruedInterest: Decimal::new(accrued, p),
-                interestRatePpm: o.interest_rate,
-                createdAt: time_sec(o.created_at),
-                lastInterestAccrual: time_sec(o.last_interest_accrual),
-            }
+    impl ObligationView {
+        fn from_pair(row: &Pair) -> Option<Self> {
+            let (creditor, debtor, owed) = pair_owed(row)?;
+            Some(Self {
+                creditor,
+                debtor,
+                assetId: row.asset_id,
+                amount: Decimal::new(owed.into(), asset_precision(row.asset_id)),
+            })
         }
     }
 
@@ -168,7 +183,6 @@ mod service {
         assetId: u16,
         feeFixed: Decimal,
         feePercentPpm: u32,
-        maxLineAprPpm: u32,
         expiresAt: i64,
         isGlobal: bool,
         allowUnknown: bool,
@@ -182,7 +196,6 @@ mod service {
                 assetId: p.asset_id,
                 feeFixed: Decimal::new(p.fee_fixed, asset_precision(p.asset_id)),
                 feePercentPpm: p.fee_percent,
-                maxLineAprPpm: p.max_line_apr,
                 expiresAt: time_sec(p.expires_at),
                 isGlobal: p.is_global(),
                 allowUnknown: p.allow_unknown,
@@ -239,7 +252,6 @@ mod service {
         feeFixed: Decimal,
         /// Chain `fx_rate` (RATE_SCALE fixed-point), not an asset amount.
         fxRate: String,
-        toInterestRatePpm: u32,
         /// From-asset still accepted (human decimal).
         remaining: Decimal,
         expiresAt: i64,
@@ -255,7 +267,6 @@ mod service {
                 posterIsCreditor: p.poster_is_creditor,
                 feeFixed: Decimal::new(p.fee_fixed, asset_precision(p.from_asset)),
                 fxRate: p.fx_rate.to_string(),
-                toInterestRatePpm: p.to_interest_rate,
                 remaining: Decimal::new(p.remaining, asset_precision(p.from_asset)),
                 expiresAt: time_sec(p.expires_at),
             }
@@ -414,8 +425,6 @@ mod service {
         assetId: u16,
         amount: Decimal,
         maxSpend: Decimal,
-        /// Highest APR ppm the first hop may charge. 0 is 0% only.
-        maxInterestRatePpm: u32,
         periodSeconds: u32,
         nextDue: i64,
         endsAt: i64,
@@ -431,7 +440,6 @@ mod service {
                 assetId: row.asset_id,
                 amount: Decimal::new(row.amount, p),
                 maxSpend: Decimal::new(row.max_spend, p),
-                maxInterestRatePpm: row.max_interest_rate,
                 periodSeconds: row.period_seconds,
                 nextDue: time_sec(row.next_due),
                 endsAt: time_sec(row.ends_at),
@@ -464,8 +472,6 @@ mod service {
         assetId: u16,
         limit: Decimal,
         depleteOnDebit: bool,
-        interestRatePpm: u32,
-        graceSeconds: u32,
         createdAt: i64,
         /// Invite-service expiry (`0` if the invite record is gone).
         expiry: i64,
@@ -479,8 +485,6 @@ mod service {
         creditor: AccountNumber,
         assetId: u16,
         remaining: Decimal,
-        maxInterestRatePpm: u32,
-        minInterestRatePpm: i32,
         expiresAt: i64,
     }
 
@@ -491,8 +495,6 @@ mod service {
                 creditor: row.creditor,
                 assetId: row.asset_id,
                 remaining: Decimal::new(row.remaining, asset_precision(row.asset_id)),
-                maxInterestRatePpm: row.max_interest_rate,
-                minInterestRatePpm: row.min_interest_rate,
                 expiresAt: time_sec(row.expires_at),
             }
         }
@@ -508,8 +510,6 @@ mod service {
                 assetId: row.asset_id,
                 limit: Decimal::new(row.limit, p),
                 depleteOnDebit: row.deplete_on_debit,
-                interestRatePpm: row.interest_rate,
-                graceSeconds: row.grace_seconds,
                 createdAt: time_sec(row.created_at),
                 expiry: time_sec(expiry),
                 claimedBy: row.claimed_by,
@@ -585,10 +585,12 @@ mod service {
         /// Every posted credit line. The network view draws one edge per row.
         /// `limit` / `exposure` are human decimals for the line's asset.
         async fn networkLines(&self) -> Vec<CreditLineView> {
-            CreditLineTable::with_service(banx::SERVICE)
-                .get_index_pk()
+            all_pairs()
                 .iter()
-                .map(CreditLineView::from_line)
+                .flat_map(pair_lines)
+                .map(|(creditor, debtor, asset_id, line)| {
+                    CreditLineView::from_line(creditor, debtor, asset_id, line)
+                })
                 .collect()
         }
 
@@ -613,18 +615,21 @@ mod service {
         ) -> Vec<CreditLineView> {
             let want_creditor = asCreditor.unwrap_or(true);
             let want_debtor = asDebtor.unwrap_or(true);
-            CreditLineTable::with_service(banx::SERVICE)
-                .get_index_pk()
+            pairs_involving(account)
                 .iter()
-                .filter(|l| {
-                    (want_creditor && l.creditor == account) || (want_debtor && l.debtor == account)
+                .flat_map(pair_lines)
+                .filter(|(creditor, debtor, _, _)| {
+                    (want_creditor && *creditor == account) || (want_debtor && *debtor == account)
                 })
-                .map(CreditLineView::from_line)
+                .map(|(creditor, debtor, asset_id, line)| {
+                    CreditLineView::from_line(creditor, debtor, asset_id, line)
+                })
                 .collect()
         }
 
-        /// Obligations where `account` is creditor and/or debtor.
-        /// Principal / interest are human decimals for the obligation's asset.
+        /// Obligations where `account` is creditor and/or debtor: one per pair
+        /// row with a balance, in the owed direction. `amount` is a human
+        /// decimal for the obligation's asset.
         async fn obligations(
             &self,
             account: AccountNumber,
@@ -633,18 +638,17 @@ mod service {
         ) -> Vec<ObligationView> {
             let want_creditor = asCreditor.unwrap_or(true);
             let want_debtor = asDebtor.unwrap_or(true);
-            ObligationTable::with_service(banx::SERVICE)
-                .get_index_pk()
+            pairs_involving(account)
                 .iter()
+                .filter_map(ObligationView::from_pair)
                 .filter(|o| {
                     (want_creditor && o.creditor == account) || (want_debtor && o.debtor == account)
                 })
-                .map(ObligationView::from)
                 .collect()
         }
 
-        /// Pair exposure: what `debtor` owes `creditor` in `assetId`
-        /// (principal + live interest). Human decimal for that asset.
+        /// Pair exposure: what `debtor` owes `creditor` in `assetId`.
+        /// Human decimal for that asset.
         async fn exposure(
             &self,
             creditor: AccountNumber,
@@ -652,7 +656,7 @@ mod service {
             assetId: u16,
         ) -> Decimal {
             Decimal::new(
-                Obligation::exposure(creditor, debtor, assetId),
+                Pair::exposure(creditor, debtor, assetId),
                 asset_precision(assetId),
             )
         }
@@ -788,20 +792,21 @@ mod service {
             let max_hops = maxHops.unwrap_or(6).clamp(1, 12) as usize;
             use std::collections::HashSet;
 
-            let all_lines: Vec<CreditLine> = CreditLineTable::with_service(banx::SERVICE)
-                .get_index_pk()
+            let pairs = all_pairs();
+            let all_lines: Vec<(AccountNumber, AccountNumber, u16, Line)> =
+                pairs.iter().flat_map(pair_lines).collect();
+            let all_obs: Vec<(AccountNumber, AccountNumber, u16, u64)> = pairs
                 .iter()
-                .collect();
-            let all_obs: Vec<Obligation> = ObligationTable::with_service(banx::SERVICE)
-                .get_index_pk()
-                .iter()
+                .filter_map(|row| {
+                    pair_owed(row).map(|(creditor, debtor, owed)| (creditor, debtor, row.asset_id, owed))
+                })
                 .collect();
 
             let mut debtors: HashSet<AccountNumber> = HashSet::new();
             debtors.insert(from);
             debtors.insert(to);
 
-            let mut selected_lines: Vec<CreditLine> = Vec::new();
+            let mut selected_lines: Vec<(AccountNumber, AccountNumber, u16, Line)> = Vec::new();
             let mut seen_line: HashSet<(AccountNumber, AccountNumber, u16)> = HashSet::new();
             let mut reverse_only: Vec<CreditLineView> = Vec::new();
 
@@ -809,41 +814,37 @@ mod service {
                 let frontier: HashSet<AccountNumber> = debtors.clone();
                 let mut grew = false;
                 for line in &all_lines {
-                    if !frontier.contains(&line.debtor) {
+                    let (creditor, debtor, asset_id, _) = *line;
+                    if !frontier.contains(&debtor) {
                         continue;
                     }
-                    let key = (line.creditor, line.debtor, line.asset_id);
+                    let key = (creditor, debtor, asset_id);
                     if !seen_line.insert(key) {
                         continue;
                     }
-                    selected_lines.push(line.clone());
-                    if debtors.insert(line.creditor) {
+                    selected_lines.push(*line);
+                    if debtors.insert(creditor) {
                         grew = true;
                     }
                 }
                 // Claims: if frontier account is owed by X, they can path-draw on X
                 // (create reverse debt and auto-net) without X having lined them.
-                for o in &all_obs {
-                    if !frontier.contains(&o.creditor) {
+                for &(creditor, debtor, asset_id, reverse_claim) in &all_obs {
+                    if !frontier.contains(&creditor) {
                         continue;
                     }
-                    let key = (o.debtor, o.creditor, o.asset_id);
+                    let key = (debtor, creditor, asset_id);
                     if seen_line.contains(&key) {
-                        continue;
-                    }
-                    let reverse_claim =
-                        Obligation::exposure(o.creditor, o.debtor, o.asset_id).value;
-                    if reverse_claim == 0 {
                         continue;
                     }
                     seen_line.insert(key);
                     reverse_only.push(CreditLineView::from_reverse_claim(
-                        o.debtor,
-                        o.creditor,
-                        o.asset_id,
+                        debtor,
+                        creditor,
+                        asset_id,
                         reverse_claim,
                     ));
-                    if debtors.insert(o.debtor) {
+                    if debtors.insert(debtor) {
                         grew = true;
                     }
                 }
@@ -854,7 +855,9 @@ mod service {
 
             let mut credit_lines: Vec<CreditLineView> = selected_lines
                 .into_iter()
-                .map(CreditLineView::from_line)
+                .map(|(creditor, debtor, asset_id, line)| {
+                    CreditLineView::from_line(creditor, debtor, asset_id, line)
+                })
                 .collect();
             credit_lines.extend(reverse_only);
 

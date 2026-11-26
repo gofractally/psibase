@@ -4,14 +4,7 @@ import { defaultAssetId } from "@/components/asset-select";
 import { AssetField } from "@/components/form-fields";
 import { useSetPayAuth } from "@/hooks/use-banx-mutations";
 import { humanToRaw } from "@/lib/amount";
-import {
-    MAX_PERCENT,
-    MIN_PERCENT_STEP,
-    amountFieldValidator,
-    percentFieldValidator,
-    percentStringToPpm,
-    useAppForm,
-} from "@/lib/form";
+import { amountFieldValidator, useAppForm } from "@/lib/form";
 import type { Asset } from "@/lib/graphql";
 import {
     fromLocalInput,
@@ -57,7 +50,6 @@ export function PayAuthDialog({
             assetId: undefined as number | undefined,
             amount: "",
             maxSpend: "",
-            maxAprPct: "0",
             periodDays: 30,
             nextDueLocal: toLocalInput(Math.floor(Date.now() / 1000)),
             endsLocal: "",
@@ -103,7 +95,7 @@ export function PayAuthDialog({
                         assetId: value.assetId!,
                         amount,
                         maxSpend,
-                        maxInterestRatePpm: percentStringToPpm(value.maxAprPct),
+
                         periodSeconds,
                         nextDueSeconds: nextDue,
                         endsAtSeconds: endsAt,
@@ -127,7 +119,6 @@ export function PayAuthDialog({
             assetId: defaultAssetId(assets),
             amount: "",
             maxSpend: "",
-            maxAprPct: "0",
             periodDays: 30,
             nextDueLocal: toLocalInput(Math.floor(Date.now() / 1000)),
             endsLocal: "",
@@ -230,26 +221,7 @@ export function PayAuthDialog({
                         Raise the max when hop fees make the draw larger than
                         the amount they receive.
                     </p>
-                    <form.AppField
-                        name="maxAprPct"
-                        validators={{
-                            onChange: percentFieldValidator(MAX_PERCENT),
-                            onSubmit: percentFieldValidator(MAX_PERCENT),
-                        }}
-                        children={(field) => (
-                            <field.TextField
-                                label="Highest APR % the first hop may charge"
-                                inputMode="decimal"
-                                min={0}
-                                max={MAX_PERCENT}
-                                step={MIN_PERCENT_STEP}
-                            />
-                        )}
-                    />
-                    <p className="text-muted-foreground -mt-2 text-xs">
-                        0% allows only a 0% line. The payee chooses the hops,
-                        so this caps whoever they draw first.
-                    </p>
+
                     <form.AppField
                         name="periodDays"
                         validators={{

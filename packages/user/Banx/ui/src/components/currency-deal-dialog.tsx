@@ -13,7 +13,7 @@ import {
     formatRawAmount,
     humanToRaw,
 } from "@/lib/amount";
-import { ppmToPercent } from "@/lib/constants";
+
 import { amountFieldValidator, useAppForm } from "@/lib/form";
 import type { Asset, FxOffer } from "@/lib/graphql";
 
@@ -156,8 +156,7 @@ export function OfferRepayDialog({
                         posterIsCreditor: current.posterIsCreditor,
                         feeFixed: current.editPolicy?.feeFixed ?? "0",
                         toRate: value.toRate.trim(),
-                        toInterestRatePpm:
-                            current.editPolicy?.toInterestRatePpm ?? 0,
+
                         remaining: value.remaining.trim(),
                         expiresAtSeconds: current.editPolicy?.expiresAt ?? 0,
                     },
@@ -502,7 +501,6 @@ export function TakeConvertDialog({
                         toAsset: value.toAsset!,
                         amountFrom: value.amount.trim(),
                         minTo: expected,
-                        interestRatePpm: policy.toInterestRatePpm,
                     },
                     {
                         onSuccess: () => {
@@ -662,9 +660,6 @@ export function TakeConvertDialog({
                                             toPrecision,
                                         )}
                                         .
-                                        {policy.toInterestRatePpm > 0
-                                            ? ` New ${toSymbol} debt at ${ppmToPercent(policy.toInterestRatePpm)} APR.`
-                                            : ""}
                                     </p>
                                     <form.AppField
                                         name="amount"

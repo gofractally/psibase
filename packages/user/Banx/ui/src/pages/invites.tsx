@@ -5,29 +5,14 @@ import { QRCodeSVG } from "qrcode.react";
 
 import { ClaimedInviteNicks } from "@/components/claimed-invite-nicks";
 
-import { AssetField, GracePeriodField } from "@/components/form-fields";
+import { AssetField } from "@/components/form-fields";
 import { formatExpiresAt } from "@/components/expires-at-picker";
 import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useInvites } from "@/hooks/use-banx-data";
 import { useCreateInvite, useDeleteInvite } from "@/hooks/use-banx-mutations";
 import { displayAmount } from "@/lib/amount";
-import {
-    DEFAULT_GRACE_SECONDS,
-    formatGracePeriod,
-    graceSecondsFromFields,
-    ppmToPercent,
-    type GracePreset,
-} from "@/lib/constants";
-import {
-    MAX_PERCENT,
-    MIN_PERCENT_STEP,
-    PPM_SCALE,
-    amountFieldValidator,
-    percentFieldValidator,
-    percentStringToPpm,
-    useAppForm,
-} from "@/lib/form";
+import { amountFieldValidator, useAppForm } from "@/lib/form";
 import { inviteClaimedBy } from "@/lib/contacts";
 import type { BanxInvite } from "@/lib/graphql";
 import {
@@ -93,8 +78,6 @@ function InviteTable({
                         {showClaimed ? <TableHead>Claimed by</TableHead> : null}
                         <TableHead>Asset</TableHead>
                         <TableHead className="text-right">Limit</TableHead>
-                        <TableHead>APR</TableHead>
-                        <TableHead>Interest-free</TableHead>
                         <TableHead>Expires</TableHead>
                         <TableHead />
                     </TableRow>
@@ -121,12 +104,6 @@ function InviteTable({
                                 </TableCell>
                                 <TableCell className="text-right font-mono">
                                     {displayAmount(row.limit)}
-                                </TableCell>
-                                <TableCell>
-                                    {ppmToPercent(row.interestRatePpm)}
-                                </TableCell>
-                                <TableCell>
-                                    {formatGracePeriod(row.graceSeconds)}
                                 </TableCell>
                                 <TableCell className="text-sm">
                                     {formatExpiresAt(row.expiry)}
@@ -197,27 +174,14 @@ export function InvitesPage() {
         defaultValues: {
             assetId: undefined as number | undefined,
             limit: "100",
-            interestPct: "0",
             deplete: false,
-            gracePreset: "7" as GracePreset,
-            graceDays: "7",
         },
         onSubmit: async ({ value }) => {
             if (value.assetId === undefined) return;
-            const graceSeconds = graceSecondsFromFields(
-                value.gracePreset,
-                value.graceDays,
-            );
-            if (graceSeconds === null) return;
             const created = await createInvite.mutateAsync({
                 assetId: value.assetId,
                 limit: value.limit.trim(),
                 depleteOnDebit: value.deplete,
-                interestRatePpm: percentStringToPpm(
-                    value.interestPct,
-                    PPM_SCALE,
-                ),
-                graceSeconds,
             });
             rememberInviteToken(created.inviteId, created.inviteToken);
             setCreateOpen(false);
@@ -233,10 +197,7 @@ export function InvitesPage() {
         form.reset({
             assetId: undefined,
             limit: "100",
-            interestPct: "0",
             deplete: false,
-            gracePreset: "7",
-            graceDays: "7",
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [createOpen]);
@@ -325,9 +286,7 @@ export function InvitesPage() {
                         <DialogTitle>New Banx invite</DialogTitle>
                         <DialogDescription>
                             Anyone with the link can join Banx and create a new
-                            account. On claim you extend this credit line. The
-                            interest-free period starts at{" "}
-                            {formatGracePeriod(DEFAULT_GRACE_SECONDS)}.
+                            account. On claim you extend this credit line.
                         </DialogDescription>
                     </DialogHeader>
                     <form
@@ -348,7 +307,7 @@ export function InvitesPage() {
                                 />
                             )}
                         />
-                        <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+                        <div className="grid gap-2">
                             <form.Subscribe
                                 selector={(s) => s.values.assetId}
                                 children={(assetId) => (
@@ -390,51 +349,7 @@ export function InvitesPage() {
                                     />
                                 )}
                             />
-                            <form.AppField
-                                name="interestPct"
-                                validators={{
-                                    onChange:
-                                        percentFieldValidator(MAX_PERCENT),
-                                    onSubmit:
-                                        percentFieldValidator(MAX_PERCENT),
-                                }}
-                                children={(field) => (
-                                    <field.TextField
-                                        label="Interest APR %"
-                                        inputMode="decimal"
-                                        min={0}
-                                        max={MAX_PERCENT}
-                                        step={MIN_PERCENT_STEP}
-                                    />
-                                )}
-                            />
                         </div>
-                        <form.Subscribe
-                            selector={(s) => ({
-                                preset: s.values.gracePreset,
-                                days: s.values.graceDays,
-                            })}
-                            children={({ preset, days }) => (
-                                <GracePeriodField
-                                    preset={preset}
-                                    days={days}
-                                    onPresetChange={(p) => {
-                                        form.setFieldValue("gracePreset", p);
-                                        if (p === "none") {
-                                            form.setFieldValue(
-                                                "graceDays",
-                                                "0",
-                                            );
-                                        } else if (p !== "custom") {
-                                            form.setFieldValue("graceDays", p);
-                                        }
-                                    }}
-                                    onDaysChange={(d) =>
-                                        form.setFieldValue("graceDays", d)
-                                    }
-                                />
-                            )}
-                        />
                         <form.AppField
                             name="deplete"
                             children={(field) => (

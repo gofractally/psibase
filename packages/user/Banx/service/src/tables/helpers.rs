@@ -40,15 +40,19 @@ pub(crate) fn live_specific_or_global<T>(
     panic!("{missing}");
 }
 
+/// Time of the current block.
+pub(crate) fn now() -> TimePointSec {
+    psibase::services::transact::Wrapper::call()
+        .currentBlock()
+        .time
+        .seconds()
+}
+
 pub(crate) fn expires_live(expires_at: TimePointSec) -> bool {
     if expires_at.seconds == 0 {
         return true;
     }
-    let now = psibase::services::transact::Wrapper::call()
-        .currentBlock()
-        .time
-        .seconds();
-    now.seconds <= expires_at.seconds
+    now().seconds <= expires_at.seconds
 }
 
 /// `out = (in - fee_fixed) * rate / RATE_SCALE`.

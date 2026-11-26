@@ -259,7 +259,7 @@ impl TokenRelay {
         );
         // Weight moves by the curve. The forward keeps the rest.
         relay.give_banx(banx);
-        let netted = Connection::get_live(taker, owner, asset_id).deposit(owed, 0);
+        let netted = Connection::get_live(taker, owner, asset_id).deposit(owed);
         emit_pair_activity(
             taker, taker, owner, asset_id, "relay", owed, netted, asset_id, 0, "",
         );

@@ -26,7 +26,6 @@ import {
     humanToRaw,
     lineAvailableRaw,
 } from "@/lib/amount";
-import { formatGracePeriod, ppmToPercent } from "@/lib/constants";
 import type { CreditLine } from "@/lib/graphql";
 import {
     buildNetworkGraph,
@@ -290,9 +289,6 @@ function LineTerms({
         ).toString(),
         precision,
     );
-    const grace = line.cycleStartedAt
-        ? line.cycleGraceSeconds
-        : line.graceSeconds;
     return (
         <div className="rounded-lg border p-3">
             <div className="flex items-center justify-between gap-2">
@@ -314,17 +310,7 @@ function LineTerms({
                 </dd>
                 <dt className="text-muted-foreground">Open</dt>
                 <dd className="text-right font-mono tabular-nums">{open}</dd>
-                <dt className="text-muted-foreground">APR</dt>
-                <dd className="text-right font-mono tabular-nums">
-                    {ppmToPercent(line.interestRatePpm)}
-                </dd>
             </dl>
-            {grace > 0 ? (
-                <p className="text-muted-foreground mt-2 text-xs">
-                    Interest-free {formatGracePeriod(grace)}
-                    {line.cycleStartedAt ? " this cycle" : ""}
-                </p>
-            ) : null}
         </div>
     );
 }

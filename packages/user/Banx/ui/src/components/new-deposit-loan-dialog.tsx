@@ -8,13 +8,8 @@ import {
     unitAmount,
 } from "@/lib/amount";
 import {
-    MAX_PERCENT,
-    MIN_PERCENT_STEP,
-    PPM_SCALE,
     amountFieldValidator,
     existingAccountValidators,
-    percentFieldValidator,
-    percentStringToPpm,
     useAppForm,
 } from "@/lib/form";
 import type { Asset } from "@/lib/graphql";
@@ -59,7 +54,6 @@ export function NewDepositLoanDialog({
             depositor: "",
             assetId: lockedAssetId,
             amount: amountFor(lockedAssetId),
-            aprPct: "0",
         },
         onSubmit: async ({ value }) => {
             const depositor = (lockedDepositor ?? value.depositor).trim();
@@ -70,10 +64,6 @@ export function NewDepositLoanDialog({
                         depositor,
                         assetId: value.assetId!,
                         amount: value.amount.trim(),
-                        interestRatePpm: percentStringToPpm(
-                            value.aprPct,
-                            PPM_SCALE,
-                        ),
                     },
                     {
                         onSuccess: () => {
@@ -93,7 +83,6 @@ export function NewDepositLoanDialog({
             depositor: initialAccount?.trim() ?? "",
             assetId: lockedAssetId,
             amount: amountFor(lockedAssetId),
-            aprPct: "0",
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, initialAccount, lockedAssetId]);
@@ -153,7 +142,7 @@ export function NewDepositLoanDialog({
                             )}
                         />
                     ) : null}
-                    <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+                    <div className="grid gap-2">
                         <form.Subscribe
                             selector={(s) => s.values.assetId}
                             children={(assetId) => {
@@ -202,22 +191,7 @@ export function NewDepositLoanDialog({
                                 );
                             }}
                         />
-                        <form.AppField
-                            name="aprPct"
-                            validators={{
-                                onChange: percentFieldValidator(MAX_PERCENT),
-                                onSubmit: percentFieldValidator(MAX_PERCENT),
-                            }}
-                            children={(field) => (
-                                <field.TextField
-                                    label="Interest APR %"
-                                    inputMode="decimal"
-                                    min={0}
-                                    max={MAX_PERCENT}
-                                    step={MIN_PERCENT_STEP}
-                                />
-                            )}
-                        />
+
                     </div>
                     <DialogFooter>
                         <Button

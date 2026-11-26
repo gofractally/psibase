@@ -56,7 +56,6 @@ function pathHops(lines: CreditLine[], offers: ForwardOffer[]): RawLink[] {
             specific.get(pair) ??
             global.get(`${line.debtor}\0${line.assetId}`);
         if (!offer) continue;
-        if (line.interestRatePpm > offer.maxLineAprPpm) continue;
         if (!offer.allowUnknown) {
             const knows = lines.some(
                 (back) =>

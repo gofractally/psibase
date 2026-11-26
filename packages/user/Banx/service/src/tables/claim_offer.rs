@@ -179,9 +179,9 @@ impl ClaimOffer {
         take.accept_claim(seller, amount);
         let pay = Connection::get_live(seller, buyer, self.asset_id);
         if self.is_sell() {
-            pay.book_at_rate(proceeds, 0);
+            pay.book(proceeds);
         } else {
-            pay.deposit(proceeds, 0);
+            pay.deposit(proceeds);
         }
 
         // Memo is the debtor so the buyer's feed can name whose debt moved.

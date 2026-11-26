@@ -4,14 +4,12 @@ mod book_auth;
 mod cash_quote;
 mod claim_offer;
 mod connection;
-mod credit_line;
 mod forward_offer;
 mod fx_offer;
 mod helpers;
 mod init;
 mod invite;
-mod obligation;
-mod pair_cycle;
+mod pair;
 mod path;
 mod pay_auth;
 mod pay_request;
@@ -20,7 +18,7 @@ mod token_relay;
 pub use connection::Connection;
 pub(crate) use helpers::{
     apply_hop_fee, apply_rate, apply_spread, emit_path_draw, expires_live, invert_hop_fee,
-    invert_rate, live_specific_or_global,
+    invert_rate, live_specific_or_global, now,
 };
 pub use helpers::{assert_account_exists, cash_sub, emit_pair_activity, relay_sub, GLOBAL};
 pub use path::{path_required_send, run_path};
@@ -42,8 +40,6 @@ pub mod tables {
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
     pub struct InitRow {
-        /// Next primary key for [`Obligation`] rows.
-        pub next_obligation_id: u32,
         /// Next primary key for [`Asset`] rows (u16 space).
         pub next_asset_id: u16,
         /// Next primary key for [`PayRequest`] rows.
@@ -59,7 +55,7 @@ pub mod tables {
 
     /// Registered currency / asset. Compact `id` is used everywhere else;
     /// `symbol` is the human/name identity.
-    #[table(name = "AssetTable", index = 5)]
+    #[table(name = "AssetTable", index = 4)]
     #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     pub struct Asset {
         #[primary_key]
@@ -92,7 +88,8 @@ pub mod tables {
     /// Path-forward offer: `poster` will sit in the middle of `path_pay`.
     /// `next_hop = 0` is global (any next hop). Specific may be posted
     /// before that hop knows the poster; `path_draw` still needs a line or
-    /// live claim when the hop runs.
+    /// live claim when the hop runs. The fee is the only price: lines carry
+    /// no interest.
     #[table(name = "ForwardOfferTab", index = 1)]
     #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct ForwardOffer {
@@ -104,9 +101,6 @@ pub mod tables {
         pub fee_fixed: Quantity,
         /// ppm (`10_000` = 1%); must be `< PPM_SCALE`.
         pub fee_percent: u32,
-        /// Max APR ppm on a **new_draw** when forwarding. Not applied to a
-        /// hop that only unwinds a reverse claim.
-        pub max_line_apr: u32,
         /// Absolute expiry (`seconds == 0` → never).
         pub expires_at: TimePointSec,
         /// If false, poster must already know the next hop (lined them, or
@@ -127,7 +121,7 @@ pub mod tables {
     /// `sell_claim`) or [`Self::SELL`] (poster will sell via `buy_claim`).
     /// `debtor = 0` is global. Residual and debtor-line checks run at take
     /// time, not at post.
-    #[table(name = "ClaimOfferTab", index = 6)]
+    #[table(name = "ClaimOfferTab", index = 5)]
     #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct ClaimOffer {
         pub poster: AccountNumber,
@@ -163,7 +157,7 @@ pub mod tables {
     /// Please-book (`PLEASE_BOOK`): poster asked the counterparty (creditor)
     /// to `deposit` them — off-graph value received. Only the creditor can
     /// fulfill; the poster cannot clear their own debt.
-    #[table(name = "RequestTab", index = 8)]
+    #[table(name = "RequestTab", index = 6)]
     #[derive(
         Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
     )]
@@ -198,7 +192,7 @@ pub mod tables {
     /// `path_pay` uses only the creditor-side row (`poster_is_creditor`).
     /// It sizes the next hop with the fee subtracted. It does not rebook:
     /// the payer still owes the middle man the full from-asset.
-    #[table(name = "FxOfferTab", index = 4)]
+    #[table(name = "FxOfferTab", index = 3)]
     #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct FxOffer {
         /// Who posted the from→to offer.
@@ -214,9 +208,6 @@ pub mod tables {
         /// Convert: `to = (amount ± fee_fixed) * fx_rate / RATE_SCALE`.
         /// Path: `to = (amount - fee_fixed) * fx_rate / RATE_SCALE`.
         pub fx_rate: u64,
-        /// Interest rate (ppm APR) for the rebooked `to_asset` bucket.
-        /// A path claim uses the credit line's APR instead.
-        pub to_interest_rate: u32,
         /// From-asset still accepted. Convert and path FX spend it.
         /// The last unit deletes the row. An empty offer is not a trade.
         pub remaining: Quantity,
@@ -236,103 +227,59 @@ pub mod tables {
         }
     }
 
-    /// Directed claim: `debtor` owes `creditor` principal + accrued interest of
-    /// `asset_id`. Accrue before any principal change. [`Obligation::net_pair`]
-    /// cancels both directions: interest first, then principal; highest rate first.
-    #[table(name = "ObligationTable", index = 2)]
-    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct Obligation {
-        #[primary_key]
-        pub id: u32,
-
-        pub creditor: AccountNumber,
-        pub debtor: AccountNumber,
-        pub asset_id: u16,
-
-        pub remaining_principal: Quantity,
-        /// Interest finalized at the last principal/rate change. Compounds
-        /// with principal (see [`crate::interest`]).
-        pub accrued_interest: Quantity,
-        /// Compound APR in ppm per year (`10_000` = 1%, `-10_000` decays).
-        /// See [`crate::interest`].
-        pub interest_rate: i32,
-
-        /// Start of the current principal/rate epoch.
-        pub last_interest_accrual: TimePointSec,
-        pub created_at: TimePointSec,
-    }
-
-    impl Obligation {
-        #[secondary_key(1)]
-        fn by_set(&self) -> (AccountNumber, AccountNumber, u16, u32) {
-            (self.creditor, self.debtor, self.asset_id, self.id)
-        }
-    }
-
-    /// Posted grace + open-cycle snapshot for a directed pair/asset.
+    /// One direction of a [`Pair`]: the creditor's facility to the debtor.
     ///
-    /// Creditor writes `grace_seconds` via `st_crd_lne`. Occupied-changing
-    /// actions write the cycle clock via [`PairCycle::sync_cycle`]. Same key as
-    /// [`CreditLine`]; separate row so a line upsert cannot clobber the clock.
-    #[table(name = "PairCycleTab", index = 7)]
+    /// `limit` is a stable cap on what the debtor may owe. A draw of `amount`
+    /// requires `owed + amount <= limit`. When `deplete_on_debit`, `remaining`
+    /// shrinks on a new draw or claim take (unwinding a reverse claim does
+    /// not; repayment does not restore it). While revolving, `remaining`
+    /// tracks `limit` and headroom ignores it.
+    ///
+    /// A zero limit is still a line: it is consent to be a known counterparty.
     #[derive(
-        Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
+        Default, Clone, Copy, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
     )]
-    pub struct PairCycle {
-        pub creditor: AccountNumber,
-        pub debtor: AccountNumber,
-        pub asset_id: u16,
-        /// Posted window for the *next* 0→positive cycle. Hides interest, then
-        /// compounds from origination (decay included).
-        pub grace_seconds: u32,
-        /// When the current cycle opened (`0` = none).
-        pub cycle_started_at: TimePointSec,
-        /// Grace snapshotted at cycle open. Later posted-grace edits do not change it.
-        pub cycle_grace_seconds: u32,
-    }
-
-    impl PairCycle {
-        #[primary_key]
-        fn pk(&self) -> (AccountNumber, AccountNumber, u16) {
-            (self.creditor, self.debtor, self.asset_id)
-        }
-    }
-
-    /// Bilateral credit facility: `creditor` will be owed by `debtor` up to
-    /// `limit` of `asset_id`, at `interest_rate` on new draws.
-    ///
-    /// `limit` is a stable cap on outstanding exposure (principal + interest).
-    /// A draw of `amount` requires `exposure + amount <= limit`.
-    /// When `deplete_on_debit`, `remaining` shrinks on new_draw / claim take
-    /// (unwind does not; repayment does not restore it). While revolving,
-    /// `remaining` tracks `limit` and headroom ignores it.
-    ///
-    /// Grace lives on [`PairCycle`], not this row. It hides interest, then
-    /// compounds from origination.
-    #[table(name = "CreditLineTable", index = 3)]
-    #[derive(
-        Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
-    )]
-    pub struct CreditLine {
-        pub creditor: AccountNumber,
-        pub debtor: AccountNumber,
-        pub asset_id: u16,
-
-        /// Stable cap on outstanding exposure (principal + accrued interest).
+    pub struct Line {
         pub limit: Quantity,
-        /// If true, new draws and claim takes also consume [`Self::remaining`]
-        /// (unwind against the reverse claim does not).
         pub deplete_on_debit: bool,
-        /// Rate applied to new draws on this line (ppm APR); see [`crate::interest`].
-        pub interest_rate: u32,
         /// Budget consumed only while `deplete_on_debit`. Tracks `limit` on a revolving line.
         pub remaining: Quantity,
     }
 
-    impl CreditLine {
+    /// Everything between two accounts in one asset: the net balance and each
+    /// side's credit line. `low` is the account with the smaller account
+    /// number, so a pair has exactly one row.
+    ///
+    /// `balance` is signed. Positive means `high` owes `low`; negative means
+    /// `low` owes `high`. Only one direction can be owed at a time, so every
+    /// write nets: a claim that meets a reverse claim cancels it first.
+    ///
+    /// A row with no balance and no line is deleted.
+    #[table(name = "PairTable", index = 2)]
+    #[derive(
+        Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
+    )]
+    pub struct Pair {
+        pub low: AccountNumber,
+        pub high: AccountNumber,
+        pub asset_id: u16,
+        /// `> 0`: `high` owes `low`. `< 0`: `low` owes `high`.
+        pub balance: i64,
+        /// `low`'s facility to `high` (`low` is the creditor).
+        pub low_line: Option<Line>,
+        /// `high`'s facility to `low` (`high` is the creditor).
+        pub high_line: Option<Line>,
+    }
+
+    impl Pair {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber, u16) {
-            (self.creditor, self.debtor, self.asset_id)
+            (self.low, self.high, self.asset_id)
+        }
+
+        #[secondary_key(1)]
+        fn by_high(&self) -> (AccountNumber, AccountNumber, u16) {
+            (self.high, self.low, self.asset_id)
         }
     }
 
@@ -344,7 +291,7 @@ pub mod tables {
     ///
     /// `to = (from − fee_fixed) * fx_rate / RATE_SCALE`. Out `from` is Banx;
     /// in `from` is tokens.
-    #[table(name = "CashQuoteTab", index = 9)]
+    #[table(name = "CashQuoteTab", index = 7)]
     #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct CashQuote {
         pub poster: AccountNumber,
@@ -369,7 +316,7 @@ pub mod tables {
 
     /// Invite created through Banx: the first accept extends a credit line to
     /// that claimee (skipped if a line already exists) and records `claimed_by`.
-    #[table(name = "BanxInviteTable", index = 10)]
+    #[table(name = "BanxInviteTable", index = 8)]
     #[derive(Default, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct BanxInvite {
         #[primary_key]
@@ -378,8 +325,6 @@ pub mod tables {
         pub asset_id: u16,
         pub limit: Quantity,
         pub deplete_on_debit: bool,
-        pub interest_rate: u32,
-        pub grace_seconds: u32,
         pub created_at: TimePointSec,
         /// Set on the first successful claim; `None` until then.
         pub claimed_by: Option<AccountNumber>,
@@ -395,7 +340,7 @@ pub mod tables {
     /// Standing book-auth: `debtor` lets `creditor` `book` deposits onto them
     /// in `asset_id`, spending [`Self::remaining`]. Dual of a credit line
     /// (who may *write* that I owe them, not who may *draw*).
-    #[table(name = "BookAuthTab", index = 11)]
+    #[table(name = "BookAuthTab", index = 9)]
     #[derive(
         Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
     )]
@@ -405,10 +350,6 @@ pub mod tables {
         pub asset_id: u16,
         /// Live budget the creditor may still book. 0 means spent; row stays so it can be topped up.
         pub remaining: Quantity,
-        /// Highest booked APR ppm the creditor may use. 0 with a 0 floor is 0% only.
-        pub max_interest_rate: u32,
-        /// Lowest booked APR ppm. 0 refuses decay; a negative floor allows it down to that rate.
-        pub min_interest_rate: i32,
         /// Absolute expiry (`seconds == 0` → never).
         pub expires_at: TimePointSec,
     }
@@ -422,7 +363,7 @@ pub mod tables {
 
     /// Repeating path payment. The payer signs once. A later `run` draws
     /// the payer and delivers `amount` to the payee. One row is one series.
-    #[table(name = "PayAuthTab", index = 12)]
+    #[table(name = "PayAuthTab", index = 10)]
     #[derive(
         Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
     )]
@@ -439,8 +380,6 @@ pub mod tables {
         pub amount: Quantity,
         /// Most the payer will be drawn for one period, same asset. At least `amount`.
         pub max_spend: Quantity,
-        /// Highest APR ppm the first hop's credit line may charge. 0 is 0% only.
-        pub max_interest_rate: u32,
         /// Length of one period. Greater than 0.
         pub period_seconds: u32,
         /// Start of the oldest period that has not been paid.
@@ -454,7 +393,7 @@ pub mod tables {
     /// Both reserves are virtual weights. A path that changes asset on
     /// `owner` uses this curve instead of a [`FxOffer`] for the pair.
     /// One row prices both directions. `asset_lo` is the lower asset id.
-    #[table(name = "BanxRelayTable", index = 13)]
+    #[table(name = "BanxRelayTable", index = 11)]
     #[derive(
         Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone,
     )]
@@ -478,7 +417,7 @@ pub mod tables {
     /// `reserve_banx` is the virtual Banx weight. The token reserve is the
     /// balance in `{owner}/{asset_id}/{token_id}`, filled when the pool is
     /// posted. One owner has one pool per pair.
-    #[table(name = "TokenRelayTable", index = 14)]
+    #[table(name = "TokenRelayTable", index = 12)]
     #[derive(
         Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone,
     )]

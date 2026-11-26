@@ -7,22 +7,9 @@ import type { ReactNode } from "react";
 import { CurrencyPicker } from "@/components/currency-picker";
 import { ExpiresAtPicker } from "@/components/expires-at-picker";
 import type { Asset } from "@/lib/graphql";
-import {
-    GRACE_PRESET_DAYS,
-    parseGraceDays,
-    type GracePreset,
-} from "@/lib/constants";
 
 import { cn } from "@shared/lib/utils";
-import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@shared/shadcn/ui/select";
 
 export function amountUnit(symbol: string | undefined) {
     if (!symbol) return undefined;
@@ -112,59 +99,5 @@ export function ExpiresField({
             onChange={onChange}
             disabled={disabled}
         />
-    );
-}
-
-export function GracePeriodField({
-    preset,
-    days,
-    onPresetChange,
-    onDaysChange,
-}: {
-    preset: GracePreset;
-    days: string;
-    onPresetChange: (preset: GracePreset) => void;
-    onDaysChange: (days: string) => void;
-}) {
-    const customInvalid =
-        preset === "custom" && parseGraceDays(days) === null;
-    return (
-        <div className="grid gap-2">
-            <Label>Interest-free period</Label>
-            <Select
-                value={preset}
-                onValueChange={(v) => onPresetChange(v as GracePreset)}
-            >
-                <SelectTrigger>
-                    <SelectValue placeholder="7 days" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {GRACE_PRESET_DAYS.map((d) => (
-                        <SelectItem key={d} value={String(d)}>
-                            {d === 1 ? "1 day" : `${d} days`}
-                        </SelectItem>
-                    ))}
-                    <SelectItem value="custom">Custom</SelectItem>
-                </SelectContent>
-            </Select>
-            {preset === "custom" ? (
-                <div className="grid gap-1">
-                    <Input
-                        inputMode="numeric"
-                        value={days}
-                        onChange={(e) => onDaysChange(e.target.value)}
-                        placeholder="Days"
-                        aria-label="Custom interest-free days"
-                        aria-invalid={customInvalid}
-                    />
-                    {customInvalid ? (
-                        <p className="text-destructive text-sm">
-                            Enter a whole number of days
-                        </p>
-                    ) : null}
-                </div>
-            ) : null}
-        </div>
     );
 }

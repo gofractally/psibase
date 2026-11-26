@@ -56,9 +56,7 @@ export function directedDebt(
         ) {
             continue;
         }
-        sum +=
-            humanToRaw(row.remainingPrincipal || "0", precision) +
-            humanToRaw(row.accruedInterest || "0", precision);
+        sum += humanToRaw(row.amount || "0", precision);
     }
     return sum;
 }
@@ -312,7 +310,6 @@ export function TakeTradeDialog({
                         posterIsCreditor: policy.posterIsCreditor,
                         amountFrom: amount,
                         toBound: rawToFixed(received, toPrec),
-                        interestRatePpm: policy.toInterestRatePpm,
                     },
                     {
                         onSuccess: () => {

@@ -1,5 +1,3 @@
-/// Daily compound interest (path-independent daily loop, then leftover seconds).
-pub mod interest;
 mod iso4217;
 /// Shared fee / FX integer math (on-chain and path search).
 pub mod math;
@@ -11,8 +9,8 @@ pub mod tables;
 pub mod service {
     use crate::tables::{
         assert_account_exists, emit_pair_activity, path_required_send, run_path, Asset, BanxInvite,
-        BanxRelay, BookAuth, CashQuote, ClaimOffer, Connection, CreditLine, ForwardOffer, FxOffer,
-        InitRow, InitTable, Obligation, PathHop, PayAuth, PayRequest, TokenRelay,
+        BanxRelay, BookAuth, CashQuote, ClaimOffer, Connection, ForwardOffer, FxOffer, InitRow,
+        InitTable, Pair, PathHop, PayAuth, PayRequest, TokenRelay,
     };
     use psibase::{
         services::events,
@@ -40,7 +38,6 @@ pub mod service {
         if InitTable::read().get_index_pk().get(&()).is_none() {
             table
                 .put(&InitRow {
-                    next_obligation_id: 1,
                     next_asset_id: 1,
                     next_request_id: 1,
                     next_pay_auth_id: 1,
@@ -68,27 +65,18 @@ pub mod service {
     /// Set a credit line for the sender as creditor, offering capacity to `debitor`.
     ///
     /// `debitor` must already exist as a chain account.
-    /// `amount` is the exposure `limit`: max outstanding principal + accrued
-    /// interest (revolving cap), not a deposited balance. See [`CreditLine`].
+    /// `amount` is the `limit`: the most `debitor` may owe the sender
+    /// (revolving cap), not a deposited balance. See [`Line`](crate::tables::Line).
+    /// Lines carry no interest.
     #[action]
     fn st_crd_lne(
         debitor: AccountNumber,
         asset_id: u16,
         amount: Quantity,
         deplete_on_debit: bool,
-        interest_rate: u32,
-        grace_seconds: u32,
     ) {
         let creditor = get_sender();
-        CreditLine::upsert_credit_line(
-            creditor,
-            debitor,
-            asset_id,
-            amount,
-            deplete_on_debit,
-            interest_rate,
-            grace_seconds,
-        );
+        Pair::set_line(creditor, debitor, asset_id, amount, deplete_on_debit);
         emit_pair_activity(
             creditor,
             creditor,
@@ -115,8 +103,6 @@ pub mod service {
         asset_id: u16,
         amount: Quantity,
         deplete_on_debit: bool,
-        interest_rate: u32,
-        grace_seconds: u32,
     ) {
         BanxInvite::add(
             invite_id,
@@ -125,8 +111,6 @@ pub mod service {
             asset_id,
             amount,
             deplete_on_debit,
-            interest_rate,
-            grace_seconds,
         );
     }
 
@@ -153,28 +137,17 @@ pub mod service {
 
     /// Debtor (sender) lets `creditor` book deposits onto them in `asset_id`,
     /// up to `remaining`. Dual of a credit line: they may *write* that you
-    /// owe them. The booked APR must sit in `min_interest_rate..=max_interest_rate`.
-    /// A floor of 0 refuses decay. `expires_at` 0 = never. Replaces any existing
-    /// row for this pair/asset.
+    /// owe them. `expires_at` 0 = never. Replaces any existing row for this
+    /// pair/asset.
     #[action]
     fn st_bk_ath(
         creditor: AccountNumber,
         asset_id: u16,
         remaining: Quantity,
-        max_interest_rate: u32,
-        min_interest_rate: i32,
         expires_at: TimePointSec,
     ) {
         let debtor = get_sender();
-        BookAuth::upsert(
-            debtor,
-            creditor,
-            asset_id,
-            remaining,
-            max_interest_rate,
-            min_interest_rate,
-            expires_at,
-        );
+        BookAuth::upsert(debtor, creditor, asset_id, remaining, expires_at);
         emit_pair_activity(
             debtor,
             debtor,
@@ -210,20 +183,11 @@ pub mod service {
 
     /// Creditor (sender) books `amount` onto `debtor` under their live
     /// book-auth. Same ledger as [`deposit`], spends remaining (row stays at
-    /// 0 so it can be topped up), auto-nets. `interest_rate` must be within
-    /// ±100% and inside the auth's min..=max. A negative rate decays the claim;
-    /// the creditor signs it, and only after the debtor set a negative floor.
-    /// Memo is stored on activity.
+    /// 0 so it can be topped up), auto-nets. Memo is stored on activity.
     #[action]
-    fn book(
-        debtor: AccountNumber,
-        asset_id: u16,
-        amount: Quantity,
-        interest_rate: i32,
-        memo: Memo,
-    ) {
+    fn book(debtor: AccountNumber, asset_id: u16, amount: Quantity, memo: Memo) {
         let creditor = get_sender();
-        let netted = BookAuth::get_assert(debtor, creditor, asset_id).book(amount, interest_rate);
+        let netted = BookAuth::get_assert(debtor, creditor, asset_id).book(amount);
         emit_pair_activity(
             creditor,
             creditor,
@@ -243,7 +207,7 @@ pub mod service {
     #[action]
     fn rm_crd_lne(debitor: AccountNumber, asset_id: u16) {
         let creditor = get_sender();
-        CreditLine::get_assert(creditor, debitor, asset_id).remove();
+        Pair::remove_line(creditor, debitor, asset_id);
         emit_pair_activity(
             creditor,
             creditor,
@@ -268,7 +232,6 @@ pub mod service {
         asset_id: u16,
         fee_fixed: Quantity,
         fee_percent: u32,
-        max_line_apr: u32,
         expires_at: TimePointSec,
         allow_unknown: bool,
     ) {
@@ -282,7 +245,6 @@ pub mod service {
             asset_id,
             fee_fixed,
             fee_percent,
-            max_line_apr,
             expires_at,
             allow_unknown,
         );
@@ -294,7 +256,6 @@ pub mod service {
         asset_id: u16,
         fee_fixed: Quantity,
         fee_percent: u32,
-        max_line_apr: u32,
         expires_at: TimePointSec,
         allow_unknown: bool,
     ) {
@@ -304,7 +265,6 @@ pub mod service {
             asset_id,
             fee_fixed,
             fee_percent,
-            max_line_apr,
             expires_at,
             allow_unknown,
         );
@@ -539,7 +499,6 @@ pub mod service {
         poster_is_creditor: bool,
         fee_fixed: Quantity,
         fx_rate: u64,
-        to_interest_rate: u32,
         remaining: Quantity,
         expires_at: TimePointSec,
     ) {
@@ -550,7 +509,6 @@ pub mod service {
             poster_is_creditor,
             fee_fixed,
             fx_rate,
-            to_interest_rate,
             remaining,
             expires_at,
         );
@@ -742,14 +700,13 @@ pub mod service {
 
     /// Take the **counterparty's** [`FxOffer`] for the leftover
     /// `from_asset` debt. Only the side that matches that debt is used.
-    /// Sender does not use their own offer. Nets `from_asset` first when
-    /// the quote exists and auto-nets `to_asset`.
+    /// Sender does not use their own offer. The new claim nets against any
+    /// `to_asset` claim the other way.
     ///
     /// `min_to` bounds the new to-asset amount. When the sender owes the
     /// from-asset, that amount is new debt: a positive `min_to` caps it
     /// and zero does not. When the sender is owed the from-asset, `min_to`
-    /// is a floor on what they receive. `interest_rate` is the APR they
-    /// read. A replaced rate fails. The amount bound does not see it.
+    /// is a floor on what they receive.
     #[action]
     fn convert(
         counterparty: AccountNumber,
@@ -757,7 +714,6 @@ pub mod service {
         to_asset: u16,
         amount_from: Quantity,
         min_to: Quantity,
-        interest_rate: u32,
     ) {
         FxOffer::take(
             get_sender(),
@@ -766,7 +722,6 @@ pub mod service {
             to_asset,
             amount_from,
             min_to,
-            interest_rate,
         );
     }
 
@@ -781,8 +736,6 @@ pub mod service {
     /// caps a debt, and zero rejects finishing in debt, including a buy that
     /// has become a pure rebook. A fresh buy only receives, so a debt cap
     /// fails. A sell receives, so zero and a debt cap both pass.
-    /// `interest_rate` is the APR they read. A replaced rate fails, on a
-    /// buy and on a sell. The amount bound does not see it.
     #[action]
     fn take_fx(
         poster: AccountNumber,
@@ -791,7 +744,6 @@ pub mod service {
         poster_is_creditor: bool,
         amount_from: Quantity,
         to_bound: i64,
-        interest_rate: u32,
     ) {
         FxOffer::take_order(
             get_sender(),
@@ -801,12 +753,11 @@ pub mod service {
             poster_is_creditor,
             amount_from,
             to_bound,
-            interest_rate,
         );
     }
 
-    /// Book a **deposit**: sender receives value and credits `depositor`, then
-    /// **auto-nets** mutual obligations for this asset.
+    /// Book a **deposit**: sender receives value and credits `depositor`. A
+    /// claim the other way is cancelled first.
     ///
     /// `request_id` 0 = none. Non-zero must be a live please-book posted by
     /// `depositor` naming the sender as creditor.
@@ -815,7 +766,6 @@ pub mod service {
         depositor: AccountNumber,
         asset_id: u16,
         amount: Quantity,
-        interest_rate: u32,
         request_id: u32,
     ) {
         let receiver = get_sender();
@@ -823,64 +773,34 @@ pub mod service {
         assert_account_exists(depositor);
         assert!(amount.value > 0, "deposit amount must be positive");
         Asset::get_assert(asset_id);
-        assert!(
-            interest_rate <= crate::tables::PPM_SCALE,
-            "interest_rate exceeds 100% (PPM_SCALE)"
-        );
-        // Unsigned on purpose: the debtor signs `deposit` and the creditor
-        // does not. A negative rate is only available through `book`.
         let req_memo = if request_id != 0 {
             PayRequest::fulfill_please_book(request_id, receiver, depositor, asset_id, amount)
         } else {
             String::new()
         };
-        let netted =
-            Connection::get_live(depositor, receiver, asset_id).deposit(amount, interest_rate);
+        let netted = Connection::get_live(depositor, receiver, asset_id).deposit(amount);
         emit_pair_activity(
             receiver, depositor, receiver, asset_id, "deposit", amount, netted, asset_id,
             request_id, &req_memo,
         );
     }
 
-    /// Live pair exposure (principal + interest since last principal/rate change).
+    /// What `debtor` owes `creditor` in `asset_id`.
     #[action]
     fn get_exposure(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Quantity {
-        Obligation::exposure(creditor, debtor, asset_id)
+        Pair::exposure(creditor, debtor, asset_id)
     }
 
-    /// Net mutual obligations between sender and `counterparty` for `asset_id`.
-    #[action]
-    fn net(counterparty: AccountNumber, asset_id: u16, max_amount: Quantity) {
-        let sender = get_sender();
-        let cancelled = Obligation::net_pair(sender, counterparty, asset_id, max_amount);
-        if cancelled.value > 0 {
-            emit_pair_activity(
-                sender,
-                sender,
-                counterparty,
-                asset_id,
-                "net",
-                cancelled,
-                Quantity::new(0),
-                asset_id,
-                0,
-                "",
-            );
-        }
-    }
-
-    /// Write off claims the sender holds on `debtor` (one-sided
-    /// [`Obligation::apply_reduction`]). Debtor does not sign.
+    /// Write off claims the sender holds on `debtor`. Debtor does not sign.
     ///
-    /// Capped at live exposure. Same waterfall as net. Partial does **not**
-    /// reset an open grace cycle; emptying the pair (principal and interest)
-    /// closes it. An already-zero balance succeeds so accrual's delete commits.
+    /// Capped at what is owed. An already-zero balance succeeds and does
+    /// nothing.
     #[action]
     fn forgive(debtor: AccountNumber, asset_id: u16, amount: Quantity) {
         let creditor = get_sender();
         assert_account_exists(debtor);
         Asset::get_assert(asset_id);
-        let take = Obligation::forgive_pair(creditor, debtor, asset_id, amount);
+        let take = Pair::forgive(creditor, debtor, asset_id, amount);
         if take.value == 0 {
             return;
         }
@@ -1008,7 +928,6 @@ pub mod service {
         asset_id: u16,
         amount: Quantity,
         max_spend: Quantity,
-        max_interest_rate: u32,
         period_seconds: u32,
         next_due: TimePointSec,
         ends_at: TimePointSec,
@@ -1019,7 +938,6 @@ pub mod service {
             asset_id,
             amount,
             max_spend,
-            max_interest_rate,
             period_seconds,
             next_due,
             ends_at,
@@ -1075,7 +993,7 @@ pub mod service {
     /// Activity history, one row per party as `account`. The same account
     /// on both sides is one row.
     ///
-    /// - `kind`: `path_draw` | `path_pay` | `deposit` | `book` | `net` |
+    /// - `kind`: `path_draw` | `path_pay` | `deposit` | `book` |
     ///   `convert` | `credit_line` | `rm_credit_line` | `book_auth` |
     ///   `rm_book_auth` | `sell_claim` | `buy_claim` | `invoice` |
     ///   `please_book` | `fulfill` | `req_cancel` |

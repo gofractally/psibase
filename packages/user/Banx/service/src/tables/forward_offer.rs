@@ -73,14 +73,9 @@ impl ForwardOffer {
         asset_id: u16,
         fee_fixed: Quantity,
         fee_percent: u32,
-        max_line_apr: u32,
         expires_at: TimePointSec,
         allow_unknown: bool,
     ) {
-        assert!(
-            max_line_apr <= PPM_SCALE,
-            "max_line_apr exceeds 100% (PPM_SCALE)"
-        );
         assert!(fee_percent < PPM_SCALE, "fee must be under 100%");
         Asset::get_assert(asset_id);
         if next_hop != Self::GLOBAL {
@@ -92,7 +87,6 @@ impl ForwardOffer {
             asset_id,
             fee_fixed,
             fee_percent,
-            max_line_apr,
             expires_at,
             allow_unknown,
         }
@@ -139,15 +133,6 @@ impl ForwardOffer {
         let draw = self.apply_fees(amount_in);
         let new_draw = conn.new_draw(draw);
         self.assert_known(creditor, new_draw);
-        // APR cap is only on new line capacity, not a pure unwind.
-        if new_draw > 0 {
-            if let Some(line) = conn.line() {
-                assert!(
-                    line.interest_rate <= self.max_line_apr,
-                    "next hop interest rate exceeds max_line_apr"
-                );
-            }
-        }
         conn.draw(draw, payer);
         draw
     }

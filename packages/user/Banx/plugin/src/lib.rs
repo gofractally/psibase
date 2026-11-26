@@ -31,7 +31,7 @@ define_trust! {
         ",
         Medium => "
             - Post or remove credit lines, book-auths, forward offers, claim offers, and currency policies
-            - Deposit, book an authorized expense, net, forgive, and convert obligations
+            - Deposit, book an authorized expense, forgive, and convert obligations
             - Create or cancel invoices and please-book requests
             - Create or cancel a repeating payment
             - Buy or sell claims under a posted claim offer
@@ -79,7 +79,6 @@ define_trust! {
             set_pay_auth,
             cancel_pay_auth,
             deposit,
-            net,
             forgive,
             convert,
             sell_claim,
@@ -277,8 +276,6 @@ impl Api for BanxPlugin {
         asset_id: u16,
         limit: String,
         deplete_on_debit: bool,
-        interest_rate_ppm: u32,
-        grace_seconds: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_credit_line)?;
         let amount = parse_amount(asset_id, &limit)?;
@@ -287,8 +284,6 @@ impl Api for BanxPlugin {
             asset_id,
             amount,
             deplete_on_debit,
-            interest_rate: interest_rate_ppm,
-            grace_seconds,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::st_crd_lne::ACTION_NAME, &packed)
@@ -308,8 +303,6 @@ impl Api for BanxPlugin {
         creditor: String,
         asset_id: u16,
         remaining: String,
-        max_interest_rate_ppm: u32,
-        min_interest_rate_ppm: i32,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_book_auth)?;
@@ -318,8 +311,6 @@ impl Api for BanxPlugin {
             creditor: parse_account(&creditor)?,
             asset_id,
             remaining,
-            max_interest_rate: max_interest_rate_ppm,
-            min_interest_rate: min_interest_rate_ppm,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
@@ -340,7 +331,6 @@ impl Api for BanxPlugin {
         debtor: String,
         asset_id: u16,
         amount: String,
-        interest_rate_ppm: i32,
         memo: String,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::book)?;
@@ -349,7 +339,6 @@ impl Api for BanxPlugin {
             debtor: parse_account(&debtor)?,
             asset_id,
             amount,
-            interest_rate: interest_rate_ppm,
             memo: memo
                 .parse()
                 .map_err(|_| ErrorType::ConversionError("memo too long (max 80 bytes)".into()))?,
@@ -363,7 +352,6 @@ impl Api for BanxPlugin {
         asset_id: u16,
         fee_fixed: String,
         fee_percent_ppm: u32,
-        max_line_apr_ppm: u32,
         expires_at_seconds: u32,
         allow_unknown: bool,
     ) -> Result<(), Error> {
@@ -374,7 +362,6 @@ impl Api for BanxPlugin {
             asset_id,
             fee_fixed,
             fee_percent: fee_percent_ppm,
-            max_line_apr: max_line_apr_ppm,
             expires_at: time_point(expires_at_seconds),
             allow_unknown,
         }
@@ -386,7 +373,6 @@ impl Api for BanxPlugin {
         asset_id: u16,
         fee_fixed: String,
         fee_percent_ppm: u32,
-        max_line_apr_ppm: u32,
         expires_at_seconds: u32,
         allow_unknown: bool,
     ) -> Result<(), Error> {
@@ -396,7 +382,6 @@ impl Api for BanxPlugin {
             asset_id,
             fee_fixed,
             fee_percent: fee_percent_ppm,
-            max_line_apr: max_line_apr_ppm,
             expires_at: time_point(expires_at_seconds),
             allow_unknown,
         }
@@ -607,7 +592,6 @@ impl Api for BanxPlugin {
         poster_is_creditor: bool,
         fee_fixed: String,
         to_rate: String,
-        to_interest_rate_ppm: u32,
         remaining: String,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
@@ -621,7 +605,6 @@ impl Api for BanxPlugin {
             poster_is_creditor,
             fee_fixed,
             fx_rate,
-            to_interest_rate: to_interest_rate_ppm,
             remaining,
             expires_at: time_point(expires_at_seconds),
         }
@@ -636,7 +619,6 @@ impl Api for BanxPlugin {
         spread_ppm: u32,
         remaining_a: String,
         remaining_b: String,
-        to_interest_rate_ppm: u32,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_exchange_quotes)?;
@@ -668,7 +650,6 @@ impl Api for BanxPlugin {
                 poster_is_creditor,
                 fee_fixed: zero,
                 fx_rate,
-                to_interest_rate: to_interest_rate_ppm,
                 remaining,
                 expires_at,
             }
@@ -727,7 +708,6 @@ impl Api for BanxPlugin {
         depositor: String,
         asset_id: u16,
         amount: String,
-        interest_rate_ppm: u32,
         request_id: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::deposit)?;
@@ -736,23 +716,10 @@ impl Api for BanxPlugin {
             depositor: parse_account(&depositor)?,
             asset_id,
             amount,
-            interest_rate: interest_rate_ppm,
             request_id,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::deposit::ACTION_NAME, &packed)
-    }
-
-    fn net(counterparty: String, asset_id: u16, max_amount: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::net)?;
-        let max_amount = parse_amount(asset_id, &max_amount)?;
-        let packed = banx::action_structs::net {
-            counterparty: parse_account(&counterparty)?,
-            asset_id,
-            max_amount,
-        }
-        .packed();
-        add_action_to_transaction(banx::action_structs::net::ACTION_NAME, &packed)
     }
 
     fn forgive(debtor: String, asset_id: u16, amount: String) -> Result<(), Error> {
@@ -773,7 +740,6 @@ impl Api for BanxPlugin {
         to_asset: u16,
         amount_from: String,
         min_to: String,
-        interest_rate: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::convert)?;
         let amount_from = parse_amount_nonzero(from_asset, &amount_from)?;
@@ -784,7 +750,6 @@ impl Api for BanxPlugin {
             to_asset,
             amount_from,
             min_to,
-            interest_rate,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::convert::ACTION_NAME, &packed)
@@ -797,7 +762,6 @@ impl Api for BanxPlugin {
         poster_is_creditor: bool,
         amount_from: String,
         to_bound: String,
-        interest_rate: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::take_fx)?;
         let amount_from = parse_amount_nonzero(from_asset, &amount_from)?;
@@ -809,7 +773,6 @@ impl Api for BanxPlugin {
             poster_is_creditor,
             amount_from,
             to_bound,
-            interest_rate,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::take_fx::ACTION_NAME, &packed)
@@ -882,7 +845,6 @@ impl Api for BanxPlugin {
         asset_id: u16,
         amount: String,
         max_spend: String,
-        max_interest_rate_ppm: u32,
         period_seconds: u32,
         next_due_seconds: u32,
         ends_at_seconds: u32,
@@ -895,7 +857,6 @@ impl Api for BanxPlugin {
             asset_id,
             amount,
             max_spend,
-            max_interest_rate: max_interest_rate_ppm,
             period_seconds,
             next_due: time_point(next_due_seconds),
             ends_at: time_point(ends_at_seconds),
@@ -1276,8 +1237,6 @@ impl Api for BanxPlugin {
         asset_id: u16,
         limit: String,
         deplete_on_debit: bool,
-        interest_rate_ppm: u32,
-        grace_seconds: u32,
     ) -> Result<CreatedInvite, Error> {
         trust::assert_authorized(trust::FunctionName::create_invite)?;
         const NUM_ACCOUNTS: u16 = 1;
@@ -1293,8 +1252,6 @@ impl Api for BanxPlugin {
             asset_id,
             amount,
             deplete_on_debit,
-            interest_rate: interest_rate_ppm,
-            grace_seconds,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::cr_invite::ACTION_NAME, &packed)?;

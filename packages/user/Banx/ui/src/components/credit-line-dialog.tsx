@@ -1,10 +1,6 @@
 import { useEffect } from "react";
 
-import {
-    AssetField,
-    GracePeriodField,
-    amountUnit,
-} from "@/components/form-fields";
+import { AssetField, amountUnit } from "@/components/form-fields";
 import { useForwardOffers } from "@/hooks/use-banx-data";
 import {
     useRemoveCreditLine,
@@ -14,20 +10,8 @@ import {
 import { liveGlobalForward } from "@/lib/account-groups";
 import { formatRawAmount } from "@/lib/amount";
 import {
-    DEFAULT_GRACE_SECONDS,
-    graceSecondsFromFields,
-    graceSecondsToPreset,
-    ppmToPercentInput,
-    type GracePreset,
-} from "@/lib/constants";
-import {
-    MAX_PERCENT,
-    MIN_PERCENT_STEP,
-    PPM_SCALE,
     amountFieldValidator,
     existingAccountValidators,
-    percentFieldValidator,
-    percentStringToPpm,
     useAppForm,
 } from "@/lib/form";
 import type { Asset, CreditLine } from "@/lib/graphql";
@@ -74,31 +58,20 @@ export function CreditLineDialog({
             debtor: "",
             assetId: undefined as number | undefined,
             limit: "100",
-            interestPct: "0",
             deplete: false,
-            gracePreset: "7" as GracePreset,
-            graceDays: "7",
             allowForward: true,
         },
         onSubmit: async ({ value }) => {
             const debtor = isEdit ? editing!.debtor : value.debtor.trim();
             const assetId = isEdit ? editing!.assetId : value.assetId;
             if (assetId === undefined || !debtor) return;
-            const graceSeconds = graceSecondsFromFields(
-                value.gracePreset,
-                value.graceDays,
-            );
-            if (graceSeconds === null) return;
+
             await setLine.mutateAsync({
                 debtor,
                 assetId,
                 limit: value.limit.trim(),
                 depleteOnDebit: value.deplete,
-                interestRatePpm: percentStringToPpm(
-                    value.interestPct,
-                    PPM_SCALE,
-                ),
-                graceSeconds,
+
             });
             if (
                 value.allowForward &&
@@ -108,7 +81,7 @@ export function CreditLineDialog({
                     assetId,
                     feeFixed: "0",
                     feePercentPpm: 0,
-                    maxLineAprPpm: 0,
+    
                     expiresAtSeconds: 0,
                     allowUnknown: false,
                 });
@@ -120,9 +93,7 @@ export function CreditLineDialog({
     useEffect(() => {
         if (!open) return;
         if (editing) {
-            const grace = graceSecondsToPreset(
-                editing.graceSeconds ?? DEFAULT_GRACE_SECONDS,
-            );
+
             form.reset({
                 debtor: editing.debtor,
                 assetId: editing.assetId,
@@ -130,10 +101,7 @@ export function CreditLineDialog({
                     editing.limit,
                     precisionOf(editing.assetId),
                 ).replace(/,/g, ""),
-                interestPct: ppmToPercentInput(editing.interestRatePpm),
                 deplete: editing.depleteOnDebit,
-                gracePreset: grace.preset,
-                graceDays: grace.days,
                 allowForward: !liveGlobalForward(
                     forwardOffers,
                     editing.assetId,
@@ -145,10 +113,7 @@ export function CreditLineDialog({
                 debtor: prefillDebtor ?? "",
                 assetId: lockedAssetId,
                 limit: "100",
-                interestPct: "0",
                 deplete: false,
-                gracePreset: "7",
-                graceDays: "7",
                 allowForward: true,
             });
         }
@@ -172,7 +137,7 @@ export function CreditLineDialog({
                     </DialogTitle>
                     <DialogDescription>
                         {isEdit
-                            ? `Update limit, interest, or revolving terms for ${editing!.debtor} in ${editSymbol}. A zero limit still keeps them as a known counterparty (needed if they may hold a claim on you). Remove the line to drop that.`
+                            ? `Update limit or revolving terms for ${editing!.debtor} in ${editSymbol}. A zero limit still keeps them as a known counterparty (needed if they may hold a claim on you). Remove the line to drop that.`
                             : "Set how much they may draw, and keep outstanding, against you. What they draw is an asset you hold. A zero limit still keeps the line."}
                     </DialogDescription>
                 </DialogHeader>
@@ -213,7 +178,7 @@ export function CreditLineDialog({
                             ) : null}
                         </>
                     ) : null}
-                    <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+                    <div className="grid gap-2">
                         <form.Subscribe
                             selector={(s) => s.values.assetId}
                             children={(assetId) => {
@@ -258,54 +223,7 @@ export function CreditLineDialog({
                                 );
                             }}
                         />
-                        <form.AppField
-                            name="interestPct"
-                            validators={{
-                                onChange: percentFieldValidator(MAX_PERCENT),
-                                onSubmit: percentFieldValidator(MAX_PERCENT),
-                            }}
-                            children={(field) => (
-                                <field.TextField
-                                    label="Interest APR %"
-                                    inputMode="decimal"
-                                    min={0}
-                                    max={MAX_PERCENT}
-                                    step={MIN_PERCENT_STEP}
-                                />
-                            )}
-                        />
                     </div>
-                    <form.Subscribe
-                        selector={(s) => ({
-                            preset: s.values.gracePreset,
-                            days: s.values.graceDays,
-                        })}
-                        children={({ preset, days }) => (
-                            <GracePeriodField
-                                preset={preset}
-                                days={days}
-                                onPresetChange={(p) => {
-                                    form.setFieldValue("gracePreset", p);
-                                    if (p === "none") {
-                                        form.setFieldValue("graceDays", "0");
-                                    } else if (p !== "custom") {
-                                        form.setFieldValue("graceDays", p);
-                                    }
-                                }}
-                                onDaysChange={(d) =>
-                                    form.setFieldValue("graceDays", d)
-                                }
-                            />
-                        )}
-                    />
-                    <p className="text-muted-foreground -mt-2 text-xs">
-                        If they repay this pair to zero within this window, no
-                        interest. Default is 7 days. Custom is whole days (0 =
-                        interest from the first second).{" "}
-                        {isEdit && editing && editing.cycleStartedAt
-                            ? "An open cycle keeps its snapshotted window; this value applies to the next cycle."
-                            : null}
-                    </p>
                     <form.AppField
                         name="deplete"
                         children={(field) => (

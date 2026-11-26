@@ -14,18 +14,6 @@ impl InitRow {
         InitTable::read_write().put(self).unwrap();
     }
 
-    /// Allocate a unique obligation primary key.
-    pub fn alloc_obligation_id() -> u32 {
-        let mut row = Self::get_assert();
-        let id = row.next_obligation_id;
-        row.next_obligation_id = row
-            .next_obligation_id
-            .checked_add(1)
-            .expect("obligation id overflow");
-        row.save();
-        id
-    }
-
     /// Allocate a unique asset id (supports a few thousand assets).
     pub fn alloc_asset_id() -> u16 {
         let mut row = Self::get_assert();

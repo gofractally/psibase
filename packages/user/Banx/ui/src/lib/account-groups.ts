@@ -6,23 +6,12 @@ import type {
     Obligation,
 } from "@/lib/graphql";
 
-export function totalRaw(
-    principal: string,
-    interest: string,
-    precision: number,
-): bigint {
-    return (
-        humanToRaw(principal || "0", precision) +
-        humanToRaw(interest || "0", precision)
-    );
-}
-
 export type GroupedAccount = {
     key: string;
     counterparty: string;
     assetId: number;
     obligations: Obligation[];
-    /** Principal + interest combined */
+    /** Sum of obligation amounts, raw units */
     total: bigint;
     /** Matching credit line, if one is extended for this pair/asset */
     creditLine?: CreditLine;
@@ -57,11 +46,7 @@ export function groupByCounterpartyAndAsset(
             map.set(key, g);
         }
         g.obligations.push(o);
-        g.total += totalRaw(
-            o.remainingPrincipal,
-            o.accruedInterest,
-            precisionOf(o.assetId),
-        );
+        g.total += humanToRaw(o.amount || "0", precisionOf(o.assetId));
     }
     return map;
 }

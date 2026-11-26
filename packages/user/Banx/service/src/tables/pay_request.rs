@@ -1,7 +1,7 @@
 use psibase::{services::tokens::Quantity, AccountNumber, Memo, Table, TimePointSec};
 
-use super::{assert_account_exists, emit_pair_activity, expires_live};
-use crate::tables::tables::{Asset, InitRow, Obligation, PayRequest, RequestTab};
+use super::{assert_account_exists, emit_pair_activity, expires_live, now};
+use crate::tables::tables::{Asset, InitRow, PayRequest, RequestTab};
 
 impl PayRequest {
     pub const INVOICE: u8 = 1;
@@ -72,7 +72,7 @@ impl PayRequest {
             remaining: amount,
             memo,
             expires_at,
-            created_at: Obligation::now(),
+            created_at: now(),
         };
         row.save();
         let kind_s = if kind == Self::INVOICE {

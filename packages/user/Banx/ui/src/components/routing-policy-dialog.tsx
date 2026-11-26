@@ -18,9 +18,7 @@ import { amountPlaceholder, displayAmount } from "@/lib/amount";
 import {
     MAX_HOP_FEE_PERCENT,
     MAX_HOP_FEE_PPM,
-    MAX_PERCENT,
     MIN_PERCENT_STEP,
-    PPM_SCALE,
     amountFieldValidator,
     percentFieldValidator,
     percentStringToPpm,
@@ -51,7 +49,7 @@ type FeeFields = {
     assetId: number | undefined;
     hopFeeFixed: string;
     hopFeePct: string;
-    maxAcceptPct: string;
+
     expiresAtSeconds: number;
     allowUnknown: boolean;
 };
@@ -60,7 +58,7 @@ const defaultFees = (assetId?: number): FeeFields => ({
     assetId,
     hopFeeFixed: "0",
     hopFeePct: "0",
-    maxAcceptPct: "20",
+
     expiresAtSeconds: 0,
     allowUnknown: true,
 });
@@ -74,7 +72,7 @@ function feesFromOffer(p: ForwardOffer): FeeFields {
         assetId: p.assetId,
         hopFeeFixed: displayAmount(p.feeFixed),
         hopFeePct: ppmToPercentInput(p.feePercentPpm),
-        maxAcceptPct: ppmToPercentInput(p.maxLineAprPpm),
+
         expiresAtSeconds: p.expiresAt,
         allowUnknown: p.allowUnknown,
     };
@@ -85,7 +83,7 @@ function feePayload(value: FeeFields) {
         assetId: value.assetId!,
         feeFixed: value.hopFeeFixed.trim(),
         feePercentPpm: percentStringToPpm(value.hopFeePct, MAX_HOP_FEE_PPM),
-        maxLineAprPpm: percentStringToPpm(value.maxAcceptPct, PPM_SCALE),
+
         expiresAtSeconds: value.expiresAtSeconds,
         allowUnknown: value.allowUnknown,
     };
@@ -96,10 +94,6 @@ const hopFeeValidators = {
     onSubmit: percentFieldValidator(MAX_HOP_FEE_PERCENT),
 };
 
-const aprValidators = {
-    onChange: percentFieldValidator(MAX_PERCENT),
-    onSubmit: percentFieldValidator(MAX_PERCENT),
-};
 
 
 
@@ -325,9 +319,7 @@ export function RoutingPolicyDialog({
                                 </>
                             ) : null}
                             . You can post before they line you; a pay still
-                            needs a line or live claim. Hop fees apply; max line APR
-                            rejects a next hop whose line is more expensive
-                            than you accept.
+                            needs a line or live claim. Hop fees apply.
                         </DialogDescription>
                     </DialogHeader>
                     <form
@@ -473,20 +465,7 @@ export function RoutingPolicyDialog({
                                                 />
                                             )}
                                         />
-                                        <specificForm.AppField
-                                            name="maxAcceptPct"
-                                            validators={aprValidators}
-                                            children={(field) => (
-                                                <field.TextField
-                                                    label="Max line APR %"
-                                                    inputMode="decimal"
-                                                    min={0}
-                                                    max={MAX_PERCENT}
-                                                    step={MIN_PERCENT_STEP}
-                                                    disabled={locked}
-                                                />
-                                            )}
-                                        />
+
                                         <specificForm.AppField
                                             name="allowUnknown"
                                             children={(field) => (
@@ -564,7 +543,7 @@ export function RoutingPolicyDialog({
             globalForm.setFieldValue("enabled", true);
             globalForm.setFieldValue("hopFeeFixed", fees.hopFeeFixed);
             globalForm.setFieldValue("hopFeePct", fees.hopFeePct);
-            globalForm.setFieldValue("maxAcceptPct", fees.maxAcceptPct);
+
             globalForm.setFieldValue(
                 "expiresAtSeconds",
                 fees.expiresAtSeconds,
@@ -574,7 +553,7 @@ export function RoutingPolicyDialog({
             globalForm.setFieldValue("enabled", false);
             globalForm.setFieldValue("hopFeeFixed", "0");
             globalForm.setFieldValue("hopFeePct", "0");
-            globalForm.setFieldValue("maxAcceptPct", "20");
+
             globalForm.setFieldValue("expiresAtSeconds", 0);
             globalForm.setFieldValue("allowUnknown", true);
         }
@@ -761,20 +740,7 @@ export function RoutingPolicyDialog({
                                             />
                                         )}
                                     />
-                                    <globalForm.AppField
-                                        name="maxAcceptPct"
-                                        validators={aprValidators}
-                                        children={(field) => (
-                                            <field.TextField
-                                                label="Max line APR %"
-                                                inputMode="decimal"
-                                                min={0}
-                                                max={MAX_PERCENT}
-                                                step={MIN_PERCENT_STEP}
-                                                disabled={locked}
-                                            />
-                                        )}
-                                    />
+
                                     <globalForm.AppField
                                         name="allowUnknown"
                                         children={(field) => (

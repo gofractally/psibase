@@ -65,16 +65,11 @@ interface api {
 
     /// Creditor posts/updates a credit line to `debtor` in `asset-id`.
     /// `limit` is a human decimal string (e.g. `"100.00"`).
-    /// `interest-rate-ppm` is APR in ppm (10000 = 1%).
-    /// `grace-seconds` is the interest-free window after a 0→positive cycle
-    /// (`604800` = 7 days). `0` = interest from the first second.
     set-credit-line: func(
         debtor: string,
         asset-id: u16,
         limit: string,
         deplete-on-debit: bool,
-        interest-rate-ppm: u32,
-        grace-seconds: u32,
     ) -> result<_, error>;
 
     /// Remove the sender's credit line to `debtor`. Limit 0 is still a line
@@ -82,15 +77,11 @@ interface api {
     remove-credit-line: func(debtor: string, asset-id: u16) -> result<_, error>;
 
     /// Debtor (sender) lets `creditor` book deposits onto them, up to
-    /// `remaining` (human decimal). The booked APR must sit in
-    /// `min-interest-rate-ppm..=max-interest-rate-ppm`. A floor of 0 refuses
-    /// decay. `expires-at-seconds` 0 = never.
+    /// `remaining` (human decimal). `expires-at-seconds` 0 = never.
     set-book-auth: func(
         creditor: string,
         asset-id: u16,
         remaining: string,
-        max-interest-rate-ppm: u32,
-        min-interest-rate-ppm: s32,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
@@ -98,14 +89,11 @@ interface api {
     remove-book-auth: func(creditor: string, asset-id: u16) -> result<_, error>;
 
     /// Creditor (sender) books `amount` onto `debtor` under their live
-    /// book-auth. `interest-rate-ppm` is a signed APR (`10_000` = 1%,
-    /// negative decays the claim), within ±1_000_000 and the auth's min..=max.
-    /// `memo` max 80 bytes.
+    /// book-auth. `memo` max 80 bytes.
     book: func(
         debtor: string,
         asset-id: u16,
         amount: string,
-        interest-rate-ppm: s32,
         memo: string,
     ) -> result<_, error>;
 
@@ -120,7 +108,6 @@ interface api {
         asset-id: u16,
         fee-fixed: string,
         fee-percent-ppm: u32,
-        max-line-apr-ppm: u32,
         expires-at-seconds: u32,
         allow-unknown: bool,
     ) -> result<_, error>;
@@ -131,7 +118,6 @@ interface api {
         asset-id: u16,
         fee-fixed: string,
         fee-percent-ppm: u32,
-        max-line-apr-ppm: u32,
         expires-at-seconds: u32,
         allow-unknown: bool,
     ) -> result<_, error>;
@@ -254,7 +240,6 @@ interface api {
         poster-is-creditor: bool,
         fee-fixed: string,
         to-rate: string,
-        to-interest-rate-ppm: u32,
         remaining: string,
         expires-at-seconds: u32,
     ) -> result<_, error>;
@@ -272,7 +257,6 @@ interface api {
         spread-ppm: u32,
         remaining-a: string,
         remaining-b: string,
-        to-interest-rate-ppm: u32,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
@@ -306,17 +290,12 @@ interface api {
         depositor: string,
         asset-id: u16,
         amount: string,
-        interest-rate-ppm: u32,
         request-id: u32,
     ) -> result<_, error>;
 
-    /// Net mutual obligations with `counterparty` for `asset-id`.
-    /// `max-amount` is a human decimal string.
-    net: func(counterparty: string, asset-id: u16, max-amount: string) -> result<_, error>;
-
     /// Write off claims the sender holds on `debtor` (one-sided; debtor does
     /// not sign). `amount` is a human decimal, capped on chain at live
-    /// exposure. Partial does not reset grace; principal to 0 closes the cycle.
+    /// exposure.
     forgive: func(debtor: string, asset-id: u16, amount: string) -> result<_, error>;
 
     /// Take the counterparty's currency-policy offer and rebook leftover
@@ -327,7 +306,6 @@ interface api {
         to-asset: u16,
         amount-from: string,
         min-to: string,
-        interest-rate: u32,
     ) -> result<_, error>;
 
     /// Take the clicked from→to order. `poster-is-creditor` is that row.
@@ -344,7 +322,6 @@ interface api {
         poster-is-creditor: bool,
         amount-from: string,
         to-bound: string,
-        interest-rate: u32,
     ) -> result<_, error>;
 
     /// Multi-hop path payment. Each hop is (account, asset-id).
@@ -370,15 +347,13 @@ interface api {
 
     /// Repeating path payment. Sender is the payer. Amounts are human
     /// decimals in `asset-id`. Times are unix seconds. `ends-at-seconds`
-    /// 0 means no scheduled end. `max-interest-rate-ppm` caps the first
-    /// hop's credit line (0 is 0% only, 1000000 is 100%). The id is
-    /// allocated on chain; refetch `payAuths` after the transaction.
+    /// 0 means no scheduled end. The id is allocated on chain; refetch
+    /// `payAuths` after the transaction.
     set-pay-auth: func(
         payee: string,
         asset-id: u16,
         amount: string,
         max-spend: string,
-        max-interest-rate-ppm: u32,
         period-seconds: u32,
         next-due-seconds: u32,
         ends-at-seconds: u32,
@@ -539,8 +514,6 @@ interface api {
         asset-id: u16,
         limit: string,
         deplete-on-debit: bool,
-        interest-rate-ppm: u32,
-        grace-seconds: u32,
     ) -> result<created-invite, error>;
 
     /// Revoke a Banx invite. Inviter only.

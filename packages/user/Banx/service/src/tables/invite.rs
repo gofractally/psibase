@@ -4,10 +4,9 @@ use psibase::{
     AccountNumber, Memo, ServiceWrapper, Table,
 };
 
-use crate::math::PPM_SCALE;
 use crate::tables::{
     emit_pair_activity,
-    tables::{Asset, BanxInvite, BanxInviteTable, CreditLine},
+    tables::{Asset, BanxInvite, BanxInviteTable, Pair},
 };
 
 impl BanxInvite {
@@ -43,8 +42,6 @@ impl BanxInvite {
         asset_id: u16,
         amount: Quantity,
         deplete_on_debit: bool,
-        interest_rate: u32,
-        grace_seconds: u32,
     ) {
         assert!(
             Self::get(invite_id).is_none(),
@@ -57,10 +54,6 @@ impl BanxInvite {
         assert!(
             amount.value > 0,
             "invite credit limit must be greater than zero"
-        );
-        assert!(
-            interest_rate <= PPM_SCALE,
-            "interest_rate exceeds 100% (PPM_SCALE)"
         );
         Asset::get_assert(asset_id);
 
@@ -90,8 +83,6 @@ impl BanxInvite {
             asset_id,
             limit: amount,
             deplete_on_debit,
-            interest_rate,
-            grace_seconds,
             created_at: now,
             claimed_by: None,
         }
@@ -115,15 +106,13 @@ impl BanxInvite {
         if !psibase::services::accounts::Wrapper::call().exists(accepter) {
             return;
         }
-        if CreditLine::get(self.inviter, accepter, self.asset_id).is_none() {
-            CreditLine::upsert_credit_line(
+        if Pair::line(self.inviter, accepter, self.asset_id).is_none() {
+            Pair::set_line(
                 self.inviter,
                 accepter,
                 self.asset_id,
                 self.limit,
                 self.deplete_on_debit,
-                self.interest_rate,
-                self.grace_seconds,
             );
             // The hook sender is the invite service. The line is the inviter's.
             emit_pair_activity(

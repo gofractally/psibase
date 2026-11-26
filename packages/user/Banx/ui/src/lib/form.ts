@@ -7,8 +7,6 @@
  * controls (`AssetField`, `ExpiresAtPicker`) that are not registered on the
  * shared form.
  */
-import { PPM_PER_PERCENT, ppmToPercent } from "@/lib/constants";
-
 import { getAccount } from "@shared/lib/get-account";
 import { zAccount } from "@shared/lib/schemas/account";
 
@@ -20,7 +18,6 @@ export {
     MAX_PERCENT,
     MIN_PERCENT_STEP,
     PPM_SCALE,
-    clampAprPercent,
     clampHopFeePercent,
     percentStringToPpm,
     percentToPpm,
@@ -133,28 +130,6 @@ export function signedPercentFieldValidator(maxAbsPercent: number) {
         if (!Number.isFinite(n)) return "Enter a number";
         if (n < -maxAbsPercent || n > maxAbsPercent) {
             return `Must be between -${maxAbsPercent}% and ${maxAbsPercent}%`;
-        }
-        const decimals = (t.replace(/^-/, "").split(".")[1] ?? "").replace(
-            /0+$/,
-            "",
-        ).length;
-        if (decimals > 4) {
-            return "Max 4 decimal places (1 ppm = 0.0001%)";
-        }
-        return undefined;
-    };
-}
-
-/** Percent in [minPpm, maxPpm] after rounding to 1 ppm. */
-export function ppmRangeValidator(minPpm: number, maxPpm: number) {
-    return ({ value }: { value: string }) => {
-        const t = String(value).trim();
-        if (t === "") return "Required";
-        const n = Number(t);
-        if (!Number.isFinite(n)) return "Enter a number";
-        const ppm = Math.round(n * PPM_PER_PERCENT);
-        if (ppm < minPpm || ppm > maxPpm) {
-            return `Must be between ${ppmToPercent(minPpm)} and ${ppmToPercent(maxPpm)}`;
         }
         const decimals = (t.replace(/^-/, "").split(".")[1] ?? "").replace(
             /0+$/,

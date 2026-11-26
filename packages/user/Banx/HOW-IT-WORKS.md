@@ -15,13 +15,15 @@ You never have “$10 in an account.” You only have:
 - **Claim:** they owe you.
 - **Debt:** you owe them.
 
+Credit is **interest-free mutual credit**. A claim never grows or shrinks on its own: what is owed is what was booked, less what has been paid back, netted away, or written off.
+
 The rest of Banx is machinery around that:
 
 | Piece | Meaning |
 |-------|---------|
-| **Credit line** | “I am willing to be owed by you, up to this much, at this APR.” A ceiling, not a pile of money. Posted by the **creditor**. |
-| **Obligation** | The actual debt. One pair/asset can have several rows (different APRs). **Exposure** is principal + live interest. |
-| **Connection** | One directed pair in one asset: the line (if any) plus both claims. A path hop *is* a connection. Capacity = reverse claim + unused line headroom. |
+| **Credit line** | “I am willing to be owed by you, up to this much.” A ceiling, not a pile of money. Interest-free. Posted by the **creditor**. |
+| **Pair** | The actual debt. One row per two accounts and one asset: a single signed **balance** plus each side’s optional credit line. Only one direction is ever owed. |
+| **Connection** | One directed pair in one asset: the line (if any) plus both claims, read from the `Pair`. A path hop *is* a connection. Capacity = reverse claim + unused line headroom. |
 | **Path-forward offer** | “I will sit in the middle of a path.” Specific next hop, or **global**. |
 | **Claim offer** | Standing bid or ask to **transfer** a claim on a debtor (not a path payment). |
 | **FX offer** | Posted from→to FX quote. Path pay uses it only to **size** the next hop. `convert` actually rebooks. |
@@ -153,33 +155,31 @@ Everything lives on **Banx**, a psibase service. Quantities on chain are **raw i
 
 Registered currencies (`usd`, `aud`, …). Compact `u16` id everywhere else; `symbol` is the name. Precision is fixed at registration (max 8). Anyone can `add_asset`.
 
-### Obligations
+### Pair
 
-A row is: `debtor` owes `creditor` this `asset_id`, at one APR.
+One table, `Pair`, keyed by `(low, high, asset_id)`, where `low` is the account with the smaller account number. So two accounts have exactly one row per asset.
 
-- Several rows per pair if draws happened at different rates.
-- `remaining_principal` + `accrued_interest` (finalized).
-- **Exposure** = Σ(principal + **live** interest) for that directed pair/asset.
-- Empty rows are deleted.
+| Field | Meaning |
+|-------|---------|
+| `balance` | Signed `i64`. `> 0`: `high` owes `low`. `< 0`: `low` owes `high`. |
+| `low_line` | `low`’s credit line to `high` (`low` is the creditor), if any |
+| `high_line` | `high`’s credit line to `low` (`high` is the creditor), if any |
 
-Writers **lock** live interest before changing principal, then mutate. Reads (GraphQL, `get_exposure`) include live interest without writing.
+- **Exposure** (what `debtor` owes `creditor`, as in `get_exposure`) is the balance read from the creditor’s side: the `|balance|` when it points that way, otherwise 0.
+- A row with no balance and no line is deleted.
+- Balances are `i64`, so a single claim balance cannot exceed `i64::MAX` base units.
+
+There is no interest, APR, grace period, or compounding. Lenders are paid only by forward fees, claim-sale spreads, FX / cash fees, and relay curves.
 
 ### Netting
 
-Every draw, deposit, claim transfer, and convert **auto-nets** the pair/asset.
+Only one direction is ever owed, so every write that books a claim **nets** on the spot: a claim that meets a reverse claim cancels it first, and only the leftover (if any) is booked the new way. Draws, deposits, claim transfers, `convert`, and cash in/out all go through this one path.
 
-1. Accrue both directions.
-2. Cancel `min(exposure each way, max)`.
-3. Reduce each direction: **all interest first** (highest APR, then older, then lower id), **then principal** in the same order.
-
-`net` still exists as an action for scripts. The UI does not expose it; writers already full-net.
+There is no separate `net` action.
 
 ### Write-off (`forgive`)
 
-The creditor drops some or all of a claim they hold. One-sided `apply_reduction` — the debtor does not sign. Same waterfall as net (interest first, highest APR). Capped at live exposure.
-
-- **Partial** does **not** reset an open grace snapshot (same as a partial deposit).
-- **Principal → 0** closes the cycle. A later 0→positive starts a new window.
+The creditor drops some or all of what a debtor owes them. One-sided: the debtor does not sign. Capped at what is owed; an already-zero balance succeeds and does nothing.
 
 UI: write-off on a savings/deposit row.
 
@@ -189,25 +189,23 @@ Posted by the creditor (`st_crd_lne`). The debtor must already exist as a chain 
 
 | Term | Meaning |
 |------|---------|
-| Limit | Cap on outstanding **exposure** (principal + interest) |
-| APR | Daily compound, ppm (`10_000` = 1%) |
+| Limit | Cap on what the debtor may owe |
 | Remaining | Unused depleting-line budget. Ignored on revolving lines |
 | Deplete | If on, each `new_draw` spends `remaining`; repayment does not restore it |
-| Grace | Interest-free window in **seconds** after this pair goes 0→positive (stored on a **pair cycle**, not on the line row) |
 
-`limit` is not a deposited balance. Drawing uses **headroom**: `limit − exposure` (and `remaining` if depleting).
+`limit` is not a deposited balance. Drawing uses **headroom**: `limit − owed` (and `remaining` if depleting).
 
-A **0-limit line** is still a line: consent to be a known counterparty. Removing the row is `rm_crd_lne`. Outstanding obligations are untouched.
+A **0-limit line** is still a line: consent to be a known counterparty. Removing the line is `rm_crd_lne`. The balance is untouched.
 
 ### Connection (a path hop)
 
-Not a table. For creditor C, debtor D, asset X:
+Not a table: a snapshot of one `Pair` row. For creditor C, debtor D, asset X:
 
 - **Forward:** D already owes C.
 - **Reverse:** C already owes D (unwind — **no line required**).
 - **Line:** C’s facility to D, if any.
 
-**Headroom** = unused line (`limit − exposure`, also capped by `remaining` if depleting).
+**Headroom** = unused line (`limit − owed`, also capped by `remaining` if depleting).
 **Capacity** = reverse claim + headroom.
 **new_draw** = amount − reverse (the part that hits the line).
 
@@ -232,12 +230,12 @@ The current path debtor (the previous hop’s account) must have a **live path-f
 - Live **specific** next hop if present; else live **global**.
 - Expired specific does **not** block the global.
 - Fees are Stripe-style: `out = in × (1 − percent) − fixed`. Hop 0 has no fee.
-- `max_line_apr` rejects a **new_draw** if the next hop’s line APR is higher. A hop that only unwinds a reverse claim is not checked.
+
 - `allow_unknown`: if off, the poster must already know the next hop (lined them, or already owes them). A hop that only unwinds a reverse claim does not need that. If on, anyone who lined the poster can become their creditor. Checked at **pay** time, not when posting. A specific offer may be posted before that hop knows the poster; at pay time the hop still needs a line, existing debt, or unwind capacity.
 
 ### Currency change
 
-If hop *i*’s asset differs from hop *i−1*, the previous hop’s **creditor** (the middle man) applies their FX offer to **size** the next hop. That does **not** rebook the previous claim: the payer still owes the middle man in the from-asset; the middle man takes the to-asset liability onward. The sender’s FX offer is ignored.
+If hop *i*’s asset differs from hop *i−1*, the previous hop’s **creditor** (the middle man) **sizes** the next hop: with their relay curve for that asset pair if they posted one, otherwise by applying their creditor-side FX offer. That does **not** rebook the previous claim: the payer still owes the middle man in the from-asset; the middle man takes the to-asset liability onward. The sender’s FX offer is ignored.
 
 `min_return` is the final **amount_out** in the **last** hop’s asset.
 
@@ -268,7 +266,7 @@ The chain still executes whatever hop list you pass. The search is a helper, not
 
 Off-graph value enters here: cash, dinner, groceries. The **receiver** (signer) books a liability to the **depositor**, then auto-nets. That is also how you **repay**: the creditor deposits the debtor (opposite claim + net).
 
-Optional `interest_rate` on the new bucket. Optional `request_id` to fulfill a please-book.
+Optional `request_id` to fulfill a please-book.
 
 ### Two request kinds (`st_req`)
 
@@ -285,7 +283,7 @@ Invoice `counterparty` may be 0. Please-book requires a named, existing account.
 
 ## Claim offers (buy / sell a claim)
 
-Not a path payment. You transfer a claim on a **debtor** to a **buyer**. The seller receives face after the **maker’s** spread as a 0% claim on the buyer. The moved claim **keeps its existing APR**.
+Not a path payment. You transfer a claim on a **debtor** to a **buyer**. Claims are **fungible**: the transfer moves balance on the debtor’s `Pair` from the seller to the buyer. The seller receives face after the **maker’s** spread as an ordinary claim on the buyer. There is no rate to carry over, so the spread is the only price.
 
 On `sell_claim` that claim is a deposit: the seller is signing and accepts the buyer’s IOU. On `buy_claim` it is a draw on the **seller’s credit line to the buyer** (reverse claim + headroom). A pure unwind of a debt the seller already owes the buyer needs no line. The ask alone does not take an unbacked IOU, even when the transfer itself only unwinds the debtor.
 
@@ -300,45 +298,27 @@ The taker signs a bound. `sell_claim` rejects proceeds below `min_proceeds`. `bu
 
 The offer’s face budget is separate from a credit line. Each take spends that face amount and leaves the row at 0 so the poster can top up by posting again. A zero post is rejected. A spent specific offer still blocks the global one until it is removed or topped up.
 
-The **debtor must know the buyer** (line to them, or a live claim). New exposure requires the **buyer’s credit line** to the debtor and is **capped** with the same capacity as a path hop (reverse claim + headroom). A depleting line’s own budget is spent only on **new_draw**. A take that only unwinds a reverse claim needs no buyer line. The offer is the rate and the face budget; the line is who and how much new exposure. Checks run at **take**, not at post.
-
-Sell / convert / path_pay are **not** a grace payoff. They lock whatever is owed (zero during grace) and move or rebook. A sold claim keeps the source cycle’s remaining window (same end). It does not start the buyer’s posted grace.
-
----
-
-## Interest
-
-Daily compound on principal + already finalized interest. Path-independent: one evaluation from the last principal/rate change.
-
-- Full days: `bal × (1 + APR / 365)` (365-day year, no leap).
-- Leftover seconds in the current day: pro-rata on that daily rate.
-- ppm: `10_000` = 1%, `PPM_SCALE` (`1_000_000`) = 100%.
-
-Interest-on-interest starts after each full day. Tiny principals can floor to zero daily increment (integer units). Use realistic precision (e.g. 4 dp USD).
-
-Compounding walks day by day in WASM, so a loan left untouched for years is more CPU at the next principal change.
-
-### Grace
-
-Posted with the credit line, stored on **PairCycle** `(creditor, debtor, asset)` so a later line upsert cannot clobber the clock.
-
-When that pair goes **0 → positive**, posted `grace_seconds` is **snapshotted**. Until that window ends, live interest is **0**. If they deposit/net/forgive the pair to **zero** inside the window, the cycle closes with nothing to charge. Partial reductions leave the snapshot.
-
-After the window, daily compound runs from the last principal/rate change (origination if nothing changed during grace). Editing the line later does not change an **open** cycle; it applies to the next 0→positive. `0` means interest from the first second.
+When the take creates new exposure, the **debtor must know the buyer** (line to them, or a live claim). New exposure requires the **buyer’s credit line** to the debtor and is **capped** with the same capacity as a path hop (reverse claim + headroom). A depleting line’s own budget is spent only on **new_draw**. A take that only unwinds a reverse claim needs no buyer line. The offer is the spread and the face budget; the line is who and how much new exposure. Checks run at **take**, not at post.
 
 ---
 
 ## Currency (FX)
 
-Anyone posts `st_fx_ofr`: from-asset → to-asset, fixed fee in from-asset, `fx_rate` (`RATE_SCALE` fixed-point, `1_000_000` = 1:1), optional APR for the rebooked bucket, expiry.
+Anyone posts `st_fx_ofr`: from-asset → to-asset, `poster_is_creditor` (which debt direction the offer applies to), fixed fee in from-asset, `fx_rate` (`RATE_SCALE` fixed-point, `1_000_000` = 1:1), `remaining` (from-asset still accepted), expiry.
 
-`to = (from − fee_fixed) × fx_rate / RATE_SCALE`.
+`to = (from − fee_fixed) × fx_rate / RATE_SCALE`. On `convert` the fee is added to the from-asset instead when the poster is the creditor (they are owed that asset); path pay always subtracts it.
 
-**`convert`** rebooks leftover from-asset debt at the counterparty’s live quote. You cannot re-denominate a claim at a rate you set yourself.
+**`convert`** reduces the leftover from-asset claim and rebooks it in the to-asset at the counterparty’s live quote, then nets against any to-asset claim the other way. You cannot re-denominate a claim at a rate you set yourself.
 
-**`take_fx`** is the order take. Leftover from-asset debt is the same rebook. With none, a buy books both legs at the order’s APR: the taker owes the poster the from-asset, and the poster owes the taker the priced to-asset. Each leg needs that party’s line as capacity. No path and no hop fee. A pool for the pair does not price this take.
+**`take_fx`** is the order take. A buy rebooks any from-asset the taker still owes the poster (same as `convert`), then opens both legs for the rest: the taker owes the poster the from-asset, and the poster owes the taker the priced to-asset. Each leg needs that party’s line as capacity (or a reverse claim to unwind). A sell only rebooks from-asset the poster owes the taker. No path and no hop fee.
 
 **Path pay** does not call `convert` or `take_fx`. It only uses the middle man’s quote to size the next hop.
+
+### Relays
+
+`st_relay` posts a constant-product curve between two Banx assets. Both reserves are virtual weights, not a debt, and one row prices both directions; posting again replaces them. If the previous hop’s creditor has a relay for the pair, a path that changes asset there uses the curve instead of an FX offer. The curve has no fee: a path that continues pays the forward fee.
+
+`st_tok_relay` is the Banx↔token version: `reserve_banx` is a virtual weight, and `reserve_tokens` is pulled into a Tokens sub-account `{owner}/{asset_id}/{token_id}`. `tok_relay_out` draws Banx on the owner for tokens; `tok_relay_in` sends tokens from the sender’s vault for Banx the owner owes. A live global forward on the asset is applied to direct swaps. `path_cash` ends a path by selling the last hop’s Banx for tokens from that account’s relay.
 
 ---
 
@@ -365,7 +345,7 @@ Multiple tokens per Banx asset: one quote row per `(poster, asset, token, is_out
 
 Each writer emits a bilateral `history.banx-app.activity` event: one row per party as `account`, the other as `counterparty`. Amounts are **human decimals** at emit (asset precision; convert’s `netted` uses the destination asset).
 
-Kinds include `path_draw`, `path_pay`, `deposit`, `book`, `net`, `forgive`, `convert`, `cash_out`, `cash_in`, `credit_line`, `rm_credit_line`, `book_auth`, `rm_book_auth`, `sell_claim` / `buy_claim`, `invoice`, `please_book`, `fulfill`, `req_cancel`.
+Kinds include `path_draw`, `path_pay`, `deposit`, `book`, `forgive`, `convert`, `take`, `relay`, `cash_out`, `cash_in`, `credit_line`, `rm_credit_line`, `book_auth`, `rm_book_auth`, `sell_claim` / `buy_claim`, `invoice`, `please_book`, `fulfill`, `req_cancel`.
 
 Hop draws write the adjacent pairs (Alice↔Bob, Bob↔Carol). A **multi-hop** `path_pay` / `pay_inv` also writes **sender↔payee** (`kind: path_pay`): `amount` is what was sent (`asset_id` = first hop), `netted` is what was delivered (`other_asset_id` = last hop). Direct (1-hop) pays are only `path_draw` on that pair — same two people.
 
@@ -400,11 +380,11 @@ New assets are registered from the currency picker on Accounts. `/assets` redire
 
 | Thing | Unit |
 |-------|------|
-| Amounts on chain | Raw `u64` at asset precision |
+| Amounts on chain | Raw `u64` at asset precision (a pair balance is `i64`, so one claim is capped at `i64::MAX`) |
 | Amounts in GraphQL / plugin / UI | Decimal strings (`"1.4500"`) |
-| APR, hop %, claim spread | ppm (`10_000` = 1%) |
+| Hop %, claim spread | ppm (`10_000` = 1%) |
 | FX `fx_rate` | `RATE_SCALE` (`1_000_000` = 1:1) |
-| Grace / expiry | Seconds (`0` expiry = never) |
+| Expiry | Seconds (`0` expiry = never) |
 | Asset precision | 0–8 decimal places |
 
 ---
@@ -417,9 +397,9 @@ New assets are registered from the currency picker on Accounts. `/assets` redire
 
 **Invoice** — “Please pay me this.” Paid with a claim or a path. Last hop is the payee.
 
-**Net** — two people owe each other; keep only the leftover.
+**Net** — two people owe each other; keep only the leftover. Every write does it automatically.
 
-**Write-off / forgive** — you hold a claim and drop some or all of it. They do not sign. Partial keeps grace; zero principal closes the cycle.
+**Write-off / forgive** — you hold a claim and drop some or all of it. They do not sign.
 
 **Credit line** — “I’ll let you owe me up to X.” Needed when someone draws *new* debt on you. Not needed to unwind an IOU that already exists.
 

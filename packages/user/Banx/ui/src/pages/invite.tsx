@@ -13,7 +13,6 @@ import { ReciprocateLineForm } from "@/components/reciprocate-line-form";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useCreditLines } from "@/hooks/use-banx-data";
 import { displayAmount } from "@/lib/amount";
-import { formatGracePeriod, ppmToPercent } from "@/lib/constants";
 import { fetchInvite } from "@/lib/graphql";
 import { inviteClaimedBy } from "@/lib/contacts";
 import {
@@ -43,16 +42,12 @@ function termsFromInvite(row: {
     assetId: number;
     limit: string;
     depleteOnDebit: boolean;
-    interestRatePpm: number;
-    graceSeconds: number;
 }): PendingReciprocal {
     return {
         inviter: row.inviter,
         assetId: row.assetId,
         limit: displayAmount(row.limit),
         depleteOnDebit: row.depleteOnDebit,
-        interestRatePpm: row.interestRatePpm,
-        graceSeconds: row.graceSeconds,
     };
 }
 
@@ -308,14 +303,6 @@ export function InvitePage() {
                     <dt>Limit</dt>
                     <dd className="text-foreground text-right font-mono">
                         {limit} {symbol}
-                    </dd>
-                    <dt>APR</dt>
-                    <dd className="text-foreground text-right">
-                        {ppmToPercent(row.interestRatePpm)}
-                    </dd>
-                    <dt>Interest-free</dt>
-                    <dd className="text-foreground text-right">
-                        {formatGracePeriod(row.graceSeconds)}
                     </dd>
                     <dt>Limit shrinks</dt>
                     <dd className="text-foreground text-right">

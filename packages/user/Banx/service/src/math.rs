@@ -4,7 +4,7 @@
 
 /// Parts-per-million scale: `PPM_SCALE` = 100%.
 ///
-/// Used for interest APR, FX/`fx_rate`, and max accept rates (`10_000` = 1%).
+/// Used for fees, spreads, and FX/`fx_rate` (`10_000` = 1%).
 pub const PPM_SCALE: u32 = 1_000_000;
 
 /// Scale for rates/takes: `out = in * rate / RATE_SCALE`.
@@ -24,7 +24,6 @@ pub fn priced_input(amount_in: u64, fee_ppm: u32) -> Option<u64> {
     let priced = u64::try_from(priced).ok()?;
     (priced > 0).then_some(priced)
 }
-
 
 /// Constant-product output of the priced input.
 ///
