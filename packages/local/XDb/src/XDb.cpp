@@ -17,25 +17,19 @@ namespace
       return mode == KvMode::write || mode == KvMode::readWrite;
    }
 
+   // These are lookups made whenever a service opens a node-local table.
+   // A read needs no section: outside one it is a read of what was
+   // published last and takes no lock (gofractally/psibase#2276).
    bool isLocal(AccountNumber sender)
    {
-      PSIBASE_SUBJECTIVE_TX
-      {
-         return Native::subjectiveDirect(KvMode::read).open<CodeTable>().get(sender).has_value();
-      }
-      __builtin_unreachable();
+      return Native::subjectiveDirect(KvMode::read).open<CodeTable>().get(sender).has_value();
    }
 
    bool isLocalPrivileged(AccountNumber sender)
    {
-      PSIBASE_SUBJECTIVE_TX
-      {
-         auto row = Native::subjectiveDirect(KvMode::read).open<CodeTable>().get(sender);
-         return row && (row->flags & CodeRow::isPrivileged);
-      }
-      __builtin_unreachable();
+      auto row = Native::subjectiveDirect(KvMode::read).open<CodeTable>().get(sender);
+      return row && (row->flags & CodeRow::isPrivileged);
    }
-
    bool isPrivileged(AccountNumber sender)
    {
       auto row = Native::tablesDirect(KvMode::read).open<CodeTable>().get(sender);

@@ -357,11 +357,20 @@ pub fn abort_subjective() {
 }
 
 /// The `subjective_tx` macro creates a scope in which
-/// the subjective database is accessible. It is necessary to use
-/// this scope for any reads or writes to the subjective database.
+/// the subjective database can be written. It takes the write
+/// lock of the node-local databases when it starts and holds it
+/// until it ends, so it should be short.
+///
+/// A read needs no scope: outside one it is a read of what was
+/// committed last, and takes no lock. Reads outside a scope are
+/// each of the latest state, not of one moment; rows that have
+/// to agree with each other are read inside a scope.
 ///
 /// The statement will be executed one or more times until
-/// it is successfully committed.
+/// it is successfully committed. It is never run again because
+/// of another writer, but it is when a change to a socket that
+/// it made cannot be applied, so it must give the same result
+/// when it is repeated.
 ///
 /// Unstructured control flow that exits the statement, (e.g. break,
 /// return, panic), will discard any changes made to the
