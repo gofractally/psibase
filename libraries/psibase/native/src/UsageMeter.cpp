@@ -12,7 +12,7 @@ namespace psibase
       constexpr UsageKind baseKinds[] = {UsageKind::local, UsageKind::ip, UsageKind::account,
                                          UsageKind::peer};
 
-      // Rows written under one acquisition of the subjective write lock.
+      // Rows written under one acquisition of the node-local write lock.
       constexpr std::size_t flushBatch = 128;
 
       std::uint64_t saturatingAdd(std::uint64_t a, std::uint64_t b)

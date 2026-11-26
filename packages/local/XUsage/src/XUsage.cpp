@@ -174,10 +174,7 @@ namespace
    {
       std::optional<UsageConfigRow> result;
       auto table = Native::sessionDirect(KvMode::read).open<UsageConfigTable>();
-      PSIBASE_SUBJECTIVE_TX
-      {
-         result = table.get({});
-      }
+      result = table.get({});
       return result;
    }
 
@@ -218,12 +215,9 @@ namespace
       auto                         table = XUsage{}.open<UsageQuotaTable>();
       std::optional<UsageQuotaRow> row;
       auto                         kind = static_cast<std::uint8_t>(identity.kind);
-      PSIBASE_SUBJECTIVE_TX
-      {
-         row = table.get(std::tuple(kind, identity.id));
-         if (!row)
-            row = table.get(std::tuple(kind, std::string()));
-      }
+      row = table.get(std::tuple(kind, identity.id));
+      if (!row)
+         row = table.get(std::tuple(kind, std::string()));
       if (row)
          return row->perWindow;
       return {};
@@ -251,12 +245,8 @@ namespace
    {
       std::vector<UsageRow> result;
       auto table = Native::subjectiveDirect(KvMode::read).open<UsageTable>();
-      PSIBASE_SUBJECTIVE_TX
-      {
-         result.clear();
-         for (auto row : table.getIndex<0>())
-            result.push_back(std::move(row));
-      }
+      for (auto row : table.getIndex<0>())
+         result.push_back(std::move(row));
       return result;
    }
 
@@ -264,10 +254,7 @@ namespace
    {
       std::optional<UsageRow> result;
       auto table = Native::subjectiveDirect(KvMode::read).open<UsageTable>();
-      PSIBASE_SUBJECTIVE_TX
-      {
-         result = table.get(std::tuple(static_cast<std::uint8_t>(identity.kind), identity.id));
-      }
+      result = table.get(std::tuple(static_cast<std::uint8_t>(identity.kind), identity.id));
       return result;
    }
 
@@ -294,10 +281,7 @@ namespace
       {
          std::optional<SocketRow> row;
          auto table = Native::sessionDirect(KvMode::read).open<SocketTable>();
-         PSIBASE_SUBJECTIVE_TX
-         {
-            row = table.get(*socket);
-         }
+         row = table.get(*socket);
          if (row)
          {
             if (auto info = std::get_if<HttpSocketInfo>(&row->info))
@@ -476,16 +460,12 @@ namespace
    {
       std::vector<Quota> result;
       auto               table = XUsage{}.open<UsageQuotaTable>();
-      PSIBASE_SUBJECTIVE_TX
+      for (auto row : table.getIndex<0>())
       {
-         result.clear();
-         for (auto row : table.getIndex<0>())
-         {
-            std::string identity{to_string(static_cast<UsageKind>(row.kind))};
-            identity += ':';
-            identity += row.id.empty() ? std::string("*") : row.id;
-            result.push_back({std::move(identity), row.perWindow});
-         }
+         std::string identity{to_string(static_cast<UsageKind>(row.kind))};
+         identity += ':';
+         identity += row.id.empty() ? std::string("*") : row.id;
+         result.push_back({std::move(identity), row.perWindow});
       }
       return json(request, psio::to_ijson(result), true);
    }

@@ -646,11 +646,21 @@ namespace
    }
 }  // namespace
 
-// The flush runs on the chain thread and writes through the subjective root
-// under the subjective write lock, while run-queue and HTTP threads commit
-// subjective transactions and socket rows through the same root. Neither
-// side may lose anything: every count charged must be in the usage table,
-// and every row the other threads committed must be there.
+// The flush runs on the chain thread and writes through the node-local
+// (subjective) roots a batch at a time, each batch under the write lock of
+// those databases (gofractally/psibase#2276), while run-queue and HTTP
+// threads open sections (which hold the same lock from start to commit) and
+// put and remove socket rows. Neither side may lose anything: every count
+// charged must be in the usage table, and every row the other threads
+// committed must be there.
+//
+// The test must not pass without racing. Under the lock a batch can never
+// land inside a section, so what shows that the two really contended is
+// that they alternated: the number of times a flush batch was published
+// right after a section committed, or the reverse. At least `minAlternations`
+// are required; if the requested rounds did not produce them more are run,
+// up to a bound. And neither side may starve: the longest any section
+// waited for the lock, and the longest batch, are bounded.
 //
 // USAGE_RACE_ROUNDS repeats it (default 1).
 TEST_CASE("usage meter: a flush racing subjective commits loses nothing on either side")
@@ -658,31 +668,43 @@ TEST_CASE("usage meter: a flush racing subjective commits loses nothing on eithe
    unsigned rounds = 1;
    if (auto env = std::getenv("USAGE_RACE_ROUNDS"))
       rounds = static_cast<unsigned>(std::atoi(env));
-   // The test must not pass without ever racing. Counted over all rounds:
-   // commits that were refused and retried (two transactions overlapped),
-   // and transactions that had a flush batch published between their
-   // checkout and their commit (a flush overlapped a transaction). If the
-   // requested rounds saw neither, more are run, up to a bound.
-   std::uint64_t  totalConflicts = 0, totalInterleaved = 0, totalBatches = 0;
-   const unsigned maxRounds = rounds + 50;
+   constexpr std::uint64_t minAlternations = 20;
+   constexpr auto          maxWait         = std::chrono::seconds(5);
+   std::uint64_t           totalAlternations = 0, totalBatches = 0, totalSections = 0;
+   std::int64_t            worstSectionWait = 0, worstBatch = 0;
+   const unsigned          maxRounds = rounds + 50;
    for (unsigned round = 0;
-        round < rounds || (round < maxRounds && (totalConflicts == 0 || totalInterleaved == 0));
-        ++round)
+        round < rounds || (round < maxRounds && totalAlternations < minAlternations); ++round)
    {
-      std::atomic<std::uint64_t> batches{0}, interleaved{0};
+      // 0: nothing yet, 1: a section committed last, 2: a flush batch did
+      std::atomic<int>           last{0};
+      std::atomic<std::uint64_t> alternations{0}, batches{0}, sections{0};
+      std::atomic<std::int64_t>  sectionWait{0}, batchTime{0};
+      auto event = [&](int kind)
+      {
+         auto previous = last.exchange(kind);
+         if (previous != 0 && previous != kind)
+            ++alternations;
+      };
+      auto raise = [](std::atomic<std::int64_t>& worst, std::int64_t value)
+      {
+         auto current = worst.load();
+         while (value > current && !worst.compare_exchange_weak(current, value))
+         {
+         }
+      };
+
       TempDirectory  dir;
       SharedDatabase shared(dir.path / "db", dbConfig, psibase::storage::open_mode::create_new);
       UsageMeter     meter;
       auto           identities = manyIdentities(100);
       constexpr unsigned writers = 3, commits = 120, chargers = 2, charges = 4000;
-      std::atomic<bool>          failed{false};
-      std::atomic<unsigned>      running{writers + chargers + 1};
-      std::atomic<std::uint64_t> conflicts{0};
-      std::vector<std::thread>   threads;
+      std::atomic<bool>        failed{false};
+      std::atomic<unsigned>    running{writers + chargers + 1};
+      std::vector<std::thread> threads;
 
-      // Services on run-queue threads: subjective transactions (optimistic,
-      // retried on conflict) that write a service row and a native row, the
-      // way x-run posts a run.
+      // Services on run-queue threads: sections that write a service row, a
+      // native row (the way x-run posts a run) and one row they all rewrite.
       for (unsigned t = 0; t < writers; ++t)
          threads.emplace_back(
              [&, t]
@@ -697,19 +719,19 @@ TEST_CASE("usage meter: a flush racing subjective commits loses nothing on eithe
                    auto key   = "svc-" + std::to_string(t) + "-" + std::to_string(i);
                    auto run   = "\x7f run-" + std::to_string(t) + "-" + std::to_string(i);
                    auto value = std::to_string(i);
-                   auto batchesBefore = batches.load();
-                   db.checkoutSubjective();
-                   do
-                   {
-                      // Every transaction also rewrites one shared row, so
-                      // transactions really conflict. A refused commit
-                      // leaves the transaction open on the current state.
-                      db.kvPutRaw(DbId::subjective, bytes("shared"), bytes(key));
-                      db.kvPutRaw(DbId::subjective, bytes(key), bytes(value));
-                      db.kvPutRaw(DbId::nativeSubjective, bytes(run), bytes(value));
-                   } while (!db.commitSubjective(sockets, closing) && ++conflicts);
-                   if (batches.load() != batchesBefore)
-                      ++interleaved;
+                   auto start = std::chrono::steady_clock::now();
+                   db.checkoutSubjective();  // takes the write lock
+                   raise(sectionWait, (std::chrono::steady_clock::now() - start).count());
+                   db.kvPutRaw(DbId::subjective, bytes("shared"), bytes(key));
+                   db.kvPutRaw(DbId::subjective, bytes(key), bytes(value));
+                   db.kvPutRaw(DbId::nativeSubjective, bytes(run), bytes(value));
+                   // Recorded while the lock is still held, so the order of
+                   // events is the order of publication.
+                   event(1);
+                   ++sections;
+                   // Nothing else writes these rows: a section is never refused
+                   if (!db.commitSubjective(sockets, closing))
+                      failed = true;
                 }
                 --running;
              });
@@ -737,14 +759,19 @@ TEST_CASE("usage meter: a flush racing subjective commits loses nothing on eithe
                        ->add(UsageField::requests, 1);
                 --running;
              });
-      // The chain thread: flush after flush, in slices as psinode does
+      // The chain thread: flush after flush, a batch at a time as psinode does
       {
          auto writer = shared.createWriter();
          while (running)
          {
             meter.prepareFlush();
-            if (meter.writeFlush(shared, *writer, UsageMeter::batchRows).written)
+            auto r = meter.writeFlush(shared, *writer, UsageMeter::batchRows);
+            if (r.written)
+            {
+               event(2);
                ++batches;
+               raise(batchTime, r.maxBatchTime.count());
+            }
          }
          for (auto& thread : threads)
             thread.join();
@@ -752,6 +779,7 @@ TEST_CASE("usage meter: a flush racing subjective commits loses nothing on eithe
          meter.flush(shared, *writer);
 
          CHECK(sumRequests(shared, *writer) == std::uint64_t{chargers} * charges);
+         CHECK(sections == std::uint64_t{writers} * commits);
          for (unsigned t = 0; t < writers; ++t)
             for (unsigned i = 0; i < commits; ++i)
             {
@@ -776,17 +804,21 @@ TEST_CASE("usage meter: a flush racing subjective commits loses nothing on eithe
          CHECK(sum(again.rows()).requests == std::uint64_t{chargers} * charges);
          CHECK(shared.kvGetSubjective(*writer, DbId::nativeSubjective, bytes("\x7f run-0-0")));
       }
-      totalConflicts += conflicts;
-      totalInterleaved += interleaved;
+      totalAlternations += alternations;
       totalBatches += batches;
+      totalSections += sections;
+      worstSectionWait = std::max(worstSectionWait, sectionWait.load());
+      worstBatch       = std::max(worstBatch, batchTime.load());
    }
-   std::printf("usage flush race: %llu refused commits retried, %llu transactions with a flush "
-               "batch inside, %llu flush batches during commits\n",
-               static_cast<unsigned long long>(totalConflicts),
-               static_cast<unsigned long long>(totalInterleaved),
-               static_cast<unsigned long long>(totalBatches));
-   REQUIRE(totalConflicts > 0);
-   REQUIRE(totalInterleaved > 0);
+   std::printf("usage flush race: %llu sections and %llu flush batches alternated %llu times; "
+               "longest wait of a section for the lock %.3f ms, longest batch %.3f ms\n",
+               static_cast<unsigned long long>(totalSections),
+               static_cast<unsigned long long>(totalBatches),
+               static_cast<unsigned long long>(totalAlternations), worstSectionWait / 1e6,
+               worstBatch / 1e6);
+   REQUIRE(totalAlternations >= minAlternations);
+   REQUIRE(std::chrono::nanoseconds(worstSectionWait) < maxWait);
+   REQUIRE(std::chrono::nanoseconds(worstBatch) < maxWait);
 }
 
 // Not part of the suite: UsageMeterTests "[.bench]". How long a flush is,
@@ -805,9 +837,12 @@ TEST_CASE("usage meter: flush cost", "[.bench]")
 
    // Another subjective writer (a run-queue thread committing, a socket
    // being added): how long its writes take while the flush runs.
-   std::atomic<bool>         stop{false};
-   std::atomic<bool>         measuring{false};
-   std::atomic<std::int64_t> worstPut{0}, worstCommit{0};
+   std::atomic<bool>          stop{false};
+   std::atomic<bool>          measuring{false};
+   std::atomic<std::int64_t>  worstPut{0}, worstCommit{0};
+   // Sections completed while a measurement is on: what a flush does to a
+   // continuous stream of them
+   std::atomic<std::uint64_t> sectionCount{0};
    std::thread               other{
        [&]
        {
@@ -834,6 +869,8 @@ TEST_CASE("usage meter: flush cost", "[.bench]")
              db.kvPutRaw(DbId::subjective, bytes(key), bytes("y"));
              db.commitSubjective(sockets, closing);
              record(worstCommit, start);
+             if (measuring)
+                ++sectionCount;
           }
        }};
 
@@ -845,11 +882,12 @@ TEST_CASE("usage meter: flush cost", "[.bench]")
    auto baseline = [&]
    {
       worstPut = worstCommit = 0;
+      sectionCount           = 0;
       measuring              = true;
       std::this_thread::sleep_for(std::chrono::milliseconds(300));
       measuring = false;
-      std::printf("%-44s other writer worst: put %.3f ms, subjective commit %.3f ms\n",
-                  "no flush (300 ms)", worstPut / 1e6, worstCommit / 1e6);
+      std::printf("%-44s other writer worst: put %.3f ms, section %.3f ms; %.0f sections/s\n",
+                  "no flush (300 ms)", worstPut / 1e6, worstCommit / 1e6, sectionCount / 0.3);
    };
    auto whole = [&](const char* label)
    {
@@ -873,6 +911,8 @@ TEST_CASE("usage meter: flush cost", "[.bench]")
       std::size_t              slices = 0, written = 0;
       std::chrono::nanoseconds prepare{0};
       meter.prepareFlush(&prepare);  // on the timekeeping thread in psinode
+      sectionCount   = 0;
+      auto wallStart = std::chrono::steady_clock::now();
       for (;;)
       {
          auto start = std::chrono::steady_clock::now();
@@ -887,11 +927,12 @@ TEST_CASE("usage meter: flush cost", "[.bench]")
          std::this_thread::yield();
       }
       measuring = false;
+      auto wall = std::chrono::steady_clock::now() - wallStart;
       std::printf("%-44s rows %5zu  prepare %.3f ms (off the chain thread), write %8.3f ms in "
                   "%zu slices, longest slice (chain thread stall) %.3f ms  other writer worst: "
-                  "put %.3f ms, commit %.3f ms\n",
+                  "put %.3f ms, section %.3f ms; %.0f sections/s during the flush\n",
                   label, written, ms(prepare), ms(all), slices, ms(worstSlice), worstPut / 1e6,
-                  worstCommit / 1e6);
+                  worstCommit / 1e6, sectionCount / (wall.count() / 1e9));
    };
 
    baseline();
