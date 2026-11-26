@@ -23,7 +23,7 @@ The defaults are immutable Git revisions:
 | psio | `e11fd099f5a584d259357dad0764502c91b992db` | Sources by FetchContent; the maintained upstream CMake project is added by `psibase_acquire_dependency` |
 | psitri | `0fd4723128f47e9445419f9043a20fe02d3f1306` | Sources only |
 | ucc | `d79166da0290fdf9d1f9d5880d4dfb45b2822cf3` | Sources only |
-| psizam | `2e3ef65e0fc1d2e5d22afa33bb1c25ef0b8f2297` | Sources only |
+| psizam | `c1b8d8eb9f6a15ab9148394a5d1e1b364cde0e26` | Sources only |
 
 The PSIO pin is `main` of gofractally/psio: PSSZ with record evolution by
 appended optionals, mandatory pruning, type-derived offset widths, the `key`
@@ -222,4 +222,4 @@ SDK (`COMPONENT libpsibase`) ships PSIO's headers for guests from the WASM
 project; PSIO's own native install rules are excluded from psibase's install
 tree (`PSIBASE_PSIO_EXCLUDE_FROM_ALL`, checked by `libraries/CMakeLists.txt`
 with `psibase_psio_install_excluded`). Rust manifest paths/pins and the wire
-and API cutover are tracked in `doc/pssz-conversion.md`.
+and API cutover are tracked in `doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md`.

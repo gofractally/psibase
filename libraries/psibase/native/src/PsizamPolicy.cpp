@@ -671,37 +671,212 @@ namespace psibase
 
    namespace
    {
+      // What the admission's code writer enforces and reports (below).
+      struct AdmissionLimits
+      {
+         std::uint32_t maxBlockParams            = 0;
+         std::uint64_t maxBranchLocalPairs       = 0;
+         std::uint64_t maxModuleBranchLocalPairs = 0;
+         // If set, receives the measure of each defined function.
+         std::vector<std::uint64_t>* measured = nullptr;
+      };
       // psizam's validating parser with a code writer that emits nothing
       // and checks what the parser has no option for: the parameters of a
-      // block, loop or if.
+      // block, loop or if, and the measure that max_branch_local_pairs and
+      // max_module_branch_local_pairs limit (defined at vmOptionCeilings in
+      // PsizamPolicy.hpp).
       //
-      // On the psizam engines max_block_params is checked here only, at
-      // the write of a code row (admitNativeWasm); the adapter's own parse
-      // before it compiles (ExecutionContext.cpp) does not repeat it. That
-      // is intended: the adapter's parse is not the admission.
+      // The parser decodes every instruction to validate it and calls its
+      // code writer for each, so the measure needs no second reading of the
+      // bodies and no instruction decoder of its own: it is computed from
+      // the calls for block, loop, if, end, the branches and the two writes
+      // of a local.
+      //
+      // On the psizam engines these are checked here only, at the write of
+      // a code row (admitNativeWasm); the adapter's own parse before it
+      // compiles (ExecutionContext.cpp) does not repeat them. That is
+      // intended: the adapter's parse is not the admission.
       struct AdmissionWriter : psizam::detail::null_writer
       {
-         using null_writer::null_writer;
-         static inline thread_local std::uint32_t maxBlockParams = 0;
-         static void check(std::uint32_t params)
+         // The parser constructs its writer, so the limits reach it here.
+         static inline thread_local AdmissionLimits limits;
+
+         AdmissionWriter(psizam::growable_allocator& allocator,
+                         std::size_t                 sourceBytes,
+                         psizam::module&             module,
+                         bool                        backtrace         = false,
+                         bool                        stackLimitIsBytes = false,
+                         std::uint32_t               compileThreads    = 0)
+             : null_writer(allocator, sourceBytes, module, backtrace, stackLimitIsBytes,
+                           compileThreads),
+               imported(module.get_imported_functions_size())
          {
-            if (params > maxBlockParams)
-               exceeds("max_block_params", params, maxBlockParams);
          }
-         void emit_block(std::uint8_t = 0x40, std::uint32_t = 0, std::uint32_t params = 0)
+
+         void emit_prologue(const psizam::func_type&                 type,
+                            const std::vector<psizam::local_entry>& declared,
+                            std::uint32_t)
          {
-            check(params);
+            locals = type.param_types.size();
+            for (const auto& group : declared)
+               locals += group.count;
+            if (lastWrite.size() < locals)
+               lastWrite.resize(locals, 0);
+            // Writes are numbered through the whole module, so that a
+            // number left by an earlier function is below `began` and
+            // nothing has to be cleared between functions.
+            began = writes + 1;
+            pairs = 0;
+            regions.clear();
+            // The function itself: its end is reached by falling into it.
+            regions.push_back(
+                {.edges = 1, .carried = std::uint32_t(type.return_types.size()), .opened = began});
+         }
+         void emit_epilogue(const psizam::func_type&,
+                            const std::vector<psizam::local_entry>&,
+                            std::uint32_t index)
+         {
+            const auto function = std::to_string(std::uint64_t(imported) + index);
+            if (limits.measured)
+               limits.measured->push_back(pairs);
+            if (pairs > limits.maxBranchLocalPairs)
+               throw std::runtime_error(
+                   "native WASM exceeds max_branch_local_pairs: " + std::to_string(pairs) +
+                   " is more than " + std::to_string(limits.maxBranchLocalPairs) +
+                   " in function " + function);
+            modulePairs += pairs;
+            if (modulePairs > limits.maxModuleBranchLocalPairs)
+               throw std::runtime_error(
+                   "native WASM exceeds max_module_branch_local_pairs: " +
+                   std::to_string(modulePairs) + " is more than " +
+                   std::to_string(limits.maxModuleBranchLocalPairs) + " at function " + function);
+         }
+         void emit_block(std::uint8_t type = 0x40, std::uint32_t results = 0,
+                         std::uint32_t params = 0)
+         {
+            open(params, 1, resultsOf(type, results));
          }
          label_t emit_loop(std::uint8_t = 0x40, std::uint32_t = 0, std::uint32_t params = 0)
          {
-            check(params);
+            open(params, 1, params);
             return {};
          }
-         branch_t emit_if(std::uint8_t = 0x40, std::uint32_t = 0, std::uint32_t params = 0)
+         branch_t emit_if(std::uint8_t type = 0x40, std::uint32_t results = 0,
+                          std::uint32_t params = 0)
          {
-            check(params);
+            open(params, 2, resultsOf(type, results));
             return {};
          }
+         label_t emit_end()
+         {
+            if (regions.empty())
+               return {};  // The parser refuses an end that closes nothing.
+            auto region = regions.back();
+            regions.pop_back();
+            if (regions.empty())
+               region.written = 0;  // No local is read after the function's end.
+            else
+               regions.back().written += region.written;
+            pairs += region.edges * (region.written + region.carried);
+            return {};
+         }
+         branch_t emit_br(std::uint32_t, std::uint8_t, std::uint32_t label = 0, std::uint32_t = 0)
+         {
+            branch(label);
+            return {};
+         }
+         branch_t emit_br_if(std::uint32_t, std::uint8_t, std::uint32_t label = 0,
+                             std::uint32_t = 0, std::uint32_t = 0)
+         {
+            branch(label);
+            return {};
+         }
+         struct br_table_parser
+         {
+            AdmissionWriter* writer;
+            branch_t emit_case(std::uint32_t, std::uint8_t, std::uint32_t label = UINT32_MAX,
+                               std::uint32_t = 0, std::uint32_t = 0)
+            {
+               writer->branch(label);
+               return {};
+            }
+            branch_t emit_default(std::uint32_t, std::uint8_t, std::uint32_t label = UINT32_MAX,
+                                  std::uint32_t = 0, std::uint32_t = 0)
+            {
+               writer->branch(label);
+               return {};
+            }
+         };
+         br_table_parser emit_br_table(std::uint32_t) { return {this}; }
+         void emit_set_local(std::uint32_t local, std::uint8_t) { write(local); }
+         void emit_tee_local(std::uint32_t local, std::uint8_t) { write(local); }
+
+        private:
+         // A block, loop or if that is open; the first is the function.
+         struct Region
+         {
+            // Into its label: its own, and one for each branch so far.
+            std::uint64_t edges = 0;
+            // The operands a branch to its label carries.
+            std::uint32_t carried = 0;
+            // The number of the first write inside it.
+            std::uint64_t opened = 0;
+            // The locals whose latest write is inside it and before the
+            // next open region began. Over a region and the open regions
+            // inside it these add up to the distinct locals written in it,
+            // which is all a region needs when it closes: it is then the
+            // innermost, and it hands its count to the one around it.
+            std::uint64_t written = 0;
+         };
+         // The results of a block type as the parser passes it: a count for
+         // a type index, otherwise one value type or none (0x40).
+         static std::uint32_t resultsOf(std::uint8_t type, std::uint32_t results)
+         {
+            return results ? results : type != 0x40;
+         }
+         void open(std::uint32_t params, std::uint64_t edges, std::uint32_t carried)
+         {
+            if (params > limits.maxBlockParams)
+               exceeds("max_block_params", params, limits.maxBlockParams);
+            regions.push_back({.edges = edges, .carried = carried, .opened = writes + 1});
+         }
+         void branch(std::uint32_t label)
+         {
+            if (label < regions.size())  // The parser has refused any other.
+               ++regions[regions.size() - 1 - label].edges;
+         }
+         void write(std::uint32_t local)
+         {
+            if (local >= locals || regions.empty())
+               return;  // The parser has refused it.
+            auto& last = lastWrite[local];
+            if (last >= began)
+            {
+               // Written before in this function: it is no longer the
+               // latest write of the region that one was in, which is the
+               // last region opened at or before it.
+               auto after = std::upper_bound(
+                   regions.begin(), regions.end(), last,
+                   [](std::uint64_t write, const Region& region) { return write < region.opened; });
+               --std::prev(after)->written;
+            }
+            last = ++writes;
+            ++regions.back().written;
+         }
+
+         std::uint32_t imported = 0;
+         // The sum over the functions read so far.
+         std::uint64_t modulePairs = 0;
+         // Writes of a local read so far in the module, and for each local
+         // index the number of the latest one.
+         std::uint64_t              writes = 0;
+         std::vector<std::uint64_t> lastWrite;
+         // Of the function being read: parameters plus declared locals, the
+         // number of its first write, its measure so far, its open regions.
+         std::uint64_t       locals = 0;
+         std::uint64_t       began  = 1;
+         std::uint64_t       pairs  = 0;
+         std::vector<Region> regions;
       };
 
       // The parser's refusals for the limits validateNativeWasm leaves to
@@ -720,9 +895,14 @@ namespace psibase
          return {};
       }
 
-      // Both passes of admission; `use` gets the parsed module.
+      // Both passes of admission; `use` gets the parsed module. `measured`,
+      // if given, gets what max_branch_local_pairs limits for each defined
+      // function, and that limit and the module's are then not applied.
       template <typename F>
-      void admit(std::span<const std::uint8_t> code, const NativeVMOptions& policy, F&& use)
+      void admit(std::span<const std::uint8_t> code,
+                 const NativeVMOptions&        policy,
+                 F&&                           use,
+                 std::vector<std::uint64_t>*   measured = nullptr)
       {
          validateNativeWasm(code, policy);
          try
@@ -732,7 +912,13 @@ namespace psibase
             psizam::module                 module;
             psizam::detail::null_debug_info debug;
             module.allocator.use_default_memory();
-            AdmissionWriter::maxBlockParams = policy.max_block_params;
+            constexpr auto unlimited = std::numeric_limits<std::uint64_t>::max();
+            AdmissionWriter::limits  = {
+                 .maxBlockParams      = policy.max_block_params,
+                 .maxBranchLocalPairs = measured ? unlimited : policy.max_branch_local_pairs,
+                 .maxModuleBranchLocalPairs =
+                    measured ? unlimited : policy.max_module_branch_local_pairs,
+                 .measured = measured};
             psizam::detail::binary_parser<AdmissionWriter, NativeVMOptions,
                                           psizam::detail::null_debug_info>{
                 module.allocator, policy, false,
@@ -765,6 +951,19 @@ namespace psibase
       std::vector<std::uint32_t> result;
       admit(code, NativeVMOptions{options, {}, vmVersion},
             [&](const psizam::module& module) { result = costsOf(module); });
+      return result;
+   }
+
+   BranchLocalPairs nativeBranchLocalPairs(std::span<const std::uint8_t> code,
+                                           const VMOptions&              options,
+                                           std::uint8_t                  vmVersion)
+   {
+      BranchLocalPairs result;
+      admit(
+          code, NativeVMOptions{options, {}, vmVersion},
+          [&](const psizam::module& module)
+          { result.imported = module.get_imported_functions_size(); },
+          &result.functions);
       return result;
    }
 

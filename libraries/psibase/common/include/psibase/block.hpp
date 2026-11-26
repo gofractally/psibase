@@ -226,6 +226,17 @@ namespace psibase
       std::uint32_t max_nested_structures = 1024;
       // Parameters of a block, loop or if
       std::uint32_t max_block_params = 16;
+      // Over the blocks, loops and ifs of a function: (edges into its
+      // label) x (locals written inside it + operands the label takes).
+      // This bounds the memory a compiler needs for the function, at most
+      // about 1 KiB a unit. The definition and the measurements are at
+      // vmOptionCeilings (PsizamPolicy.hpp).
+      std::uint32_t max_branch_local_pairs = 524'288;
+
+      // --- The module, again ---
+      // The sum of that over the functions of a module: what a compiler
+      // needs when it compiles them at once
+      std::uint32_t max_module_branch_local_pairs = 4'194'304;
 
       friend auto operator<=>(const VMOptions&, const VMOptions&) = default;
       PSIO_REFLECT(VMOptions,
@@ -254,7 +265,9 @@ namespace psibase
                    max_code_bytes,
                    max_br_table_elements,
                    max_nested_structures,
-                   max_block_params)
+                   max_block_params,
+                   max_branch_local_pairs,
+                   max_module_branch_local_pairs)
    };
    // Every member is a 32-bit integer and nothing else is stored.
    inline constexpr std::size_t vmOptionCount = sizeof(VMOptions) / sizeof(std::uint32_t);

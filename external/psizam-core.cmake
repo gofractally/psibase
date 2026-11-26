@@ -38,13 +38,16 @@ set(PSIBASE_VM_ENGINES "WASMTIME;JIT2" CACHE STRING
 # source that defines it. VmEngine.cpp reads the generated list.
 set(vm_engine_namespaces)
 set(vm_engine_sources)
+# The psizam wasmtime backend (target psizam-wasmtime) is part of every build,
+# whichever engine the node has: psitest runs the test module on it
+# (gofractally/psibase#2231). It is only built for what links it.
+if(NOT EXISTS "${PSIBASE_PSIZAM_SOURCE_DIR}/wasmtime/CMakeLists.txt")
+    message(FATAL_ERROR "The selected psizam source has no wasmtime backend")
+endif()
+add_subdirectory("${PSIBASE_PSIZAM_SOURCE_DIR}/wasmtime" psizam-wasmtime)
 function(psibase_add_wasmtime_engine)
     # The node executes services with wasmtime. psizam still validates every
     # module and supplies its stack costs.
-    if(NOT EXISTS "${PSIBASE_PSIZAM_SOURCE_DIR}/wasmtime/CMakeLists.txt")
-        message(FATAL_ERROR "The selected psizam source has no wasmtime backend")
-    endif()
-    add_subdirectory("${PSIBASE_PSIZAM_SOURCE_DIR}/wasmtime" psizam-wasmtime)
     target_link_libraries(psibase-psizam PUBLIC psizam-wasmtime)
 endfunction()
 if(PSIBASE_VM_BACKEND STREQUAL "LLVM_AOT")
@@ -95,12 +98,10 @@ if(PSIBASE_VM_BACKEND STREQUAL "LLVM_AOT")
             string(APPEND host_identity "${relative}:${digest}\n")
         endforeach()
     endforeach()
-    file(SHA256 "${CMAKE_CURRENT_LIST_DIR}/../programs/psitest/main.cpp" tester_host_digest)
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_LIST_DIR}/../programs/psitest/main.cpp")
+    # psitest is not part of this identity: its host functions are bound to
+    # the wasmtime engine of the test module and reach no saved AOT artifact.
     file(SHA256 "${CMAKE_CURRENT_LIST_FILE}" host_build_digest)
-    string(SHA256 host_identity
-        "${host_identity}tester:${tester_host_digest}\nbuild:${host_build_digest}")
+    string(SHA256 host_identity "${host_identity}build:${host_build_digest}")
     file(CONFIGURE OUTPUT "${CMAKE_BINARY_DIR}/generated/psibase-native-aot-host.hpp"
         CONTENT "#pragma once\n#define PSIBASE_NATIVE_AOT_HOST_ID \"${host_identity}\"\n" @ONLY)
     target_include_directories(psibase-psizam PUBLIC "${CMAKE_BINARY_DIR}/generated")
@@ -147,7 +148,7 @@ elseif(PSIBASE_VM_BACKEND STREQUAL "JIT1")
     set(vm_engine_sources native/src/ExecutionContext.cpp)
 elseif(PSIBASE_VM_BACKEND STREQUAL "WASMTIME")
     psibase_add_wasmtime_engine()
-    # The tester and the psizam-specific tests keep a psizam engine (JIT2).
+    # The psizam-specific tests keep a psizam engine (JIT2).
     target_compile_definitions(psibase-psizam PUBLIC PSIBASE_VM_WASMTIME)
     set(vm_engine_namespaces vm_wasmtime)
     set(vm_engine_sources native/src/ExecutionContextWasmtime.cpp)

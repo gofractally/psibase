@@ -3,7 +3,8 @@
 //! JSON has one source of behaviour, PSIO's I-JSON (`external/psio/docs/json.md`):
 //! `psio::to_ijson` / `from_ijson`, and serde through `psio::Serde`, read and
 //! write the same text. The texts here are the ones the C++ side documents
-//! (`doc/flip-interop.md` 5 of the C++ flip branch) and pins in
+//! (`doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md` 5 of the C++ flip
+//! branch) and pins in
 //! `libraries/psibase/common/tests/json.cpp`: what a Rust tool reads from a
 //! node and what a node reads from a Rust tool.
 #![allow(non_snake_case)]

@@ -1450,7 +1450,9 @@ void run(const std::string&              db_path,
           auto stats = wasmCache.stats();
           PSIBASE_LOG(psibase::loggers::generic::get(), info)
               << "Service modules: " << stats.compiled << " compiled, " << stats.loaded
-              << " loaded from the cache, " << stats.discarded << " cache entries discarded";
+              << " loaded from the cache, " << stats.discarded << " cache entries discarded, "
+              << stats.compilesAbandoned << " compiles abandoned, " << stats.compilesNotRetried
+              << " speculative runs not compiled for";
        }};
    auto sharedState = std::make_shared<psibase::SharedState>(std::move(database), wasmCache);
    auto system      = sharedState->getSystemContext();
@@ -1841,6 +1843,10 @@ void run(const std::string&              db_path,
                                                        [&server_work]() { server_work.reset(); });
                                   });
                  node.consensus().async_shutdown();
+                 // No speculative run is worth waiting for any more: the
+                 // compiles they started are stopped, so that neither a run
+                 // waiting for one nor its compile thread holds up the exit.
+                 system->wasmCache.abandonSpeculativeCompiles();
               });
        });
 

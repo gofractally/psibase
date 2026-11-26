@@ -43,7 +43,7 @@ These are the changes the team has to agree to, as opposed to review for quality
 | Stack depth | psizam's validator, and the wasmtime shim | A byte budget (`max_stack_bytes`) charged per call frame from costs the validator computes, so every engine overflows at the same call |
 | Float policy per code version | 09e1f9075, 3a0ae5d56 | A service runs under the float profile its `vmVersion` names: 0 is the strict WebAssembly deterministic profile, 1 is "deterministic performance" (fused multiply-add, as wasmtime behaves). SetCode stamps the chain default, 1, on new code. NaNs are canonical in both |
 | Code admission when stored | `admitNativeWasm` (`PsizamPolicy.cpp`), run by the native write of a code row (#2256) | A transaction that stores service code the chain policy does not admit (`setCode`, `stageCode`, genesis) fails with the reason. The policy includes the imports: each must be a host function of the one list every engine registers (`NativeHostFunctions.hpp`), with its signature (#2259), and the entry points: an export named `start`, `called`, `serve` or `processTransaction` must be a function of that entry point's fixed signature, and `start` and `called` must be exported (#2261; `serve` and `processTransaction` are optional). Before, it succeeded and the service failed when first called |
-| When service code is compiled | `TransactionContext::prepareCode`, `WasmCache` (`VmEngine.cpp`), `BlockContext::deferUncompiledCode`, `RTransact::onSpecTrx` (#2256) | A pushed transaction is offered to a block only after its speculative run has passed (before: once its signatures were checked). The speculative run compiles what it stores or executes, on a compile thread, waits at most 5 s (`PSIBASE_SPECULATIVE_COMPILE_MS`) outside its one-second limit, and is refused if 4 compiles are already in flight. A producer running a transaction from its queue never compiles or waits for a compile: the transaction is deferred to a later block with no result. A node applying a block compiles in the background and only the first execution waits. Boot blocks, the tester, callbacks and queries compile where they need the module, as before |
+| When service code is compiled | `TransactionContext::prepareCode`, `WasmCache` (`VmEngine.cpp`), `BlockContext::deferUncompiledCode`, `RTransact::onSpecTrx` (#2256) | A pushed transaction is offered to a block only after its speculative run has passed (before: once its signatures were checked). The speculative run compiles what it stores or executes, on a compile thread, waits at most 5 s (`PSIBASE_SPECULATIVE_COMPILE_MS`) outside its one-second limit, and is refused if 4 compiles are already in flight. A compile that reaches that bound is stopped in the compiler (wasmtime; #2267) and leaves nothing: no module, no stored artifact and no record of a refusal, so the same code is compiled again when it is next asked for, by a later run under the same bound or by a block to completion. Until its thread has left the compiler it still counts as in flight. What a block needs is never stopped: a speculative run's compile that a block comes to need loses its bound, or is run again if it was stopped already. **This makes the bound a hard, machine-dependent limit on what a node runs speculatively**: before compiles could be stopped, the run gave up, the compile finished and the transaction sent again found the module; now code that a node's machine does not compile within its bound is stopped at every attempt, never passes a speculative run there, and so is never put into a block that node produces (the node still applies a block of another producer that contains it). The operator raises the bound with `PSIBASE_SPECULATIVE_COMPILE_MS`. So that such code does not occupy a compile thread for the bound at every attempt, a node remembers for 10 minutes (`PSIBASE_SPECULATIVE_COMPILE_RETRY_MS`; 0 turns it off) that it stopped the compile and fails a run that needs the code at once, saying when it was stopped, at which bound and until when; that is not charged as compile time. The memory is not a refusal and is never stored: it holds at most 4,096 codes and an entry goes when its time is up, when the bound is raised above the one the compile was stopped at, and when a block asks for the code. A producer running a transaction from its queue never compiles or waits for a compile: the transaction is deferred to a later block with no result. A node applying a block compiles in the background and only the first execution waits. Boot blocks, the tester, callbacks and queries compile where they need the module, as before |
 | Wide-arithmetic instructions | 8b09a8776 | C++ services are compiled with `-mwide-arithmetic`; every engine must accept `i64.add128`, `i64.sub128`, `i64.mul_wide_s/u` |
 | Block size limit | 01c148342, bf02dd93c | A block stops filling at 4 MiB of transactions; the limit is an on-chain setting |
 | Signature service | b474c3e15 | `verify-sig` is a different implementation and is stricter about key encodings (details below) |
@@ -82,7 +82,7 @@ Visible in traces but not consensus: action trace time, the transaction limit an
 - wasmtime is the engine, and every landing is qualified on it on x86. psizam's interpreter, JIT1 and JIT2 are kept only as a cross-check for wasmtime and for LLVM AOT, and are experimental with their known problems documented. They are largely compatible, with only minor known issues, and could be revived later for something wasmtime lacks, such as debugging.
 - LLVM AOT is the second engine: robust, but slow to compile, and faster than wasmtime at run time for some modules, so engines may later be chosen per application. It is re-verified on x86-64 Linux, most recently with the serialization change in (e93c2e64d): native 20/20, including the consensus test that compares LLVM AOT and saved AOT artifacts with JIT1 bit for bit, and end-to-end 39/39. The Rust suite has not been run under it and macOS has not been run. Getting there needed two fixes: the LLVM AOT build had never linked on Linux, and the consensus test leaves JIT2 out on x86-64, where JIT2 keeps NaN payloads through SIMD float operations.
 - The status of each engine and the known problems of the experimental ones are in psizam's [KNOWN_ISSUES.md](https://github.com/gofractally/psizam/blob/main/KNOWN_ISSUES.md). #2228 stays open for LLVM AOT on macOS and for the experimental engines.
-- `psitest` still runs every test module on JIT2 while the services it drives run on wasmtime: the one place an experimental engine is on the path of the suites (#2231).
+- `psitest` runs the test module on wasmtime, like the services it drives, in every build configuration; no experimental engine is on the path of the suites (#2231). A test module is not chain code: no admission limits, stack budget or CPU limit apply to it (`programs/psitest/main.cpp`, `test_module`).
 - psizam tests a reviewer will see fail, all predating this work: the `memory_grow_2` spec cases on every engine, `psizam_host_tail_reentry_tests` (intentionally red), and on x86 "Test call depth dynamic - jit_llvm".
 - Rust services use wide arithmetic only when built with rustc 1.100 or newer; rustc calls the target feature unstable and warns that using it will become an error (#2230). A test in the Rust suite checks 128-bit arithmetic in a service against a 32-bit-limb reference, so a compiler that gets it wrong fails the suite.
 
@@ -172,9 +172,9 @@ This section was written by the author of the migration.
 - Account names keep psibase's own coding; method names use PSIO's coder.
 
 **Where to look.**
-- `doc/team-review.md`: everything the team must decide or confirm. Start with sections 12 and 13.
-- `doc/pssz-conversion.md`: the mapping from each old call to the new one (sections 3 and 6.6), the merge handover and classes of failure (section 7).
-- `doc/flip-interop.md`: the rules that keep C++ and Rust twins of a type identical. `doc/merge-checklist.md`.
+- `doc/migrations/2026-11-fracpack-to-pssz/team-review.md`: everything the team must decide or confirm. Start with sections 12 and 13.
+- `doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md`: the mapping from each old call to the new one (sections 3 and 6.6), the merge handover and classes of failure (section 7).
+- `doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md`: the rules that keep C++ and Rust twins of a type identical. `doc/migrations/2026-11-fracpack-to-pssz/merge-checklist.md`.
 - Code: `libraries/psibase/common/include/psibase/{Table,Rpc,Actor,schema}.hpp`, `libraries/psibase/native/src/{BlockContext,TransactionContext}.cpp`, `rust/psibase`, `rust/psibase_macros`, `packages/system/Transact`.
 - The library itself: start with its `docs/annotations.md`, `docs/tutorial-annotations.md` and `docs/pssz-spec.md`.
 
@@ -182,7 +182,7 @@ This section was written by the author of the migration.
 - macOS, wasmtime: full ctest 88/88 (the count fell because the old library's own tests were deleted with it).
 - x86-64 Linux at e93c2e64d: wasmtime native 19/19, end-to-end 39/39, Rust 29/29, plugins 1/1; LLVM AOT native 20/20 and end-to-end 39/39.
 - A fixture that C++ and Rust both encode is byte-identical for types, JSON, service schemas, leaf types and wrappers, and every Rust workspace type-checks.
-- End to end by hand: boot, account creation, GraphQL on a C++ and on a Rust service, the schema endpoint, pushing a transaction, and stopping and restarting a node that continues. Commands and output are in `doc/pssz-conversion.md` section 7.
+- End to end by hand: boot, account creation, GraphQL on a C++ and on a Rust service, the schema endpoint, pushing a transaction, and stopping and restarting a node that continues. Commands and output are in `doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md` section 7.
 - PSIO's own suites: C++ 424/424 in both JSON-parser configurations, Rust 1,141, JavaScript 252, Python 90.
 
 **Questions for reviewers.**
@@ -190,7 +190,7 @@ This section was written by the author of the migration.
 2. Trust. Rows a service reads from its own tables are decoded with validation today. The intended rule is trusted reads of own rows and validated action and cross-service data.
 3. Naming. The implementing language is the authority for a name; a blanket camelCase rename is held for team discussion.
 4. Members that exist in a struct but are absent from reflection, listed as questions of intent.
-5. JSON and GraphQL behaviour that clients will notice (`doc/team-review.md` sections 8 and 12).
+5. JSON and GraphQL behaviour that clients will notice (`doc/migrations/2026-11-fracpack-to-pssz/team-review.md` sections 8 and 12).
 
 **Closed since the migration merged.**
 - Transaction size: the guest's strict check now walks the transaction in place, and Transact accepts one up to its 32 MiB of memory (31.6 MiB measured). A test pins 1, 4.5, 8 and 16 MiB and passes on both machines and both engines.
@@ -198,7 +198,7 @@ This section was written by the author of the migration.
 - Variant labels follow one rule in every language, so C++ and Rust service schemas compare with no special case.
 - The fracpack-named calls and helpers are renamed or deleted.
 
-**Known gaps.** The living list is `doc/team-review.md`, sections 12 and 13.
+**Known gaps.** The living list is `doc/migrations/2026-11-fracpack-to-pssz/team-review.md`, sections 12 and 13.
 1. Large transactions over HTTP (#2233, partly fixed). Up to 1.6 MiB the client gets the whole trace; above that, a 200 with the outcome only; above 5 MiB, a 413 naming the limit; from 8 MiB a service ahead of `r-transact` traps and the client gets a 500. The two limits are new constants chosen by measurement and need the team's confirmation. Receiving from a peer has no size limit of its own.
 2. Names and pages still describing the old format (#2234): a `block.frac` file name in the consensus replay test, and the documentation pages `fracpack.md`, `schema.md`, `js-libraries.md` and the end of `rust-service/tables.md`. `demo/` has not been built.
 3. Not exercised by anyone (#2236): front ends and plugins in a browser, the snapshot tools at run time and validation on snapshot import, `demo/`, and a service that reads a multi-megabyte argument. `psibase boot` returns before the boot transactions are applied, which needs confirming as intended.
@@ -254,7 +254,7 @@ Suite results are recorded per commit under `tests/timing/runs/`. On wasmtime un
 
 Open items are tracked as issues and closed as they are fixed.
 
-- LLVM AOT is re-verified on x86 only (native and end-to-end); not on macOS, and not the Rust suite. The interpreter, JIT1 and JIT2 are experimental and unverified on this head: #2228. `psitest` still runs test modules on JIT2: #2231.
+- LLVM AOT is re-verified on x86 only (native and end-to-end); not on macOS, and not the Rust suite. The interpreter, JIT1 and JIT2 are experimental and unverified on this head: #2228.
 - Deterministic stack check on wasmtime costs memory traffic on every call: #2221.
 - Admission does not cover what only an engine's compiler refuses: such code is stored and fails at its first call. wasmtime refuses modules the chain policy admits (a function with more than 50,000 locals or 1,000 parameters, a name over 100,000 bytes, a function body over 7,654,321 bytes), which a psizam engine would run: #2256.
 - Events: one billing event per transaction and the per-block pipeline: #2218. Objective pricing for events, by size and index count: #2223.
@@ -265,7 +265,7 @@ Open items are tracked as issues and closed as they are fixed.
 - The verifier's differential and Wycheproof checks are not an in-tree test: #2225.
 - The team's CI image cannot configure the head (CMake 3.28, binaryen 133): #2238.
 - psitri, ucc and psio have no license file.
-- Serialization: large transactions over HTTP (#2233), names and pages still describing the old format (#2234), and what nobody has exercised yet, including front ends and plugins in a browser (#2236). The rest is in section 9 and `doc/team-review.md`.
+- Serialization: large transactions over HTTP (#2233), names and pages still describing the old format (#2234), and what nobody has exercised yet, including front ends and plugins in a browser (#2236). The rest is in section 9 and `doc/migrations/2026-11-fracpack-to-pssz/team-review.md`.
 - Throughput has not been remeasured since the serialization change.
 - `doc/verify-sig/` records measurements taken before the serialization change; its harness and case generator use the old library's calls and will not build against this head as written.
 - psitri: the legacy engine's compatibility leg ([psitri#2](https://github.com/gofractally/psitri/issues/2)); freed space that can stay uncompacted ([psitri#7](https://github.com/gofractally/psitri/issues/7)); a debug mode that aborts on a partly filled segment ([psitri#6](https://github.com/gofractally/psitri/issues/6)).
