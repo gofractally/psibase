@@ -1,4 +1,4 @@
-#include <services/system/VerifyR1.hpp>
+#include <services/system/VerifyBear1.hpp>
 
 #include <psibase/api.hpp>
 #include <psibase/check.hpp>
@@ -14,13 +14,19 @@ extern "C"
 #include <bearssl/bearssl_ec.h>
 }
 
-// Verifies ECDSA signatures over secp256r1 (R1, P-256).
+// Verifies ECDSA signatures over secp256r1 (R1, P-256) with BearSSL.
+//
+// This is the second verifier for the curve. The default is verify-r1; an
+// account that prefers this implementation chooses it in auth-sig
+// (psibase/verifier.hpp lists the verifiers allowed for a key). Both accept
+// and reject exactly the same claims and proofs.
 //
 // A claim is a DER SubjectPublicKeyInfo and a proof is the 64-byte signature
 // r || s over the transaction hash. Only what verification needs is linked:
 // BearSSL's P-256 and nothing else. It does not allocate, and its tables are
-// constants in the binary, so there is nothing to set up at start. It uses
-// its 64-bit code, which relies on the wide-arithmetic instructions.
+// constants in the binary, so there is nothing to set up at start and the
+// service is one page. It uses its 64-bit code, which relies on the
+// wide-arithmetic instructions.
 //
 // Keys of any other type belong to another verifier (psibase/verifier.hpp)
 // and are rejected here.
@@ -136,15 +142,11 @@ namespace
       }
    }
 
-   // n / 2 for P-256, where n is the group order.
-   constexpr unsigned char r1HalfOrder[32] = {
-       0x7f, 0xff, 0xff, 0xff, 0x80, 0x00, 0x00, 0x00, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-       0xde, 0x73, 0x7d, 0x56, 0xd3, 0x8b, 0xcf, 0x42, 0x79, 0xdc, 0xe5, 0x61, 0x7e, 0x31, 0x92, 0xa8};
-
    void verifyR1(Bytes point, const unsigned char* hash, const unsigned char* signature)
    {
-      // BearSSL accepts any s in [1, n-1]. Big-endian, so memcmp orders by value.
-      check(std::memcmp(signature + 32, r1HalfOrder, 32) <= 0, "signature invalid");
+      // BearSSL accepts any s in [1, n-1].
+      check(verifier::isLowS(std::span<const unsigned char, 64>{signature, 64}, KeyType::secp256r1),
+            "signature invalid");
       unsigned char expanded[65];
       if (point.size() == 33)
       {
@@ -187,7 +189,7 @@ extern "C" void start(AccountNumber thisService)
 
 int main(int argc, const char* const* argv)
 {
-   return ::psibase::serviceMain<SystemService::VerifyR1>(argc, argv);
+   return ::psibase::serviceMain<SystemService::VerifyBear1>(argc, argv);
 }
 
 #endif

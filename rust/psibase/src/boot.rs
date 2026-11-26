@@ -49,7 +49,8 @@ fn genesis_transaction<R: Read + Seek>(
     essential_services: &EssentialServices,
 ) -> Result<SignedTransaction, anyhow::Error> {
     let mut services = vec![];
-    let mut essential = essential_services.clone();
+    let mut essential = essential_services
+        .for_packages(service_packages.iter().flat_map(|s| s.get_services().iter()));
     for s in service_packages {
         s.get_genesis(&mut services)?;
         // Only install the transact service and its dependencies
@@ -125,7 +126,8 @@ pub fn get_initial_actions<
 ) -> Result<(), anyhow::Error> {
     let has_packages = true;
 
-    let mut essential = essential_services.clone();
+    let mut essential = essential_services
+        .for_packages(service_packages.iter().flat_map(|s| s.get_services().iter()));
     for s in &mut service_packages[..] {
         if essential.is_empty() {
             builder.set_label(format!("Installing code for {}", s.name()));

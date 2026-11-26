@@ -1,9 +1,15 @@
-//! Which service verifies signatures made with which kind of key.
+//! Which services verify signatures made with which kind of key.
 //!
-//! Each kind of key has its own verifier service. A claim for a key names
-//! the verifier for that key's kind, so everything that builds or checks a
+//! Each verifier service handles one kind of key. A kind of key has a
+//! default verifier and may have others that an account can choose instead;
+//! a claim for a key names one of them. Everything that builds or checks a
 //! claim asks here instead of naming a service. This mirrors
 //! `psibase/verifier.hpp`; the two must agree.
+//!
+//! - A claim on its own (a credential, a guest key) is acceptable if it
+//!   names any verifier allowed for its key: `is_allowed_verifier`.
+//! - A claim for an account must name the verifier the account stored with
+//!   its key (auth-sig). The default is `verifier_for`.
 
 use crate::{account_raw, AccountNumber};
 
@@ -15,10 +21,17 @@ pub enum KeyType {
     Secp256r1,
 }
 
-/// The service that verifies secp256k1 signatures
+/// Verifies secp256k1 signatures
 pub const VERIFY_K1: AccountNumber = AccountNumber::new(account_raw!("verify-k1"));
-/// The service that verifies secp256r1 (P-256) signatures
+/// Verifies secp256r1 (P-256) signatures. The default for that curve.
 pub const VERIFY_R1: AccountNumber = AccountNumber::new(account_raw!("verify-r1"));
+/// Verifies secp256r1 (P-256) signatures with a second, independent
+/// implementation. An account may choose it in place of the default.
+pub const VERIFY_BEAR1: AccountNumber = AccountNumber::new(account_raw!("verify-br1"));
+
+// The verifiers allowed for each key type, the default first.
+const K1_VERIFIERS: [AccountNumber; 1] = [VERIFY_K1];
+const R1_VERIFIERS: [AccountNumber; 2] = [VERIFY_R1, VERIFY_BEAR1];
 
 // AlgorithmIdentifier { id-ecPublicKey, namedCurve }
 const K1_ALGORITHM: [u8; 18] = [
@@ -40,12 +53,17 @@ impl KeyType {
         }
     }
 
-    /// The service that verifies signatures made with keys of this type
-    pub const fn verifier(self) -> AccountNumber {
+    /// The verifiers allowed for keys of this type, the default first
+    pub const fn allowed_verifiers(self) -> &'static [AccountNumber] {
         match self {
-            KeyType::Secp256k1 => VERIFY_K1,
-            KeyType::Secp256r1 => VERIFY_R1,
+            KeyType::Secp256k1 => &K1_VERIFIERS,
+            KeyType::Secp256r1 => &R1_VERIFIERS,
         }
+    }
+
+    /// The default verifier for keys of this type
+    pub const fn verifier(self) -> AccountNumber {
+        self.allowed_verifiers()[0]
     }
 }
 
@@ -87,16 +105,31 @@ pub fn key_type(spki: &[u8]) -> Option<KeyType> {
         .find(|t| ec_point(spki, *t).is_some())
 }
 
-/// The service that verifies signatures made with the key whose DER
-/// SubjectPublicKeyInfo is `spki`: the service a claim for this key must
-/// name. `None` if no verifier accepts the key.
+/// The default verifier for the key whose DER SubjectPublicKeyInfo is
+/// `spki`: the service a claim for this key names unless another allowed
+/// verifier was chosen for it. `None` if no verifier accepts the key.
 pub fn verifier_for(spki: &[u8]) -> Option<AccountNumber> {
     key_type(spki).map(KeyType::verifier)
 }
 
+/// The verifiers allowed for the key whose DER SubjectPublicKeyInfo is
+/// `spki`, the default first. Empty if no verifier accepts the key.
+pub fn allowed_verifiers(spki: &[u8]) -> &'static [AccountNumber] {
+    key_type(spki).map_or(&[], KeyType::allowed_verifiers)
+}
+
 /// The type of key that `service` verifies, if it is one of the verifiers
 pub fn verified_key_type(service: AccountNumber) -> Option<KeyType> {
-    KEY_TYPES.into_iter().find(|t| t.verifier() == service)
+    KEY_TYPES
+        .into_iter()
+        .find(|t| t.allowed_verifiers().contains(&service))
+}
+
+/// Whether `service` is one of the verifiers allowed for the key whose DER
+/// SubjectPublicKeyInfo is `spki`: whether a claim of `service` and this key
+/// is one that can be verified.
+pub fn is_allowed_verifier(service: AccountNumber, spki: &[u8]) -> bool {
+    allowed_verifiers(spki).contains(&service)
 }
 
 #[cfg(test)]
@@ -118,7 +151,36 @@ mod tests {
         assert_eq!(VERIFY_R1.to_string(), "verify-r1");
         assert_eq!("verify-k1".parse::<AccountNumber>().unwrap(), VERIFY_K1);
         assert_eq!("verify-r1".parse::<AccountNumber>().unwrap(), VERIFY_R1);
+        assert_eq!(VERIFY_BEAR1.to_string(), "verify-br1");
+        assert_eq!("verify-br1".parse::<AccountNumber>().unwrap(), VERIFY_BEAR1);
         assert_ne!(VERIFY_K1, VERIFY_R1);
+        assert_ne!(VERIFY_R1, VERIFY_BEAR1);
+        assert_ne!(VERIFY_K1, VERIFY_BEAR1);
+    }
+
+    #[test]
+    fn allowed_verifiers_per_key_type() {
+        let mut point = vec![0x04];
+        point.extend_from_slice(&[0x11; 64]);
+        let k1 = spki(KeyType::Secp256k1, &point);
+        let r1 = spki(KeyType::Secp256r1, &point);
+        assert_eq!(allowed_verifiers(&k1), &[VERIFY_K1]);
+        assert_eq!(allowed_verifiers(&r1), &[VERIFY_R1, VERIFY_BEAR1]);
+        assert!(allowed_verifiers(&[]).is_empty());
+
+        assert!(is_allowed_verifier(VERIFY_K1, &k1));
+        assert!(!is_allowed_verifier(VERIFY_R1, &k1));
+        assert!(!is_allowed_verifier(VERIFY_BEAR1, &k1));
+        assert!(is_allowed_verifier(VERIFY_R1, &r1));
+        assert!(is_allowed_verifier(VERIFY_BEAR1, &r1));
+        assert!(!is_allowed_verifier(VERIFY_K1, &r1));
+        assert!(!is_allowed_verifier(VERIFY_R1, &[]));
+        assert!(!is_allowed_verifier(AccountNumber::new(account_raw!("auth-sig")), &r1));
+
+        assert_eq!(verified_key_type(VERIFY_BEAR1), Some(KeyType::Secp256r1));
+        // The default is the first of the allowed verifiers.
+        assert_eq!(verifier_for(&r1), Some(VERIFY_R1));
+        assert_eq!(verifier_for(&k1), Some(VERIFY_K1));
     }
 
     #[test]

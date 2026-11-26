@@ -1,9 +1,14 @@
-// Which service verifies signatures made with which kind of key.
+// Which services verify signatures made with which kind of key.
 //
-// Each kind of key has its own verifier service. A claim for a key names the
-// verifier for that key's kind, so everything that builds or checks a claim
-// asks here instead of naming a service. This mirrors psibase/verifier.hpp
-// (C++) and psibase::verifier (Rust); the three must agree.
+// Each verifier service handles one kind of key. A kind of key has a default
+// verifier and may have others that an account can choose instead; a claim
+// for a key names one of them. Everything that builds or checks a claim asks
+// here instead of naming a service. This mirrors psibase/verifier.hpp (C++)
+// and psibase::verifier (Rust); the three must agree.
+//
+// A claim for an account must name the verifier the account stored with its
+// key (auth-sig's `account(name) { pubkey verifier }`); verifierFor is only
+// the default.
 
 export type VerifiedKeyType = "secp256k1" | "secp256r1";
 
@@ -19,9 +24,10 @@ const algorithms: { [K in VerifiedKeyType]: number[] } = {
     ],
 };
 
-const verifiers: { [K in VerifiedKeyType]: string } = {
-    secp256k1: "verify-k1",
-    secp256r1: "verify-r1",
+// The verifiers allowed for each key type, the default first.
+const verifiers: { [K in VerifiedKeyType]: readonly string[] } = {
+    secp256k1: ["verify-k1"],
+    secp256r1: ["verify-r1", "verify-br1"],
 };
 
 const keyTypes = Object.keys(verifiers) as VerifiedKeyType[];
@@ -51,17 +57,36 @@ export function verifiedKeyType(spki: Uint8Array): VerifiedKeyType | undefined {
     return keyTypes.find((type) => isKeyOfType(spki, type));
 }
 
-/** The service that verifies signatures made with keys of this type. */
-export function verifierForKeyType(type: VerifiedKeyType): string {
+/** The verifiers allowed for keys of this type, the default first. */
+export function allowedVerifiersForKeyType(
+    type: VerifiedKeyType,
+): readonly string[] {
     return verifiers[type];
 }
 
-/** The service that verifies signatures made with the key whose DER
- * SubjectPublicKeyInfo is `spki`: the service a claim for this key must
- * name. Undefined if no verifier accepts the key. */
+/** The default verifier for keys of this type. */
+export function verifierForKeyType(type: VerifiedKeyType): string {
+    return verifiers[type][0];
+}
+
+/** The default verifier for the key whose DER SubjectPublicKeyInfo is
+ * `spki`: the service a claim for this key names unless another allowed
+ * verifier was chosen for it. Undefined if no verifier accepts the key. */
 export function verifierFor(spki: Uint8Array): string | undefined {
     const type = verifiedKeyType(spki);
-    return type && verifiers[type];
+    return type && verifiers[type][0];
+}
+
+/** The verifiers allowed for the key whose DER SubjectPublicKeyInfo is
+ * `spki`, the default first. Empty if no verifier accepts the key. */
+export function allowedVerifiers(spki: Uint8Array): readonly string[] {
+    const type = verifiedKeyType(spki);
+    return type ? verifiers[type] : [];
+}
+
+/** Whether `service` is one of the verifiers allowed for this key. */
+export function isAllowedVerifier(service: string, spki: Uint8Array): boolean {
+    return allowedVerifiers(spki).includes(service);
 }
 
 /** `verifierFor`, for building a claim: throws if there is no verifier. */

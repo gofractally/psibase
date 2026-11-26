@@ -121,10 +121,10 @@ if(DEFINED WASI_SDK_PREFIX)
         COMPONENT libpsibase
     )
 
-    # Signature verification uses two small libraries instead of Botan, one
-    # per verifier service: libsecp256k1 for secp256k1 (VerifyK1) and BearSSL's
-    # P-256 for secp256r1 (VerifyR1). Each is built by its own build system and
-    # only the objects the service references are linked.
+    # Two verifier services use a small library each instead of Botan:
+    # libsecp256k1 for secp256k1 (VerifyK1) and BearSSL's P-256 for the second
+    # secp256r1 verifier (VerifyBear1). Each is built by its own build system
+    # and only the objects the service references are linked.
     #
     # Both are built for 64-bit arithmetic, whose 64x64->128 multiply is one
     # wide-arithmetic instruction. (Without -mwide-arithmetic it would be a
@@ -169,9 +169,13 @@ if(DEFINED WASI_SDK_PREFIX)
             -DSECP256K1_BUILD_EXAMPLES=OFF
     )
 
-    # BearSSL has no release containing the 64-bit P-256 code, so a commit is pinned.
+    # BearSSL has no release containing the 64-bit P-256 code, so a commit is
+    # pinned. It is fetched from the project's own fork, not from the author's
+    # server: the code that verifies signatures is then held where the rest
+    # of the project's code is, and any change to it is a commit there that
+    # can be reviewed. The fork's master is upstream's history, unmodified.
     ExternalProject_Add(wasm-bearssl
-        GIT_REPOSITORY https://www.bearssl.org/git/BearSSL
+        GIT_REPOSITORY https://github.com/gofractally/BearSSL.git
         GIT_TAG 7bea48e5e850ab4cafbe68d3765cdaba13a86d6f
         DEPENDS ${wasm-deps}
         PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm/bearssl
@@ -233,7 +237,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate RDynLd REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode
-        Transact VerifyK1 VerifyR1 XAdmin XBasic XDb XHttp XKeys XRun XSites XTimer XTransact
+        Transact VerifyBear1 VerifyK1 VerifyR1 XAdmin XBasic XDb XHttp XKeys XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
         XPackages XPeers XProxy XSignup XSocketListService WSEcho XDelay ServerId)
@@ -759,10 +763,12 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig-schema.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "VerifyK1(^${PSIBASE_VERSION}.0)" "VerifyR1(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "VerifyK1(^${PSIBASE_VERSION}.0)" "VerifyR1(^${PSIBASE_VERSION}.0)" "VerifyBear1(^${PSIBASE_VERSION}.0)"
 )
 
-# One verifier service per key type. psibase/verifier.hpp maps a key to its verifier.
+# The verifier services. psibase/verifier.hpp says which of them a key may
+# use. auth-sig depends on all of them, so that an account can choose any
+# verifier allowed for its key.
 psibase_package(
     OUTPUT ${SERVICE_DIR}/VerifyK1.psi
     NAME VerifyK1
@@ -779,10 +785,22 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/VerifyR1.psi
     NAME VerifyR1
     VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "Verifies signatures made with secp256r1 (P-256) keys"
+    DESCRIPTION "Verifies signatures made with secp256r1 (P-256) keys, using Botan"
     SERVICE verify-r1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyR1.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/VerifyR1-schema.json
+        FLAGS isVerify
+    DEPENDS wasm
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/VerifyBear1.psi
+    NAME VerifyBear1
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Verifies signatures made with secp256r1 (P-256) keys, using BearSSL. Accounts opt in."
+    SERVICE verify-br1
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyBear1.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/VerifyBear1-schema.json
         FLAGS isVerify
     DEPENDS wasm
 )
@@ -1563,7 +1581,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthNone AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG PrivDefault
     Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Favor Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VerifyK1 VerifyR1 VirtualServer WebCrypto Workshop WsAuth Config
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VerifyBear1 VerifyK1 VerifyR1 VirtualServer WebCrypto Workshop WsAuth Config
     XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSignup XSites XTimer XTransact)
 
 install(
@@ -1641,6 +1659,7 @@ install(
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
           ${SERVICE_DIR}/TransactService.psi
+          ${SERVICE_DIR}/VerifyBear1.psi
           ${SERVICE_DIR}/VerifyK1.psi
           ${SERVICE_DIR}/VerifyR1.psi
           ${SERVICE_DIR}/VirtualServer.psi

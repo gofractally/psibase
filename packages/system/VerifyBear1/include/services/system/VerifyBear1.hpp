@@ -6,19 +6,20 @@
 
 namespace SystemService
 {
-   /// Verifies ECDSA signatures made with secp256r1 (P-256) keys.
+   /// Verifies ECDSA signatures made with secp256r1 (P-256) keys, with
+   /// BearSSL: the second verifier for the curve, which an account may
+   /// choose in auth-sig in place of the default, verify-r1.
    ///
-   /// Use `psibase::verifierFor` to find the verifier for a key; do not
-   /// name this service for a key directly.
-   struct VerifyR1 : psibase::Service
+   /// Which verifiers a key may use is defined in psibase/verifier.hpp.
+   struct VerifyBear1 : psibase::Service
    {
-      static constexpr auto     service      = psibase::verifier::r1;
+      static constexpr auto     service      = psibase::verifier::bear1;
       static constexpr uint64_t serviceFlags = psibase::CodeRow::isVerify;
 
       void verifySys(psibase::Checksum256 transactionHash,
                      psibase::Claim       claim,
                      std::vector<char>    proof);
    };
-   PSIO_REFLECT(VerifyR1, method(verifySys, transactionHash, claim, proof))
-   PSIBASE_REFLECT_TABLES(VerifyR1)
+   PSIO_REFLECT(VerifyBear1, method(verifySys, transactionHash, claim, proof))
+   PSIBASE_REFLECT_TABLES(VerifyBear1)
 }  // namespace SystemService

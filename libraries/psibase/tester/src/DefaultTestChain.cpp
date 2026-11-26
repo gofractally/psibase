@@ -3,6 +3,7 @@
 #include <psibase/fileUtil.hpp>
 #include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
+#include <psibase/verifier.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/AuthDelegate.hpp>
 #include <services/system/Producers.hpp>
@@ -21,7 +22,20 @@ namespace
    // - Anything that is used in the genesis block
    // - SetCode to install the remaining services at the beginning
    //   of the next block.
-   constexpr AccountNumber essentialServices[] = {Transact::service, SetCode::service};
+   //
+   // Every verifier that is being installed goes into the genesis block
+   // too. The set of verify services is part of the consensus state: after
+   // genesis it changes one block at a time, and a change cannot begin
+   // while another is pending, so verifiers installed by separate
+   // transactions of a boot would be refused.
+   const std::vector<AccountNumber> essentialServices = []
+   {
+      std::vector<AccountNumber> result{Transact::service, SetCode::service};
+      for (auto type : {KeyType::secp256k1, KeyType::secp256r1})
+         for (auto service : allowedVerifiers(type))
+            result.push_back(service);
+      return result;
+   }();
 
    // Returns the number of leading packages up to and including
    // the last one containing an essential service.

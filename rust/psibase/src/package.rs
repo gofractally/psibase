@@ -1764,12 +1764,15 @@ pub fn make_ref(package: &str) -> Result<PackageRef, anyhow::Error> {
 #[derive(Debug, Clone)]
 pub struct EssentialServices {
     remaining: Vec<AccountNumber>,
+    // Installed first as well, but only if a package provides them
+    if_present: Vec<AccountNumber>,
 }
 
 impl EssentialServices {
     pub fn empty() -> Self {
         Self {
             remaining: Vec::new(),
+            if_present: Vec::new(),
         }
     }
     pub fn with_key(block_signing_key: &Option<AnyPublicKey>) -> Self {
@@ -1777,7 +1780,37 @@ impl EssentialServices {
         if let Some(key) = block_signing_key {
             remaining.push(key.key.service)
         }
-        Self { remaining }
+        // Every verifier that is being installed goes into the genesis
+        // block. The set of verify services is part of the consensus state:
+        // after genesis it changes one block at a time, and a change cannot
+        // begin while another is pending, so verifiers installed by
+        // separate transactions of a boot would be refused.
+        let if_present = [crate::KeyType::Secp256k1, crate::KeyType::Secp256r1]
+            .into_iter()
+            .flat_map(|t| t.allowed_verifiers().iter().copied())
+            .collect();
+        Self {
+            remaining,
+            if_present,
+        }
+    }
+    /// The services that have to be found among the packages whose
+    /// services are `present`: the required ones and whichever of the
+    /// optional ones a package provides.
+    pub fn for_packages<'a>(
+        &self,
+        present: impl IntoIterator<Item = &'a AccountNumber>,
+    ) -> Self {
+        let mut result = Self {
+            remaining: self.remaining.clone(),
+            if_present: Vec::new(),
+        };
+        for account in present {
+            if self.if_present.contains(account) && !result.remaining.contains(account) {
+                result.remaining.push(*account);
+            }
+        }
+        result
     }
     pub fn remove(&mut self, accounts: &[AccountNumber]) {
         for account in accounts {
@@ -1791,7 +1824,7 @@ impl EssentialServices {
     }
     pub fn intersects(&self, accounts: &[AccountNumber]) -> bool {
         for account in accounts {
-            if self.remaining.iter().find(|a| *a == account).is_some() {
+            if self.remaining.contains(account) || self.if_present.contains(account) {
                 return true;
             }
         }
