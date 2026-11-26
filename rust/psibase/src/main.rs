@@ -121,7 +121,8 @@ struct AccountArgs {
     /// Set the account to authenticate using this key.
     /// When modifying an account, VERIFIER=KEY chooses a verify service
     /// other than the default for the key (e.g. verify-br1=alice.pub);
-    /// the account then signs with -s VERIFIER=KEY.
+    /// the account then signs with -s VERIFIER=KEY. The change itself is
+    /// signed both ways: -s KEY -s VERIFIER=KEY.
     #[clap(short = 'k', long, value_name = "KEY")]
     key: Option<AnyPublicKey>,
 

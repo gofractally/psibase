@@ -277,7 +277,7 @@ Modify an account
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
 
-  Signatures are verified by the default verify service for the key's type (`verify-k1` for secp256k1, `verify-r1` for P-256). To choose another verify service allowed for the key, write *verifier*`=`*public-key*, for example `-k verify-br1=alice.pub`. Transactions for the account are then signed with `-s verify-br1=alice.pem`.
+  Signatures are verified by the default verify service for the key's type (`verify-k1` for secp256k1, `verify-r1` for P-256). To choose another verify service allowed for the key, write *verifier*`=`*public-key*, for example `-k verify-br1=alice.pub`. Transactions for the account are then signed with `-s verify-br1=alice.pem`. The transaction that makes the change is authorized partly before and partly after it, as when a key is replaced, so it carries both claims: `psibase modify alice -k verify-br1=alice.pub -s alice.pem -s verify-br1=alice.pem`.
 
 - `-o`, `--owner` *owner*
 
