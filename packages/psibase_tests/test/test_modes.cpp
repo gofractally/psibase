@@ -114,3 +114,58 @@ TEST_CASE("two modes: an HTTP JSON body outside its declaration is refused")
    CHECK(static_cast<int>(bad.status) != 200);
    CHECK(std::string(bad.body.begin(), bad.body.end()).find("length_bound") != std::string::npos);
 }
+
+// What "its own table" rests on: a service that is not privileged reaches a
+// database only through the db service, which lets it write under its own
+// account and no other; the node itself opens a database for a privileged
+// service only.
+TEST_CASE("two modes: only the service writes under its own account")
+{
+   DefaultTestChain t;
+   t.addService(TestModes::service, "TestModes.wasm");
+   const auto other = AccountNumber{"test-mds2"};
+   t.addService(other, "TestModes.wasm");
+   auto svc = t.from(TestModes::service).to<TestModes>();
+
+   CHECK(svc.writeOther(TestModes::service, 0).succeeded());
+   CHECK(svc.writeOther(TestModes::service, 1).succeeded());
+   CHECK(svc.writeOther(other, 0).failed("cannot write to another service's prefix"));
+   CHECK(svc.writeOther(other, 1).failed("cannot write to another service's prefix"));
+   CHECK(svc.openDirect(other).failed("service may not open databases"));
+   CHECK(svc.openDirect(TestModes::service).failed("service may not open databases"));
+}
+
+// A trusted read holds nothing against what the row's type declares, but it
+// is not a read of arbitrary memory: bytes that are not a frame of the type
+// (here: what a wrong change of the type would leave in the table) end the
+// action with the decoder's message.
+TEST_CASE("two modes: an own row that is not a frame of its type ends the action")
+{
+   DefaultTestChain t;
+   t.addService(TestModes::service, "TestModes.wasm");
+   auto svc = t.from(TestModes::service).to<TestModes>();
+
+   // header (size of the fixed part), id, offset of the text, text
+   const auto row = psio::to_pssz(NoteRow{7, "abcdefgh"});
+   REQUIRE(row.size() == 14);
+   REQUIRE(svc.storeBytes(7, row).succeeded());
+   CHECK(svc.length(7).returnVal() == 8);
+
+   // Cut inside the fixed part
+   REQUIRE(svc.storeBytes(8, std::vector<char>(row.begin(), row.begin() + 3)).succeeded());
+   CHECK(svc.length(8).failed("pssz: record fixed region truncated"));
+   CHECK(!svc.valid(8).returnVal());
+   // No bytes at all
+   REQUIRE(svc.storeBytes(9, std::vector<char>{}).succeeded());
+   CHECK(svc.length(9).failed("pssz: record header truncated"));
+   // The offset of the text points past the end of the row
+   auto past = row;
+   past[5]   = static_cast<char>(200);
+   REQUIRE(svc.storeBytes(10, past).succeeded());
+   CHECK(svc.length(10).failed("pssz: invalid record payload offset"));
+   // The header claims a fixed part larger than the row
+   auto header = row;
+   header[0]   = static_cast<char>(200);
+   REQUIRE(svc.storeBytes(11, header).succeeded());
+   CHECK(svc.length(11).failed("pssz: record fixed region truncated"));
+}

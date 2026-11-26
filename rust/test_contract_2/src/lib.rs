@@ -118,6 +118,15 @@ mod service {
         kv_put_bytes(table.handle(), &psio::to_key(&key), &row);
     }
 
+    /// Stores `row` as the bytes of row `id` of this service's own
+    /// `NoteTable`, whatever they are.
+    #[action]
+    pub fn store_bytes(id: u32, row: Vec<u8>) {
+        let table = NoteTable::new();
+        let key = table.serialize_key(0, &id);
+        kv_put_bytes(table.handle(), &psio::to_key(&key), &row);
+    }
+
     /// The length of the memo of row `id`, read as a service reads its own
     /// table: trusted.
     #[action]
@@ -237,6 +246,7 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
             "note": {"id": 0, "memo": ""},
             "store_raw": {"id": 0, "extra": 0},
             "note_len": {"id": 0},
+            "store_bytes": {"id": 0, "row": ""},
             "serveSys": {
                 "request": {
                     "body": "",
@@ -301,6 +311,40 @@ fn test_two_modes(chain: psibase::Chain) -> Result<(), psibase::Error> {
     assert_eq!(Wrapper::push(&chain).note_len(3).get()?, 81);
     Wrapper::push(&chain).store_raw(4, 0).get()?;
     assert_eq!(Wrapper::push(&chain).note_len(4).get()?, 80);
+
+    // A trusted read is still a safe one. Bytes that are not a frame of the
+    // row's type (what a wrong change of the type would leave in the table)
+    // end the action; nothing outside the row is read.
+    let row = psio::to_pssz(&service::Note {
+        id: 5,
+        memo: Memo::new("abcdefgh".to_string()).unwrap(),
+    });
+    // header (size of the fixed part), id, offset of the memo, memo
+    assert_eq!(row.len(), 14);
+    Wrapper::push(&chain).store_bytes(5, row.clone()).get()?;
+    assert_eq!(Wrapper::push(&chain).note_len(5).get()?, 8);
+    let refused = |id: u32, bytes: Vec<u8>| -> String {
+        Wrapper::push(&chain).store_bytes(id, bytes).get().unwrap();
+        let error = Wrapper::push(&chain)
+            .note_len(id)
+            .get()
+            .expect_err("a row that is not a frame of its type ends the action")
+            .to_string();
+        println!("row {id}: {error}");
+        error
+    };
+    // Cut inside the fixed part
+    assert!(refused(6, row[..3].to_vec()).contains("out of range"));
+    // No bytes at all
+    assert!(refused(7, vec![]).contains("out of range"));
+    // The offset of the memo points past the end of the row
+    let mut past = row.clone();
+    past[5] = 200;
+    assert!(refused(8, past).contains("out of range"));
+    // The header claims a fixed part larger than the row
+    let mut header = row.clone();
+    header[0] = 200;
+    assert!(refused(9, header).contains("out of range"));
 
     Ok(())
 }

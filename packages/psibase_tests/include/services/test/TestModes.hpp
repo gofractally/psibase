@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace TestService
 {
@@ -48,6 +49,18 @@ namespace TestService
       /// asks.
       bool valid(std::uint32_t id);
 
+      /// Stores `row` as the bytes of row `id` of the service's own table,
+      /// whatever they are: a row that is not a frame of `NoteRow` at all
+      /// (what a wrong change of the row's type leaves behind).
+      void storeBytes(std::uint32_t id, std::vector<char> row);
+      /// Tries to write a row of `NoteTable` under the account `other`, in
+      /// the service database (`db` 0) or the write-only one (`db` 1),
+      /// through the table classes
+      void writeOther(psibase::AccountNumber other, std::uint8_t db);
+      /// Tries to open the service database itself, under `other`, for
+      /// writing, without the `db` service
+      void openDirect(psibase::AccountNumber other);
+
       /// POST /note with a JSON `NoteRow`: the body is validated, then stored
       std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& request);
    };
@@ -57,5 +70,8 @@ namespace TestService
                 method(storeChecked, id, text),
                 method(length, id),
                 method(valid, id),
+                method(storeBytes, id, row),
+                method(writeOther, other, db),
+                method(openDirect, other),
                 method(serveSys, request))
 }  // namespace TestService

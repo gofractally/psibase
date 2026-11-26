@@ -23,11 +23,26 @@ custom_error! {
 
 /// Whether a table of `service` in `db` is the running service's own.
 ///
-/// In the databases keyed by service, only the service itself is let to
-/// write under its own account (`Db::open`, `XDb::open`), so a row found
-/// there is one this service wrote. A native database is never "own";
-/// neither is anything when there is no running service (a test, a tool:
-/// `get_service()` is 0).
+/// What makes a row there "written by this service":
+/// - The node opens a database only for a privileged service
+///   (`NativeFunctions::kvOpen`); every other service gets its handle from
+///   the `db` service (`Db::open`: service and write-only databases) or
+///   `x-db` (`XDb::open`: subjective, session, temporary), and both give a
+///   write handle only under the caller's own account.
+/// - A privileged service can open any prefix itself. It is part of what
+///   the chain trusts (it may replace any service's code), so it is not a
+///   writer this rule defends against.
+/// - A service may hand a write handle of its own prefix to another service
+///   (exported handles): that is its own decision about its own rows.
+/// - Nothing but services writes these databases: genesis writes native
+///   rows only, and a snapshot carries the service database under a signed
+///   state root.
+///
+/// A native database is never "own"; neither is anything when there is no
+/// running service (a test, a tool: `get_service()` is 0). Trusted is not
+/// unchecked: `psio::from_pssz_trusted` is safe Rust and panics on bytes
+/// that are not a frame of the type (a row left by an incompatible change
+/// of the record), which ends the action.
 pub(crate) fn is_own_table(db: DbId, service: AccountNumber) -> bool {
     matches!(
         db,

@@ -103,14 +103,6 @@ namespace psibase
       /// Validates `bytes` and decodes them into the value
       using Decode = psio::codec_status (*)(std::span<const char> bytes, ReturnType& value);
 
-      /// The result as the plain type: for a trace whose method is not known
-      static psio::codec_status decodePlain(std::span<const char> bytes, ReturnType& value)
-      {
-         if (auto status = psio::validate_pssz<ReturnType>(bytes); !status.ok())
-            return status;
-         value = psio::from_pssz<ReturnType>(psio::trusted{bytes});
-         return psio::codec_ok();
-      }
       /// The result of method `I` of `T`, with everything its `returns(...)`
       /// states (`psio::decode_method_result`)
       template <typename T, std::size_t I>
@@ -120,7 +112,7 @@ namespace psibase
          return psio::decode_method_result<T, I>(bytes, value);
       }
 
-      Result(TransactionTrace&& t, Decode decode = &decodePlain)
+      Result(TransactionTrace&& t, Decode decode)
           : TraceResult(std::forward<TransactionTrace>(t)), _return(std::nullopt)
       {
          if (!_t.error.has_value())
@@ -720,12 +712,19 @@ namespace psibase
             using Class = MethodClass<MemberPtr>;
             if constexpr (std::is_void_v<result_type>)
                return Result<result_type>(chain.trace(act, keys));
-            else if constexpr (std::same_as<result_type, psio::method_result_t<Class, I>>)
+            else
+            {
+               // The result is read as the method declares it. A method whose
+               // C++ return type is not the type of its result on the wire (a
+               // view, a table handle) has no value a test can hold: read its
+               // trace with TestChain::trace and decode it explicitly.
+               static_assert(std::same_as<result_type, psio::method_result_t<Class, I>>,
+                             "the tester cannot hold the result of this method: its return "
+                             "type is not the type of its packed result");
                return Result<result_type>(
                    chain.trace(act, keys),
                    &Result<result_type>::template decodeMethod<Class, I>);
-            else
-               return Result<result_type>(chain.trace(act, keys));
+            }
          }
       };
 

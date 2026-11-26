@@ -865,6 +865,19 @@ namespace psibase
    /// (`psio::to_pssz_checked`, `psio::validate_value`). The same holds for a
    /// table of another account opened through these classes: it is read as
    /// its owner wrote it, without validation.
+   ///
+   /// Who can write a row: the node opens a database only for a privileged
+   /// service; every other service gets its handle from the `db` / `x-db`
+   /// services, which give a write handle only under the caller's own
+   /// account. A privileged service is part of what the chain trusts.
+   ///
+   /// Trusted is not unchecked. `get` (the trusted decode) ends the action
+   /// with the decoder's message when the stored bytes are not a frame of
+   /// `T`: a truncated row, an offset outside the row, a required member
+   /// missing (what an incompatible change of `T` leaves behind). A view
+   /// (`getView`) is for rows that are frames of `T`: over other bytes it
+   /// does not end the action, and a member it cannot place reads as empty
+   /// or zero.
    template <typename T, auto Primary, auto... Secondary>
    class Table
    {
