@@ -619,6 +619,44 @@ TEST_CASE("Native config writes reject VM limits that cannot be instantiated")
    }
 }
 
+// A service's ordinary write does not check what a row declares
+// (psio::to_pssz is the fast write, gofractally/psio#14): the node is the
+// reader that validates a row it will itself read. HostConfigRow declares its
+// two strings UTF-8.
+TEST_CASE("Native rows written by a service are validated against their declaration")
+{
+   NativeService fixture;
+   auto          mode = psibase::DbMode::rpc();
+   psibase::TransactionContext transaction{fixture.block, fixture.signedTransaction, fixture.trace,
+                                            mode};
+   auto                   action = fixture.action();
+   psibase::ActionTrace   trace;
+   psibase::ActionContext context{transaction, action, trace};
+   psibase::NativeFunctions host{fixture.block.db, transaction, mode,
+                                 {.codeNum = fixture.service,
+                                  .flags   = psibase::CodeRow::isPrivileged |
+                                             psibase::ExecutionContext::isLocal},
+                                 &context};
+   auto handle = host.kvOpen(static_cast<uint32_t>(psibase::HostConfigRow::db), {},
+                             static_cast<uint32_t>(psibase::KvMode::write));
+   auto key    = psio::to_key(psibase::hostConfigKey());
+
+   psibase::HostConfigRow row{.hostVersion = "1.0", .config = "{}"};
+   psibase::HostConfigRow bad = row;
+   bad.config                 = "{\"name\":\"\xff\"}";
+   // The service's write packs both; only a validating reader tells them apart.
+   const auto good   = psio::to_pssz(row);
+   const auto spoilt = psio::to_pssz(bad);
+   REQUIRE(psio::validate_pssz<psibase::HostConfigRow>(good).ok());
+   REQUIRE(!psio::validate_pssz<psibase::HostConfigRow>(spoilt).ok());
+
+   fixture.block.db.checkoutSubjective();
+   CHECK_THROWS_WITH(host.kvPut(handle, key, spoilt),
+                     Catch::Matchers::ContainsSubstring("HostConfigRow has invalid format"));
+   CHECK_NOTHROW(host.kvPut(handle, key, good));
+   fixture.block.db.abortSubjective();
+}
+
 TEST_CASE("Node host bounds traps and watchdog timeouts leave cached code reusable")
 {
    NativeService fixture;

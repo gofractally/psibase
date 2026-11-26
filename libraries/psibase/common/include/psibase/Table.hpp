@@ -853,6 +853,18 @@ namespace psibase
    /// point to the primary index.
    ///
    /// `Table` serializes keys using `psio::to_key` (the `psio::key` format). It serializes `T` as PSSZ (`psio::to_pssz`).
+   ///
+   /// A table is the storage of the service that writes it, and its rows are
+   /// trusted: `put` is the fast write and every read is the trusted read
+   /// (`psio::from_pssz<T>(psio::trusted{...})`, a view). Neither holds a row
+   /// against what `T` declares (a bound, `utf8`, an order, an invariant), so
+   /// a row is read back as it was written. What comes from outside the
+   /// service (an action argument, another service's result, an HTTP body)
+   /// is validated where it comes in, before it reaches a row; a service that
+   /// wants a row checked when it is written asks for it
+   /// (`psio::to_pssz_checked`, `psio::validate_value`). The same holds for a
+   /// table of another account opened through these classes: it is read as
+   /// its owner wrote it, without validation.
    template <typename T, auto Primary, auto... Secondary>
    class Table
    {
