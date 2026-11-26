@@ -62,6 +62,32 @@ def wait_for(f, timeout=15):
         time.sleep(0.25)
     raise TimeoutError()
 
+def unique_package_source(directory, name, wasm_path):
+    '''A package source holding a copy of a test package whose service code
+    is unique to this call: the module gets a custom section of random
+    bytes, which changes its hash and nothing else.'''
+    import hashlib, json, secrets, zipfile
+    source = os.path.join(directory, 'unique-' + name + '-' + secrets.token_hex(4))
+    os.makedirs(source)
+    original = os.path.join(testutil.test_packages(), name + '.psi')
+    target = os.path.join(source, name + '.psi')
+    section_name = b'usage-test'
+    payload = bytes([len(section_name)]) + section_name + secrets.token_bytes(16)
+    assert len(payload) < 128
+    with zipfile.ZipFile(original) as zin, zipfile.ZipFile(target, 'w', zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename == wasm_path:
+                data += bytes([0, len(payload)]) + payload
+            zout.writestr(item, data)
+    with open(os.path.join(testutil.test_packages(), 'index.json')) as f:
+        (entry,) = [e for e in json.load(f) if e['name'] == name]
+    with open(target, 'rb') as f:
+        entry['sha256'] = hashlib.sha256(f.read()).hexdigest()
+    with open(os.path.join(source, 'index.json'), 'w') as f:
+        json.dump([entry], f)
+    return source
+
 def forwarded_api(node, address=CLIENT):
     api = node.new_api()
     api.session.headers['X-Forwarded-For'] = address
@@ -255,7 +281,13 @@ class TestUsage(unittest.TestCase):
         # A signed transaction costs a signature check, and a transaction
         # that needs code this node has not compiled costs a compile. Both
         # are charged to whoever pushed the transaction.
-        (a,) = cluster.complete(*testutil.generate_names(1), env={'PSIBASE_NATIVE_AOT_CACHE': os.path.join(cluster.dir, 'fresh-aot-cache')})
+        # The node uses the suite's shared store of compiled modules like every
+        # other test node, so booting compiles nothing that was compiled
+        # before. What must be new to it is only the code installed below. A
+        # trial run waits a bounded time for a compile it starts (5 s by
+        # default); the bound is raised here so that a slow compiler (LLVM)
+        # does not turn the install into a retry.
+        (a,) = cluster.complete(*testutil.generate_names(1), env={'PSIBASE_SPECULATIVE_COMPILE_MS': '120000'})
         a.boot(packages=['Minimal', 'Explorer', 'TokenUsers'])
         a.push_action('alice', 'tokens', 'debit', FAUCET_DEBIT)
         a.wait(new_block())
@@ -280,6 +312,9 @@ class TestUsage(unittest.TestCase):
             return usage if usage and int(usage['total']['trialOk']) >= 1 else None
         self.assertEqual(counters(wait_for(pushed)['total'])['verifyRuns'], 0)
 
+        # New code: a copy of the Counter test package whose service has bytes
+        # no node has seen, so that no store of compiled modules, shared or
+        # the node's own, can already hold it.
         # New code: whoever pushes the transaction whose trial run has to
         # compile it pays for the compile; the others do not. The package
         # is installed by the operator's own client (local:unix) and first
@@ -288,7 +323,7 @@ class TestUsage(unittest.TestCase):
             return counters(me(api)['usage']['total'])['compileNs']
         before = {'signer': compile_ns(signer), 'other': compile_ns(other)}
         local_before = wait_for(lambda: identity(a, 'local:unix'))['total']['compileNs']
-        a.install(sources=[testutil.test_packages()], packages=['Counter'])
+        a.install(sources=[unique_package_source(cluster.dir, 'Counter', 'service/counter.wasm')], packages=['Counter'])
         a.wait(new_block())
         caller = forwarded_api(a, '198.51.100.22')
         Transact(caller).push_action('bob', 'counter', 'inc', {"key":"","id":0})
