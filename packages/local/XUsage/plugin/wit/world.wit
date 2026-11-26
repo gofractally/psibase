@@ -1,0 +1,19 @@
+package x-usage:plugin;
+
+interface api {
+    use host:types/types.{error};
+
+    /// What the logged-in user used of the node this page is served by:
+    /// the JSON that the usage service answers at `/me` (the identity,
+    /// and its usage record if anything is recorded yet).
+    ///
+    /// This is the only way for another app to read a user's usage. The
+    /// caller needs the user's permission (trust level High, like other
+    /// queries of personal data); the usage service itself answers `/me`
+    /// to no web origin but the supervisor's.
+    get-my-usage: func() -> result<string, error>;
+}
+
+world imports {
+    import api;
+}

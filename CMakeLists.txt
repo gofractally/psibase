@@ -363,6 +363,7 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(packages/:Plugins 
     accounts
+    x-usage
     accounts-query
     aes
     auth-any
@@ -1497,7 +1498,8 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XUsage-schema.json
         SERVER x-usage
         FLAGS isPrivileged
-    DEPENDS wasm
+        DATA ${Plugins_OUTPUT_FILE_x_usage} /plugin.wasm
+    DEPENDS wasm ${Plugins_DEP}
 )
 
 psibase_package(

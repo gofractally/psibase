@@ -143,9 +143,31 @@ namespace
                                             .count());
    }
 
+   // Who may read `/me` from a web page. A user's usage is personal data,
+   // so no origin but the supervisor's: another app reaches it through the
+   // supervisor and this service's plugin, which checks that the user
+   // trusts the caller (gofractally/psibase#2270). The service's own origin
+   // and clients that are not browsers need no header.
+   std::vector<HttpHeader> allowSupervisor(const HttpRequest& request)
+   {
+      auto headers = allowCors(request, AccountNumber{"supervisor"});
+      for (auto& h : headers)
+      {
+         if (h.matches("Access-Control-Allow-Headers"))
+            h.value = "Accept, Authorization, Content-Type";
+         else if (h.matches("Access-Control-Allow-Methods"))
+            h.value = "GET, OPTIONS";
+      }
+      if (!headers.empty())
+         headers.push_back({"Vary", "Origin"});
+      return headers;
+   }
+
    HttpReply json(const HttpRequest& request, std::string body, bool admin)
    {
       HttpReply reply{.contentType = "application/json", .body{body.begin(), body.end()}};
+      if (!admin)
+         reply.headers = allowSupervisor(request);
       if (admin)
       {
          // The admin UI is served from x-admin
@@ -502,6 +524,10 @@ auto XUsage::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
 
    if (target == "/me")
    {
+      // The preflight of the supervisor's request; any other origin gets no
+      // allow header and the browser stops there.
+      if (request.method == "OPTIONS")
+         return HttpReply{.headers = allowSupervisor(request)};
       if (request.method != "GET")
          return HttpReply::methodNotAllowed(request);
       return serveMe(request, socket);

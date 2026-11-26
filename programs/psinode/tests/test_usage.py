@@ -122,6 +122,27 @@ class TestUsage(unittest.TestCase):
         wait_for(lambda: int(me(user)['usage']['total']['requests']) >= requests_before + 3)
         self.assertIsNone(identity(a, 'ip:203.0.113.60'))
 
+        # A user's usage is not readable by a page of another app: /me (and
+        # the operator's endpoints) allow no web origin but the supervisor's,
+        # through which the usage plugin is called.
+        def cors(api, path, origin, method='GET'):
+            with api.request(method, path, service='x-usage', headers={'Origin': origin}) as reply:
+                return reply.headers.get('Access-Control-Allow-Origin')
+        root = a.url.split('//')[1].rstrip('/')
+        supervisor = 'https://supervisor.' + root
+        for api in [anon, user]:
+            for origin in ['https://evil.' + root, 'https://tokens.' + root, 'https://' + root, 'http://supervisor.' + root, 'https://supervisor.' + root + '.evil.example', 'null']:
+                for method in ['GET', 'OPTIONS']:
+                    self.assertIsNone(cors(api, '/me', origin, method), (origin, method))
+            self.assertEqual(cors(api, '/me', supervisor), supervisor)
+            self.assertEqual(cors(api, '/me', supervisor, 'OPTIONS'), supervisor)
+        with user.request('OPTIONS', '/me', service='x-usage', headers={'Origin': supervisor}) as reply:
+            self.assertIn('Authorization', reply.headers['Access-Control-Allow-Headers'])
+        for path in ['/report', '/identity?id=account:alice', '/quotas']:
+            for origin in ['https://evil.' + root, supervisor]:
+                self.assertIsNone(cors(a, path, origin), (path, origin))
+            self.assertEqual(cors(a, path, 'https://x-admin.' + root), 'https://x-admin.' + root)
+
         # Nobody selects another identity through /me
         with anon.get('/me', service='x-usage', params={'id': 'account:alice'}) as reply:
             self.assertEqual(reply.json()['identity'], 'ip:' + CLIENT)
