@@ -3,6 +3,7 @@
 #include <map>
 #include <optional>
 #include <psibase/AccountNumber.hpp>
+#include <psibase/GetSchemaFn.hpp>
 #include <psibase/block.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/zip.hpp>
@@ -66,17 +67,22 @@ namespace psibase
       // returns {target path, mime-type}
       static std::pair<std::string_view, std::string_view> dataFileInfo(std::string_view path);
 
-      void genesis(std::vector<GenesisService>& out);
+      void genesis(std::vector<GenesisService>& out) const;
       bool hasService(AccountNumber service) const;
-      void installCode(std::vector<Action>& actions);
-      void setSchema(std::vector<Action>& actions);
-      void storeData(std::vector<Action>& actions);
-      void regServer(std::vector<Action>& actions);
-      void postinstall(std::vector<Action>& actions, std::span<const PackagedService> packages);
-      void commitInstall(std::vector<Action>& actions, AccountNumber sender);
-      bool needsUI();
+      void installCode(std::vector<Action>& actions) const;
+      void setSchema(std::vector<Action>& actions) const;
+      void storeData(std::vector<Action>& actions) const;
+      void regServer(std::vector<Action>& actions) const;
+      void postinstall(std::vector<Action>&             actions,
+                       std::span<const PackagedService> packages) const;
+      void postinstall(std::vector<Action>& actions, const GetSchemaFn& packages) const;
+      void commitInstall(std::vector<Action>& actions, AccountNumber sender) const;
+      bool needsUI() const;
 
-      std::vector<char> manifest();
+      // Returns nullptr if there is no schema
+      const ServiceSchema* getSchema(AccountNumber service) const;
+
+      std::vector<char> manifest() const;
 
       std::vector<char>                                                    buf;
       zip::ZipReader                                                       archive;
@@ -85,6 +91,12 @@ namespace psibase
       std::vector<std::tuple<AccountNumber, zip::FileHeader, ServiceInfo>> services;
       std::vector<std::pair<AccountNumber, zip::FileHeader>>               data;
       std::optional<zip::FileHeader>                                       postinstallScript;
+   };
+
+   struct PackageSchemas
+   {
+      std::span<const PackagedService> packages;
+      const ServiceSchema*             operator()(AccountNumber service) const;
    };
 
    // Sorts packages in the correct order for installation
