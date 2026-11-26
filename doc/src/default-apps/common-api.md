@@ -77,7 +77,7 @@ TaPoS must be attached to every transaction submitted to a psibase network. In a
 }
 ```
 
-Each verifier service handles one kind of key: `verify-k1` verifies secp256k1 signatures, and `verify-r1` (the default) and `verify-br1` verify secp256r1 (P-256) signatures. A claim for an account's key must name the verifier the account stored with the key in `auth-sig` (`account(name) { pubkey verifier }` in its GraphQL API), which is the default for the kind of key unless the account chose another with `setKeyVerifier`. `signTransaction` and the `verifierFor` function of the common library give the default; `allowedVerifiers` lists every verifier a key may use.
+Each verifier service handles one kind of key: `verify-k1` verifies secp256k1 signatures, and `verify-r1` (the default) and `verify-br1` verify secp256r1 (P-256) signatures. A claim for an account's key must name the verifier stored with that key in `auth-sig` (`account(name) { active { key verifier } owner { key verifier } }` in its GraphQL API), which is the default for the kind of key unless another was given when the key was stored. `signTransaction` and the `verifierFor` function of the common library give the default; `allowedVerifiers` lists every verifier a key may use.
 
 `Proof` is a hex string containing data which proves the claim. e.g. `verify-k1` expects a signature (64 bytes, `r || s`, low-S). See [Signing (js)](#signing-js) to fill claims and proofs.
 
