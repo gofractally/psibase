@@ -342,26 +342,6 @@ export function SellClaimDialog({
         })),
     });
 
-    const lineQueries = useQueries({
-        queries: loadAccounts.map((account) => ({
-            queryKey: QueryKey.creditLines(account),
-            queryFn: () => fetchCreditLines(account),
-            enabled: open && !!target && !!account && !takingAsk,
-        })),
-    });
-
-    const debtorLinesQuery = useQuery({
-        queryKey: QueryKey.creditLines(target?.debtor),
-        queryFn: () => fetchCreditLines(target!.debtor),
-        enabled: open && !!target,
-    });
-
-    const debtorObligationsQuery = useQuery({
-        queryKey: QueryKey.obligations(target?.debtor),
-        queryFn: () => fetchObligations(target!.debtor),
-        enabled: open && !!target,
-    });
-
     const userLinesQuery = useQuery({
         queryKey: QueryKey.creditLines(user),
         queryFn: () => fetchCreditLines(user!),
@@ -374,15 +354,16 @@ export function SellClaimDialog({
         enabled: open && takingAsk && !!user,
     });
 
+    // Other people's lines and balances are private. Taking an ask, you are the
+    // buyer, so every row the capacity check needs is between you and the
+    // debtor, and already in your own data. Selling, the buyer's capacity is
+    // someone else's data: it is checked when the sale runs.
     const options: BuyerOption[] = useMemo(() => {
         if (!target || !user) return [];
         const maxClaim = BigInt(target.maxRaw || "0");
-        const debtorLines = debtorLinesQuery.data;
-        const debtorObs = debtorObligationsQuery.data;
-        if (!debtorLines || !debtorObs) return [];
-        const buyerLinesForCap = takingAsk ? userLinesQuery.data : null;
+        const userLines = takingAsk ? userLinesQuery.data : null;
         const userObs = takingAsk ? userObligationsQuery.data : null;
-        if (takingAsk && (!buyerLinesForCap || !userObs)) return [];
+        if (takingAsk && (!userLines || !userObs)) return [];
         const out: BuyerOption[] = [];
         loadAccounts.forEach((account, i) => {
             const offers = offerQueries[i]?.data;
@@ -404,43 +385,34 @@ export function SellClaimDialog({
             ) {
                 return;
             }
-            const capLines = takingAsk
-                ? buyerLinesForCap
-                : lineQueries[i]?.data;
-            if (!capLines) return;
-            const capacity = claimCapacityRaw(
-                capLines,
-                debtorLines,
-                debtorObs,
-                buyer,
-                target.debtor,
-                target.assetId,
-                target.precision,
-            );
-            if (capacity <= 0n) return;
+            const capacity =
+                takingAsk && userLines && userObs
+                    ? claimCapacityRaw(
+                          userLines,
+                          userLines,
+                          userObs,
+                          buyer,
+                          target.debtor,
+                          target.assetId,
+                          target.precision,
+                      )
+                    : null;
+            if (capacity !== null && capacity <= 0n) return;
             const offerLeft = humanToRaw(
                 offer.remaining || "0",
                 target.precision,
             );
             if (offerLeft <= 0n) return;
-            const held = takingAsk
-                ? claimHeldRaw(
-                      debtorObs,
-                      seller,
-                      target.debtor,
-                      target.assetId,
-                      target.precision,
-                  )
-                : maxClaim;
-            if (held <= 0n) return;
-            let maxFace = capacity < held ? capacity : held;
+            // The seller's claim is theirs to know when taking an ask.
+            let maxFace = capacity ?? maxClaim;
+            if (maxFace <= 0n) return;
             if (offerLeft < maxFace) maxFace = offerLeft;
             if (takingAsk) {
                 // The cost is a draw on the seller's line to the buyer.
-                if (!buyerLinesForCap || !userObs) return;
+                if (!userLines || !userObs) return;
                 const byCost = maxFaceForCost(
                     costCapacityRaw(
-                        buyerLinesForCap,
+                        userLines,
                         userObs,
                         seller,
                         buyer,
@@ -471,9 +443,6 @@ export function SellClaimDialog({
         user,
         loadAccounts,
         offerQueries,
-        lineQueries,
-        debtorLinesQuery.data,
-        debtorObligationsQuery.data,
         userLinesQuery.data,
         userObligationsQuery.data,
         nowSec,
@@ -486,9 +455,6 @@ export function SellClaimDialog({
         open &&
         loadAccounts.length > 0 &&
         (offerQueries.some((q) => q.isLoading) ||
-            (!takingAsk && lineQueries.some((q) => q.isLoading)) ||
-            debtorLinesQuery.isLoading ||
-            debtorObligationsQuery.isLoading ||
             (takingAsk &&
                 (userLinesQuery.isLoading || userObligationsQuery.isLoading)));
 

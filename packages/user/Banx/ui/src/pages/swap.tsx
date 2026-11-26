@@ -14,7 +14,7 @@ import {
     useQuotePath,
     type PathQuote,
 } from "@/hooks/use-banx-mutations";
-import { amountPlaceholder, displayAmount } from "@/lib/amount";
+import { amountPlaceholder, formatRawAmount } from "@/lib/amount";
 import { assetIdBySymbol } from "@/lib/transfer-url";
 import { amountFieldValidator } from "@/lib/form";
 import type { Asset } from "@/lib/graphql";
@@ -226,7 +226,12 @@ export function SwapPage() {
 
     const paySymbol = payAsset != null ? symbolOf(payAsset) : "";
     const receiveSymbol = receiveAsset != null ? symbolOf(receiveAsset) : "";
-    const receiveShown = quote ? displayAmount(quote.amountOut) : "";
+    const receiveShown = quote
+        ? formatRawAmount(
+              quote.amountOut,
+              receiveAsset != null ? precisionOf(receiveAsset) : 0,
+          )
+        : "";
     const canSwap = !!quote && canQuote && !searching && !paying;
 
     let action = "Swap";
@@ -280,7 +285,16 @@ export function SwapPage() {
                                 setPayAsset(receiveAsset);
                                 setReceiveAsset(payAsset);
                                 writePair(receiveAsset, payAsset);
-                                if (quote) setPayAmount(quote.amountOut);
+                                if (quote) {
+                                    setPayAmount(
+                                        formatRawAmount(
+                                            quote.amountOut,
+                                            payAsset != null
+                                                ? precisionOf(payAsset)
+                                                : 0,
+                                        ),
+                                    );
+                                }
                             }}
                         >
                             <ArrowDownUp />
@@ -309,18 +323,24 @@ export function SwapPage() {
                             <div className="text-muted-foreground flex justify-between gap-3 text-xs">
                                 <span>Rate</span>
                                 <span className="text-right font-mono">
-                                    {displayAmount(quote.amountIn)} {paySymbol}{" "}
-                                    → {displayAmount(quote.amountOut)}{" "}
+                                    {formatRawAmount(
+                                        quote.amountIn,
+                                        payAsset != null ? precisionOf(payAsset) : 0,
+                                    )}{" "}
+                                    {paySymbol} →{" "}
+                                    {formatRawAmount(
+                                        quote.amountOut,
+                                        receiveAsset != null
+                                            ? precisionOf(receiveAsset)
+                                            : 0,
+                                    )}{" "}
                                     {receiveSymbol}
                                 </span>
                             </div>
-                            <PathRoute
-                                user={user}
-                                hops={quote.hops}
-                                symbolOf={symbolOf}
-                                labelOf={label}
-                                className="border-0 bg-transparent px-0 py-0"
-                            />
+                            <p className="text-muted-foreground text-xs">
+                                Private path, {quote.hopCount ?? 0} hops.
+                                Intermediaries are not shown.
+                            </p>
                         </div>
                     ) : null}
                     {quoteError ? (
@@ -347,10 +367,7 @@ export function SwapPage() {
                             };
                             pathPay.mutate(
                                 {
-                                    hops: quote.hops.map((hop) => ({
-                                        account: hop.account,
-                                        assetId: hop.assetId,
-                                    })),
+                                    route: quote.route,
                                     amount: quote.amountIn,
                                     minReturn: quote.minReturn,
                                 },

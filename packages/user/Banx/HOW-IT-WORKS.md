@@ -217,7 +217,7 @@ Not a table: a snapshot of one `Pair` row. For creditor C, debtor D, asset X:
 
 ## Path pay
 
-`path_pay(hops, amount, min_return)` is atomic. Each hop is `(account, asset_id)`: draw on that account in that asset.
+`path_pay(route, amount, min_return, request_id)` is atomic. `route` is a sealed list of hops from `quotePath`; each hop is `(account, asset_id)` plus the exact amount it must draw, and execution fails if the live price of any hop differs.
 
 ### Hop 0
 
@@ -254,7 +254,7 @@ An invoice fulfill **does not** shrink an existing debt to the payee. The books 
 
 ### Finding a path (off-chain)
 
-`quotePath` / `pathGraph` search a **scoped subgraph** (lines + reverse claims + forward offers + FX), not the whole network. Same fee/FX formulas as chain. Exact-in: amount is what you send. Exact-out: amount is what the payee should receive; the quote finds the send.
+`quotePath` (query service, signed-in payer or payee only) searches a **scoped subgraph** (lines + reverse claims + forward offers + FX), not the whole network, and returns a sealed route, not the hops. Same fee/FX formulas as chain. Exact-in: amount is what you send. Exact-out: amount is what the payee should receive; the quote finds the send.
 
 The chain still executes whatever hop list you pass. The search is a helper, not an enforcer.
 
@@ -358,7 +358,7 @@ GraphQL `activity(account, counterparty?, assetId?)` is the pair view when both 
 | Layer | Role |
 |-------|------|
 | **service** (`banx`) | Tables and actions. Source of truth. |
-| **r-banx** | GraphQL: assets, lines, obligations, offers, FX, requests, scoped `pathGraph`, pair or account `activity`. |
+| **r-banx** | GraphQL: public assets, offers, FX and relays; your own lines, obligations, requests and `activity` (rows you are a party to); `quotePath`. |
 | **plugin** | WIT `api` for the Supervisor (`setCreditLine`, `pathPay`, `quotePath`, …). Human decimals in, raw out. |
 | **ui** | React app on the `banx` subdomain. |
 

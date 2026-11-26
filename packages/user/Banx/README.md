@@ -70,17 +70,29 @@ UI: `/requests` (Plus to create). An account-row Request button opens the same m
 
 ## Path pay
 
-`path_pay(hops, amount, min_return)` is atomic.
+`path_pay(route, amount, min_return, request_id)` is atomic. `route` is a sealed blob from `quotePath`, not a hop list. The query service searches, then seals the hops; execution opens the blob and never searches. It checks the sender is the quoted payer, the blob is not expired (60 seconds) and was sealed with the current key, and `amount` matches. Everything below describes what each hop then does.
+
+**Every hop is quoted to an exact amount.** Each sealed slot carries what that hop draws, in the hop's asset and after fees. Execution prices every hop live and aborts with `path price changed since the quote` if any draw differs. A forward fee, FX quote or relay reserve replaced after the quote therefore fails the payment outright. It does not fill at a worse price just because that price is still above `min_return`. `min_return` stays as your own floor on top. A fee that moves and moves back before inclusion does not matter, and settings that do not change any draw (a looser limit, a later expiry) do not invalidate a quote. There is no separate revision counter on lines or offers.
 
 - **Hop 0** — sender draws on the first account (line and/or reverse claim). No hop fee.
 - **Later hops** — the current path debtor must have a **live** path-forward offer. Specific next hop if live; otherwise a live global. Expired specific does **not** block the global. Buy-claim offers are not used here.
 - **Asset change** — the previous hop’s **creditor** (middle man) sizes the next hop: with their relay curve for the pair if they posted one, otherwise their creditor-side FX offer. The payer’s claim stays in the from-asset; the middle man takes the to-asset liability. The sender’s offer is ignored.
 - **min_return** — final **amount_out** in the last hop’s asset must be at least this.
-- **Invoice** — `pay_inv(hops, max_spend, request_id)`: remaining is exact, `max_spend` is the send budget.
+- **Invoice** — `pay_inv(route, max_spend, request_id)`: remaining is exact, `max_spend` is the send budget.
 
-Off-chain **Find path** (`quotePath`) searches a scoped subgraph (lines + reverse claims + clearing + FX), not the full network. Exact-in: amount is what you send. Exact-out: amount is what the payee should receive; the quote finds the send. Hop cards can show expected hop/FX fees.
+**Find path** (`quotePath` on the query service) needs a signed-in caller who is the payer or the payee. It searches a scoped subgraph (lines + reverse claims + clearing + FX), not the full network, and returns the sealed route with amounts in raw units, an expiry, and a hop count. It does not return the hops. Exact-in: amount is what you send. Exact-out: amount is what the payee should receive; the quote finds the send. The UI shows the send, the receive, and the hop count only.
 
-You can still edit hops before execute.
+### What the seal does and does not hide
+
+The route is sealed with a 12-slot envelope, padded so the blob does not show how many hops were used. The UI and plugin never handle hops. The key is **objective state** and is passed as an action argument, so it is readable by any service and by anyone reading history. The seal is not secrecy from validators.
+
+The query service answers private data only to a signed-in caller, and only with rows the caller is a party to: `creditLines`, `obligations`, `bookAuths`, `exposure`, `requests`/`request`, `payAuths`, `forwardOffers` (your own routing fees), `invites` and `activity` (your own history). Asking about another account returns just what is between you and them. There is no network-wide line, forwarding or path-graph query, so Banx has no network map: other people's lines are not shown. Public marketplace data stays public: assets, claim offers, FX offers, relays, token relays, cash quotes and vaults, and a single invite by id (its link is how it is claimed).
+
+This is a limit of the query service, not of the chain. The `Pair`, `ForwardOffer` and other rows are ordinary service tables that any service can read, and executed hops still emit `path_draw` activity events naming each pair. Caller-scoped queries stop Banx's own API from handing out the graph. They do not make the ledger private.
+
+### Routing key
+
+Until a key is set, every route action fails with `routing key is not set`. `deploy.sh` sets one when `routingReady` is false and leaves an existing key alone, so a redeploy does not invalidate open quotes. `ROTATE_KEY=1 ./packages/user/Banx/deploy.sh` replaces it, which does. The GraphQL `routingReady` field says whether a key exists.
 
 ## Path-forward offers
 
@@ -124,7 +136,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | Layer | Role |
 |-------|------|
 | **service** | Tables and actions |
-| **r-banx** | GraphQL (assets, lines, obligations, forward/claim offers, FX, scoped `pathGraph`) |
+| **r-banx** | GraphQL: caller-scoped lines, obligations, requests and history; public offers, FX, relays; `quotePath` returns a sealed route |
 | **plugin** | WIT `api` for the Supervisor (`setCreditLine`, `pathPay`, `quotePath`, …) |
 | **ui** | React app on the `banx` subdomain |
 
@@ -176,7 +188,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 
 New assets are registered from the currency picker on Accounts. `/assets` redirects there.
 
-`/obligations` and `/history` redirect to `/accounts`.
+`/obligations`, `/history` and `/network` redirect to `/accounts`.
 
 ## Build
 

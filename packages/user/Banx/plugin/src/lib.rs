@@ -1,15 +1,12 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::banx::plugin::types::PathHopQuote as WitPathHopQuote;
-use bindings::exports::banx::plugin::api::{
-    CreatedInvite, Guest as Api, PathHop as WitPathHop, PathQuote,
-};
+use bindings::exports::banx::plugin::api::{CreatedInvite, Guest as Api};
+use bindings::exports::banx::plugin::authorized::Guest as Authorized;
 use bindings::exports::banx::plugin::helpers::Guest as Helpers;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::api::add_action_to_transaction;
 
-use banx::path_find::{find_banx_path, find_banx_path_exact_out};
 use psibase::define_trust;
 use psibase::fracpack::Pack;
 use psibase::services::tokens::{Decimal, Precision, Quantity};
@@ -20,14 +17,13 @@ use errors::ErrorType;
 
 mod query {
     pub mod fetch_asset;
-    pub mod fetch_path_graph;
 }
 
 define_trust! {
     descriptions {
         Low => "
             - Convert amounts using asset precision
-            - Quote multi-hop paths (read-only GraphQL + search)
+            - Ask Banx for a private path quote as the signed-in user (hops are sealed, not shown)
         ",
         Medium => "
             - Post or remove credit lines, book-auths, forward offers, claim offers, and currency policies
@@ -51,7 +47,7 @@ define_trust! {
     }
     functions {
         None => [decimal_to_quantity, quantity_to_decimal, quote_curve_out, quote_curve_in],
-        Low => [quote_path],
+        Low => [graphql],
         Medium => [
             set_credit_line,
             remove_credit_line,
@@ -130,6 +126,13 @@ fn time_point(seconds: u32) -> TimePointSec {
 }
 
 /// Parse a human decimal (`"1.45"`) into raw units using GraphQL asset precision.
+fn parse_raw(amount: &str) -> Result<u64, Error> {
+    amount
+        .trim()
+        .parse()
+        .map_err(|_| ErrorType::ConversionError("amount must be a raw integer".into()).into())
+}
+
 fn parse_amount(asset_id: u16, amount: &str) -> Result<Quantity, Error> {
     let asset = query::fetch_asset::fetch_asset(asset_id)?;
     let precision = asset.precision()?;
@@ -147,13 +150,6 @@ fn parse_signed_amount(asset_id: u16, amount: &str) -> Result<i64, Error> {
         ErrorType::ConversionError("signed amount does not fit".to_string()).into()
     })?;
     Ok(if neg { -raw } else { raw })
-}
-
-fn parse_raw(amount: &str) -> Result<u64, Error> {
-    amount
-        .trim()
-        .parse::<u64>()
-        .map_err(|_| ErrorType::ConversionError(amount.to_string()).into())
 }
 
 fn parse_amount_nonzero(asset_id: u16, amount: &str) -> Result<Quantity, Error> {
@@ -327,12 +323,7 @@ impl Api for BanxPlugin {
         add_action_to_transaction(banx::action_structs::rm_bk_ath::ACTION_NAME, &packed)
     }
 
-    fn book(
-        debtor: String,
-        asset_id: u16,
-        amount: String,
-        memo: String,
-    ) -> Result<(), Error> {
+    fn book(debtor: String, asset_id: u16, amount: String, memo: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::book)?;
         let amount = parse_amount_nonzero(asset_id, &amount)?;
         let packed = banx::action_structs::book {
@@ -779,31 +770,20 @@ impl Api for BanxPlugin {
     }
 
     fn path_pay(
-        hops: Vec<WitPathHop>,
+        route: String,
         amount: String,
         min_return: String,
         request_id: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::path_pay)?;
-        if hops.is_empty() {
-            return Err(
-                ErrorType::ConversionError("path must have at least one hop".into()).into(),
-            );
+        if route.trim().is_empty() {
+            return Err(ErrorType::ConversionError("route required".into()).into());
         }
-        let first_asset = hops[0].asset_id;
-        let last_asset = hops[hops.len() - 1].asset_id;
-        let amount = parse_amount_nonzero(first_asset, &amount)?;
-        let min_return = parse_amount(last_asset, &min_return)?;
-
-        let mut path = Vec::with_capacity(hops.len());
-        for h in hops {
-            path.push(banx::tables::PathHop {
-                account: parse_account(&h.account)?,
-                asset_id: h.asset_id,
-            });
-        }
+        // Amounts are raw integer strings from the sealed quote, not human decimals.
+        let amount = Quantity::new(parse_raw(&amount)?);
+        let min_return = Quantity::new(parse_raw(&min_return)?);
         let packed = banx::action_structs::path_pay {
-            hops: path,
+            route,
             amount,
             min_return,
             request_id,
@@ -812,27 +792,14 @@ impl Api for BanxPlugin {
         add_action_to_transaction(banx::action_structs::path_pay::ACTION_NAME, &packed)
     }
 
-    fn pay_inv(hops: Vec<WitPathHop>, max_spend: String, request_id: u32) -> Result<(), Error> {
+    fn pay_inv(route: String, max_spend: String, request_id: u32) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::pay_inv)?;
-        if hops.is_empty() {
-            return Err(
-                ErrorType::ConversionError("path must have at least one hop".into()).into(),
-            );
-        }
         if request_id == 0 {
             return Err(ErrorType::ConversionError("pay_inv requires an invoice".into()).into());
         }
-        let first_asset = hops[0].asset_id;
-        let max_spend = parse_amount_nonzero(first_asset, &max_spend)?;
-        let mut path = Vec::with_capacity(hops.len());
-        for h in hops {
-            path.push(banx::tables::PathHop {
-                account: parse_account(&h.account)?,
-                asset_id: h.asset_id,
-            });
-        }
+        let max_spend = Quantity::new(parse_raw(&max_spend)?);
         let packed = banx::action_structs::pay_inv {
-            hops: path,
+            route,
             max_spend,
             request_id,
         }
@@ -865,21 +832,9 @@ impl Api for BanxPlugin {
         add_action_to_transaction(banx::action_structs::st_pay_ath::ACTION_NAME, &packed)
     }
 
-    fn run_pay_auth(id: u32, hops: Vec<WitPathHop>) -> Result<(), Error> {
+    fn run_pay_auth(id: u32, route: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::run_pay_auth)?;
-        if hops.is_empty() {
-            return Err(
-                ErrorType::ConversionError("path must have at least one hop".into()).into(),
-            );
-        }
-        let mut path = Vec::with_capacity(hops.len());
-        for h in hops {
-            path.push(banx::tables::PathHop {
-                account: parse_account(&h.account)?,
-                asset_id: h.asset_id,
-            });
-        }
-        let packed = banx::action_structs::run_pay_ath { id, hops: path }.packed();
+        let packed = banx::action_structs::run_pay_ath { id, route }.packed();
         add_action_to_transaction(banx::action_structs::run_pay_ath::ACTION_NAME, &packed)
     }
 
@@ -887,125 +842,6 @@ impl Api for BanxPlugin {
         trust::assert_authorized(trust::FunctionName::cancel_pay_auth)?;
         let packed = banx::action_structs::rm_pay_ath { id, force_cancel }.packed();
         add_action_to_transaction(banx::action_structs::rm_pay_ath::ACTION_NAME, &packed)
-    }
-
-    fn quote_path(
-        from_account: String,
-        to_account: String,
-        amount: String,
-        from_asset: u16,
-        to_asset: Option<u16>,
-        max_hops: u8,
-        exact_out: bool,
-    ) -> Result<PathQuote, Error> {
-        trust::assert_authorized(trust::FunctionName::quote_path)?;
-        let from = from_account.trim();
-        let to = to_account.trim();
-        if from.is_empty() || to.is_empty() {
-            return Err(ErrorType::InvalidAccount("from/to required".into()).into());
-        }
-        let from = parse_account(from)?;
-        let to = parse_account(to)?;
-        // A payment to yourself is the last hop of a path whose asset changed.
-        if from == to && to_asset == Some(from_asset) {
-            return Err(ErrorType::NoPath("from and to are the same account".into()).into());
-        }
-        let max_hops = max_hops.clamp(1, 12);
-
-        // Exact-out: amount is desired receive (to-asset). Exact-in: amount is send (from-asset).
-        let amount_raw = if exact_out {
-            let Some(to_a) = to_asset else {
-                return Err(
-                    ErrorType::ConversionError("exact-out quote requires to-asset".into()).into(),
-                );
-            };
-            parse_amount_nonzero(to_a, &amount)?
-        } else {
-            parse_amount_nonzero(from_asset, &amount)?
-        };
-
-        let snap = query::fetch_path_graph::fetch_path_graph(from, to, max_hops)?;
-
-        let quote = if exact_out {
-            find_banx_path_exact_out(
-                &snap.lines,
-                &snap.routing,
-                &snap.fx,
-                from,
-                to,
-                amount_raw.value,
-                from_asset,
-                to_asset,
-                max_hops,
-                snap.now,
-            )
-        } else {
-            find_banx_path(
-                &snap.lines,
-                &snap.routing,
-                &snap.fx,
-                from,
-                to,
-                amount_raw.value,
-                from_asset,
-                to_asset,
-                max_hops,
-                snap.now,
-            )
-        }
-        .ok_or_else(|| {
-            ErrorType::NoPath(if exact_out {
-                format!(
-                    "cannot deliver {amount} to {to} from {from} within {max_hops} hops \
-                     (insufficient amount_out after fees, or no route)"
-                )
-            } else {
-                format!(
-                    "cannot send {amount} from {from} to {to} within {max_hops} hops \
-                     (amount exceeds capacity after fees, or no route)"
-                )
-            })
-        })?;
-
-        let last_asset = quote.hops.last().map(|h| h.asset_id).unwrap_or(from_asset);
-        let from_prec = query::fetch_asset::fetch_asset(from_asset)?.precision()?;
-        let to_prec = query::fetch_asset::fetch_asset(last_asset)?.precision()?;
-        let amount_in = Decimal::new(Quantity::new(quote.amount_in), from_prec).to_string();
-        let amount_out = Decimal::new(Quantity::new(quote.amount_out), to_prec).to_string();
-        // Exact-out: min-return is the requested receive amount; exact-in: amount_out.
-        let min_return = if exact_out {
-            Decimal::new(amount_raw, to_prec).to_string()
-        } else {
-            amount_out.clone()
-        };
-
-        let mut wit_hops = Vec::with_capacity(quote.hops.len());
-        for h in quote.hops {
-            let hop_prec = query::fetch_asset::fetch_asset(h.asset_id)?.precision()?;
-            let amount = Decimal::new(Quantity::new(h.amount), hop_prec).to_string();
-            let hop_fee = Decimal::new(Quantity::new(h.hop_fee), hop_prec).to_string();
-            let fx_fee = if let Some(from_a) = h.fx_from_asset {
-                let fx_prec = query::fetch_asset::fetch_asset(from_a)?.precision()?;
-                Decimal::new(Quantity::new(h.fx_fee), fx_prec).to_string()
-            } else {
-                Decimal::new(Quantity::new(0), hop_prec).to_string()
-            };
-            wit_hops.push(WitPathHopQuote {
-                account: h.account.to_string(),
-                asset_id: h.asset_id,
-                amount,
-                hop_fee,
-                fx_fee,
-                fx_from_asset: h.fx_from_asset,
-            });
-        }
-
-        Ok(PathQuote {
-            hops: wit_hops,
-            amount_in,
-            amount_out,
-            min_return,
-        })
     }
 
     fn set_cash_quote(
@@ -1197,7 +1033,7 @@ impl Api for BanxPlugin {
     }
 
     fn path_cash(
-        hops: Vec<WitPathHop>,
+        route: String,
         amount: String,
         token_id: u32,
         recipient: String,
@@ -1205,29 +1041,13 @@ impl Api for BanxPlugin {
         max_owed: String,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::path_cash)?;
-        if hops.is_empty() {
-            return Err(
-                ErrorType::ConversionError("path must have at least one hop".into()).into(),
-            );
-        }
-        let first_asset = hops[0].asset_id;
-        let amount = parse_amount_nonzero(first_asset, &amount)?;
-        let min_tokens = parse_token_amount(token_id, &min_tokens)?;
-        let max_owed = parse_amount(first_asset, &max_owed)?;
-        let mut path = Vec::with_capacity(hops.len());
-        for h in hops {
-            path.push(banx::tables::PathHop {
-                account: parse_account(&h.account)?,
-                asset_id: h.asset_id,
-            });
-        }
         let packed = banx::action_structs::path_cash {
-            hops: path,
-            amount,
+            route,
+            amount: Quantity::new(parse_raw(&amount)?),
             token_id,
             recipient: parse_account(&recipient)?,
-            min_tokens,
-            max_owed,
+            min_tokens: parse_token_amount(token_id, &min_tokens)?,
+            max_owed: Quantity::new(parse_raw(&max_owed)?),
         }
         .packed();
         add_action_to_transaction(banx::action_structs::path_cash::ACTION_NAME, &packed)
@@ -1285,6 +1105,13 @@ impl Api for BanxPlugin {
         }
         .packed();
         add_action_to_transaction(banx::action_structs::add_asset::ACTION_NAME, &packed)
+    }
+}
+
+impl Authorized for BanxPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        trust::assert_authorized(trust::FunctionName::graphql)?;
+        bindings::host::http::api::post_graphql_get_json(&query)
     }
 }
 

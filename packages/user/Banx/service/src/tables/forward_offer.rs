@@ -63,6 +63,24 @@ impl ForwardOffer {
         )
     }
 
+    /// [`Self::get_live`] without the panic, at an explicit time. Tests use it
+    /// to price a path that may be broken. A test process cannot call another
+    /// service for the block time, so the caller supplies `now`.
+    #[cfg(test)]
+    pub(crate) fn find_live(
+        poster: AccountNumber,
+        next_hop: AccountNumber,
+        asset_id: u16,
+        now: i64,
+    ) -> Option<Self> {
+        let live = |o: &Self| o.expires_at.seconds == 0 || now <= o.expires_at.seconds;
+        let specific = Self::get(poster, next_hop, asset_id).filter(live);
+        if specific.is_some() || next_hop == GLOBAL {
+            return specific;
+        }
+        Self::get(poster, GLOBAL, asset_id).filter(live)
+    }
+
     pub fn is_global(&self) -> bool {
         self.next_hop == Self::GLOBAL
     }

@@ -1,38 +1,6 @@
 package banx:plugin;
 
 interface types {
-    /// Hop used for `path-pay` execution (account + asset only).
-    record path-hop {
-        account: string,
-        asset-id: u16,
-    }
-
-    /// Quoted hop with expected fee breakdown (from `quote-path`).
-    record path-hop-quote {
-        account: string,
-        asset-id: u16,
-        /// Notional drawn on this hop after fees (human decimal, hop asset).
-        amount: string,
-        /// Routing fee on this hop (human decimal, hop asset). `"0"` for hop 0.
-        hop-fee: string,
-        /// FX fixed fee when converting into this hop (human decimal, prior asset).
-        /// `"0"` if no asset change.
-        fx-fee: string,
-        /// Prior asset id when FX convert happened; none otherwise.
-        fx-from-asset: option<u16>,
-    }
-
-    /// Result of off-chain multi-hop path discovery for `path-pay`.
-    record path-quote {
-        hops: list<path-hop-quote>,
-        /// Amount to draw on the first hop (human decimal in first hop asset).
-        amount-in: string,
-        /// Estimated amount_out after fees (human decimal in last hop asset).
-        amount-out: string,
-        /// Suggested min-return for `path-pay` (human decimal in last hop asset).
-        min-return: string,
-    }
-
     /// Token + id from `create-invite` (token is the claim-URL secret).
     record created-invite {
         invite-token: string,
@@ -61,7 +29,7 @@ interface helpers {
 
 interface api {
     use host:types/types.{error};
-    use types.{path-hop, path-hop-quote, path-quote, created-invite};
+    use types.{created-invite};
 
     /// Creditor posts/updates a credit line to `debtor` in `asset-id`.
     /// `limit` is a human decimal string (e.g. `"100.00"`).
@@ -327,20 +295,21 @@ interface api {
     /// Multi-hop path payment. Each hop is (account, asset-id).
     /// Amounts are human decimal strings in the first/last hop assets respectively.
     /// `request-id` 0 = none; otherwise an invoice you are fulfilling (last hop
-    /// must be the payee).
+    /// must be the payee). `route` is the sealed blob from `quotePath`.
+    /// The hop list is not an argument. `amount` and `min-return` are raw
+    /// integers from the quote. The chain fails the payment if any hop's live
+    /// price differs from the quoted amount.
     path-pay: func(
-        hops: list<path-hop>,
+        route: string,
         amount: string,
         min-return: string,
         request-id: u32,
     ) -> result<_, error>;
 
-    /// Pay a live invoice: walk hops backward from remaining, send the
-    /// smallest amount that clears the bill if that is ≤ `max-spend`.
-    /// `max-spend` is a human decimal in the first hop's asset. Last hop
-    /// must be the payee; any account with a path may pay.
+    /// Pay a live invoice with a sealed route. `max-spend` is a human
+    /// decimal in the first hop's asset. Last hop must be the payee.
     pay-inv: func(
-        hops: list<path-hop>,
+        route: string,
         max-spend: string,
         request-id: u32,
     ) -> result<_, error>;
@@ -359,10 +328,9 @@ interface api {
         ends-at-seconds: u32,
     ) -> result<_, error>;
 
-    /// Pay the oldest due period. Last hop is the payee. Every hop uses
-    /// the series asset. Caller is the payer or the payee. The stored
-    /// payer is drawn.
-    run-pay-auth: func(id: u32, hops: list<path-hop>) -> result<_, error>;
+    /// Pay the oldest due period. `route` is a fresh sealed quote from the
+    /// stored payer to the stored payee. Caller is the payer or the payee.
+    run-pay-auth: func(id: u32, route: string) -> result<_, error>;
 
     /// Delete a repeating payment. Payer or payee. `force-cancel` false
     /// throws when a period is payable. True deletes anyway and does not pay.
@@ -478,35 +446,13 @@ interface api {
     /// exactly `amount` on the first hop and does not use `max-owed`.
     /// `min-tokens` floors the token output.
     path-cash: func(
-        hops: list<path-hop>,
+        route: string,
         amount: string,
         token-id: u32,
         recipient: string,
         min-tokens: string,
         max-owed: string,
     ) -> result<_, error>;
-
-    /// Discover a multi-hop path from `from-account` to `to-account` (TokenSwap-style
-    /// max amount_out search over credit lines / forward offers / FX). Uses a scoped GraphQL
-    /// subgraph around the two endpoints — not a full-network dump.
-    ///
-    /// - `exact-out = false` (default): `amount` is what you send (`from-asset`);
-    ///   fees reduce what the payee receives.
-    /// - `exact-out = true`: `amount` is what the payee should receive (requires
-    ///   `to-asset`); quote finds the minimum send so you absorb hop/FX fees.
-    ///
-    /// `to-asset` empty/none → any final asset (exact-in only); otherwise require
-    /// that asset on the last hop. `from-account` and `to-account` may be the
-    /// same when `to-asset` differs from `from-asset`: the sender is the last hop.
-    quote-path: func(
-        from-account: string,
-        to-account: string,
-        amount: string,
-        from-asset: u16,
-        to-asset: option<u16>,
-        max-hops: u8,
-        exact-out: bool,
-    ) -> result<path-quote, error>;
 
     /// Create a single-use network+Banx invite that extends a credit line to the claimee.
     /// `limit` is a human decimal. Returns the invite token for the claim URL.
@@ -528,7 +474,17 @@ interface api {
     ) -> result<_, error>;
 }
 
+/// Authorized queries to this app's http server. The host attaches the
+/// signed-in user's query token, so `quotePath` can tell who is asking.
+interface authorized {
+    use host:types/types.{error};
+
+    /// Run a GraphQL query against Banx. Returns the raw JSON response.
+    graphql: func(query: string) -> result<string, error>;
+}
+
 world imports {
     import api;
     import helpers;
+    import authorized;
 }

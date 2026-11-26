@@ -9,5 +9,6 @@ world impl {
 
     export api;
     export helpers;
+    export authorized;
 }
 

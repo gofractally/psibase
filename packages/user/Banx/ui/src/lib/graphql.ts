@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { graphql } from "@shared/lib/graphql";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
+import { AuthorizedGraphqlPlugin } from "@shared/lib/plugins/authorized-graphql-plugin";
 
 import { BANX_SERVICE } from "./constants";
 
@@ -182,8 +184,20 @@ export type PayAuth = z.infer<typeof zPayAuth>;
 export type BanxInvite = z.infer<typeof zBanxInvite>;
 export type ActivityEvent = z.infer<typeof zActivity>;
 
+/** Banx's `authorized.graphql`. The host adds the signed-in user's token. */
+export const banxAuthorized = new AuthorizedGraphqlPlugin(BANX_SERVICE);
+
+/** Public marketplace data: assets, offers, pools, quotes. No sign-in needed. */
 const gql = <T>(query: string) =>
     graphql<T>(query, { service: BANX_SERVICE });
+
+/**
+ * Private data: your lines, balances, routing fees, requests, repeating
+ * payments, invites and history. The query service only answers a signed-in
+ * caller, and only with rows the caller is a party to.
+ */
+const gqlAuth = <T>(query: string) =>
+    graphqlAuth<T>(banxAuthorized.authorized.graphql, query);
 
 export async function fetchAssets(): Promise<Asset[]> {
     const data = await gql<{ assets: Asset[] }>(`{ assets { id symbol precision description } }`);
@@ -196,14 +210,14 @@ export async function fetchAssets(): Promise<Asset[]> {
 const bookAuthFields = `debtor creditor assetId remaining expiresAt`;
 
 export async function fetchBookAuths(account: string): Promise<BookAuth[]> {
-    const data = await gql<{ bookAuths: BookAuth[] }>(
+    const data = await gqlAuth<{ bookAuths: BookAuth[] }>(
         `{ bookAuths(account: "${account}") { ${bookAuthFields} } }`,
     );
     return zBookAuth.array().parse(data.bookAuths);
 }
 
 export async function fetchCreditLines(account: string): Promise<CreditLine[]> {
-    const data = await gql<{ creditLines: CreditLine[] }>(
+    const data = await gqlAuth<{ creditLines: CreditLine[] }>(
         `{ creditLines(account: "${account}") {
             creditor debtor assetId limit depleteOnDebit exposure remaining
         } }`,
@@ -211,26 +225,10 @@ export async function fetchCreditLines(account: string): Promise<CreditLine[]> {
     return zCreditLine.array().parse(data.creditLines);
 }
 
-export async function fetchNetworkLines(): Promise<CreditLine[]> {
-    const data = await gql<{ networkLines: CreditLine[] }>(
-        `{ networkLines {
-            creditor debtor assetId limit depleteOnDebit exposure remaining
-        } }`,
-    );
-    return zCreditLine.array().parse(data.networkLines);
-}
-
 const forwardOfferFields = `poster nextHop assetId feeFixed feePercentPpm expiresAt isGlobal allowUnknown`;
 
-export async function fetchNetworkForwardOffers(): Promise<ForwardOffer[]> {
-    const data = await gql<{ networkForwardOffers: ForwardOffer[] }>(
-        `{ networkForwardOffers { ${forwardOfferFields} } }`,
-    );
-    return zForwardOffer.array().parse(data.networkForwardOffers);
-}
-
 export async function fetchObligations(account: string): Promise<Obligation[]> {
-    const data = await gql<{ obligations: Obligation[] }>(
+    const data = await gqlAuth<{ obligations: Obligation[] }>(
         `{ obligations(account: "${account}") {
             creditor debtor assetId amount
         } }`,
@@ -241,7 +239,7 @@ export async function fetchObligations(account: string): Promise<Obligation[]> {
 export async function fetchForwardOffers(
     account: string,
 ): Promise<ForwardOffer[]> {
-    const data = await gql<{ forwardOffers: ForwardOffer[] }>(
+    const data = await gqlAuth<{ forwardOffers: ForwardOffer[] }>(
         `{ forwardOffers(poster: "${account}") { ${forwardOfferFields} } }`,
     );
     return zForwardOffer.array().parse(data.forwardOffers);
@@ -269,7 +267,7 @@ export async function fetchBuyClaimOffers(
 const inviteFields = `id inviter assetId limit depleteOnDebit createdAt expiry claimedBy`;
 
 export async function fetchInvites(inviter: string): Promise<BanxInvite[]> {
-    const data = await gql<{ invites: BanxInvite[] }>(
+    const data = await gqlAuth<{ invites: BanxInvite[] }>(
         `{ invites(inviter: "${inviter}") { ${inviteFields} } }`,
     );
     return zBanxInvite.array().parse(data.invites);
@@ -285,7 +283,7 @@ export async function fetchInvite(id: number): Promise<BanxInvite | null> {
 }
 
 export async function fetchRequests(account: string): Promise<PayRequest[]> {
-    const data = await gql<{ requests: PayRequest[] }>(
+    const data = await gqlAuth<{ requests: PayRequest[] }>(
         `{ requests(account: "${account}") {
             id kind poster counterparty assetId amount remaining memo
             expiresAt createdAt
@@ -297,7 +295,7 @@ export async function fetchRequests(account: string): Promise<PayRequest[]> {
 const payAuthFields = `id payer payee assetId amount maxSpend periodSeconds nextDue endsAt`;
 
 export async function fetchPayAuths(account: string): Promise<PayAuth[]> {
-    const data = await gql<{ payAuths: PayAuth[] }>(
+    const data = await gqlAuth<{ payAuths: PayAuth[] }>(
         `{ payAuths(account: "${account}") { ${payAuthFields} } }`,
     );
     return zPayAuth.array().parse(data.payAuths);
@@ -418,7 +416,7 @@ export async function fetchActivity(
     counterparty: string,
     assetId: number,
 ): Promise<ActivityEvent[]> {
-    const data = await gql<{
+    const data = await gqlAuth<{
         activity: {
             edges: {
                 node: {
@@ -450,7 +448,7 @@ export async function fetchActivityWith(
     counterparty: string,
     last = 200,
 ): Promise<ActivityEvent[]> {
-    const data = await gql<{
+    const data = await gqlAuth<{
         activity: {
             edges: {
                 node: {
@@ -481,7 +479,7 @@ export async function fetchActivityFeed(
     account: string,
     last = 200,
 ): Promise<ActivityEvent[]> {
-    const data = await gql<{
+    const data = await gqlAuth<{
         activity: {
             edges: {
                 node: {

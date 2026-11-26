@@ -3,6 +3,8 @@ mod iso4217;
 pub mod math;
 /// Off-chain path discovery for multi-hop `path_pay` (TokenSwap-style search).
 pub mod path_find;
+/// Sealed route envelopes. Search stays in the query service.
+pub mod route;
 pub mod tables;
 
 #[psibase::service(name = "banx-app", tables = "tables::tables")]
@@ -10,7 +12,7 @@ pub mod service {
     use crate::tables::{
         assert_account_exists, emit_pair_activity, path_required_send, run_path, Asset, BanxInvite,
         BanxRelay, BookAuth, CashQuote, ClaimOffer, Connection, ForwardOffer, FxOffer, InitRow,
-        InitTable, Pair, PathHop, PayAuth, PayRequest, TokenRelay,
+        InitTable, Pair, PayAuth, PayRequest, RouteKey, RouteKeyTable, TokenRelay,
     };
     use psibase::{
         services::events,
@@ -67,14 +69,8 @@ pub mod service {
     /// `debitor` must already exist as a chain account.
     /// `amount` is the `limit`: the most `debitor` may owe the sender
     /// (revolving cap), not a deposited balance. See [`Line`](crate::tables::Line).
-    /// Lines carry no interest.
     #[action]
-    fn st_crd_lne(
-        debitor: AccountNumber,
-        asset_id: u16,
-        amount: Quantity,
-        deplete_on_debit: bool,
-    ) {
+    fn st_crd_lne(debitor: AccountNumber, asset_id: u16, amount: Quantity, deplete_on_debit: bool) {
         let creditor = get_sender();
         Pair::set_line(creditor, debitor, asset_id, amount, deplete_on_debit);
         emit_pair_activity(
@@ -756,18 +752,37 @@ pub mod service {
         );
     }
 
+    /// Replace the routing key. Service account only. Old quotes stop opening.
+    #[action]
+    fn rotate_key(secret: Vec<u8>) {
+        assert_eq!(
+            get_sender(),
+            Wrapper::SERVICE,
+            "only the service account can rotate the routing key"
+        );
+        assert_eq!(secret.len(), 32, "routing key must be 32 bytes");
+        let table = RouteKeyTable::read_write();
+        let epoch = table
+            .get_index_pk()
+            .get(&0)
+            .map(|row| row.epoch.checked_add(1).expect("route epoch overflow"))
+            .unwrap_or(1);
+        table
+            .put(&RouteKey {
+                key: 0,
+                epoch,
+                secret,
+            })
+            .unwrap();
+    }
+
     /// Book a **deposit**: sender receives value and credits `depositor`. A
     /// claim the other way is cancelled first.
     ///
     /// `request_id` 0 = none. Non-zero must be a live please-book posted by
     /// `depositor` naming the sender as creditor.
     #[action]
-    fn deposit(
-        depositor: AccountNumber,
-        asset_id: u16,
-        amount: Quantity,
-        request_id: u32,
-    ) {
+    fn deposit(depositor: AccountNumber, asset_id: u16, amount: Quantity, request_id: u32) {
         let receiver = get_sender();
         assert!(depositor != receiver, "cannot deposit from self");
         assert_account_exists(depositor);
@@ -818,7 +833,37 @@ pub mod service {
         );
     }
 
-    /// Path payment along `hops`: each hop is `(account, asset_id)`.
+    fn route_key() -> RouteKey {
+        RouteKeyTable::read()
+            .get_index_pk()
+            .get(&0)
+            .expect("routing key is not set")
+    }
+
+    /// Open a sealed route. Does not check who submitted: a payee can submit
+    /// a payer's repeating payment. Callers that draw the sender check that.
+    fn open_route(route: &str) -> crate::route::OpenedRoute {
+        let key = route_key();
+        let opened = crate::route::open(&key.secret, route, crate::tables::now().seconds)
+            .unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(opened.terms.epoch, key.epoch, "route is from an old key");
+        opened
+    }
+
+    fn assert_route_payer(opened: &crate::route::OpenedRoute) {
+        assert_eq!(
+            opened.terms.payer,
+            get_sender(),
+            "route was quoted for a different payer"
+        );
+    }
+
+    /// Path payment along a sealed route from [`quotePath`].
+    ///
+    /// The hop list is not an argument. The query service searched and sealed
+    /// it, along with the exact amount each hop draws. This action opens that
+    /// blob, prices every hop live, and aborts if any draw differs from the
+    /// quote. `min_return` is the caller's own floor on top of that.
     ///
     /// # Example
     ///
@@ -829,8 +874,8 @@ pub mod service {
     ///    for the pair, the curve sizes the next hop. Otherwise apply their
     ///    creditor-side [`FxOffer`]. Does **not** rebook the previous
     ///    claim: the payer still owes the middle man the full from-asset.
-    /// 3. **Later hops** — intermediate's live [`ForwardOffer`] (fee + max
-    ///    line APR); draw on next line.
+    /// 3. **Later hops** — intermediate's live [`ForwardOffer`] fee, then
+    ///    draw on the next line. The fee is the only price.
     /// 4. **`min_return`** — final hop principal (in **last** asset) ≥ this.
     ///
     /// The sender may be the last hop when that asset differs from the first.
@@ -844,10 +889,27 @@ pub mod service {
     /// be the invoice poster in that asset. Prefer [`pay_inv`] when paying a
     /// bill (exact remaining, spend budget).
     #[action]
-    fn path_pay(hops: Vec<PathHop>, amount: Quantity, min_return: Quantity, request_id: u32) {
-        assert!(!hops.is_empty(), "path_pay must include at least one hop");
+    fn path_pay(route: String, amount: Quantity, min_return: Quantity, request_id: u32) {
         assert!(amount.value > 0, "path_pay amount must be positive");
-        run_path(get_sender(), hops, amount, min_return, request_id, "");
+        let opened = open_route(&route);
+        assert_route_payer(&opened);
+        assert_eq!(
+            opened.terms.amount_in, amount.value,
+            "route amount does not match the signed amount"
+        );
+        assert!(
+            opened.terms.amount_out >= min_return.value,
+            "route receive is below min_return"
+        );
+        run_path(
+            get_sender(),
+            opened.hops,
+            &opened.amounts,
+            amount,
+            min_return,
+            request_id,
+            "",
+        );
     }
 
     /// Path-pay that ends by selling the last hop's Banx for that account's tokens.
@@ -862,17 +924,23 @@ pub mod service {
     /// hop and does not use `max_owed`.
     #[action]
     fn path_cash(
-        hops: Vec<PathHop>,
+        route: String,
         amount: Quantity,
         token_id: u32,
         recipient: AccountNumber,
         min_tokens: Quantity,
         max_owed: Quantity,
     ) {
-        assert!(!hops.is_empty(), "path_cash must include at least one hop");
         assert!(amount.value > 0, "path_cash amount must be positive");
         assert_account_exists(recipient);
+        let opened = open_route(&route);
+        assert_route_payer(&opened);
+        assert_eq!(
+            opened.terms.amount_in, amount.value,
+            "route amount does not match the signed amount"
+        );
         let sender = get_sender();
+        let hops = opened.hops;
         let last = hops[hops.len() - 1];
         let banx_in = if hops.len() == 1 {
             assert!(last.account != sender, "path cannot draw on self");
@@ -881,7 +949,15 @@ pub mod service {
             Connection::get_live(last.account, sender, last.asset_id).draw(owed, sender);
             amount
         } else {
-            run_path(sender, hops, amount, Quantity::new(1), 0, "")
+            run_path(
+                sender,
+                hops,
+                &opened.amounts,
+                amount,
+                Quantity::new(1),
+                0,
+                "",
+            )
         };
         TokenRelay::pay_tokens_for_banx(
             last.account,
@@ -903,11 +979,17 @@ pub mod service {
     /// poster in that asset. No `min_return`. Anyone with a path to the
     /// poster may pay (`counterparty` is who was billed, `0` = anyone).
     #[action]
-    fn pay_inv(hops: Vec<PathHop>, max_spend: Quantity, request_id: u32) {
+    fn pay_inv(route: String, max_spend: Quantity, request_id: u32) {
         assert!(request_id != 0, "pay_inv requires an invoice");
-        assert!(!hops.is_empty(), "pay_inv must include at least one hop");
         assert!(max_spend.value > 0, "pay_inv max_spend must be positive");
+        let opened = open_route(&route);
+        assert_route_payer(&opened);
+        let hops = opened.hops;
         let last_hop = hops[hops.len() - 1];
+        assert_eq!(
+            last_hop.account, opened.terms.payee,
+            "route does not end at the invoice payee"
+        );
         let remaining =
             PayRequest::live_invoice_remaining(request_id, last_hop.account, last_hop.asset_id);
         let required = path_required_send(&hops, remaining);
@@ -915,7 +997,15 @@ pub mod service {
             required.value <= max_spend.value,
             "pay_inv max_spend below required send"
         );
-        run_path(get_sender(), hops, required, remaining, request_id, "");
+        run_path(
+            get_sender(),
+            hops,
+            &opened.amounts,
+            required,
+            remaining,
+            request_id,
+            "",
+        );
     }
 
     /// Repeating path payment. Sender is the payer. Returns the series id.
@@ -947,8 +1037,18 @@ pub mod service {
     /// Pay the oldest due period. Sender is the payer or the payee.
     /// The stored payer is drawn. This does not fulfill an invoice.
     #[action]
-    fn run_pay_ath(id: u32, hops: Vec<PathHop>) {
-        PayAuth::run(id, hops, get_sender());
+    fn run_pay_ath(id: u32, route: String) {
+        let opened = open_route(&route);
+        let row = PayAuth::get_assert(id);
+        assert_eq!(
+            opened.terms.payer, row.payer,
+            "route was quoted for a different payer"
+        );
+        assert_eq!(
+            opened.terms.payee, row.payee,
+            "route does not pay the stored payee"
+        );
+        PayAuth::run(id, opened.hops, &opened.amounts, get_sender());
     }
 
     /// Delete a repeating payment. Payer or payee.

@@ -4,12 +4,9 @@ import { ChevronDown, Loader2, QrCode, XCircle } from "lucide-react";
 
 import { defaultAssetId } from "@/components/asset-select";
 import { AssetField, amountUnit } from "@/components/form-fields";
-import { PathRoute } from "@/components/path-route";
 import { TransferQrDialog } from "@/components/transfer-qr-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
-import { useBanxContacts } from "@/hooks/use-banx-contacts";
 import {
-    type PathHopQuote,
     usePathPay,
     usePayInvoice,
     useQuotePath,
@@ -45,20 +42,16 @@ import {
 } from "@shared/shadcn/ui/dialog";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-type Hop = { account: string; assetId: number | undefined };
-
+/** Amounts are raw ledger units. The form fields hold decimals, converted with these precisions. */
 type QuoteSummary = {
+    route: string;
     amountIn: string;
     amountOut: string;
     minReturn: string;
-    hops: PathHopQuote[];
+    hopCount: number;
+    fromPrecision: number;
+    toPrecision: number;
 };
-
-function feeIsPositive(fee: string | undefined): boolean {
-    if (!fee) return false;
-    const n = Number(fee);
-    return Number.isFinite(n) ? n > 0 : displayAmount(fee) !== "0";
-}
 
 /** Caption under the amount. The typed amount is what the payee receives. */
 function transferCostNote(
@@ -69,19 +62,14 @@ function transferCostNote(
     precisionOf: (id: number) => number,
 ): string | null {
     if (fromAsset === undefined || toAsset === undefined) return null;
-    const send = `${displayAmount(quote.amountIn)} ${symbolOf(fromAsset)}`;
+    const precision = precisionOf(fromAsset);
+    const send = `${formatRawAmount(quote.amountIn, precision)} ${symbolOf(fromAsset)}`;
     if (fromAsset !== toAsset) {
-        const charged = quote.hops.some(
-            (h) => feeIsPositive(h.hopFee) || feeIsPositive(h.fxFee),
-        );
-        return charged
-            ? `Fee + conversion · you send ${send}`
+        return quote.hopCount > 1
+            ? `Private path · you send ${send}`
             : `Conversion · you send ${send}`;
     }
-    const precision = precisionOf(fromAsset);
-    const extra =
-        humanToRaw(quote.amountIn, precision) -
-        humanToRaw(quote.amountOut, precision);
+    const extra = BigInt(quote.amountIn) - BigInt(quote.amountOut);
     if (extra <= 0n) return null;
     return `Fee ${formatRawAmount(extra.toString(), precision)} ${symbolOf(fromAsset)}`;
 }
@@ -131,7 +119,7 @@ function canFindPath(
 }
 
 type ExecValues = {
-    hops: Hop[];
+    route: string;
     amount: string;
     minReturn: string;
 };
@@ -142,23 +130,16 @@ function quoteMatchesExec(
     exec: ExecValues,
     invoice: boolean,
 ): boolean {
-    if (!quote) return false;
-    const cleaned = exec.hops.filter(
-        (h) => h.account.trim() && h.assetId !== undefined,
-    );
-    if (cleaned.length !== quote.hops.length) return false;
-    for (let i = 0; i < cleaned.length; i++) {
-        const hop = cleaned[i]!;
-        const quoted = quote.hops[i]!;
-        if (
-            hop.account.trim() !== quoted.account.trim() ||
-            hop.assetId !== quoted.assetId
-        ) {
-            return false;
-        }
+    if (!quote || !quote.route) return false;
+    if (exec.route !== quote.route) return false;
+    if (humanToRaw(exec.amount, quote.fromPrecision).toString() !== quote.amountIn) {
+        return false;
     }
-    if (exec.amount.trim() !== quote.amountIn.trim()) return false;
-    if (!invoice && exec.minReturn.trim() !== quote.minReturn.trim()) {
+    if (
+        !invoice &&
+        humanToRaw(exec.minReturn, quote.toPrecision).toString() !==
+            quote.minReturn
+    ) {
         return false;
     }
     return true;
@@ -250,7 +231,6 @@ export function TransferDialog({
     defaultAsset?: number;
 }) {
     const { data: user } = useCurrentUser();
-    const { label } = useBanxContacts("/accounts");
     const { assets, byId, precisionOf, symbolOf, isSuccess: assetsReady } =
         useAssetMap();
     // Present only on the accounts page, where the header already chose the currency.
@@ -336,9 +316,7 @@ export function TransferDialog({
             rememberFailedKey(null);
             setQuoteError(null);
             setQuote(null);
-            execForm.setFieldValue("hops", [
-                { account: "", assetId: undefined },
-            ]);
+            execForm.setFieldValue("route", "");
             try {
                 await new Promise<void>((resolve, reject) => {
                     quotePath.mutate(
@@ -357,29 +335,30 @@ export function TransferDialog({
                                     resolve();
                                     return;
                                 }
-                                execForm.setFieldValue(
-                                    "hops",
-                                    q.hops.map((h) => ({
-                                        account: h.account,
-                                        assetId: h.assetId as
-                                            | number
-                                            | undefined,
-                                    })),
-                                );
-                                execForm.setFieldValue("amount", q.amountIn);
-                                minSyncedRef.current = q.minReturn;
-                                execForm.setFieldValue(
-                                    "minReturn",
+                                execForm.setFieldValue("route", q.route);
+                                const fromPrecision = precisionOf(value.fromAsset!);
+                                const toPrecision = precisionOf(value.toAsset!);
+                                const minShown = formatRawAmount(
                                     q.minReturn,
+                                    toPrecision,
                                 );
+                                execForm.setFieldValue(
+                                    "amount",
+                                    formatRawAmount(q.amountIn, fromPrecision),
+                                );
+                                minSyncedRef.current = minShown;
+                                execForm.setFieldValue("minReturn", minShown);
                                 rememberQuotedKey(key);
                                 rememberFailedKey(null);
                                 setQuoteError(null);
                                 setQuote({
+                                    route: q.route,
                                     amountIn: q.amountIn,
                                     amountOut: q.amountOut,
                                     minReturn: q.minReturn,
-                                    hops: q.hops,
+                                    hopCount: q.hopCount ?? 0,
+                                    fromPrecision,
+                                    toPrecision,
                                 });
                                 resolve();
                             },
@@ -389,9 +368,7 @@ export function TransferDialog({
                                     rememberFailedKey(key);
                                     setQuote(null);
                                     setQuoteError(e.message);
-                                    execForm.setFieldValue("hops", [
-                                        { account: "", assetId: undefined },
-                                    ]);
+                                    execForm.setFieldValue("route", "");
                                     execForm.setFieldValue("amount", "");
                                     minSyncedRef.current = "";
                                     execForm.setFieldValue("minReturn", "");
@@ -411,7 +388,7 @@ export function TransferDialog({
 
     const execForm = useAppForm({
         defaultValues: {
-            hops: [{ account: "", assetId: undefined }] as Hop[],
+            route: "",
             amount: "",
             minReturn: "",
         },
@@ -435,40 +412,22 @@ export function TransferDialog({
                 setConfirmOpen(false);
                 return;
             }
-            const cleaned = value.hops
-                .filter((h) => h.account.trim() && h.assetId !== undefined)
-                .map((h) => ({
-                    account: h.account.trim(),
-                    assetId: h.assetId!,
-                }));
-            if (cleaned.length === 0) return;
-            if (requestId) {
-                const invoicePayee = (
-                    prefill?.payee ||
-                    findForm.state.values.payee
-                ).trim();
-                const invoiceAsset =
-                    parseAssetId(prefill?.toAsset, assets) ??
-                    findForm.state.values.toAsset;
-                const last = cleaned[cleaned.length - 1];
-                if (
-                    !invoicePayee ||
-                    invoiceAsset === undefined ||
-                    last.account !== invoicePayee ||
-                    last.assetId !== invoiceAsset
-                ) {
-                    toast.error(
-                        "Last hop must be the invoice payee in the invoice asset",
-                    );
-                    return;
-                }
-            }
+            const sealed = quoteRef.current;
+            if (!value.route || !sealed) return;
+            const rawAmount = humanToRaw(
+                value.amount,
+                sealed.fromPrecision,
+            ).toString();
+            const rawMin = humanToRaw(
+                value.minReturn,
+                sealed.toPrecision,
+            ).toString();
             await new Promise<void>((resolve, reject) => {
                 if (requestId) {
                     payInvoice.mutate(
                         {
-                            hops: cleaned,
-                            maxSpend: value.amount.trim(),
+                            route: value.route,
+                            maxSpend: rawAmount,
                             requestId,
                         },
                         {
@@ -484,9 +443,9 @@ export function TransferDialog({
 
                 pathPay.mutate(
                     {
-                        hops: cleaned,
-                        amount: value.amount.trim(),
-                        minReturn: value.minReturn.trim(),
+                        route: value.route,
+                        amount: rawAmount,
+                        minReturn: rawMin,
                     },
                     {
                         onSuccess: () => {
@@ -547,31 +506,6 @@ export function TransferDialog({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, prefill, assetsReady, assets, requestId, defaultAsset, lockedFrom]);
 
-    const addHop = () => {
-        const hops = execForm.state.values.hops;
-        const prevAsset = hops[hops.length - 1]?.assetId;
-        execForm.setFieldValue("hops", [
-            ...hops,
-            {
-                account: "",
-                assetId:
-                    prevAsset ??
-                    findForm.state.values.fromAsset ??
-                    defaultAssetId(assets),
-            },
-        ]);
-        rememberQuotedKey(null);
-        setQuote(null);
-    };
-
-    const removeLastHop = () => {
-        const hops = execForm.state.values.hops;
-        if (hops.length <= 1) return;
-        execForm.setFieldValue("hops", hops.slice(0, -1));
-        rememberQuotedKey(null);
-        setQuote(null);
-    };
-
     const clearAfterPay = () => {
         setConfirmOpen(false);
         rememberQuotedKey(null);
@@ -590,9 +524,7 @@ export function TransferDialog({
             isTouched: false,
             isDirty: false,
         }));
-        execForm.setFieldValue("hops", [
-            { account: "", assetId: undefined },
-        ]);
+        execForm.setFieldValue("route", "");
         execForm.setFieldValue("amount", "");
         execForm.setFieldValue("minReturn", "");
         onOpenChange(false);
@@ -605,11 +537,8 @@ export function TransferDialog({
 
     const pinnedSymbol =
         pinnedId !== undefined ? symbolOf(pinnedId) : undefined;
-    const quotedFrom = quote?.hops[0]?.assetId;
-    const quotedTo =
-        quote && quote.hops.length > 0
-            ? quote.hops[quote.hops.length - 1]?.assetId
-            : undefined;
+    const quotedFrom = findForm.state.values.fromAsset;
+    const quotedTo = findForm.state.values.toAsset;
     const confirmNote = quote
         ? transferCostNote(quote, quotedFrom, quotedTo, symbolOf, precisionOf)
         : null;
@@ -795,13 +724,7 @@ export function TransferDialog({
                                     requestId > 0,
                                 );
                                 const failed = !!key && failedKey === key;
-                                const ready =
-                                    found &&
-                                    exec.hops.some(
-                                        (h) =>
-                                            h.account.trim() &&
-                                            h.assetId !== undefined,
-                                    );
+                                const ready = found && !!exec.route;
                                 const suggestAsset =
                                     values.toAsset ?? values.fromAsset;
                                 const suggestSymbol =
@@ -862,14 +785,12 @@ export function TransferDialog({
                                             findNow();
                                         }}
                                     />
-                                    {found && quote && user ? (
-                                        <PathRoute
-                                            className="basis-full"
-                                            user={user}
-                                            hops={quote.hops}
-                                            symbolOf={symbolOf}
-                                            labelOf={label}
-                                        />
+                                    {found && quote ? (
+                                        <p className="text-muted-foreground basis-full text-sm">
+                                            Private path, {quote.hopCount}{" "}
+                                            {quote.hopCount === 1 ? "hop" : "hops"}.
+                                            Intermediaries are not shown.
+                                        </p>
                                     ) : null}
                                     </>
                                 );
@@ -947,134 +868,6 @@ export function TransferDialog({
                         />
                     )}
                 />
-                <h3 className="text-sm font-medium">Hops &amp; execute</h3>
-                <execForm.Subscribe
-                    selector={(s) => s.values.hops}
-                    children={(hops) => (
-                        <div className="space-y-4">
-                            {hops.map((hop, i) => {
-                                // Fee annotations come from the last successful quote
-                                // for this hop list (index-aligned while unedited).
-                                const quoted = quote?.hops[i];
-                                const sameHop =
-                                    quoted &&
-                                    quoted.account === hop.account.trim() &&
-                                    quoted.assetId === hop.assetId;
-                                const showFees = Boolean(sameHop);
-                                const hopFee = quoted?.hopFee;
-                                const fxFee = quoted?.fxFee;
-                                const hasHopFee =
-                                    showFees && feeIsPositive(hopFee);
-                                const hasFxFee =
-                                    showFees && feeIsPositive(fxFee);
-                                const hopSym =
-                                    hop.assetId !== undefined
-                                        ? symbolOf(hop.assetId)
-                                        : "";
-                                const fxSym =
-                                    quoted?.fxFromAsset !== undefined
-                                        ? symbolOf(quoted.fxFromAsset)
-                                        : "";
-                                return (
-                                    <div
-                                        key={i}
-                                        className="grid gap-2 rounded-md border p-3"
-                                    >
-                                        <div className="grid gap-2 sm:grid-cols-2">
-                                            <execForm.AppField
-                                                name={`hops[${i}].account`}
-                                                children={(field) => (
-                                                    <field.TextField
-                                                        label={`Hop ${i + 1} account`}
-                                                        placeholder="account"
-                                                        required
-                                                    />
-                                                )}
-                                            />
-                                            <execForm.Field
-                                                name={`hops[${i}].assetId`}
-                                                children={(field) => (
-                                                    <AssetField
-                                                        assets={assets}
-                                                        value={field.state.value}
-                                                        onChange={(id) =>
-                                                            field.handleChange(
-                                                                id,
-                                                            )
-                                                        }
-                                                    />
-                                                )}
-                                            />
-                                        </div>
-                                        {showFees ? (
-                                            <div className="text-muted-foreground space-y-0.5 text-xs font-mono">
-                                                {quoted?.amount ? (
-                                                    <p>
-                                                        After fees:{" "}
-                                                        {displayAmount(
-                                                            quoted.amount,
-                                                        )}
-                                                        {hopSym
-                                                            ? ` ${hopSym}`
-                                                            : ""}
-                                                    </p>
-                                                ) : null}
-                                                {i === 0 &&
-                                                !hasHopFee &&
-                                                !hasFxFee ? (
-                                                    <p>No hop fee (first hop)</p>
-                                                ) : null}
-                                                {hasHopFee ? (
-                                                    <p>
-                                                        Hop fee:{" "}
-                                                        {displayAmount(
-                                                            hopFee!,
-                                                        )}
-                                                        {hopSym
-                                                            ? ` ${hopSym}`
-                                                            : ""}
-                                                    </p>
-                                                ) : i > 0 && showFees ? (
-                                                    <p>Hop fee: 0</p>
-                                                ) : null}
-                                                {hasFxFee ? (
-                                                    <p>
-                                                        FX fee:{" "}
-                                                        {displayAmount(fxFee!)}
-                                                        {fxSym
-                                                            ? ` ${fxSym}`
-                                                            : ""}
-                                                    </p>
-                                                ) : null}
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                />
-
-                <div className="flex flex-wrap gap-2">
-                    <Button type="button" variant="outline" onClick={addHop}>
-                        Add hop
-                    </Button>
-                    <execForm.Subscribe
-                        selector={(s) => s.values.hops.length}
-                        children={(len) =>
-                            len > 1 ? (
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    onClick={removeLastHop}
-                                >
-                                    Remove last hop
-                                </Button>
-                            ) : null
-                        }
-                    />
-                </div>
-
                 <div
                     className={
                         requestId
@@ -1086,14 +879,9 @@ export function TransferDialog({
                         selector={(s) => s.values.fromAsset}
                         children={(fromAsset) => (
                             <execForm.Subscribe
-                                selector={(s) => s.values.hops[0]}
-                                children={(firstHop) => {
-                                    const hopChosen =
-                                        !!firstHop?.account.trim() &&
-                                        firstHop.assetId !== undefined;
-                                    const sendAsset = hopChosen
-                                        ? firstHop.assetId
-                                        : fromAsset;
+                                selector={(s) => s.values.route}
+                                children={() => {
+                                    const sendAsset = fromAsset;
                                     const known =
                                         sendAsset !== undefined &&
                                         byId.has(sendAsset);
@@ -1153,16 +941,9 @@ export function TransferDialog({
                             selector={(s) => s.values.toAsset}
                             children={(toAsset) => (
                         <execForm.Subscribe
-                            selector={(s) =>
-                                s.values.hops[s.values.hops.length - 1]
-                            }
-                            children={(lastHop) => {
-                                const hopChosen =
-                                    !!lastHop?.account.trim() &&
-                                    lastHop.assetId !== undefined;
-                                const receiveAsset = hopChosen
-                                    ? lastHop.assetId
-                                    : toAsset;
+                            selector={(s) => s.values.route}
+                            children={() => {
+                                const receiveAsset = toAsset;
                                 const known =
                                     receiveAsset !== undefined &&
                                     byId.has(receiveAsset);
@@ -1253,25 +1034,26 @@ export function TransferDialog({
                                         if (!matched || !quote) {
                                             return QUOTE_STALE;
                                         }
-                                        const sendAsset = quote.hops[0]?.assetId;
+                                        const sendAsset =
+                                            findForm.state.values.fromAsset;
                                         const receiveAsset =
-                                            quote.hops[quote.hops.length - 1]
-                                                ?.assetId;
+                                            findForm.state.values.toAsset;
                                         return (
                                             <>
                                                 You send{" "}
                                                 <span className="text-foreground font-medium">
-                                                    {displayAmount(
-                                                        exec.amount,
-                                                    )}
+                                                    {displayAmount(exec.amount)}
                                                 </span>
                                                 {sendAsset !== undefined
                                                     ? ` ${symbolOf(sendAsset)}`
                                                     : ""}
                                                 . Payee gets{" "}
                                                 <span className="text-foreground font-medium">
-                                                    {displayAmount(
+                                                    {formatRawAmount(
                                                         quote.amountOut,
+                                                        receiveAsset !== undefined
+                                                            ? precisionOf(receiveAsset)
+                                                            : 0,
                                                     )}
                                                 </span>
                                                 {receiveAsset !== undefined
@@ -1298,14 +1080,14 @@ export function TransferDialog({
                                     exec,
                                     requestId > 0,
                                 );
-                                if (!matched || !quote || !user) return null;
+                                if (!matched || !quote) return null;
                                 return (
-                                    <PathRoute
-                                        user={user}
-                                        hops={quote.hops}
-                                        symbolOf={symbolOf}
-                                        labelOf={label}
-                                    />
+                                    <p className="text-muted-foreground text-sm">
+                                        Private path, {quote.hopCount}{" "}
+                                        {quote.hopCount === 1
+                                            ? "hop"
+                                            : "hops"}.
+                                    </p>
                                 );
                             }}
                         />

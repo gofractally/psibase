@@ -11,8 +11,6 @@ import {
     fetchCashVault,
     fetchTokenRelays,
     fetchCreditLines,
-    fetchNetworkLines,
-    fetchNetworkForwardOffers,
     fetchFxOffers,
     fetchObligations,
     fetchForwardOffers,
@@ -54,27 +52,6 @@ export function useCreditLines(): UseQueryResult<CreditLine[], Error> {
     return useQuery({
         queryKey: QueryKey.creditLines(user),
         queryFn: () => fetchCreditLines(user!),
-        enabled: !!user,
-    });
-}
-
-export function useNetworkLines(): UseQueryResult<CreditLine[], Error> {
-    const { data: user } = useCurrentUser();
-    return useQuery({
-        queryKey: QueryKey.networkLines(),
-        queryFn: fetchNetworkLines,
-        enabled: !!user,
-    });
-}
-
-export function useNetworkForwardOffers(): UseQueryResult<
-    ForwardOffer[],
-    Error
-> {
-    const { data: user } = useCurrentUser();
-    return useQuery({
-        queryKey: QueryKey.networkForwardOffers(),
-        queryFn: fetchNetworkForwardOffers,
         enabled: !!user,
     });
 }
@@ -129,17 +106,6 @@ export function useForwardOffers(): UseQueryResult<ForwardOffer[], Error> {
         queryKey: QueryKey.forwardOffers(user),
         queryFn: () => fetchForwardOffers(user!),
         enabled: !!user,
-    });
-}
-
-/** Path forwarding posted by `poster`, including another account. */
-export function usePosterForwardOffers(
-    poster: string | null | undefined,
-): UseQueryResult<ForwardOffer[], Error> {
-    return useQuery({
-        queryKey: QueryKey.forwardOffers(poster),
-        queryFn: () => fetchForwardOffers(poster!),
-        enabled: !!poster,
     });
 }
 

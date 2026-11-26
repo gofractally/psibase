@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 
-import { PathRoute } from "@/components/path-route";
-import { useBanxContacts } from "@/hooks/use-banx-contacts";
 import {
     useQuotePath,
     useRunPayAuth,
@@ -11,7 +9,6 @@ import { displayAmount } from "@/lib/amount";
 import type { PayAuth } from "@/lib/graphql";
 import { dueCount } from "@/lib/pay-auth";
 
-import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -34,8 +31,6 @@ export function PayAuthCollectDialog({
     onOpenChange: (open: boolean) => void;
 }) {
     const open = row !== null;
-    const { data: viewer } = useCurrentUser();
-    const { label } = useBanxContacts("/requests");
     const quotePath = useQuotePath();
     const run = useRunPayAuth();
     const [quote, setQuote] = useState<PathQuote | null>(null);
@@ -85,14 +80,19 @@ export function PayAuthCollectDialog({
         if (!row || !quote || unpaid < 1) return;
         setError(null);
         setStoppedAfter(null);
-        const hops = quote.hops.map((hop) => ({
-            account: hop.account,
-            assetId: hop.assetId,
-        }));
         let paid = 0;
         try {
             for (let i = 0; i < unpaid; i++) {
-                await run.mutateAsync({ id: row.id, hops });
+                const next = await quotePath.mutateAsync({
+                    fromAccount: row.payer,
+                    toAccount: row.payee,
+                    amount: displayAmount(row.amount),
+                    fromAsset: row.assetId,
+                    toAsset: row.assetId,
+                    maxHops: 6,
+                    exactOut: true,
+                });
+                await run.mutateAsync({ id: row.id, route: next.route });
                 paid += 1;
             }
             onOpenChange(false);
@@ -119,14 +119,11 @@ export function PayAuthCollectDialog({
                         time and stops if a payment fails.
                     </p>
                 ) : null}
-                {quote && viewer ? (
-                    <PathRoute
-                        user={row?.payer ?? viewer}
-                        hops={quote.hops}
-                        symbolOf={symbolOf}
-                        labelOf={label}
-                        senderIsYou={viewer === row?.payer}
-                    />
+                {quote ? (
+                    <p className="text-muted-foreground text-sm">
+                        Private path, {quote.hopCount ?? 0} hops. A new quote
+                        is sealed for each period.
+                    </p>
                 ) : null}
                 {quotePath.isPending && !quote && !error ? (
                     <p className="text-muted-foreground text-sm">

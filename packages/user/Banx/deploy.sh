@@ -2,6 +2,10 @@
 # Build Banx and deploy to pinkduck.lol.
 #
 #   ./packages/user/Banx/deploy.sh
+#
+# Routing key: path payments fail until `banx-app` has one. A deploy sets it
+# only when `routingReady` is false, so redeploying does not invalidate open
+# quotes. `ROTATE_KEY=1` forces a new one, which does.
 set -euo pipefail
 
 API="${API:-https://pinkduck.lol}"
@@ -53,6 +57,16 @@ account_exists() {
 push_json() {
     local file=$1
     psibase push -a "$API" -s "$KEY" "$file"
+}
+
+# Whether `banx-app` has a routing key. Public query, no sign-in.
+routing_ready() {
+    local json
+    json=$(curl -sS --max-time 20 \
+        "https://${SENDER}.${API#https://}/graphql" \
+        -H 'content-type: application/json' \
+        -d '{"query":"{ routingReady }"}')
+    [[ "$json" == *'"routingReady":true'* ]]
 }
 
 if [[ "${SKIP_BUILD:-0}" != 1 ]]; then
@@ -133,6 +147,32 @@ cat > "$ACTIONS" <<EOF
 ]
 EOF
 push_json "$ACTIONS"
+
+echo "==> routing key"
+if [[ "${ROTATE_KEY:-0}" == 1 ]] || ! routing_ready; then
+    # 32 random bytes as hex. Written to the temp dir, never printed. The key
+    # is still recorded on chain: it is objective state, so any service and
+    # anyone reading history can read it. It keeps hops out of the UI and
+    # plugin. It does not hide a route from validators.
+    SECRET=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+    KEY_ACTIONS="$EXTRACT/rotate-key.json"
+    cat > "$KEY_ACTIONS" <<EOF
+[
+  {
+    "sender": "${SENDER}",
+    "service": "${SENDER}",
+    "method": "rotate_key",
+    "data": { "secret": "${SECRET}" }
+  }
+]
+EOF
+    push_json "$KEY_ACTIONS"
+    rm -f "$KEY_ACTIONS"
+    unset SECRET
+    echo "    provisioned (open quotes no longer open)"
+else
+    echo "    already set (ROTATE_KEY=1 to replace it)"
+fi
 
 echo "==> upload UI"
 psibase upload -a "$API" -s "$KEY" -S "$SENDER" -r "$EXTRACT/data/${SENDER}"

@@ -2,7 +2,10 @@ import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { BANX_SERVICE } from "@/lib/constants";
+import { banxAuthorized } from "@/lib/graphql";
 import { QueryKey } from "@/lib/query-keys";
+
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { supervisor } from "@shared/lib/supervisor";
@@ -16,10 +19,6 @@ export function useInvalidateLedger() {
         void qc.invalidateQueries({ queryKey: QueryKey.assets() });
         if (!user) return;
         void qc.invalidateQueries({ queryKey: QueryKey.creditLines(user) });
-        void qc.invalidateQueries({ queryKey: QueryKey.networkLines() });
-        void qc.invalidateQueries({
-            queryKey: QueryKey.networkForwardOffers(),
-        });
         void qc.invalidateQueries({ queryKey: QueryKey.bookAuths(user) });
         void qc.invalidateQueries({ queryKey: QueryKey.obligations(user) });
         void qc.invalidateQueries({
@@ -249,16 +248,14 @@ export function usePathPay() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: {
-            hops: { account: string; assetId: number }[];
+            route: string;
+            /** Raw units from the quote. */
             amount: string;
             minReturn: string;
             requestId?: number;
         }) =>
             banxCall("pathPay", [
-                p.hops.map((h) => ({
-                    account: h.account,
-                    assetId: h.assetId,
-                })),
+                p.route,
                 p.amount,
                 p.minReturn,
                 p.requestId ?? 0,
@@ -303,17 +300,8 @@ export function useSetPayAuth() {
 export function useRunPayAuth() {
     const invalidate = useInvalidateBanx();
     return useMutation({
-        mutationFn: async (p: {
-            id: number;
-            hops: { account: string; assetId: number }[];
-        }) =>
-            banxCall("runPayAuth", [
-                p.id,
-                p.hops.map((h) => ({
-                    account: h.account,
-                    assetId: h.assetId,
-                })),
-            ]),
+        mutationFn: async (p: { id: number; route: string }) =>
+            banxCall("runPayAuth", [p.id, p.route]),
         onSuccess: () => {
             invalidate();
             toast.success("Repeating payment collected");
@@ -339,18 +327,12 @@ export function usePayInvoice() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: {
-            hops: { account: string; assetId: number }[];
+            route: string;
+            /** Raw units, the most the payer will be drawn. */
             maxSpend: string;
             requestId: number;
         }) =>
-            banxCall("payInv", [
-                p.hops.map((h) => ({
-                    account: h.account,
-                    assetId: h.assetId,
-                })),
-                p.maxSpend,
-                p.requestId,
-            ]),
+            banxCall("payInv", [p.route, p.maxSpend, p.requestId]),
         onSuccess: () => {
             invalidate();
             toast.success("Invoice paid");
@@ -359,40 +341,16 @@ export function usePayInvoice() {
     });
 }
 
-export type PathHopQuote = {
-    account: string;
-    assetId: number;
-    /** Notional drawn on this hop after fees (hop asset). */
-    amount: string;
-    /** Routing fee on this hop (hop asset). `"0"` for hop 0. */
-    hopFee: string;
-    /** FX fixed fee into this hop (prior asset). `"0"` if no convert. */
-    fxFee: string;
-    /** Prior asset when FX convert happened. */
-    fxFromAsset?: number;
-};
-
 export type PathQuote = {
-    hops: PathHopQuote[];
-    /** Amount to draw on first hop (from-asset). */
+    /** Sealed blob. Submit this; do not build a hop list. */
+    route: string;
+    /** Raw units. */
     amountIn: string;
-    /** Residual after fees (last-hop asset). */
     amountOut: string;
+    expiresAt: number;
+    hopCount: number;
     /** Suggested path_pay min-return (last-hop asset). */
     minReturn: string;
-};
-
-type RawHop = {
-    account: string;
-    assetId?: number;
-    asset_id?: number;
-    amount?: string;
-    hopFee?: string;
-    hop_fee?: string;
-    fxFee?: string;
-    fx_fee?: string;
-    fxFromAsset?: number | null;
-    fx_from_asset?: number | null;
 };
 
 /** Curve output or required input. The plugin calls the service math. */
@@ -439,12 +397,13 @@ export function useCurveQuote(
     });
 }
 
-/** Off-chain path discovery (scoped graph + TokenSwap-style search). */
+/** Sealed path quote. Hops stay on the query service. */
 export function useQuotePath() {
     return useMutation({
         mutationFn: async (p: {
             fromAccount: string;
             toAccount: string;
+            /** Human decimal. */
             amount: string;
             fromAsset: number;
             /** Final hop must be in this asset. */
@@ -456,51 +415,32 @@ export function useQuotePath() {
              */
             exactOut?: boolean;
         }): Promise<PathQuote> => {
-            // Always pass a real boolean (some bridges drop/omit `false`).
             const exactOut = p.exactOut === true;
-            const res = (await supervisor.functionCall({
-                service: BANX_SERVICE,
-                intf: "api",
-                method: "quotePath",
-                params: [
-                    p.fromAccount,
-                    p.toAccount,
-                    p.amount,
-                    p.fromAsset,
-                    p.toAsset,
-                    p.maxHops,
-                    exactOut,
-                ],
-            })) as Record<string, unknown> & {
-                hops: RawHop[];
-            };
-            // Prefer camelCase (jco); fall back to snake_case if present.
-            const amountIn = String(
-                res.amountIn ?? res.amount_in ?? p.amount,
+            // JSON.stringify gives a valid GraphQL string literal, so free
+            // text such as a typed payee cannot break out of the query.
+            const data = await graphqlAuth<{
+                quotePath: {
+                    route: string;
+                    amountIn: string;
+                    amountOut: string;
+                    minReturn: string;
+                    expiresAt: number;
+                    hopCount: number;
+                };
+            }>(
+                banxAuthorized.authorized.graphql,
+                `{ quotePath(from: ${JSON.stringify(p.fromAccount)}, to: ${JSON.stringify(p.toAccount)}, amount: ${JSON.stringify(p.amount)}, fromAsset: ${p.fromAsset}, toAsset: ${p.toAsset}, maxHops: ${p.maxHops}, exactOut: ${exactOut}) {
+                    route amountIn amountOut minReturn expiresAt hopCount
+                } }`,
             );
-            const amountOut = String(res.amountOut ?? res.amount_out ?? "");
-            const minReturn = String(
-                res.minReturn ?? res.min_return ?? amountOut,
-            );
+            const q = data.quotePath;
             return {
-                hops: (res.hops ?? []).map((h) => {
-                    const fxFrom =
-                        h.fxFromAsset ?? h.fx_from_asset ?? undefined;
-                    return {
-                        account: h.account,
-                        assetId: Number(h.assetId ?? h.asset_id),
-                        amount: String(h.amount ?? ""),
-                        hopFee: String(h.hopFee ?? h.hop_fee ?? "0"),
-                        fxFee: String(h.fxFee ?? h.fx_fee ?? "0"),
-                        fxFromAsset:
-                            fxFrom === null || fxFrom === undefined
-                                ? undefined
-                                : Number(fxFrom),
-                    };
-                }),
-                amountIn,
-                amountOut,
-                minReturn,
+                route: q.route,
+                amountIn: q.amountIn,
+                amountOut: q.amountOut,
+                minReturn: q.minReturn,
+                expiresAt: q.expiresAt,
+                hopCount: q.hopCount,
             };
         },
     });
@@ -1243,19 +1183,16 @@ export function usePathCash() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: {
-            hops: { account: string; assetId: number }[];
+            route: string;
+            /** Raw units. */
             amount: string;
             tokenId: number;
             recipient: string;
             minTokens: string;
-            /** One-hop only: most Banx this call may book, before netting. Human decimal of that hop. A longer path ignores it. */
             maxOwed: string;
         }) =>
             banxCall("pathCash", [
-                p.hops.map((h) => ({
-                    account: h.account,
-                    assetId: h.assetId,
-                })),
+                p.route,
                 p.amount,
                 p.tokenId,
                 p.recipient,

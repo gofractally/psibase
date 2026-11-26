@@ -94,14 +94,26 @@ fn forward_amount(hops: &[PathHop], amount: u64) -> Option<u64> {
     (forward > 0).then_some(forward)
 }
 
+const PRICE_CHANGED: &str = "path price changed since the quote";
+
 /// Run a path draw. Returns the last-hop amount.
+///
+/// `expected[i]` is what hop `i` was quoted to draw, in that hop's asset and
+/// after fees. Each hop is priced live and must draw exactly that. A fee, FX
+/// rate or relay reserve replaced since the quote changes a draw and aborts
+/// here, rather than filling at a worse price inside `min_return`.
 pub(crate) fn execute_path(
     sender: AccountNumber,
     hops: Vec<PathHop>,
+    expected: &[u64],
     amount: Quantity,
 ) -> Quantity {
     assert!(!hops.is_empty(), "path must include at least one hop");
     assert!(amount.value > 0, "path amount must be positive");
+    assert!(
+        hops.len() == expected.len(),
+        "route amounts do not match its hops"
+    );
     let mut path_debtor = sender;
     let mut forward = amount;
     let first_asset = hops[0].asset_id;
@@ -131,6 +143,7 @@ pub(crate) fn execute_path(
 
         if i == 0 {
             Connection::get_live(next_creditor, path_debtor, asset_id).draw(forward, sender);
+            assert!(forward.value == expected[0], "{PRICE_CHANGED}");
             prev_asset = asset_id;
             path_debtor = next_creditor;
             continue;
@@ -146,8 +159,12 @@ pub(crate) fn execute_path(
             }
         }
         assert!(forward.value > 0, "path hop produced nothing to forward");
-        forward = ForwardOffer::get_live(path_debtor, next_creditor, asset_id)
-            .path_draw(next_creditor, forward, sender);
+        forward = ForwardOffer::get_live(path_debtor, next_creditor, asset_id).path_draw(
+            next_creditor,
+            forward,
+            sender,
+        );
+        assert!(forward.value == expected[i], "{PRICE_CHANGED}");
         prev_asset = asset_id;
         path_debtor = next_creditor;
     }
@@ -164,6 +181,7 @@ pub(crate) fn execute_path(
 pub fn run_path(
     sender: AccountNumber,
     hops: Vec<PathHop>,
+    expected: &[u64],
     amount: Quantity,
     min_return: Quantity,
     request_id: u32,
@@ -172,7 +190,7 @@ pub fn run_path(
     let hop_count = hops.len();
     let first_asset = hops[0].asset_id;
     let last_hop = hops[hops.len() - 1];
-    let forward = execute_path(sender, hops, amount);
+    let forward = execute_path(sender, hops, expected, amount);
     assert!(
         forward.value >= min_return.value,
         "path_pay final amount below min_return"
@@ -201,4 +219,102 @@ pub fn run_path(
         );
     }
     forward
+}
+
+/// What each hop of `hops` draws for a send of `amount`, as far as the path
+/// can be priced, and whether all of it could. Never panics. A hop that
+/// cannot be priced and every hop after it read 0.
+///
+/// Test-only: a chain test seals a route the way the query service would. It
+/// mirrors [`execute_path`], which asserts the same numbers on every hop, so
+/// a drift between the two fails the payment tests.
+#[cfg(test)]
+pub(crate) fn peek_hop_amounts(hops: &[PathHop], amount: u64, now: i64) -> (Vec<u64>, bool) {
+    let mut out = vec![0_u64; hops.len()];
+    if hops.is_empty() {
+        return (out, false);
+    }
+    out[0] = amount;
+    let mut pools: HashMap<(AccountNumber, u16, u16), BanxRelay> = HashMap::new();
+    let mut spent: HashMap<(AccountNumber, u16, u16), u64> = HashMap::new();
+    let mut forward = amount;
+    for i in 1..hops.len() {
+        let prev = hops[i - 1];
+        let hop = hops[i];
+        if hop.asset_id != prev.asset_id {
+            if let Some(stored) = BanxRelay::get(prev.account, prev.asset_id, hop.asset_id) {
+                let key = (stored.owner, stored.asset_lo, stored.asset_hi);
+                let relay = pools.entry(key).or_insert(stored);
+                let Some(next) = relay.apply_out(prev.asset_id, forward) else {
+                    return (out, false);
+                };
+                forward = next;
+            } else {
+                let Some(pol) = FxOffer::get(prev.account, prev.asset_id, hop.asset_id, true)
+                else {
+                    return (out, false);
+                };
+                let key = (prev.account, prev.asset_id, hop.asset_id);
+                let used = spent.get(&key).copied().unwrap_or(0);
+                let live = pol.expires_at.seconds == 0 || now <= pol.expires_at.seconds;
+                if !live || forward > pol.remaining.value.saturating_sub(used) {
+                    return (out, false);
+                }
+                spent.insert(key, used + forward);
+                let Some(next) = try_apply_rate(forward, pol.fee_fixed.value, pol.fx_rate) else {
+                    return (out, false);
+                };
+                forward = next;
+            }
+        }
+        let Some(offer) = ForwardOffer::find_live(prev.account, hop.account, hop.asset_id, now)
+        else {
+            return (out, false);
+        };
+        let Some(next) = try_apply_hop_fee(forward, offer.fee_fixed.value, offer.fee_percent)
+        else {
+            return (out, false);
+        };
+        forward = next;
+        out[i] = forward;
+    }
+    (out, true)
+}
+
+/// [`path_required_send`] without the panics, for a path that may be broken.
+#[cfg(test)]
+pub(crate) fn peek_required_send(hops: &[PathHop], target_out: u64, now: i64) -> Option<u64> {
+    if hops.is_empty() {
+        return None;
+    }
+    if relay_used_twice(hops) {
+        return smallest_input_for_output(target_out, |a| {
+            let (amounts, complete) = peek_hop_amounts(hops, a, now);
+            complete
+                .then(|| amounts[amounts.len() - 1])
+                .filter(|v| *v > 0)
+        });
+    }
+    let mut need = Quantity::new(target_out);
+    for i in (1..hops.len()).rev() {
+        let prev = hops[i - 1];
+        let hop = hops[i];
+        let offer = ForwardOffer::find_live(prev.account, hop.account, hop.asset_id, now)?;
+        need = invert_hop_fee(need, offer.fee_fixed, offer.fee_percent);
+        if hop.asset_id != prev.asset_id {
+            if let Some(relay) = BanxRelay::get(prev.account, prev.asset_id, hop.asset_id) {
+                need = relay.swap_in(prev.asset_id, need);
+            } else {
+                let pol = FxOffer::get(prev.account, prev.asset_id, hop.asset_id, true)?;
+                if !(pol.expires_at.seconds == 0 || now <= pol.expires_at.seconds) {
+                    return None;
+                }
+                need = invert_rate(need, pol.fee_fixed, pol.fx_rate);
+                if need.value > pol.remaining.value {
+                    return None;
+                }
+            }
+        }
+    }
+    Some(need.value)
 }

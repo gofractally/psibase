@@ -64,7 +64,7 @@ impl PayAuth {
     }
 
     /// Pay the oldest due period only. Several elapsed periods stay due.
-    pub fn run(id: u32, hops: Vec<PathHop>, sender: AccountNumber) {
+    pub fn run(id: u32, hops: Vec<PathHop>, expected: &[u64], sender: AccountNumber) {
         let mut row = Self::get_assert(id);
         assert!(
             sender == row.payer || sender == row.payee,
@@ -96,7 +96,7 @@ impl PayAuth {
             .expect("pay auth next_due overflow");
         row.save();
         let memo = format!("pay-auth {}", row.id);
-        run_path(row.payer, hops, required, row.amount, 0, &memo);
+        run_path(row.payer, hops, expected, required, row.amount, 0, &memo);
     }
 
     /// Erase the row. Does not draw.

@@ -9,11 +9,111 @@ mod tests {
     };
     use crate::Wrapper;
     use psibase::fracpack::Pack;
-    use psibase::services::tokens::{Precision, Quantity};
+    use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::*;
 
     fn hop(account: AccountNumber, asset_id: u16) -> PathHop {
         PathHop { account, asset_id }
+    }
+
+    const TEST_ROUTE_KEY: [u8; 32] = [7; 32];
+
+    fn ensure_route_key(chain: &psibase::Chain) {
+        let table = crate::tables::RouteKeyTable::read();
+        if table.get_index_pk().get(&0).is_some() {
+            return;
+        }
+        Wrapper::push_from(chain, Wrapper::SERVICE)
+            .rotate_key(TEST_ROUTE_KEY.to_vec())
+            .get()
+            .expect("rotate route key");
+    }
+
+    fn chain_seconds(chain: &psibase::Chain) -> i64 {
+        psibase::services::transact::Wrapper::push(chain)
+            .currentBlock()
+            .get()
+            .expect("current block")
+            .time
+            .seconds()
+            .seconds
+    }
+
+    /// Seal a hop list the way the query service would, with every term set.
+    fn seal_with(
+        chain: &psibase::Chain,
+        payer: AccountNumber,
+        hops: Vec<PathHop>,
+        amount_in: u64,
+        amount_out: u64,
+        expires_at: i64,
+    ) -> String {
+        ensure_route_key(chain);
+        let mut random = [0_u8; 24 + 12 * 48];
+        random[0] = 1;
+        let last = *hops.last().expect("hops");
+        // What each hop will draw. A hop that cannot be priced reads 0: the
+        // payment fails at that hop before the amount is compared.
+        let (amounts, _) = crate::tables::peek_hop_amounts(&hops, amount_in, chain_seconds(chain));
+        crate::route::seal(
+            &TEST_ROUTE_KEY,
+            crate::route::RouteTerms {
+                epoch: 1,
+                payer,
+                payee: last.account,
+                from_asset: hops[0].asset_id,
+                to_asset: last.asset_id,
+                amount_in,
+                amount_out,
+                expires_at,
+            },
+            &hops,
+            &amounts,
+            &random,
+        )
+        .expect("seal route")
+    }
+
+    /// Seal a hop list the way the query service would. `amount` is the draw.
+    /// Most tests pass `min_return` on the action, so the sealed receive is
+    /// left open. The `route_*` tests below set it.
+    fn seal(
+        chain: &psibase::Chain,
+        payer: AccountNumber,
+        hops: Vec<PathHop>,
+        amount: Quantity,
+    ) -> String {
+        let now = chain_seconds(chain);
+        seal_with(chain, payer, hops, amount.value, u64::MAX, now + 60)
+    }
+
+    /// Seal for `pay_inv`: the send is the smallest that clears the invoice.
+    fn seal_inv(
+        chain: &psibase::Chain,
+        payer: AccountNumber,
+        hops: Vec<PathHop>,
+        request_id: u32,
+    ) -> String {
+        let remaining = PayRequest::get(request_id)
+            .map(|row| row.remaining.value)
+            .unwrap_or(1);
+        let now = chain_seconds(chain);
+        let send = crate::tables::peek_required_send(&hops, remaining, now).unwrap_or(remaining);
+        seal_with(chain, payer, hops, send, u64::MAX, now + 60)
+    }
+
+    /// Seal for `run_pay_ath`: the send is the smallest that delivers one period.
+    fn seal_auth(
+        chain: &psibase::Chain,
+        payer: AccountNumber,
+        hops: Vec<PathHop>,
+        id: u32,
+    ) -> String {
+        let now = chain_seconds(chain);
+        let send = PayAuth::get(id)
+            .and_then(|row| crate::tables::peek_required_send(&hops, row.amount.value, now))
+            .unwrap_or(1);
+        seal_with(chain, payer, hops, send, u64::MAX, now + 60)
     }
 
     fn never() -> TimePointSec {
@@ -37,9 +137,30 @@ mod tests {
         Ok(chain.graphql(Wrapper::SERVICE, query)?)
     }
 
+    /// A query as `user`, through the same session token the UI uses.
+    fn banx_gql_as(
+        chain: &psibase::Chain,
+        user: AccountNumber,
+        query: &str,
+    ) -> Result<serde_json::Value, psibase::Error> {
+        let token = chain.login(user, Wrapper::SERVICE)?;
+        Ok(chain.graphql_auth(Wrapper::SERVICE, query, &token)?)
+    }
+
+    /// The first GraphQL error message, or a marker when there is none.
+    fn gql_error(reply: &serde_json::Value) -> String {
+        reply
+            .pointer("/errors/0/message")
+            .and_then(|m| m.as_str())
+            .unwrap_or("(no error)")
+            .to_string()
+    }
+
+    /// `account`'s own feed, read as `account`: history is private to its owner.
     fn activity_nodes(chain: &psibase::Chain, account: AccountNumber) -> Vec<serde_json::Value> {
-        let graph = banx_gql(
+        let graph = banx_gql_as(
             chain,
+            account,
             &format!(
                 r#"{{ activity(account: "{account}", last: 50) {{
                     edges {{ node {{ kind amount netted actor counterparty memo assetId }} }}
@@ -146,6 +267,863 @@ mod tests {
         Ok(())
     }
 
+    /// Two accounts and a USD route between them. No lines: every route test
+    /// below fails before a hop is drawn.
+    fn route_net(chain: &psibase::Chain) -> (AccountNumber, AccountNumber, u16) {
+        Wrapper::push(chain).init().get().unwrap();
+        let alice = account!("alice");
+        let gary = account!("gary");
+        chain.new_account(alice).unwrap();
+        chain.new_account(gary).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        (alice, gary, usd)
+    }
+
+    fn pay_error(
+        chain: &psibase::Chain,
+        sender: AccountNumber,
+        route: String,
+        amount: u64,
+        min_return: u64,
+    ) -> String {
+        let pushed = Wrapper::push_from(chain, sender).path_pay(
+            route,
+            Quantity::new(amount),
+            Quantity::new(min_return),
+            0,
+        );
+        pushed
+            .trace
+            .error
+            .clone()
+            .unwrap_or_else(|| "(no error: path_pay succeeded)".to_string())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_route_key_unset_blocks_payment_and_reports_not_ready(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let (alice, _gary, _usd) = route_net(&chain);
+        let ready = banx_gql(&chain, "{ routingReady }")?;
+        assert_eq!(
+            ready.pointer("/data/routingReady"),
+            Some(&serde_json::json!(false)),
+            "{ready}"
+        );
+
+        let err = pay_error(&chain, alice, "00".to_string(), 10, 10);
+        assert!(err.contains("routing key is not set"), "{err}");
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_route_key_provision_rotate_and_permissions(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let (alice, gary, usd) = route_net(&chain);
+
+        let denied = Wrapper::push_from(&chain, alice)
+            .rotate_key(vec![1; 32])
+            .get()
+            .expect_err("only the service account may set the key");
+        assert!(
+            denied.to_string().contains("only the service account"),
+            "{denied}"
+        );
+        let short = Wrapper::push_from(&chain, Wrapper::SERVICE)
+            .rotate_key(vec![1; 31])
+            .get()
+            .expect_err("key must be 32 bytes");
+        assert!(short.to_string().contains("must be 32 bytes"), "{short}");
+
+        // Provision, seal under epoch 1, then rotate: the old quote stops opening.
+        let route = seal(&chain, alice, vec![hop(gary, usd)], Quantity::new(10));
+        let ready = banx_gql(&chain, "{ routingReady }")?;
+        assert_eq!(
+            ready.pointer("/data/routingReady"),
+            Some(&serde_json::json!(true)),
+            "{ready}"
+        );
+        Wrapper::push_from(&chain, Wrapper::SERVICE)
+            .rotate_key(TEST_ROUTE_KEY.to_vec())
+            .get()?;
+        let err = pay_error(&chain, alice, route, 10, 0);
+        assert!(err.contains("route is from an old key"), "{err}");
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_route_is_bound_to_payer_amount_receive_and_time(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let (alice, gary, usd) = route_net(&chain);
+        let now = chain_seconds(&chain);
+
+        // Quoted for alice. Gary cannot spend it.
+        let route = seal_with(&chain, alice, vec![hop(gary, usd)], 500, 500, now + 60);
+        let err = pay_error(&chain, gary, route.clone(), 500, 500);
+        assert!(
+            err.contains("route was quoted for a different payer"),
+            "{err}"
+        );
+
+        // The signed amount must be the quoted draw.
+        let err = pay_error(&chain, alice, route.clone(), 400, 400);
+        assert!(
+            err.contains("route amount does not match the signed amount"),
+            "{err}"
+        );
+
+        // A floor above the quoted receive is rejected before any hop runs.
+        let err = pay_error(&chain, alice, route.clone(), 500, 501);
+        assert!(err.contains("route receive is below min_return"), "{err}");
+
+        // A flipped character in the blob is not a route.
+        let mut bytes = route.clone().into_bytes();
+        let mid = bytes.len() / 2;
+        bytes[mid] = if bytes[mid] == b'0' { b'1' } else { b'0' };
+        let err = pay_error(&chain, alice, String::from_utf8(bytes).unwrap(), 500, 500);
+        assert!(err.contains("payment unavailable"), "{err}");
+
+        // The same blob is rejected once its quote has expired.
+        pin(&chain, now + 120);
+        let err = pay_error(&chain, alice, route, 500, 500);
+        assert!(err.contains("payment unavailable"), "{err}");
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_quote_path_needs_a_signed_in_caller(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let (_alice, _gary, usd) = route_net(&chain);
+        ensure_route_key(&chain);
+        let query = format!(
+            r#"{{ quotePath(from: "alice", to: "gary", amount: "1", fromAsset: {usd}, toAsset: {usd}, maxHops: 3, exactOut: true) {{ route }} }}"#
+        );
+        let reply = banx_gql(&chain, &query)?;
+        assert!(gql_error(&reply).contains("sign in"), "{reply}");
+        assert!(reply.pointer("/data/quotePath/route").is_none(), "{reply}");
+
+        // Signed in as someone who is neither end of the payment.
+        let carol = account!("carol");
+        chain.new_account(carol).unwrap();
+        let reply = banx_gql_as(&chain, carol, &query)?;
+        assert!(gql_error(&reply).contains("payer or the payee"), "{reply}");
+        Ok(())
+    }
+
+    /// Lines and forwarding that alice, gary and carol can tell apart:
+    /// alice->gary, carol->alice, and gary->carol, which alice is not a party to.
+    fn private_net(chain: &psibase::Chain) -> (AccountNumber, AccountNumber, AccountNumber, u16) {
+        let (alice, gary, usd) = route_net(chain);
+        let carol = account!("carol");
+        chain.new_account(carol).unwrap();
+        Wrapper::push_from(chain, alice)
+            .st_crd_lne(gary, usd, Quantity::new(100), false)
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, carol)
+            .st_crd_lne(alice, usd, Quantity::new(50), false)
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, gary)
+            .st_crd_lne(carol, usd, Quantity::new(70), false)
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, alice)
+            .st_glb_fwd(usd, Quantity::new(0), 10_000, never(), true)
+            .get()
+            .unwrap();
+        (alice, gary, carol, usd)
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_private_queries_need_sign_in(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        let (_alice, _gary, _carol, usd) = private_net(&chain);
+        for query in [
+            r#"{ creditLines(account: "alice") { creditor } }"#.to_string(),
+            r#"{ obligations(account: "alice") { creditor } }"#.to_string(),
+            r#"{ bookAuths(account: "alice") { creditor } }"#.to_string(),
+            format!(r#"{{ exposure(creditor: "alice", debtor: "gary", assetId: {usd}) }}"#),
+            r#"{ forwardOffers(poster: "alice") { poster } }"#.to_string(),
+            r#"{ requests(account: "alice") { id } }"#.to_string(),
+            r#"{ request(id: 1) { id } }"#.to_string(),
+            r#"{ payAuths(account: "alice") { id } }"#.to_string(),
+            r#"{ invites(inviter: "alice") { id } }"#.to_string(),
+            r#"{ activity(account: "alice", last: 5) { edges { node { kind } } } }"#.to_string(),
+        ] {
+            let reply = banx_gql(&chain, &query)?;
+            assert!(gql_error(&reply).contains("sign in"), "{query} -> {reply}");
+        }
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_network_wide_queries_are_gone(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        let (alice, _gary, _carol, _usd) = private_net(&chain);
+        for query in [
+            "{ networkLines { creditor } }",
+            "{ networkForwardOffers { poster } }",
+            r#"{ pathGraph(from: "alice", to: "gary", maxHops: 3) { now } }"#,
+        ] {
+            // Not even a signed-in caller can ask for the whole graph.
+            let reply = banx_gql_as(&chain, alice, query)?;
+            assert!(
+                gql_error(&reply).contains("Unknown field"),
+                "{query} -> {reply}"
+            );
+        }
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_private_queries_return_only_rows_the_caller_is_party_to(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let (alice, gary, carol, usd) = private_net(&chain);
+        let creditors = |reply: &serde_json::Value| -> Vec<String> {
+            let mut rows: Vec<String> = reply
+                .pointer("/data/creditLines")
+                .and_then(|v| v.as_array())
+                .unwrap_or_else(|| panic!("no creditLines in {reply}"))
+                .iter()
+                .map(|r| {
+                    format!(
+                        "{}>{}",
+                        r["creditor"].as_str().unwrap(),
+                        r["debtor"].as_str().unwrap()
+                    )
+                })
+                .collect();
+            rows.sort();
+            rows
+        };
+        let lines = |who: AccountNumber, about: &str| {
+            banx_gql_as(
+                &chain,
+                who,
+                &format!(r#"{{ creditLines(account: "{about}") {{ creditor debtor }} }}"#),
+            )
+        };
+
+        // Your own account: every line you are on.
+        assert_eq!(
+            creditors(&lines(alice, "alice")?),
+            vec!["alice>gary", "carol>alice"]
+        );
+        // Someone else's account: only the lines between you and them.
+        assert_eq!(creditors(&lines(gary, "alice")?), vec!["alice>gary"]);
+        assert_eq!(creditors(&lines(gary, "carol")?), vec!["gary>carol"]);
+        assert_eq!(creditors(&lines(carol, "gary")?), vec!["gary>carol"]);
+        // gary->carol is not visible to alice at all.
+        let alice_on_gary = creditors(&lines(alice, "gary")?);
+        assert_eq!(alice_on_gary, vec!["alice>gary"]);
+
+        // Obligations follow the same rule.
+        Wrapper::push_from(&chain, carol)
+            .path_pay(
+                seal(&chain, carol, vec![hop(gary, usd)], Quantity::new(10)),
+                Quantity::new(10),
+                Quantity::new(0),
+                0,
+            )
+            .get()?;
+        let owed = banx_gql_as(
+            &chain,
+            alice,
+            r#"{ obligations(account: "gary") { creditor debtor } }"#,
+        )?;
+        assert_eq!(
+            owed.pointer("/data/obligations")
+                .and_then(|v| v.as_array())
+                .map(|v| v.len()),
+            Some(0),
+            "alice is not a party to gary and carol's debt: {owed}"
+        );
+        let owed = banx_gql_as(
+            &chain,
+            carol,
+            r#"{ obligations(account: "gary") { creditor debtor } }"#,
+        )?;
+        assert_eq!(
+            owed.pointer("/data/obligations")
+                .and_then(|v| v.as_array())
+                .map(|v| v.len()),
+            Some(1),
+            "{owed}"
+        );
+
+        // Things only the owner may read.
+        let routing = banx_gql_as(
+            &chain,
+            gary,
+            r#"{ forwardOffers(poster: "alice") { poster } }"#,
+        )?;
+        assert!(gql_error(&routing).contains("your own"), "{routing}");
+        let own = banx_gql_as(
+            &chain,
+            alice,
+            r#"{ forwardOffers(poster: "alice") { poster } }"#,
+        )?;
+        assert_eq!(gql_error(&own), "(no error)", "{own}");
+        let feed = banx_gql_as(
+            &chain,
+            gary,
+            r#"{ activity(account: "alice", last: 5) { edges { node { kind } } } }"#,
+        )?;
+        assert!(gql_error(&feed).contains("your own"), "{feed}");
+        let invites = banx_gql_as(&chain, gary, r#"{ invites(inviter: "alice") { id } }"#)?;
+        assert!(gql_error(&invites).contains("your own"), "{invites}");
+        let third_party = banx_gql_as(
+            &chain,
+            alice,
+            &format!(r#"{{ exposure(creditor: "gary", debtor: "carol", assetId: {usd}) }}"#),
+        )?;
+        assert!(gql_error(&third_party).contains("party"), "{third_party}");
+
+        // Marketplace data stays public: no sign-in needed.
+        let public = banx_gql(&chain, "{ assets { id } constants { ppmScale } }")?;
+        assert_eq!(gql_error(&public), "(no error)", "{public}");
+        Ok(())
+    }
+
+    /// Quote through the real query service, then execute the sealed route.
+    /// Also proves the search's per-hop amounts equal what the chain draws.
+    fn quote_route(
+        chain: &psibase::Chain,
+        payer: AccountNumber,
+        payee: AccountNumber,
+        usd: u16,
+        receive_raw: u64,
+    ) -> Result<(String, u64, u64, u64), psibase::Error> {
+        let precision = Asset::get(usd).unwrap().precision;
+        let human = Decimal::new(Quantity::new(receive_raw), precision).to_string();
+        let reply = banx_gql_as(
+            chain,
+            payer,
+            &format!(
+                r#"{{ quotePath(from: "{payer}", to: "{payee}", amount: "{human}", fromAsset: {usd}, toAsset: {usd}, maxHops: 4, exactOut: true) {{ route amountIn amountOut minReturn hopCount }} }}"#
+            ),
+        )?;
+        let q = reply
+            .pointer("/data/quotePath")
+            .unwrap_or_else(|| panic!("quotePath failed: {reply}"));
+        let num = |k: &str| q[k].as_str().unwrap().parse::<u64>().unwrap();
+        Ok((
+            q["route"].as_str().unwrap().to_string(),
+            num("amountIn"),
+            num("amountOut"),
+            q["hopCount"].as_u64().unwrap(),
+        ))
+    }
+
+    /// alice -> gary (2% forward) -> steve, with room on every line.
+    fn quoted_net(chain: &psibase::Chain) -> (AccountNumber, AccountNumber, AccountNumber, u16) {
+        Wrapper::push(chain).init().get().unwrap();
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(chain, gary)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false)
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false)
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), PPM_SCALE * 2 / 100, never(), true)
+            .get()
+            .unwrap();
+        ensure_route_key(chain);
+        (alice, gary, steve, usd)
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_quoted_route_executes_with_the_quoted_amounts(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let (alice, gary, steve, usd) = quoted_net(&chain);
+        let (route, amount_in, amount_out, hops) = quote_route(&chain, alice, steve, usd, 490)?;
+        assert_eq!(hops, 2);
+        assert!(
+            amount_out >= 490 && amount_in > amount_out,
+            "{amount_in} {amount_out}"
+        );
+
+        Wrapper::push_from(&chain, alice)
+            .path_pay(route, Quantity::new(amount_in), Quantity::new(490), 0)
+            .get()?;
+        assert_eq!(exp(&chain, gary, alice, usd), amount_in);
+        assert_eq!(exp(&chain, steve, gary, usd), amount_out);
+        Ok(())
+    }
+
+    /// The amounts are the protection here, not `min_return`: a floor of 0
+    /// would accept any fill, and a replaced fee still fails.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_a_changed_fee_fails_even_with_no_min_return(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let (alice, gary, steve, usd) = quoted_net(&chain);
+        let (route, amount_in, _out, _) = quote_route(&chain, alice, steve, usd, 490)?;
+
+        // Gary raises his fee from 2% to 10% after the quote.
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), PPM_SCALE / 10, never(), true)
+            .get()?;
+        let err = pay_error(&chain, alice, route.clone(), amount_in, 0);
+        assert!(err.contains("path price changed since the quote"), "{err}");
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
+        assert_eq!(exp(&chain, steve, gary, usd), 0);
+
+        // Put the fee back and the same quote runs.
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), PPM_SCALE * 2 / 100, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(route, Quantity::new(amount_in), Quantity::new(0), 0)
+            .get()?;
+        assert_eq!(exp(&chain, gary, alice, usd), amount_in);
+        Ok(())
+    }
+
+    /// A route whose sealed amount for one hop is off by one does not run, even
+    /// though the draw would have succeeded and `min_return` is 0.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_each_sealed_hop_amount_must_match_the_live_price(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let (alice, gary, steve, usd) = quoted_net(&chain);
+        let now = chain_seconds(&chain);
+        let hops = vec![hop(gary, usd), hop(steve, usd)];
+        let seal_amounts = |amounts: [u64; 2]| {
+            let mut random = [0_u8; 24 + 12 * 48];
+            random[0] = 1;
+            crate::route::seal(
+                &TEST_ROUTE_KEY,
+                crate::route::RouteTerms {
+                    epoch: 1,
+                    payer: alice,
+                    payee: steve,
+                    from_asset: usd,
+                    to_asset: usd,
+                    amount_in: 500,
+                    amount_out: u64::MAX,
+                    expires_at: now + 60,
+                },
+                &hops,
+                &amounts,
+                &random,
+            )
+            .expect("seal route")
+        };
+        // 500 through a 2% forward draws 490 on the second hop.
+        for wrong in [489, 491, 0] {
+            let err = pay_error(&chain, alice, seal_amounts([500, wrong]), 500, 0);
+            assert!(
+                err.contains("path price changed since the quote"),
+                "{wrong}: {err}"
+            );
+        }
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                seal_amounts([500, 490]),
+                Quantity::new(500),
+                Quantity::new(0),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, steve, gary, usd), 490);
+        Ok(())
+    }
+
+    struct Quoted {
+        route: String,
+        amount_in: u64,
+        amount_out: u64,
+        min_return: u64,
+        hops: u64,
+    }
+
+    /// Quote through the real query service, as `user`. `amount_raw` is what the
+    /// payee receives in `to_asset` when `exact_out`, otherwise what the payer
+    /// sends in `from_asset`.
+    fn quote_between(
+        chain: &psibase::Chain,
+        user: AccountNumber,
+        payer: AccountNumber,
+        payee: AccountNumber,
+        (from_asset, to_asset): (u16, u16),
+        amount_raw: u64,
+        exact_out: bool,
+    ) -> Quoted {
+        let amount_asset = if exact_out { to_asset } else { from_asset };
+        let precision = Asset::get(amount_asset).unwrap().precision;
+        let human = Decimal::new(Quantity::new(amount_raw), precision).to_string();
+        let reply = banx_gql_as(
+            chain,
+            user,
+            &format!(
+                r#"{{ quotePath(from: "{payer}", to: "{payee}", amount: "{human}", fromAsset: {from_asset}, toAsset: {to_asset}, maxHops: 5, exactOut: {exact_out}) {{ route amountIn amountOut minReturn hopCount }} }}"#
+            ),
+        )
+        .unwrap();
+        let q = reply
+            .pointer("/data/quotePath")
+            .unwrap_or_else(|| panic!("quotePath failed: {reply}"));
+        let num = |k: &str| q[k].as_str().unwrap().parse::<u64>().unwrap();
+        Quoted {
+            route: q["route"].as_str().unwrap().to_string(),
+            amount_in: num("amountIn"),
+            amount_out: num("amountOut"),
+            min_return: num("minReturn"),
+            hops: q["hopCount"].as_u64().unwrap(),
+        }
+    }
+
+    struct FxNet {
+        isabelle: AccountNumber,
+        john: AccountNumber,
+        mike: AccountNumber,
+        james: AccountNumber,
+        aud: u16,
+        usd: u16,
+    }
+
+    /// Isabelle owes in AUD. John takes AUD and posts an AUD->USD offer (0.65,
+    /// 10 flat). Mike and James are USD hops, Mike keeping a 1% forward fee.
+    fn fx_net(chain: &psibase::Chain) -> FxNet {
+        Wrapper::push(chain).init().get().unwrap();
+        let isabelle = account!("isabelle");
+        let john = account!("john");
+        let mike = account!("mike");
+        let james = account!("james");
+        for a in [isabelle, john, mike, james] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let limit = Quantity::new(1_000_000);
+        Wrapper::push_from(chain, john)
+            .st_crd_lne(isabelle, aud, limit, false)
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, mike)
+            .st_crd_lne(john, usd, limit, false)
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, james)
+            .st_crd_lne(mike, usd, limit, false)
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, john)
+            .st_glb_fwd(usd, Quantity::new(0), 0, never(), true)
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, mike)
+            .st_glb_fwd(usd, Quantity::new(0), PPM_SCALE / 100, never(), true)
+            .get()
+            .unwrap();
+        post_fx(chain, john, aud, usd, 65);
+        ensure_route_key(chain);
+        FxNet {
+            isabelle,
+            john,
+            mike,
+            james,
+            aud,
+            usd,
+        }
+    }
+
+    /// John's AUD->USD offer at `percent` USD per 100 AUD, with a flat 10 AUD fee.
+    fn post_fx(chain: &psibase::Chain, john: AccountNumber, aud: u16, usd: u16, percent: u64) {
+        Wrapper::push_from(chain, john)
+            .st_fx_ofr(
+                aud,
+                usd,
+                true,
+                Quantity::new(10),
+                RATE_SCALE * percent / 100,
+                Quantity::new(u64::MAX),
+                never(),
+            )
+            .get()
+            .unwrap();
+    }
+
+    /// Isabelle pays James in USD while owing John in AUD, across John's offer.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_quoted_fx_route_exact_out_crosses_currencies(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let n = fx_net(&chain);
+        let q = quote_between(
+            &chain,
+            n.isabelle,
+            n.isabelle,
+            n.james,
+            (n.aud, n.usd),
+            5_000,
+            true,
+        );
+        assert_eq!(q.hops, 3, "john (AUD), mike (USD), james (USD)");
+        assert!(q.amount_out >= 5_000);
+
+        Wrapper::push_from(&chain, n.isabelle)
+            .path_pay(
+                q.route,
+                Quantity::new(q.amount_in),
+                Quantity::new(q.min_return),
+                0,
+            )
+            .get()?;
+
+        // Isabelle stays in AUD. John takes the USD liability to Mike.
+        assert_eq!(exp(&chain, n.john, n.isabelle, n.aud), q.amount_in);
+        assert_eq!(exp(&chain, n.isabelle, n.john, n.usd), 0);
+        // Worked from the offer, not from the quote: (send - 10 flat) * 0.65.
+        let fx_out = (q.amount_in - 10) * 65 / 100;
+        assert_eq!(exp(&chain, n.mike, n.john, n.usd), fx_out);
+        // Mike keeps 1% of what he forwards to James.
+        let paid = exp(&chain, n.james, n.mike, n.usd);
+        assert_eq!(paid, q.amount_out);
+        let fee = fx_out - paid;
+        assert!(
+            fee >= fx_out / 100 && fee <= fx_out / 100 + 1,
+            "fee {fee} of {fx_out}"
+        );
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_quoted_fx_route_exact_in_crosses_currencies(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let n = fx_net(&chain);
+        let q = quote_between(
+            &chain,
+            n.isabelle,
+            n.isabelle,
+            n.james,
+            (n.aud, n.usd),
+            10_000,
+            false,
+        );
+        assert_eq!(q.amount_in, 10_000);
+        assert_eq!(
+            q.min_return, q.amount_out,
+            "exact-in floors at the quoted receive"
+        );
+
+        Wrapper::push_from(&chain, n.isabelle)
+            .path_pay(
+                q.route,
+                Quantity::new(10_000),
+                Quantity::new(q.min_return),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, n.john, n.isabelle, n.aud), 10_000);
+        // (10_000 - 10) * 0.65 = 6_493.5, floored.
+        assert_eq!(exp(&chain, n.mike, n.john, n.usd), 6_493);
+        assert_eq!(exp(&chain, n.james, n.mike, n.usd), q.amount_out);
+        Ok(())
+    }
+
+    /// John moves his rate after the quote. Even a better-for-John rate fails
+    /// with no floor set: the payer approved a different price.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_a_replaced_fx_rate_fails_the_quoted_route(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let n = fx_net(&chain);
+        let pair = (n.aud, n.usd);
+        let q = quote_between(&chain, n.isabelle, n.isabelle, n.james, pair, 5_000, true);
+
+        post_fx(&chain, n.john, n.aud, n.usd, 60);
+        let err = pay_error(&chain, n.isabelle, q.route.clone(), q.amount_in, 0);
+        assert!(err.contains("path price changed since the quote"), "{err}");
+        assert_eq!(exp(&chain, n.john, n.isabelle, n.aud), 0);
+        assert_eq!(exp(&chain, n.james, n.mike, n.usd), 0);
+
+        // A fresh quote prices the new rate: more AUD for the same USD.
+        let fresh = quote_between(&chain, n.isabelle, n.isabelle, n.james, pair, 5_000, true);
+        assert!(
+            fresh.amount_in > q.amount_in,
+            "{} vs {}",
+            fresh.amount_in,
+            q.amount_in
+        );
+        Wrapper::push_from(&chain, n.isabelle)
+            .path_pay(
+                fresh.route,
+                Quantity::new(fresh.amount_in),
+                Quantity::new(fresh.min_return),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, n.john, n.isabelle, n.aud), fresh.amount_in);
+        Ok(())
+    }
+
+    /// Bob pays Alice in AUD through John's USD/AUD relay curve.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_quoted_relay_route_executes_and_goes_stale_after_another_trade(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let net = relay_net(&chain);
+        post_relay(&chain, net.john, net.usd, net.aud);
+        ensure_route_key(&chain);
+        let pair = (net.usd, net.aud);
+        let quote =
+            |amount: u64| quote_between(&chain, net.bob, net.bob, net.alice, pair, amount, true);
+
+        let first = quote(1_000);
+        let second = quote(1_000);
+        assert_eq!(first.amount_in, second.amount_in);
+        assert_eq!(first.hops, 3, "brandon, john (USD), alice (AUD)");
+
+        Wrapper::push_from(&chain, net.bob)
+            .path_pay(
+                first.route,
+                Quantity::new(first.amount_in),
+                Quantity::new(first.min_return),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, net.brandon, net.bob, net.usd), first.amount_in);
+        assert_eq!(exp(&chain, net.alice, net.john, net.aud), first.amount_out);
+
+        // That trade moved the curve. The second quote priced the old reserves.
+        let err = pay_error(&chain, net.bob, second.route, second.amount_in, 0);
+        assert!(err.contains("path price changed since the quote"), "{err}");
+
+        // A fresh quote prices the new reserves: AUD is dearer in USD now.
+        let third = quote(1_000);
+        assert!(
+            third.amount_in > first.amount_in,
+            "{} vs {}",
+            third.amount_in,
+            first.amount_in
+        );
+        Wrapper::push_from(&chain, net.bob)
+            .path_pay(
+                third.route,
+                Quantity::new(third.amount_in),
+                Quantity::new(third.min_return),
+                0,
+            )
+            .get()?;
+        assert_eq!(
+            exp(&chain, net.alice, net.john, net.aud),
+            first.amount_out + third.amount_out
+        );
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_quoted_route_pays_an_invoice_and_binds_the_price(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let (alice, gary, steve, usd) = quoted_net(&chain);
+        let id = Wrapper::push_from(&chain, steve)
+            .st_req(
+                PayRequest::INVOICE,
+                alice,
+                usd,
+                Quantity::new(400),
+                "lunch".into(),
+                never(),
+            )
+            .get()?;
+        let q = quote_between(&chain, alice, alice, steve, (usd, usd), 400, true);
+
+        // A budget under the quoted send is refused.
+        let low = Wrapper::push_from(&chain, alice)
+            .pay_inv(q.route.clone(), Quantity::new(q.amount_in - 1), id)
+            .get()
+            .expect_err("budget below the send");
+        assert!(
+            low.to_string().contains("max_spend below required send"),
+            "{low}"
+        );
+
+        // Gary raises his fee. A generous budget would absorb it. The price
+        // check does not.
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), PPM_SCALE / 10, never(), true)
+            .get()?;
+        let moved = Wrapper::push_from(&chain, alice)
+            .pay_inv(q.route.clone(), Quantity::new(q.amount_in * 2), id)
+            .get()
+            .expect_err("the fee moved");
+        assert!(
+            moved
+                .to_string()
+                .contains("path price changed since the quote"),
+            "{moved}"
+        );
+        assert!(PayRequest::get(id).is_some());
+
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), PPM_SCALE * 2 / 100, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .pay_inv(q.route, Quantity::new(q.amount_in), id)
+            .get()?;
+        assert!(PayRequest::get(id).is_none());
+        assert_eq!(exp(&chain, steve, gary, usd), 400);
+        assert_eq!(exp(&chain, gary, alice, usd), q.amount_in);
+        Ok(())
+    }
+
+    /// The payee runs the payer's repeating payment with a route they quoted
+    /// for the payer.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_quoted_route_runs_a_repeating_payment_and_binds_the_price(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let (alice, gary, steve, usd) = quoted_net(&chain);
+        let start = chain_seconds(&chain);
+        let id = schedule(&chain, alice, steve, usd, 400, 1_000, 100, start, 0);
+        let q = quote_between(&chain, steve, alice, steve, (usd, usd), 400, true);
+
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), PPM_SCALE / 10, never(), true)
+            .get()?;
+        let moved = Wrapper::push_from(&chain, steve)
+            .run_pay_ath(id, q.route.clone())
+            .get()
+            .expect_err("the fee moved");
+        assert!(
+            moved
+                .to_string()
+                .contains("path price changed since the quote"),
+            "{moved}"
+        );
+        assert_eq!(pay_row(id).next_due.seconds, start);
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
+
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), PPM_SCALE * 2 / 100, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .run_pay_ath(id, q.route)
+            .get()?;
+        assert_eq!(pay_row(id).next_due.seconds, start + 100);
+        assert_eq!(exp(&chain, steve, gary, usd), 400);
+        assert_eq!(exp(&chain, gary, alice, usd), q.amount_in);
+        Ok(())
+    }
+
     #[psibase::test_case(packages("Banx"))]
     fn test_path_pay_same_asset_hops(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -173,7 +1151,7 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(&chain, alice, vec![hop(gary, usd), hop(steve, usd)], amount),
                 amount,
                 Quantity::new(490),
                 0,
@@ -229,12 +1207,27 @@ mod tests {
             .get()?;
 
         assert!(Wrapper::push_from(&chain, bluey)
-            .path_pay(vec![hop(bingo, aud)], popper, popper, 0)
+            .path_pay(
+                seal(&chain, bluey, vec![hop(bingo, aud)], popper),
+                popper,
+                popper,
+                0
+            )
             .get()
             .is_err());
 
         Wrapper::push_from(&chain, bluey)
-            .path_pay(vec![hop(bandit, aud), hop(bingo, aud)], popper, popper, 0)
+            .path_pay(
+                seal(
+                    &chain,
+                    bluey,
+                    vec![hop(bandit, aud), hop(bingo, aud)],
+                    popper,
+                ),
+                popper,
+                popper,
+                0,
+            )
             .get()?;
 
         assert_eq!(exp(&chain, bluey, bandit, aud), leftover.value);
@@ -245,7 +1238,12 @@ mod tests {
 
         assert!(Wrapper::push_from(&chain, bluey)
             .path_pay(
-                vec![hop(bandit, aud), hop(bingo, aud)],
+                seal(
+                    &chain,
+                    bluey,
+                    vec![hop(bandit, aud), hop(bingo, aud)],
+                    Quantity::new(leftover.value + 1)
+                ),
                 Quantity::new(leftover.value + 1),
                 Quantity::new(leftover.value + 1),
                 0,
@@ -255,7 +1253,12 @@ mod tests {
 
         Wrapper::push_from(&chain, bluey)
             .path_pay(
-                vec![hop(bandit, aud), hop(bingo, aud)],
+                seal(
+                    &chain,
+                    bluey,
+                    vec![hop(bandit, aud), hop(bingo, aud)],
+                    leftover,
+                ),
                 leftover,
                 leftover,
                 0,
@@ -306,7 +1309,12 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, aud), hop(steve, usd)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(700),
                 0,
@@ -400,12 +1408,17 @@ mod tests {
 
         Wrapper::push_from(&chain, zac)
             .path_pay(
-                vec![
-                    hop(mitchell, aud),
-                    hop(john, aud),
-                    hop(mike, usd),
-                    hop(brandon, usd),
-                ],
+                seal(
+                    &chain,
+                    zac,
+                    vec![
+                        hop(mitchell, aud),
+                        hop(john, aud),
+                        hop(mike, usd),
+                        hop(brandon, usd),
+                    ],
+                    amount_aud,
+                ),
                 amount_aud,
                 min_brandon,
                 0,
@@ -493,7 +1506,12 @@ mod tests {
         // 1% hop fee: 50506 * 99/100 floors to 50000.
         Wrapper::push_from(&chain, mitchell)
             .path_pay(
-                vec![hop(john, aud), hop(cafe, aud)],
+                seal(
+                    &chain,
+                    mitchell,
+                    vec![hop(john, aud), hop(cafe, aud)],
+                    5_0506.into(),
+                ),
                 5_0506.into(),
                 5_0000.into(),
                 id,
@@ -595,12 +1613,17 @@ mod tests {
         // Actual final = 6113; demand 7000 → fail; no legs stick.
         let result = Wrapper::push_from(&chain, zac)
             .path_pay(
-                vec![
-                    hop(mitchell, aud),
-                    hop(john, aud),
-                    hop(mike, usd),
-                    hop(brandon, usd),
-                ],
+                seal(
+                    &chain,
+                    zac,
+                    vec![
+                        hop(mitchell, aud),
+                        hop(john, aud),
+                        hop(mike, usd),
+                        hop(brandon, usd),
+                    ],
+                    Quantity::new(10_000),
+                ),
                 Quantity::new(10_000),
                 Quantity::new(7_000),
                 0,
@@ -670,7 +1693,12 @@ mod tests {
             .get()?;
 
         let too_big = Wrapper::push_from(&chain, alice).path_pay(
-            vec![hop(gary, aud), hop(steve, usd)],
+            seal(
+                &chain,
+                alice,
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(1_000),
+            ),
             Quantity::new(1_000),
             Quantity::new(700),
             0,
@@ -698,7 +1726,7 @@ mod tests {
             )
             .get()?;
         let inv = Wrapper::push_from(&chain, alice).pay_inv(
-            vec![hop(gary, aud), hop(steve, usd)],
+            seal_inv(&chain, alice, vec![hop(gary, aud), hop(steve, usd)], id),
             Quantity::new(2_000),
             id,
         );
@@ -712,7 +1740,12 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, aud), hop(steve, usd)],
+                    Quantity::new(500),
+                ),
                 Quantity::new(500),
                 Quantity::new(350),
                 0,
@@ -723,7 +1756,12 @@ mod tests {
         assert!(FxOffer::get(gary, aud, usd, true).is_none());
         assert!(Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, aud), hop(steve, usd)],
+                    Quantity::new(1)
+                ),
                 Quantity::new(1),
                 Quantity::new(0),
                 0,
@@ -789,7 +1827,12 @@ mod tests {
 
         let result = Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100),
+                ),
                 Quantity::new(100),
                 Quantity::new(0),
                 0,
@@ -824,7 +1867,12 @@ mod tests {
 
         let result = Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100),
+                ),
                 Quantity::new(100),
                 Quantity::new(80),
                 0,
@@ -834,7 +1882,12 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100),
+                ),
                 Quantity::new(100),
                 Quantity::new(50),
                 0,
@@ -861,7 +1914,12 @@ mod tests {
             .st_crd_lne(alice, usd, Quantity::new(1_000), false)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![hop(bob, usd)], amount, amount, 0)
+            .path_pay(
+                seal(&chain, alice, vec![hop(bob, usd)], amount),
+                amount,
+                amount,
+                0,
+            )
             .get()?;
 
         Wrapper::push_from(&chain, bob)
@@ -897,7 +1955,7 @@ mod tests {
         // Alice draws 100 on Bob → Bob is creditor, Alice debtor.
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(bob, usd)],
+                seal(&chain, alice, vec![hop(bob, usd)], Quantity::new(100)),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -909,7 +1967,7 @@ mod tests {
         // Bob draws 100 on Alice → reverse claim auto-nets to zero.
         Wrapper::push_from(&chain, bob)
             .path_pay(
-                vec![hop(alice, usd)],
+                seal(&chain, bob, vec![hop(alice, usd)], Quantity::new(100)),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -921,7 +1979,7 @@ mod tests {
         // Partial reverse: Alice draws 100, Bob draws 40 → Alice still owes 60.
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(bob, usd)],
+                seal(&chain, alice, vec![hop(bob, usd)], Quantity::new(100)),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -929,7 +1987,7 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, bob)
             .path_pay(
-                vec![hop(alice, usd)],
+                seal(&chain, bob, vec![hop(alice, usd)], Quantity::new(40)),
                 Quantity::new(40),
                 Quantity::new(40),
                 0,
@@ -1175,7 +2233,12 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(500),
+                ),
                 Quantity::new(500),
                 Quantity::new(490),
                 0,
@@ -1219,7 +2282,12 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100),
+                ),
                 Quantity::new(100),
                 Quantity::new(90),
                 0,
@@ -1246,7 +2314,12 @@ mod tests {
         assert_eq!(line.remaining.value, 100);
 
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![hop(bob, usd)], Quantity::new(60), Quantity::new(60), 0)
+            .path_pay(
+                seal(&chain, alice, vec![hop(bob, usd)], Quantity::new(60)),
+                Quantity::new(60),
+                Quantity::new(60),
+                0,
+            )
             .get()?;
         let line = Pair::line(bob, alice, usd).unwrap();
         assert_eq!(line.limit.value, 100);
@@ -1256,7 +2329,12 @@ mod tests {
 
         // Remaining is 40, not 40-after-shrunk-cap.
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![hop(bob, usd)], Quantity::new(40), Quantity::new(40), 0)
+            .path_pay(
+                seal(&chain, alice, vec![hop(bob, usd)], Quantity::new(40)),
+                Quantity::new(40),
+                Quantity::new(40),
+                0,
+            )
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 100);
         assert_eq!(Pair::line(bob, alice, usd).unwrap().remaining.value, 0);
@@ -1267,7 +2345,12 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 0);
         let over = Wrapper::push_from(&chain, alice)
-            .path_pay(vec![hop(bob, usd)], Quantity::new(1), Quantity::new(1), 0)
+            .path_pay(
+                seal(&chain, alice, vec![hop(bob, usd)], Quantity::new(1)),
+                Quantity::new(1),
+                Quantity::new(1),
+                0,
+            )
             .get();
         assert!(over.is_err());
         Ok(())
@@ -1725,7 +2808,12 @@ mod tests {
 
         assert!(Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100)
+                ),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -1738,7 +2826,12 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100),
+                ),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -1778,7 +2871,12 @@ mod tests {
         assert!(
             Wrapper::push_from(&chain, sender)
                 .path_pay(
-                    vec![hop(alice, usd), hop(mallory, usd)],
+                    seal(
+                        &chain,
+                        sender,
+                        vec![hop(alice, usd), hop(mallory, usd)],
+                        Quantity::new(100)
+                    ),
                     Quantity::new(100),
                     Quantity::new(100),
                     0,
@@ -1816,7 +2914,12 @@ mod tests {
 
         Wrapper::push_from(&chain, mitchell)
             .path_pay(
-                vec![hop(john, usd), hop(cafe, usd)],
+                seal(
+                    &chain,
+                    mitchell,
+                    vec![hop(john, usd), hop(cafe, usd)],
+                    Quantity::new(50_0000),
+                ),
                 Quantity::new(50_0000),
                 Quantity::new(50_0000),
                 0,
@@ -1849,7 +2952,12 @@ mod tests {
 
         assert!(Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100)
+                ),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -1862,7 +2970,12 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100),
+                ),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -1893,7 +3006,12 @@ mod tests {
             .get()?;
         assert!(Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100)
+                ),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -1906,7 +3024,12 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100),
+                ),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -1943,7 +3066,12 @@ mod tests {
             .get()?;
         assert!(Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100)
+                ),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -1956,7 +3084,12 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100),
+                ),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -2094,7 +3227,12 @@ mod tests {
             .get()?;
 
         let direct = Wrapper::push_from(&chain, john)
-            .path_pay(vec![hop(michelle, aud)], dollars, dollars, 0)
+            .path_pay(
+                seal(&chain, john, vec![hop(michelle, aud)], dollars),
+                dollars,
+                dollars,
+                0,
+            )
             .get();
         assert!(
             direct.is_err(),
@@ -2105,7 +3243,12 @@ mod tests {
 
         Wrapper::push_from(&chain, john)
             .path_pay(
-                vec![hop(isabelle, merlo), hop(michelle, aud)],
+                seal(
+                    &chain,
+                    john,
+                    vec![hop(isabelle, merlo), hop(michelle, aud)],
+                    grams,
+                ),
                 grams,
                 dollars,
                 0,
@@ -2171,7 +3314,12 @@ mod tests {
 
         let trade = Wrapper::push_from(&chain, john)
             .path_pay(
-                vec![hop(isabelle, weetbix), hop(john, aud)],
+                seal(
+                    &chain,
+                    john,
+                    vec![hop(isabelle, weetbix), hop(john, aud)],
+                    Quantity::new(BISCUITS),
+                ),
                 Quantity::new(BISCUITS),
                 Quantity::new(DOLLARS),
                 0,
@@ -2184,7 +3332,12 @@ mod tests {
 
         Wrapper::push_from(&chain, john)
             .path_pay(
-                vec![hop(isabelle, weetbix), hop(michelle, weetbix)],
+                seal(
+                    &chain,
+                    john,
+                    vec![hop(isabelle, weetbix), hop(michelle, weetbix)],
+                    Quantity::new(BISCUITS),
+                ),
                 Quantity::new(BISCUITS),
                 Quantity::new(BISCUITS),
                 0,
@@ -2298,7 +3451,12 @@ mod tests {
 
         Wrapper::push_from(&chain, john)
             .path_pay(
-                vec![hop(isabelle, weetbix), hop(michelle, weetbix)],
+                seal(
+                    &chain,
+                    john,
+                    vec![hop(isabelle, weetbix), hop(michelle, weetbix)],
+                    Quantity::new(BISCUITS),
+                ),
                 Quantity::new(BISCUITS),
                 Quantity::new(BISCUITS),
                 0,
@@ -2306,7 +3464,12 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, john)
             .path_pay(
-                vec![hop(isabelle, kwh), hop(michelle, kwh)],
+                seal(
+                    &chain,
+                    john,
+                    vec![hop(isabelle, kwh), hop(michelle, kwh)],
+                    Quantity::new(CHARGE),
+                ),
                 Quantity::new(CHARGE),
                 Quantity::new(CHARGE),
                 0,
@@ -2499,12 +3662,17 @@ mod tests {
 
         Wrapper::push_from(&chain, john)
             .path_pay(
-                vec![
-                    hop(isabelle, kwh),
-                    hop(michelle, kwh),
-                    hop(isabelle, aud),
-                    hop(john, aud),
-                ],
+                seal(
+                    &chain,
+                    john,
+                    vec![
+                        hop(isabelle, kwh),
+                        hop(michelle, kwh),
+                        hop(isabelle, aud),
+                        hop(john, aud),
+                    ],
+                    Quantity::new(TRADE),
+                ),
                 Quantity::new(TRADE),
                 Quantity::new(quoted_aud),
                 0,
@@ -2569,7 +3737,12 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, aud), hop(steve, usd)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(700),
                 0,
@@ -2633,7 +3806,12 @@ mod tests {
             )
             .get()?;
         let consumed = Wrapper::push_from(&chain, alice).path_pay(
-            vec![hop(gary, aud), hop(steve, usd)],
+            seal(
+                &chain,
+                alice,
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(1_000),
+            ),
             Quantity::new(1_000),
             Quantity::new(0),
             0,
@@ -2665,7 +3843,12 @@ mod tests {
 
         // (1000 − 100) × 0.70 = 630. Asking for 700 must fail and leave the budget.
         let short = Wrapper::push_from(&chain, alice).path_pay(
-            vec![hop(gary, aud), hop(steve, usd)],
+            seal(
+                &chain,
+                alice,
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(1_000),
+            ),
             Quantity::new(1_000),
             Quantity::new(700),
             0,
@@ -2688,7 +3871,12 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, aud), hop(steve, usd)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(630),
                 0,
@@ -2714,7 +3902,7 @@ mod tests {
         Ok(())
     }
 
-    /// A debtor-side quote is not a path rate. pathGraph omits it.
+    /// A debtor-side quote is not a path rate.
     /// fxOffers still lists it. Removing the creditor row makes
     /// the path fail again while the debtor row remains.
     #[psibase::test_case(packages("Banx"))]
@@ -2773,24 +3961,20 @@ mod tests {
         let policies_q = r#"{ fxOffers(poster: "gary") {
             poster fromAsset toAsset posterIsCreditor
         } }"#;
-        let graph_q = r#"{ pathGraph(from: "alice", to: "steve", maxHops: 4) {
-            fxOffers { poster fromAsset toAsset posterIsCreditor }
-        } }"#;
-
         let listed = banx_gql(&chain, policies_q)?;
-        let graph = banx_gql(&chain, graph_q)?;
         assert_eq!(
             gary_sides(&listed, "/data/fxOffers", aud, usd),
             vec![false],
             "{listed}"
         );
-        assert!(
-            gary_sides(&graph, "/data/pathGraph/fxOffers", aud, usd).is_empty(),
-            "{graph}"
-        );
 
         let debtor_only = Wrapper::push_from(&chain, alice).path_pay(
-            vec![hop(gary, aud), hop(steve, usd)],
+            seal(
+                &chain,
+                alice,
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(1_000),
+            ),
             Quantity::new(1_000),
             Quantity::new(0),
             0,
@@ -2821,21 +4005,20 @@ mod tests {
             )
             .get()?;
         let listed = banx_gql(&chain, policies_q)?;
-        let graph = banx_gql(&chain, graph_q)?;
         assert_eq!(
             gary_sides(&listed, "/data/fxOffers", aud, usd),
             vec![false, true],
             "{listed}"
         );
-        assert_eq!(
-            gary_sides(&graph, "/data/pathGraph/fxOffers", aud, usd),
-            vec![true],
-            "{graph}"
-        );
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, aud), hop(steve, usd)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(700),
                 0,
@@ -2856,7 +4039,12 @@ mod tests {
             .rm_fx_ofr(aud, usd, true)
             .get()?;
         let again = Wrapper::push_from(&chain, alice).path_pay(
-            vec![hop(gary, aud), hop(steve, usd)],
+            seal(
+                &chain,
+                alice,
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(1_000),
+            ),
             Quantity::new(1_000),
             Quantity::new(0),
             0,
@@ -2876,15 +4064,10 @@ mod tests {
         );
 
         let listed = banx_gql(&chain, policies_q)?;
-        let graph = banx_gql(&chain, graph_q)?;
         assert_eq!(
             gary_sides(&listed, "/data/fxOffers", aud, usd),
             vec![false],
             "{listed}"
-        );
-        assert!(
-            gary_sides(&graph, "/data/pathGraph/fxOffers", aud, usd).is_empty(),
-            "{graph}"
         );
 
         Ok(())
@@ -2929,7 +4112,12 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, aud), hop(steve, usd)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(700),
                 0,
@@ -3012,7 +4200,12 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud), hop(steve, usd), hop(sam, gbp)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, aud), hop(steve, usd), hop(sam, gbp)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(560),
                 0,
@@ -3078,7 +4271,12 @@ mod tests {
 
         let no_gary = Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, aud), hop(steve, usd)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(1),
                 0,
@@ -3102,7 +4300,12 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, aud), hop(steve, usd)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(700),
                 0,
@@ -3424,7 +4627,12 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(950),
                 0,
@@ -3471,7 +4679,12 @@ mod tests {
 
         Wrapper::push_from(&chain, a)
             .path_pay(
-                vec![hop(b, usd), hop(c, usd)],
+                seal(
+                    &chain,
+                    a,
+                    vec![hop(b, usd), hop(c, usd)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(1_000),
                 0,
@@ -3482,7 +4695,12 @@ mod tests {
 
         Wrapper::push_from(&chain, c)
             .path_pay(
-                vec![hop(b, usd), hop(a, usd)],
+                seal(
+                    &chain,
+                    c,
+                    vec![hop(b, usd), hop(a, usd)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(1_000),
                 0,
@@ -3529,7 +4747,12 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(400),
+                ),
                 Quantity::new(400),
                 Quantity::new(400),
                 id,
@@ -3577,7 +4800,11 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, mitchell)
-            .pay_inv(vec![hop(john, aud), hop(cafe, aud)], 20_0000.into(), id)
+            .pay_inv(
+                seal_inv(&chain, mitchell, vec![hop(john, aud), hop(cafe, aud)], id),
+                20_0000.into(),
+                id,
+            )
             .get()?;
 
         assert!(PayRequest::get(id).is_none());
@@ -3624,7 +4851,11 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, mitchell)
-            .pay_inv(vec![hop(john, aud), hop(cafe, aud)], 20_0000.into(), id)
+            .pay_inv(
+                seal_inv(&chain, mitchell, vec![hop(john, aud), hop(cafe, aud)], id),
+                20_0000.into(),
+                id,
+            )
             .get()?;
 
         assert!(PayRequest::get(id).is_none());
@@ -3669,7 +4900,7 @@ mod tests {
             .get()?;
 
         let failed = Wrapper::push_from(&chain, mitchell).pay_inv(
-            vec![hop(john, aud), hop(cafe, aud)],
+            seal_inv(&chain, mitchell, vec![hop(john, aud), hop(cafe, aud)], id),
             4_0000.into(),
             id,
         );
@@ -3733,7 +4964,7 @@ mod tests {
             .get()?;
 
         let failed = Wrapper::push_from(&chain, alice).pay_inv(
-            vec![hop(gary, aud), hop(steve, usd)],
+            seal_inv(&chain, alice, vec![hop(gary, aud), hop(steve, usd)], id),
             Quantity::new(500),
             id,
         );
@@ -3787,7 +5018,7 @@ mod tests {
         // Ends at Gary, not Steve.
         assert!(Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, usd)],
+                seal(&chain, alice, vec![hop(gary, usd)], Quantity::new(100)),
                 Quantity::new(100),
                 Quantity::new(100),
                 id,
@@ -3799,7 +5030,7 @@ mod tests {
         // Named counterparty is who was billed; anyone with a path may pay.
         Wrapper::push_from(&chain, gary)
             .path_pay(
-                vec![hop(steve, usd)],
+                seal(&chain, gary, vec![hop(steve, usd)], Quantity::new(100)),
                 Quantity::new(100),
                 Quantity::new(100),
                 id,
@@ -3835,7 +5066,7 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(steve, usd)],
+                seal(&chain, alice, vec![hop(steve, usd)], Quantity::new(100)),
                 Quantity::new(100),
                 Quantity::new(100),
                 id,
@@ -3895,7 +5126,7 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(bob, usd)],
+                seal(&chain, alice, vec![hop(bob, usd)], Quantity::new(1_000)),
                 Quantity::new(1_000),
                 Quantity::new(1_000),
                 0,
@@ -3971,7 +5202,12 @@ mod tests {
             .st_crd_lne(alice, usd, Quantity::new(100), true)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![hop(bob, usd)], Quantity::new(60), Quantity::new(60), 0)
+            .path_pay(
+                seal(&chain, alice, vec![hop(bob, usd)], Quantity::new(60)),
+                Quantity::new(60),
+                Quantity::new(60),
+                0,
+            )
             .get()?;
         assert_eq!(Pair::line(bob, alice, usd).unwrap().remaining.value, 40);
 
@@ -4012,7 +5248,12 @@ mod tests {
             .st_crd_lne(alice, usd, Quantity::new(100), true)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![hop(bob, usd)], Quantity::new(60), Quantity::new(60), 0)
+            .path_pay(
+                seal(&chain, alice, vec![hop(bob, usd)], Quantity::new(60)),
+                Quantity::new(60),
+                Quantity::new(60),
+                0,
+            )
             .get()?;
         assert_eq!(Pair::line(bob, alice, usd).unwrap().remaining.value, 40);
 
@@ -4048,7 +5289,7 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(bob, usd)],
+                seal(&chain, alice, vec![hop(bob, usd)], Quantity::new(100)),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -4072,7 +5313,12 @@ mod tests {
             .deposit(alice, usd, Quantity::new(100), 0)
             .get()?;
         let over = Wrapper::push_from(&chain, alice)
-            .path_pay(vec![hop(bob, usd)], Quantity::new(1), Quantity::new(1), 0)
+            .path_pay(
+                seal(&chain, alice, vec![hop(bob, usd)], Quantity::new(1)),
+                Quantity::new(1),
+                Quantity::new(1),
+                0,
+            )
             .get();
         assert!(over.is_err());
         Ok(())
@@ -4111,7 +5357,7 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(bob, usd)],
+                seal(&chain, alice, vec![hop(bob, usd)], Quantity::new(200)),
                 Quantity::new(200),
                 Quantity::new(200),
                 0,
@@ -4125,7 +5371,12 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 0);
         let over = Wrapper::push_from(&chain, alice)
-            .path_pay(vec![hop(bob, usd)], Quantity::new(1), Quantity::new(1), 0)
+            .path_pay(
+                seal(&chain, alice, vec![hop(bob, usd)], Quantity::new(1)),
+                Quantity::new(1),
+                Quantity::new(1),
+                0,
+            )
             .get();
         assert!(over.is_err());
         Ok(())
@@ -4172,7 +5423,12 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, aud), hop(steve, usd)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(0),
                 0,
@@ -5400,12 +6656,13 @@ mod tests {
 
         pin(&chain, START + 40);
         Wrapper::push_from(&chain, alice)
-            .run_pay_ath(id, vec![hop(bob, usd)])
+            .run_pay_ath(id, seal_auth(&chain, alice, vec![hop(bob, usd)], id))
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 100);
         assert_eq!(pay_row(id).next_due.seconds, START + 100);
 
-        let early = Wrapper::push_from(&chain, alice).run_pay_ath(id, vec![hop(bob, usd)]);
+        let early = Wrapper::push_from(&chain, alice)
+            .run_pay_ath(id, seal_auth(&chain, alice, vec![hop(bob, usd)], id));
         assert!(early.get().is_err());
         assert_eq!(pay_row(id).next_due.seconds, START + 100);
         assert_eq!(exp(&chain, bob, alice, usd), 100);
@@ -5431,24 +6688,25 @@ mod tests {
         let id = schedule(&chain, alice, bob, usd, 100, 100, 100, START - 250, 0);
 
         Wrapper::push_from(&chain, alice)
-            .run_pay_ath(id, vec![hop(bob, usd)])
+            .run_pay_ath(id, seal_auth(&chain, alice, vec![hop(bob, usd)], id))
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 100);
         assert_eq!(pay_row(id).next_due.seconds, START - 150);
 
         Wrapper::push_from(&chain, alice)
-            .run_pay_ath(id, vec![hop(bob, usd)])
+            .run_pay_ath(id, seal_auth(&chain, alice, vec![hop(bob, usd)], id))
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 200);
         assert_eq!(pay_row(id).next_due.seconds, START - 50);
 
         Wrapper::push_from(&chain, alice)
-            .run_pay_ath(id, vec![hop(bob, usd)])
+            .run_pay_ath(id, seal_auth(&chain, alice, vec![hop(bob, usd)], id))
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 300);
         assert_eq!(pay_row(id).next_due.seconds, START + 50);
 
-        let extra = Wrapper::push_from(&chain, alice).run_pay_ath(id, vec![hop(bob, usd)]);
+        let extra = Wrapper::push_from(&chain, alice)
+            .run_pay_ath(id, seal_auth(&chain, alice, vec![hop(bob, usd)], id));
         assert!(extra.get().is_err());
         assert_eq!(exp(&chain, bob, alice, usd), 300);
         assert_eq!(pay_row(id).next_due.seconds, START + 50);
@@ -5483,12 +6741,16 @@ mod tests {
         pin(&chain, START);
         let id = schedule(&chain, alice, bob, usd, 100, 100, 100, START, 0);
 
-        let wrong_payee = Wrapper::push_from(&chain, alice).run_pay_ath(id, vec![hop(carol, usd)]);
+        let wrong_payee = Wrapper::push_from(&chain, alice)
+            .run_pay_ath(id, seal_auth(&chain, alice, vec![hop(carol, usd)], id));
         assert!(wrong_payee.get().is_err());
-        let wrong_asset = Wrapper::push_from(&chain, alice).run_pay_ath(id, vec![hop(bob, aud)]);
+        let wrong_asset = Wrapper::push_from(&chain, alice)
+            .run_pay_ath(id, seal_auth(&chain, alice, vec![hop(bob, aud)], id));
         assert!(wrong_asset.get().is_err());
-        let over_ceiling =
-            Wrapper::push_from(&chain, alice).run_pay_ath(id, vec![hop(dave, usd), hop(bob, usd)]);
+        let over_ceiling = Wrapper::push_from(&chain, alice).run_pay_ath(
+            id,
+            seal_auth(&chain, alice, vec![hop(dave, usd), hop(bob, usd)], id),
+        );
         assert!(over_ceiling.get().is_err());
 
         assert_eq!(pay_row(id).next_due.seconds, START);
@@ -5518,14 +6780,15 @@ mod tests {
         pin(&chain, START);
         let id = schedule(&chain, alice, bob, usd, 100, 100, 100, START, 0);
 
-        let third = Wrapper::push_from(&chain, carol).run_pay_ath(id, vec![hop(bob, usd)]);
+        let third = Wrapper::push_from(&chain, carol)
+            .run_pay_ath(id, seal_auth(&chain, carol, vec![hop(bob, usd)], id));
         assert!(third.get().is_err());
         let third_cancel = Wrapper::push_from(&chain, carol).rm_pay_ath(id, true);
         assert!(third_cancel.get().is_err());
         assert_eq!(pay_row(id).next_due.seconds, START);
 
         Wrapper::push_from(&chain, bob)
-            .run_pay_ath(id, vec![hop(bob, usd)])
+            .run_pay_ath(id, seal_auth(&chain, alice, vec![hop(bob, usd)], id))
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 100);
         assert_eq!(exp(&chain, alice, bob, usd), 0);
@@ -5574,7 +6837,10 @@ mod tests {
         let id = schedule(&chain, alice, bob, usd, 100, 100, 100, START, 0);
 
         Wrapper::push_from(&chain, bob)
-            .run_pay_ath(id, vec![hop(carol, usd), hop(bob, usd)])
+            .run_pay_ath(
+                id,
+                seal_auth(&chain, alice, vec![hop(carol, usd), hop(bob, usd)], id),
+            )
             .get()?;
         assert_eq!(exp(&chain, carol, alice, usd), 100);
         assert_eq!(exp(&chain, bob, carol, usd), 100);
@@ -5644,7 +6910,8 @@ mod tests {
             .get()?;
         assert!(PayAuth::get(due).is_none());
         assert_eq!(exp(&chain, bob, alice, usd), 0);
-        let gone = Wrapper::push_from(&chain, alice).run_pay_ath(due, vec![hop(bob, usd)]);
+        let gone = Wrapper::push_from(&chain, alice)
+            .run_pay_ath(due, seal_auth(&chain, alice, vec![hop(bob, usd)], due));
         assert!(gone.get().is_err());
 
         let payer_cancels = schedule(&chain, alice, bob, usd, 100, 100, 100, START + 500, 0);
@@ -5661,10 +6928,16 @@ mod tests {
 
         let ending = schedule(&chain, alice, bob, usd, 100, 100, 100, START, START + 50);
         Wrapper::push_from(&chain, alice)
-            .run_pay_ath(ending, vec![hop(bob, usd)])
+            .run_pay_ath(
+                ending,
+                seal_auth(&chain, alice, vec![hop(bob, usd)], ending),
+            )
             .get()?;
         assert_eq!(pay_row(ending).next_due.seconds, START + 100);
-        let after_end = Wrapper::push_from(&chain, alice).run_pay_ath(ending, vec![hop(bob, usd)]);
+        let after_end = Wrapper::push_from(&chain, alice).run_pay_ath(
+            ending,
+            seal_auth(&chain, alice, vec![hop(bob, usd)], ending),
+        );
         assert!(after_end.get().is_err());
         Wrapper::push_from(&chain, alice)
             .rm_pay_ath(ending, false)
@@ -5698,7 +6971,12 @@ mod tests {
 
         let err = Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(carol, usd), hop(alice, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(carol, usd), hop(alice, usd)],
+                    Quantity::new(100),
+                ),
                 Quantity::new(100),
                 Quantity::new(0),
                 0,
@@ -5764,7 +7042,12 @@ mod tests {
             .get()?;
 
         let onward = Wrapper::push_from(&chain, alice).path_pay(
-            vec![hop(bob, aud), hop(alice, usd), hop(carol, usd)],
+            seal(
+                &chain,
+                alice,
+                vec![hop(bob, aud), hop(alice, usd), hop(carol, usd)],
+                Quantity::new(1_000),
+            ),
             Quantity::new(1_000),
             Quantity::new(0),
             0,
@@ -5776,7 +7059,12 @@ mod tests {
             .unwrap_or("")
             .contains("path cannot route back through the sender"));
         let same = Wrapper::push_from(&chain, alice).path_pay(
-            vec![hop(bob, usd), hop(alice, usd)],
+            seal(
+                &chain,
+                alice,
+                vec![hop(bob, usd), hop(alice, usd)],
+                Quantity::new(1_000),
+            ),
             Quantity::new(1_000),
             Quantity::new(0),
             0,
@@ -5792,7 +7080,12 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(bob, aud), hop(alice, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(bob, aud), hop(alice, usd)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(1_000),
                 0,
@@ -5907,12 +7200,17 @@ mod tests {
 
         let cycled = Wrapper::push_from(&chain, bob).run_pay_ath(
             id,
-            vec![
-                hop(bob, usd),
-                hop(carol, usd),
-                hop(alice, usd),
-                hop(bob, usd),
-            ],
+            seal_auth(
+                &chain,
+                alice,
+                vec![
+                    hop(bob, usd),
+                    hop(carol, usd),
+                    hop(alice, usd),
+                    hop(bob, usd),
+                ],
+                id,
+            ),
         );
         assert!(cycled.get().is_err());
         assert_eq!(pay_row(id).next_due.seconds, START);
@@ -5973,12 +7271,17 @@ mod tests {
         let err = Wrapper::push_from(&chain, bob)
             .run_pay_ath(
                 id,
-                vec![
-                    hop(carol, usd),
-                    hop(dave, usd),
-                    hop(alice, usd),
-                    hop(bob, usd),
-                ],
+                seal_auth(
+                    &chain,
+                    alice,
+                    vec![
+                        hop(carol, usd),
+                        hop(dave, usd),
+                        hop(alice, usd),
+                        hop(bob, usd),
+                    ],
+                    id,
+                ),
             )
             .get()
             .unwrap_err();
@@ -6082,11 +7385,16 @@ mod tests {
         chain.new_account(carol).unwrap();
         let missing = Wrapper::push_from(&chain, net.bob)
             .path_pay(
-                vec![
-                    hop(net.brandon, net.usd),
-                    hop(net.john, net.usd),
-                    hop(carol, net.aud),
-                ],
+                seal(
+                    &chain,
+                    net.bob,
+                    vec![
+                        hop(net.brandon, net.usd),
+                        hop(net.john, net.usd),
+                        hop(carol, net.aud),
+                    ],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(1),
                 0,
@@ -6098,11 +7406,16 @@ mod tests {
 
         let short = Wrapper::push_from(&chain, net.bob)
             .path_pay(
-                vec![
-                    hop(net.brandon, net.usd),
-                    hop(net.john, net.usd),
-                    hop(net.alice, net.aud),
-                ],
+                seal(
+                    &chain,
+                    net.bob,
+                    vec![
+                        hop(net.brandon, net.usd),
+                        hop(net.john, net.usd),
+                        hop(net.alice, net.aud),
+                    ],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(1_364),
                 0,
@@ -6114,11 +7427,16 @@ mod tests {
 
         Wrapper::push_from(&chain, net.bob)
             .path_pay(
-                vec![
-                    hop(net.brandon, net.usd),
-                    hop(net.john, net.usd),
-                    hop(net.alice, net.aud),
-                ],
+                seal(
+                    &chain,
+                    net.bob,
+                    vec![
+                        hop(net.brandon, net.usd),
+                        hop(net.john, net.usd),
+                        hop(net.alice, net.aud),
+                    ],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(1_363),
                 0,
@@ -6153,7 +7471,11 @@ mod tests {
             hop(net.alice, net.aud),
         ];
         let err = Wrapper::push_from(&chain, net.bob)
-            .pay_inv(hops.clone(), Quantity::new(999), id)
+            .pay_inv(
+                seal_inv(&chain, net.bob, hops.clone(), id),
+                Quantity::new(999),
+                id,
+            )
             .get()
             .expect_err("999 is under the curve's required send");
         assert!(
@@ -6164,7 +7486,11 @@ mod tests {
         assert_eq!(PayRequest::get_assert(id).remaining.value, 1_363);
 
         Wrapper::push_from(&chain, net.bob)
-            .pay_inv(hops, Quantity::new(1_000), id)
+            .pay_inv(
+                seal_inv(&chain, net.bob, hops, id),
+                Quantity::new(1_000),
+                id,
+            )
             .get()?;
         assert!(PayRequest::get(id).is_none());
         assert_eq!(exp(&chain, net.alice, net.john, net.aud), 1_363);
@@ -6189,28 +7515,15 @@ mod tests {
             )
             .get()?;
 
-        let graph = banx_gql(
+        let listed = banx_gql(
             &chain,
-            r#"{ pathGraph(from: "bob", to: "alice", maxHops: 4) {
-                fxOffers { poster fromAsset toAsset }
-                relays { owner assetLo assetHi }
-            } }"#,
+            r#"{ banxRelays(owner: "john") { owner assetLo assetHi } }"#,
         )?;
-        let policies = graph
-            .pointer("/data/pathGraph/fxOffers")
-            .and_then(|v| v.as_array())
-            .expect("policies");
-        assert!(
-            policies
-                .iter()
-                .all(|row| row.get("poster").and_then(|v| v.as_str()) != Some("john")),
-            "{graph}"
-        );
-        let relays = graph
-            .pointer("/data/pathGraph/relays")
+        let relays = listed
+            .pointer("/data/banxRelays")
             .and_then(|v| v.as_array())
             .expect("relays");
-        assert_eq!(relays.len(), 1, "{graph}");
+        assert_eq!(relays.len(), 1, "{listed}");
         assert_eq!(
             relays[0].get("owner").and_then(|v| v.as_str()),
             Some("john")
@@ -6218,11 +7531,16 @@ mod tests {
 
         Wrapper::push_from(&chain, net.bob)
             .path_pay(
-                vec![
-                    hop(net.brandon, net.usd),
-                    hop(net.john, net.usd),
-                    hop(net.alice, net.aud),
-                ],
+                seal(
+                    &chain,
+                    net.bob,
+                    vec![
+                        hop(net.brandon, net.usd),
+                        hop(net.john, net.usd),
+                        hop(net.alice, net.aud),
+                    ],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(1_363),
                 0,
@@ -6239,11 +7557,16 @@ mod tests {
 
         Wrapper::push_from(&chain, net.bob)
             .path_pay(
-                vec![
-                    hop(net.brandon, net.usd),
-                    hop(net.john, net.usd),
-                    hop(net.alice, net.aud),
-                ],
+                seal(
+                    &chain,
+                    net.bob,
+                    vec![
+                        hop(net.brandon, net.usd),
+                        hop(net.john, net.usd),
+                        hop(net.alice, net.aud),
+                    ],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(2_000),
                 0,
@@ -6265,11 +7588,16 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, net.bob)
             .path_pay(
-                vec![
-                    hop(net.brandon, net.usd),
-                    hop(net.john, net.usd),
-                    hop(net.alice, net.aud),
-                ],
+                seal(
+                    &chain,
+                    net.bob,
+                    vec![
+                        hop(net.brandon, net.usd),
+                        hop(net.john, net.usd),
+                        hop(net.alice, net.aud),
+                    ],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(1),
                 0,
@@ -6285,7 +7613,12 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, net.bob)
             .path_pay(
-                vec![hop(net.john, net.usd)],
+                seal(
+                    &chain,
+                    net.bob,
+                    vec![hop(net.john, net.usd)],
+                    Quantity::new(500),
+                ),
                 Quantity::new(500),
                 Quantity::new(500),
                 0,
@@ -6366,7 +7699,12 @@ mod tests {
         let ghost = account!("nobody");
         let missing = Wrapper::push_from(&chain, bob)
             .path_cash(
-                vec![hop(brandon, aud), hop(john, aud)],
+                seal(
+                    &chain,
+                    bob,
+                    vec![hop(brandon, aud), hop(john, aud)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 gas,
                 ghost,
@@ -6386,7 +7724,12 @@ mod tests {
 
         Wrapper::push_from(&chain, bob)
             .path_cash(
-                vec![hop(brandon, aud), hop(john, aud)],
+                seal(
+                    &chain,
+                    bob,
+                    vec![hop(brandon, aud), hop(john, aud)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 gas,
                 alice,
@@ -6565,7 +7908,7 @@ mod tests {
         let weight_before = TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value;
         let face_only = Wrapper::push_from(&chain, alice)
             .path_cash(
-                vec![hop(john, aud)],
+                seal(&chain, alice, vec![hop(john, aud)], Quantity::new(1_000)),
                 Quantity::new(1_000),
                 gas,
                 alice,
@@ -6583,7 +7926,7 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_cash(
-                vec![hop(john, aud)],
+                seal(&chain, alice, vec![hop(john, aud)], Quantity::new(1_000)),
                 Quantity::new(1_000),
                 gas,
                 alice,
@@ -6600,7 +7943,7 @@ mod tests {
         );
 
         let self_hop = Wrapper::push_from(&chain, john).path_cash(
-            vec![hop(john, aud)],
+            seal(&chain, john, vec![hop(john, aud)], Quantity::new(1)),
             Quantity::new(1),
             gas,
             john,
@@ -6673,7 +8016,7 @@ mod tests {
         );
         let path = Wrapper::push_from(&chain, alice)
             .path_cash(
-                vec![hop(john, aud)],
+                seal(&chain, alice, vec![hop(john, aud)], Quantity::new(100)),
                 Quantity::new(100),
                 gas,
                 alice,
@@ -6785,7 +8128,7 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(john, aud)],
+                seal(&chain, alice, vec![hop(john, aud)], Quantity::new(625)),
                 Quantity::new(625),
                 Quantity::new(625),
                 0,
@@ -7017,7 +8360,11 @@ mod tests {
             )
             .get()?;
         let short = Wrapper::push_from(&chain, net.bob)
-            .pay_inv(hops.clone(), Quantity::new(500), id)
+            .pay_inv(
+                seal_inv(&chain, net.bob, hops.clone(), id),
+                Quantity::new(500),
+                id,
+            )
             .get()
             .expect_err("500 is one short of the sequential curve");
         assert!(
@@ -7027,7 +8374,11 @@ mod tests {
         assert_eq!(relay_sides(net.john, net.usd, net.aud), (10_000, 15_000));
 
         Wrapper::push_from(&chain, net.bob)
-            .pay_inv(hops.clone(), Quantity::new(501), id)
+            .pay_inv(
+                seal_inv(&chain, net.bob, hops.clone(), id),
+                Quantity::new(501),
+                id,
+            )
             .get()?;
         assert!(PayRequest::get(id).is_none());
         assert_eq!(exp(&chain, carol, net.john, net.usd), 500);
@@ -7036,7 +8387,12 @@ mod tests {
         assert_eq!(relay_sides(net.john, net.usd, net.aud), (10_001, 15_000));
 
         Wrapper::push_from(&chain, net.bob)
-            .path_pay(hops, Quantity::new(1_000), Quantity::new(999), 0)
+            .path_pay(
+                seal(&chain, net.bob, hops, Quantity::new(1_000)),
+                Quantity::new(1_000),
+                Quantity::new(999),
+                0,
+            )
             .get()?;
         assert_eq!(exp(&chain, carol, net.john, net.usd), 1_499);
         Ok(())
@@ -7095,7 +8451,11 @@ mod tests {
             )
             .get()?;
         let short = Wrapper::push_from(&chain, net.bob)
-            .pay_inv(hops.clone(), Quantity::new(1_024), id)
+            .pay_inv(
+                seal_inv(&chain, net.bob, hops.clone(), id),
+                Quantity::new(1_024),
+                id,
+            )
             .get()
             .expect_err("1024 is below the send that delivers 1400");
         assert!(
@@ -7106,7 +8466,11 @@ mod tests {
         assert!(PayRequest::get(id).is_some());
 
         Wrapper::push_from(&chain, net.bob)
-            .pay_inv(hops, Quantity::new(1_500), id)
+            .pay_inv(
+                seal_inv(&chain, net.bob, hops, id),
+                Quantity::new(1_500),
+                id,
+            )
             .get()?;
         assert!(PayRequest::get(id).is_none());
         assert_eq!(exp(&chain, carol, net.john, net.usd), 1_400);
@@ -7209,7 +8573,12 @@ mod tests {
 
         let sell = vec![hop(john, wow), hop(anthony, aud)];
         let early = Wrapper::push_from(&chain, billy)
-            .path_pay(sell.clone(), Quantity::new(gold), Quantity::new(1), 0)
+            .path_pay(
+                seal(&chain, billy, sell.clone(), Quantity::new(gold)),
+                Quantity::new(gold),
+                Quantity::new(1),
+                0,
+            )
             .get()
             .expect_err("unvalidated mail is not gold John owes Billy");
         assert!(
@@ -7236,7 +8605,12 @@ mod tests {
         assert_eq!(exp(&chain, billy, john, wow), gold);
 
         let over = Wrapper::push_from(&chain, billy)
-            .path_pay(sell.clone(), Quantity::new(gold + 1), Quantity::new(1), 0)
+            .path_pay(
+                seal(&chain, billy, sell.clone(), Quantity::new(gold + 1)),
+                Quantity::new(gold + 1),
+                Quantity::new(1),
+                0,
+            )
             .get()
             .expect_err("the sale cannot draw more gold than John owes");
         assert!(
@@ -7249,7 +8623,7 @@ mod tests {
 
         let direct = Wrapper::push_from(&chain, billy)
             .path_pay(
-                vec![hop(john, aud)],
+                seal(&chain, billy, vec![hop(john, aud)], Quantity::new(gold)),
                 Quantity::new(gold),
                 Quantity::new(1),
                 0,
@@ -7265,7 +8639,12 @@ mod tests {
 
         let back = Wrapper::push_from(&chain, billy)
             .path_pay(
-                vec![hop(john, wow), hop(anthony, aud), hop(billy, aud)],
+                seal(
+                    &chain,
+                    billy,
+                    vec![hop(john, wow), hop(anthony, aud), hop(billy, aud)],
+                    Quantity::new(gold),
+                ),
                 Quantity::new(gold),
                 Quantity::new(1),
                 0,
@@ -7282,7 +8661,12 @@ mod tests {
 
         // 15,000 * 1,000 / 11,000 = 1,363 AUD. Reserves become 13,637 AUD and 11,000 gold.
         Wrapper::push_from(&chain, billy)
-            .path_pay(sell, Quantity::new(gold), Quantity::new(1_363), 0)
+            .path_pay(
+                seal(&chain, billy, sell, Quantity::new(gold)),
+                Quantity::new(gold),
+                Quantity::new(1_363),
+                0,
+            )
             .get()?;
         assert_eq!(exp(&chain, billy, john, wow), 0);
         assert_eq!(exp(&chain, john, billy, wow), 0);
@@ -7296,7 +8680,12 @@ mod tests {
         // Billy spends 500 AUD through Anthony. That unwinds 500 of the sale, so John owes Anthony 863.
         Wrapper::push_from(&chain, billy)
             .path_pay(
-                vec![hop(anthony, aud), hop(john, aud)],
+                seal(
+                    &chain,
+                    billy,
+                    vec![hop(anthony, aud), hop(john, aud)],
+                    Quantity::new(500),
+                ),
                 Quantity::new(500),
                 Quantity::new(500),
                 0,
@@ -7337,7 +8726,12 @@ mod tests {
 
         let skip = Wrapper::push_from(&chain, matt)
             .path_pay(
-                vec![hop(john, aud), hop(josh, wow)],
+                seal(
+                    &chain,
+                    matt,
+                    vec![hop(john, aud), hop(josh, wow)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(1),
                 0,
@@ -7352,7 +8746,12 @@ mod tests {
 
         let back = Wrapper::push_from(&chain, matt)
             .path_pay(
-                vec![hop(josh, aud), hop(john, aud), hop(matt, wow)],
+                seal(
+                    &chain,
+                    matt,
+                    vec![hop(josh, aud), hop(john, aud), hop(matt, wow)],
+                    Quantity::new(1_000),
+                ),
                 Quantity::new(1_000),
                 Quantity::new(1),
                 0,
@@ -7369,7 +8768,12 @@ mod tests {
 
         let buy = vec![hop(josh, aud), hop(john, aud), hop(josh, wow)];
         let no_exit = Wrapper::push_from(&chain, matt)
-            .path_pay(buy.clone(), Quantity::new(1_000), Quantity::new(1), 0)
+            .path_pay(
+                seal(&chain, matt, buy.clone(), Quantity::new(1_000)),
+                Quantity::new(1_000),
+                Quantity::new(1),
+                0,
+            )
             .get()
             .expect_err("Josh has no WOW line to John yet");
         assert!(
@@ -7383,7 +8787,12 @@ mod tests {
         offer_line(&chain, josh, john, wow);
         // 10,000 * 1,000 / 16,000 = 625 gold. Reserves become 16,000 AUD and 9,375 gold.
         Wrapper::push_from(&chain, matt)
-            .path_pay(buy, Quantity::new(1_000), Quantity::new(625), 0)
+            .path_pay(
+                seal(&chain, matt, buy, Quantity::new(1_000)),
+                Quantity::new(1_000),
+                Quantity::new(625),
+                0,
+            )
             .get()?;
         assert_eq!(exp(&chain, josh, matt, aud), 1_000);
         assert_eq!(exp(&chain, john, josh, aud), 1_000);
@@ -7452,7 +8861,7 @@ mod tests {
         let buy = vec![hop(zac, aud), hop(john, aud), hop(dave, wow)];
         let no_line = Wrapper::push_from(&chain, dave)
             .path_pay(
-                buy.clone(),
+                seal(&chain, dave, buy.clone(), Quantity::new(PAY_AUD)),
                 Quantity::new(PAY_AUD),
                 Quantity::new(GOLD_OUT),
                 0,
@@ -7478,7 +8887,12 @@ mod tests {
             .st_crd_lne(john, wow, Quantity::new(DEAL_GOLD + GOLD_OUT), false)
             .get()?;
         Wrapper::push_from(&chain, dave)
-            .path_pay(buy, Quantity::new(PAY_AUD), Quantity::new(GOLD_OUT), 0)
+            .path_pay(
+                seal(&chain, dave, buy, Quantity::new(PAY_AUD)),
+                Quantity::new(PAY_AUD),
+                Quantity::new(GOLD_OUT),
+                0,
+            )
             .get()?;
         assert_eq!(exp(&chain, zac, dave, aud), PAY_AUD);
         assert_eq!(exp(&chain, john, zac, aud), PAY_AUD);
@@ -7546,7 +8960,7 @@ mod tests {
         let buy = vec![hop(zac, aud), hop(john, aud), hop(dave, wow)];
         let no_line = Wrapper::push_from(&chain, dave)
             .path_pay(
-                buy.clone(),
+                seal(&chain, dave, buy.clone(), Quantity::new(PAY_AUD)),
                 Quantity::new(PAY_AUD),
                 Quantity::new(GOLD_OUT),
                 0,
@@ -7569,7 +8983,12 @@ mod tests {
             .st_crd_lne(john, wow, Quantity::new(WEIGHT_GOLD + GOLD_OUT), false)
             .get()?;
         Wrapper::push_from(&chain, dave)
-            .path_pay(buy, Quantity::new(PAY_AUD), Quantity::new(GOLD_OUT), 0)
+            .path_pay(
+                seal(&chain, dave, buy, Quantity::new(PAY_AUD)),
+                Quantity::new(PAY_AUD),
+                Quantity::new(GOLD_OUT),
+                0,
+            )
             .get()?;
         assert_eq!(exp(&chain, zac, dave, aud), PAY_AUD);
         assert_eq!(exp(&chain, john, zac, aud), PAY_AUD);
@@ -7636,7 +9055,7 @@ mod tests {
         let pay = vec![hop(zac, wow), hop(john, wow), hop(mitchell, aud)];
         let no_line = Wrapper::push_from(&chain, dave)
             .path_pay(
-                pay.clone(),
+                seal(&chain, dave, pay.clone(), Quantity::new(PAY_GOLD)),
                 Quantity::new(PAY_GOLD),
                 Quantity::new(AUD_OUT),
                 0,
@@ -7658,7 +9077,12 @@ mod tests {
             .st_crd_lne(john, aud, Quantity::new(AUD_OUT), false)
             .get()?;
         Wrapper::push_from(&chain, dave)
-            .path_pay(pay, Quantity::new(PAY_GOLD), Quantity::new(AUD_OUT), 0)
+            .path_pay(
+                seal(&chain, dave, pay, Quantity::new(PAY_GOLD)),
+                Quantity::new(PAY_GOLD),
+                Quantity::new(AUD_OUT),
+                0,
+            )
             .get()?;
         assert_eq!(exp(&chain, zac, dave, wow), PAY_GOLD);
         assert_eq!(exp(&chain, john, zac, wow), PAY_GOLD);
@@ -7690,7 +9114,7 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud)],
+                seal(&chain, alice, vec![hop(gary, aud)], Quantity::new(100)),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -7811,7 +9235,7 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, gary)
             .path_pay(
-                vec![hop(alice, aud)],
+                seal(&chain, gary, vec![hop(alice, aud)], Quantity::new(100)),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -7870,7 +9294,7 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, gary)
             .path_pay(
-                vec![hop(alice, aud)],
+                seal(&chain, gary, vec![hop(alice, aud)], Quantity::new(10)),
                 Quantity::new(10),
                 Quantity::new(10),
                 0,
@@ -7932,7 +9356,7 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, gary)
             .path_pay(
-                vec![hop(alice, aud)],
+                seal(&chain, gary, vec![hop(alice, aud)], Quantity::new(51)),
                 Quantity::new(51),
                 Quantity::new(51),
                 0,
@@ -7977,7 +9401,7 @@ mod tests {
         // rebook is debt, so 0 is not an open cap.
         Wrapper::push_from(&chain, gary)
             .path_pay(
-                vec![hop(alice, aud)],
+                seal(&chain, gary, vec![hop(alice, aud)], Quantity::new(49)),
                 Quantity::new(49),
                 Quantity::new(49),
                 0,
@@ -8025,7 +9449,7 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, gary)
             .path_pay(
-                vec![hop(alice, aud)],
+                seal(&chain, gary, vec![hop(alice, aud)], Quantity::new(80)),
                 Quantity::new(80),
                 Quantity::new(80),
                 0,
@@ -8129,7 +9553,7 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud)],
+                seal(&chain, alice, vec![hop(gary, aud)], Quantity::new(100)),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -8732,7 +10156,7 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud)],
+                seal(&chain, alice, vec![hop(gary, aud)], Quantity::new(100)),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -8867,7 +10291,12 @@ mod tests {
             .get()?;
 
         let too_big = Wrapper::push_from(&chain, alice).path_pay(
-            vec![hop(gary, aud), hop(steve, usd)],
+            seal(
+                &chain,
+                alice,
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(1_000),
+            ),
             Quantity::new(1_000),
             Quantity::new(700),
             0,
@@ -8895,7 +10324,7 @@ mod tests {
             )
             .get()?;
         let inv = Wrapper::push_from(&chain, alice).pay_inv(
-            vec![hop(gary, aud), hop(steve, usd)],
+            seal_inv(&chain, alice, vec![hop(gary, aud), hop(steve, usd)], id),
             Quantity::new(2_000),
             id,
         );
@@ -8909,7 +10338,12 @@ mod tests {
 
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, aud), hop(steve, usd)],
+                    Quantity::new(500),
+                ),
                 Quantity::new(500),
                 Quantity::new(350),
                 0,
@@ -8920,7 +10354,12 @@ mod tests {
         assert!(FxOffer::get(gary, aud, usd, true).is_none());
         assert!(Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud), hop(steve, usd)],
+                seal(
+                    &chain,
+                    alice,
+                    vec![hop(gary, aud), hop(steve, usd)],
+                    Quantity::new(1)
+                ),
                 Quantity::new(1),
                 Quantity::new(0),
                 0,
@@ -8950,7 +10389,7 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud)],
+                seal(&chain, alice, vec![hop(gary, aud)], Quantity::new(100)),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -9001,7 +10440,7 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud)],
+                seal(&chain, alice, vec![hop(gary, aud)], Quantity::new(100)),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -9051,7 +10490,7 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
-                vec![hop(gary, aud)],
+                seal(&chain, alice, vec![hop(gary, aud)], Quantity::new(100)),
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
@@ -9107,7 +10546,12 @@ mod tests {
             .st_crd_lne(alice, aud, Quantity::new(10000), false)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![hop(gary, aud)], 100.into(), 100.into(), 0)
+            .path_pay(
+                seal(&chain, alice, vec![hop(gary, aud)], 100.into()),
+                100.into(),
+                100.into(),
+                0,
+            )
             .get()?;
         Wrapper::push_from(&chain, alice)
             .st_fx_ofr(
@@ -9221,7 +10665,12 @@ mod tests {
             .get()
             .unwrap();
         Wrapper::push_from(chain, x)
-            .path_pay(vec![hop(y, usd)], Quantity::new(50), Quantity::new(50), 0)
+            .path_pay(
+                seal(&chain, x, vec![hop(y, usd)], Quantity::new(50)),
+                Quantity::new(50),
+                Quantity::new(50),
+                0,
+            )
             .get()
             .unwrap();
         assert_eq!(both(chain, x, y, usd), (0, 50));
@@ -9234,7 +10683,12 @@ mod tests {
             .get()
             .unwrap();
         Wrapper::push_from(chain, y)
-            .path_pay(vec![hop(x, usd)], Quantity::new(80), Quantity::new(80), 0)
+            .path_pay(
+                seal(&chain, y, vec![hop(x, usd)], Quantity::new(80)),
+                Quantity::new(80),
+                Quantity::new(80),
+                0,
+            )
             .get()
             .unwrap();
         assert_eq!(both(chain, x, y, usd), (30, 0));
@@ -9401,7 +10855,12 @@ mod tests {
 
         // B draws 100. Removing A's line leaves what B owes.
         Wrapper::push_from(&chain, b)
-            .path_pay(vec![hop(a, usd)], Quantity::new(100), Quantity::new(100), 0)
+            .path_pay(
+                seal(&chain, b, vec![hop(a, usd)], Quantity::new(100)),
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+            )
             .get()?;
         assert_eq!(exp(&chain, a, b, usd), 100);
         Wrapper::push_from(&chain, a).rm_crd_lne(b, usd).get()?;
@@ -9416,7 +10875,12 @@ mod tests {
             .is_err());
         // Without a line B cannot draw more.
         assert!(Wrapper::push_from(&chain, b)
-            .path_pay(vec![hop(a, usd)], Quantity::new(1), Quantity::new(1), 0)
+            .path_pay(
+                seal(&chain, b, vec![hop(a, usd)], Quantity::new(1)),
+                Quantity::new(1),
+                Quantity::new(1),
+                0
+            )
             .get()
             .is_err());
 
@@ -9553,7 +11017,12 @@ mod tests {
             .get()?;
         assert_eq!(remaining(), 200);
         Wrapper::push_from(&chain, b)
-            .path_pay(vec![hop(a, usd)], Quantity::new(60), Quantity::new(60), 0)
+            .path_pay(
+                seal(&chain, b, vec![hop(a, usd)], Quantity::new(60)),
+                Quantity::new(60),
+                Quantity::new(60),
+                0,
+            )
             .get()?;
         assert_eq!(remaining(), 140);
 

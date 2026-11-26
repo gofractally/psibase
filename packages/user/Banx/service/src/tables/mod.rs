@@ -22,6 +22,8 @@ pub(crate) use helpers::{
 };
 pub use helpers::{assert_account_exists, cash_sub, emit_pair_activity, relay_sub, GLOBAL};
 pub use path::{path_required_send, run_path};
+#[cfg(test)]
+pub(crate) use path::{peek_hop_amounts, peek_required_send};
 
 #[psibase::service_tables]
 pub mod tables {
@@ -433,6 +435,20 @@ pub mod tables {
         fn pk(&self) -> (AccountNumber, u16, u32) {
             (self.owner, self.asset_id, self.token_id)
         }
+    }
+
+    /// Service routing key for sealed routes. This is objective state and
+    /// the secret arrives as an action argument, so any service and anyone
+    /// reading history can read it and open a route. The seal keeps hops out
+    /// of the UI and plugin. It is not secrecy from validators or other
+    /// services. `deploy.sh` sets it when none exists.
+    #[table(name = "RouteKeyTable", index = 13)]
+    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    pub struct RouteKey {
+        #[primary_key]
+        pub key: u8,
+        pub epoch: u64,
+        pub secret: Vec<u8>,
     }
 }
 
