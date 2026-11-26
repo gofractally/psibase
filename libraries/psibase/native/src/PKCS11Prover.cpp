@@ -382,7 +382,7 @@ psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session, Ac
 
 std::vector<char> psibase::PKCS11Prover::prove(std::span<const char> data, const Claim& claim) const
 {
-   if ((service == AccountNumber() || claim.service == service) && claim.rawData == pubKey)
+   if (claim.rawData == pubKey && answersFor(service, claim))
    {
       auto data_cnvt = std::span{reinterpret_cast<const unsigned char*>(data.data()), data.size()};
       std::vector<char> result;
@@ -406,7 +406,7 @@ std::vector<char> psibase::PKCS11Prover::prove(std::span<const char> data, const
 
 bool psibase::PKCS11Prover::remove(const Claim& claim)
 {
-   return (service == AccountNumber() || claim.service == service) && claim.rawData == pubKey;
+   return claim.rawData == pubKey && answersFor(service, claim);
 }
 
 void psibase::PKCS11Prover::get(std::vector<Claim>& out) const

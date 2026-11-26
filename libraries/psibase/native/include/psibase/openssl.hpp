@@ -4,6 +4,7 @@
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
 
+#include <psibase/block.hpp>
 #include <psibase/verifier.hpp>
 
 #include <memory>
@@ -41,9 +42,16 @@ namespace psibase
    // The OpenSSL curve for the keys that a verify service verifies. Throws if
    // the service is not one of the verifiers in psibase/verifier.hpp.
    int curveNidFor(AccountNumber verifyService);
-   // Throws unless service is the verifier for this public key (a DER
-   // SubjectPublicKeyInfo): a claim naming any other service would not verify.
+   // Throws unless service is one of the verifiers allowed for this public
+   // key (a DER SubjectPublicKeyInfo): a claim naming any other service would
+   // not verify.
    void checkVerifier(AccountNumber service, std::span<const char> publicKey);
+   // Whether a prover that holds the key of this claim under proverService
+   // signs for it. The signature does not depend on which service verifies
+   // it, so a key answers for every verifier allowed for it: a producer that
+   // registers its key under another allowed verifier needs no new key.
+   // A prover with no service answers for any.
+   bool answersFor(AccountNumber proverService, const Claim& claim);
    // Rewrites a raw r || s ECDSA signature made with key into the low-S form,
    // s <= n/2. The verifiers accept no other form.
    void normalizeSignature(EVP_PKEY* key, std::span<char> signature);

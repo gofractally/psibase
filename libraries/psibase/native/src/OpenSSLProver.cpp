@@ -134,11 +134,16 @@ int psibase::curveNidFor(AccountNumber verifyService)
 
 void psibase::checkVerifier(AccountNumber service, std::span<const char> publicKey)
 {
-   auto expected = verifierFor(publicKey);
-   if (!expected)
+   if (!verifierFor(publicKey))
       throw std::runtime_error("Unsupported public key");
-   if (*expected != service)
-      throw std::runtime_error("Key belongs to " + expected->str() + ", not " + service.str());
+   if (!isAllowedVerifier(service, publicKey))
+      throw std::runtime_error(service.str() + " does not verify this kind of key");
+}
+
+bool psibase::answersFor(AccountNumber proverService, const Claim& claim)
+{
+   return proverService == AccountNumber() || claim.service == proverService ||
+          isAllowedVerifier(claim.service, claim.rawData);
 }
 
 void psibase::normalizeSignature(EVP_PKEY* key, std::span<char> signature)
@@ -206,7 +211,7 @@ psibase::OpenSSLProver::~OpenSSLProver()
 std::vector<char> psibase::OpenSSLProver::prove(std::span<const char> data,
                                                 const Claim&          claim) const
 {
-   if ((service == AccountNumber() || claim.service == service) && claim.rawData == pubKey)
+   if (claim.rawData == pubKey && answersFor(service, claim))
    {
       std::unique_ptr<EVP_MD_CTX, OpenSSLDeleter> ctx(EVP_MD_CTX_new());
       EVP_DigestSignInit(ctx.get(), nullptr, EVP_sha256(), nullptr,
@@ -239,7 +244,7 @@ std::vector<char> psibase::OpenSSLProver::prove(std::span<const char> data,
 
 bool psibase::OpenSSLProver::remove(const Claim& claim)
 {
-   return (service == AccountNumber() || claim.service == service) && claim.rawData == pubKey;
+   return claim.rawData == pubKey && answersFor(service, claim);
 }
 
 void psibase::OpenSSLProver::get(std::vector<Claim>& out) const
