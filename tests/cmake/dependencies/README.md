@@ -222,4 +222,4 @@ SDK (`COMPONENT libpsibase`) ships PSIO's headers for guests from the WASM
 project; PSIO's own native install rules are excluded from psibase's install
 tree (`PSIBASE_PSIO_EXCLUDE_FROM_ALL`, checked by `libraries/CMakeLists.txt`
 with `psibase_psio_install_excluded`). Rust manifest paths/pins and the wire
-and API cutover are tracked in `doc/pssz-conversion.md`.
+and API cutover are tracked in `doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md`.

@@ -1,5 +1,6 @@
 //! The `ServiceSchema` record against the sample of the interop
-//! specification (`doc/flip-interop.md` section 2 of the C++ flip branch):
+//! specification (`doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md` section 2
+//! of the C++ flip branch):
 //! a service with `credit(to, amount, memo)`, `getRow(AccountNumber)` with an
 //! unnamed parameter, `init()` and one table, as C++ `psio::to_ijson` writes
 //! its schema. `tests/service-schema-sample.json` is that text.

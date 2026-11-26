@@ -880,7 +880,8 @@ namespace
 // (WasmConfigRow: 512 pages, 32 MiB). r-transact, which takes a transaction
 // from a client, hands it on and answers it, has two limits of its own: a
 // body of push_transaction is at most 5 MiB, and a trace of more than
-// 3.25 MiB is answered by its outcome alone. See doc/pssz-conversion.md 7.9.
+// 3.25 MiB is answered by its outcome alone. See
+// doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md 7.9.
 TEST_CASE("Test transaction size")
 {
    DefaultTestChain t;
@@ -1070,7 +1071,8 @@ TEST_CASE("Test transaction size")
    }
 }
 
-// Measurements behind doc/pssz-conversion.md 7.9, 7.11 and 7.12. Not part of the suite:
+// Measurements behind doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md 7.9,
+// 7.11 and 7.12. Not part of the suite:
 // psitest Transact-test.wasm "[.measure]"
 TEST_CASE("Measure transaction size", "[.measure]")
 {

@@ -30,7 +30,8 @@ namespace UserService
       }
 
       // An installed schema and the one that replaces it are of one service:
-      // they are compared as contracts (doc/flip-interop.md section 0.1).
+      // they are compared as contracts
+      // (doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md section 0.1).
       bool indexesEqual(const Schema&                 lschema,
                         const AnyType&                ltype,
                         const std::vector<IndexInfo>& lhs,
