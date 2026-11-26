@@ -2,9 +2,10 @@ function(add suffix)
     add_system_service("${suffix}" AuthSig src/AuthSig.cpp)
     add_system_service("${suffix}" RAuthSig src/RAuthSig.cpp)
     
+    # The public key type. It does not use Botan.
     add_library(Spki${suffix} src/Spki.cpp)
-    target_link_libraries(Spki${suffix} PUBLIC -lbotan-3 services_system${suffix} psibase${suffix} exception-stub${suffix})
-    target_include_directories(Spki${suffix} PUBLIC ${ROOT_BINARY_DIR}/wasm/deps/include/botan-3 include)
+    target_link_libraries(Spki${suffix} PUBLIC services_system${suffix} psibase${suffix} exception-stub${suffix})
+    target_include_directories(Spki${suffix} PUBLIC include)
     target_link_options(Spki${suffix} PUBLIC 
         -Wl,-z,stack-size=32768
     )

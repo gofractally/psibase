@@ -1,10 +1,8 @@
 #include "services/system/Spki.hpp"
 
-#include <botan/ber_dec.h>
-#include <botan/der_enc.h>
-#include <botan/pem.h>
-#include <botan/x509_key.h>
+#include <psibase/check.hpp>
 #include <psibase/crypto.hpp>
+#include <psibase/pem.hpp>
 
 namespace SystemService
 {
@@ -12,33 +10,16 @@ namespace SystemService
    {
       bool SubjectPublicKeyInfo::validate(const std::vector<unsigned char>& data)
       {
-         Botan::AlgorithmIdentifier algorithm;
-         std::vector<std::uint8_t>  key;
-
-         Botan::BER_Decoder(data)
-             .start_sequence()
-             .decode(algorithm)
-             .decode(key, Botan::ASN1_Type::BitString)
-             .end_cons();
-         return true;
+         return psibase::hasSubjectPublicKeyInfoShape(data);
       }
 
       std::vector<unsigned char> parseSubjectPublicKeyInfoFromPem(std::string_view s)
       {
-         Botan::AlgorithmIdentifier algorithm;
-         std::vector<std::uint8_t>  key;
-
-         std::string label_got;
-         auto        ber = Botan::PEM_Code::decode(s, label_got);
-         if (label_got != "PUBLIC KEY")
-         {
-            psibase::check(false,
-                           "Pem->SPKI: Expected label \"PUBLIC KEY\", got label: " + label_got);
-         }
-
-         auto result = std::vector<unsigned char>(ber.begin(), ber.end());
-         SubjectPublicKeyInfo::validate(result);
-         return result;
+         auto der = psibase::pemDecode(s, "PUBLIC KEY");
+         psibase::check(der.has_value(), "Pem->SPKI: Expected a PEM encoded PUBLIC KEY");
+         psibase::check(SubjectPublicKeyInfo::validate(*der),
+                        "Pem->SPKI: not a SubjectPublicKeyInfo");
+         return std::move(*der);
       }
 
       std::vector<unsigned char> parseSubjectPublicKeyInfo(std::string_view s)
@@ -55,8 +36,7 @@ namespace SystemService
 
       std::string to_string(const SubjectPublicKeyInfo& key)
       {
-         return Botan::PEM_Code::encode(reinterpret_cast<const std::uint8_t*>(key.data.data()),
-                                        key.data.size(), "PUBLIC KEY");
+         return psibase::pemEncode(key.data, "PUBLIC KEY");
       }
 
       psibase::Checksum256 keyFingerprint(const SubjectPublicKeyInfo& key)

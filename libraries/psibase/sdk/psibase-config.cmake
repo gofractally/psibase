@@ -126,7 +126,6 @@ function(add_libs suffix)
     add_library(Spki${suffix} INTERFACE IMPORTED)
     target_link_libraries(Spki${suffix} INTERFACE 
         -L${root}/lib
-        -lbotan-3 
         services_system${suffix} 
         psibase${suffix} 
         exception-stub${suffix}
@@ -134,7 +133,6 @@ function(add_libs suffix)
     )
     target_include_directories(Spki${suffix} INTERFACE 
         ${root}/include/services/system/AuthSig/include
-        ${root}/include/botan-3
     )
 
     add_library(PrivateKeyInfo${suffix} INTERFACE IMPORTED)

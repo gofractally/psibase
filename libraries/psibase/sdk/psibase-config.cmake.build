@@ -63,6 +63,7 @@ function(add_libs suffix)
         @ROOT_SOURCE_DIR@/packages/system/SetCode/include
         @ROOT_SOURCE_DIR@/packages/system/StagedTx/service/cpp/include
         @ROOT_SOURCE_DIR@/packages/system/Transact/include
+        @ROOT_SOURCE_DIR@/packages/system/VerifyBear1/include
         @ROOT_SOURCE_DIR@/packages/system/VerifyK1/include
         @ROOT_SOURCE_DIR@/packages/system/VerifyR1/include
         @ROOT_SOURCE_DIR@/packages/system/VirtualServer/service/cpp/include
@@ -166,8 +167,6 @@ function(add_libs suffix)
 
     add_library(Spki${suffix} INTERFACE IMPORTED)
     target_link_libraries(Spki${suffix} INTERFACE 
-        -L@ROOT_BINARY_DIR@/wasm/deps/lib
-        -lbotan-3
         services_system${suffix} 
         psibase${suffix} 
         exception-stub${suffix}
@@ -176,7 +175,6 @@ function(add_libs suffix)
     )
     target_include_directories(Spki${suffix} INTERFACE 
         @ROOT_SOURCE_DIR@/packages/system/AuthSig/include
-        @ROOT_BINARY_DIR@/wasm/deps/include/botan-3 
     )
 
     add_library(PrivateKeyInfo${suffix} INTERFACE IMPORTED)

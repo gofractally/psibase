@@ -2,16 +2,16 @@
 #include "services/system/Spki.hpp"
 
 #include <botan/auto_rng.h>
-#include <botan/ber_dec.h>
 #include <botan/bigint.h>
-#include <botan/der_enc.h>
+#include <botan/ec_group.h>
 #include <botan/ecc_key.h>
 #include <botan/entropy_src.h>
-#include <botan/pem.h>
 #include <botan/pk_algs.h>
 #include <botan/pk_keys.h>
 #include <botan/pkcs8.h>
 #include <botan/pubkey.h>
+#include <psibase/check.hpp>
+#include <psibase/pem.hpp>
 
 namespace SystemService
 {
@@ -19,26 +19,17 @@ namespace SystemService
    {
       std::vector<unsigned char> parsePrivateKeyInfo(std::string_view s)
       {
-         Botan::AlgorithmIdentifier algorithm;
-         std::vector<std::uint8_t>  key;
+         auto der = psibase::pemDecode(s, "PRIVATE KEY");
+         psibase::check(der.has_value(), "Pem->PrivateKeyInfo: Expected a PEM encoded PRIVATE KEY");
 
-         std::string label_got;
-         auto        ber = Botan::PEM_Code::decode(s, label_got);
-         if (label_got != "PRIVATE KEY")
-         {
-            psibase::check(
-                false,
-                "Pem->PrivateKeyInfo: Expected label \"PRIVATE KEY\", got label: " + label_got);
-         }
+         // Aborts unless it is a key that can be used
+         std::unique_ptr<Botan::Private_Key> privateKey = Botan::PKCS8::load_key(*der);
 
-         std::unique_ptr<Botan::Private_Key> privateKey = Botan::PKCS8::load_key(ber);
-
-         return std::vector<unsigned char>(ber.begin(), ber.end());
+         return std::move(*der);
       }
       std::string to_string(const PrivateKeyInfo& key)
       {
-         return Botan::PEM_Code::encode(reinterpret_cast<const std::uint8_t*>(key.data.data()),
-                                        key.data.size(), "PRIVATE KEY");
+         return psibase::pemEncode(key.data, "PRIVATE KEY");
       }
 
       SubjectPublicKeyInfo getSubjectPublicKeyInfo(const PrivateKeyInfo& private_key)
@@ -65,9 +56,10 @@ namespace SystemService
          auto ec = dynamic_cast<const Botan::EC_PrivateKey*>(key.get());
          psibase::check(ec != nullptr, "Not an elliptic curve key");
          const Botan::BigInt& order = ec->domain().get_order();
-         Botan::BigInt        sValue(msg.data() + 32, 32);
+         std::span<std::uint8_t> s{msg.data() + 32, 32};
+         Botan::BigInt           sValue = Botan::BigInt::from_bytes(s);
          if (sValue > order / 2)
-            Botan::BigInt::encode_1363(msg.data() + 32, 32, order - sValue);
+            (order - sValue).serialize_to(s);
 
          return msg;
       }

@@ -87,21 +87,28 @@ endif()
 
 if(DEFINED WASI_SDK_PREFIX)
     ProcessorCount(NUM_PROCS)
-    # This is used by the key libraries of AuthSig (Spki, PrivateKeyInfo). The kinds of keys supported need to be configured
-    # here.  We use a minimized build to keep the size of the service down. Static linking is
-    # not enough because the algorithms are looked up dynamically.
+    # Botan is used by verify-r1 and by the key libraries of AuthSig (Spki,
+    # PrivateKeyInfo), XKeys and XBasic. The kinds of keys supported need to be
+    # configured here.  We use a minimized build to keep the size of the services
+    # down. Static linking is not enough because the algorithms are looked up
+    # dynamically. pcurves_secp256r1 and pcurves_secp256k1 are the fixed-size
+    # implementations of the two curves that have a verifier.
     #
     # --cpu=generic is used instead of --cpu=wasm, because Botan thinks that wasm means emscripten.
     # --cc=gcc is used instead of clang, because Botan's clang configration includes -pthread.
     # The stack protector requires an entropy source so we can't support it.
     #  -msimd128 is disabled because binaryen 105 doesn't fully support it
+    #
+    # It is built with 64-bit words: see wasm/patch-botan-word64.cmake.
+    # -mwide-arithmetic makes the 64x64->128 multiply one instruction.
     ExternalProject_Add(wasm-botan
-        URL https://github.com/gofractally/psibase/releases/download/deps/Botan-3.1.1.tar.xz
-        URL_HASH SHA256=30c84fe919936a98fef5331f246c62aa2c0e4d2085b2d4511207f6a20afa3a6b
+        URL https://botan.randombit.net/releases/Botan-3.14.1.tar.xz
+        URL_HASH SHA256=5b85cba0f014d344eb8e9919aee0a3bdc31e16acb05816410025be9bee1e0930
         DEPENDS ${wasm-deps}
         PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm/botan
         INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps
-        CONFIGURE_COMMAND <SOURCE_DIR>/configure.py --cc-bin=${WASI_SDK_PREFIX}/bin/clang++ --cc=gcc --cpu=generic --os=none --ar-command=${WASI_SDK_PREFIX}/bin/llvm-ar --build-targets=static --with-sysroot-dir=${WASI_SDK_PREFIX}/share/wasi-sysroot --minimized-build --enable-modules=ecdsa,bcrypt,raw_hash,auto_rng,sha2_64,getentropy --with-os-feature=getentropy "--cxxflags=--target=wasm32-wasip1 -O3 -msign-ext -mnontrapping-fptoint -mbulk-memory" --without-stack-protector --prefix=<INSTALL_DIR>
+        PATCH_COMMAND ${CMAKE_COMMAND} -DTYPES_H=<SOURCE_DIR>/src/lib/utils/types.h -P ${CMAKE_CURRENT_SOURCE_DIR}/wasm/patch-botan-word64.cmake
+        CONFIGURE_COMMAND <SOURCE_DIR>/configure.py --cc-bin=${WASI_SDK_PREFIX}/bin/clang++ --cc=gcc --cpu=generic --os=none --ar-command=${WASI_SDK_PREFIX}/bin/llvm-ar --build-targets=static --with-sysroot-dir=${WASI_SDK_PREFIX}/share/wasi-sysroot --minimized-build --enable-modules=ecdsa,bcrypt,raw_hash,auto_rng,sha2_64,getentropy,pcurves_secp256r1,pcurves_secp256k1 --with-os-feature=getentropy "--cxxflags=--target=wasm32-wasip1 -O3 -msign-ext -mnontrapping-fptoint -mbulk-memory -mwide-arithmetic" --without-stack-protector --prefix=<INSTALL_DIR>
         BUILD_COMMAND make -j${NUM_PROCS}
         INSTALL_COMMAND make install
     )
