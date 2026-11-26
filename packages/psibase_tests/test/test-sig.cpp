@@ -117,7 +117,8 @@ TEST_CASE("ec")
              .failed("signature invalid"));
    t.startBlock(0);
 
-   CHECK(TraceResult(t.pushTransaction(t.makeTransaction({authsig.from(sue).setKey(pub_key2)}),
+   CHECK(TraceResult(t.pushTransaction(t.makeTransaction({authsig.from(sue).setActive(
+                                           SystemService::AuthSig::KeySpec::of(pub_key2))}),
                                        {{pub_key1, priv_key1}}))
              .succeeded());
    t.startBlock(0);

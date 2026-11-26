@@ -463,7 +463,9 @@ namespace
       CALL(Transact, "transact", startBoot, std::vector<Checksum256>{digest, Checksum256{}});
       CALL(Accounts, "accounts", newAccount, alice, AccountNumber{"auth-sig"},
            NewAccountMode::requireNew);
-      CALL(AuthSigService, "auth-sig", newAccount, alice, spki);
+      CALL(AuthSigService, "auth-sig", newAccount, alice,
+           SystemService::AuthSig::KeySpec{spki, 7, AccountNumber{"verify-r1"}},
+           SystemService::AuthSig::KeySpec::of(spki));
       CALL(Packages, "packages", postinstall, meta, bytes);
       CALL(Packages, "packages", setSchema, setcodeSchema);
       CALL(Sites, "sites", storeSys, "/index.html", "text/html", std::optional<std::string>{"gzip"},

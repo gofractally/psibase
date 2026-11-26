@@ -13,9 +13,20 @@ using namespace UserService;
 using SystemService::AuthSig::RAuthSig;
 using SystemService::AuthSig::SubjectPublicKeyInfo;
 
+// The part of auth-sig's account that this asks for
+struct ActiveKey
+{
+   SubjectPublicKeyInfo key;
+   PSIO_REFLECT(ActiveKey, key)
+};
+struct AccountKeys
+{
+   ActiveKey active;
+   PSIO_REFLECT(AccountKeys, active)
+};
 struct KeyData
 {
-   std::optional<SystemService::AuthSig::AuthRecord> account;
+   std::optional<AccountKeys> account;
    PSIO_REFLECT(KeyData, account)
 };
 
@@ -28,7 +39,7 @@ struct KeyReply
 void CredResThief::create()
 {
    auto owner = getSender();
-   auto query = std::format(R"(query {{ account(name: "{}") {{ account pubkey verifier }} }})", owner.str());
+   auto query = std::format(R"(query {{ account(name: "{}") {{ active {{ key }} }} }})", owner.str());
    auto reply = to<RAuthSig>()
                     .serveSys(HttpRequest{
                         .host        = "auth-sig.psibase.localhost:8080",
@@ -40,7 +51,7 @@ void CredResThief::create()
                     .value();
    auto ownerAccount = psio::from_ijson<KeyReply>(reply.body).data.account;
    check(ownerAccount.has_value(), "Could not find owner key");
-   auto id = to<Credentials>().issue(keyFingerprint(ownerAccount->pubkey), std::nullopt,
+   auto id = to<Credentials>().issue(keyFingerprint(ownerAccount->active.key), std::nullopt,
                                      std::vector{MethodNumber{"bill"}});
    open<CredIdTable>().put({owner, id});
 }

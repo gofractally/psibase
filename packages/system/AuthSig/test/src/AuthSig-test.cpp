@@ -233,19 +233,25 @@ SCENARIO("AuthSig::newAccount does not overwrite an existing account key")
 
    THEN("an attacker cannot take over the victim via newAccount")
    {
-      REQUIRE(attacker.to<AuthSig::AuthSig>().newAccount(victim.id, bob_keys.first)
+      using AuthSig::KeySpec;
+      REQUIRE(attacker.to<AuthSig::AuthSig>()
+                  .newAccount(victim.id, KeySpec::of(bob_keys.first), KeySpec::of(bob_keys.first))
                   .failed("account already exists"));
 
-      REQUIRE(victim.to<AuthSig::AuthSig>().setKey(alice_keys.first).succeeded());
+      REQUIRE(victim.to<AuthSig::AuthSig>().setActive(KeySpec::of(alice_keys.first)).succeeded());
 
       auto stolen = t.from(victim.id).with({bob_keys});
-      REQUIRE(stolen.to<AuthSig::AuthSig>().setKey(bob_keys.first).failed(""));
+      REQUIRE(stolen.to<AuthSig::AuthSig>().setActive(KeySpec::of(bob_keys.first)).failed(""));
    }
 
    THEN("newAccount still creates a genuinely new account")
    {
-      REQUIRE(attacker.to<AuthSig::AuthSig>().newAccount("newuser00"_a, bob_keys.first).succeeded());
+      using AuthSig::KeySpec;
+      REQUIRE(attacker.to<AuthSig::AuthSig>()
+                  .newAccount("newuser00"_a, KeySpec::of(bob_keys.first),
+                              KeySpec::of(bob_keys.first))
+                  .succeeded());
       auto fresh = t.from("newuser00"_a).with({bob_keys});
-      REQUIRE(fresh.to<AuthSig::AuthSig>().setKey(bob_keys.first).succeeded());
+      REQUIRE(fresh.to<AuthSig::AuthSig>().setActive(KeySpec::of(bob_keys.first)).succeeded());
    }
 }

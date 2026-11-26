@@ -102,9 +102,16 @@ namespace
          return "VerifyBr1.wasm";
    }
 
+   // The part of auth-sig's account that these tests ask for
+   struct StoredKeys
+   {
+      SystemService::AuthSig::AuthKey owner;
+      SystemService::AuthSig::AuthKey active;
+      PSIO_REFLECT(StoredKeys, owner, active)
+   };
    struct StoredKey
    {
-      std::optional<SystemService::AuthSig::AuthRecord> account;
+      std::optional<StoredKeys> account;
       PSIO_REFLECT(StoredKey, account)
    };
    struct StoredKeyReply
@@ -549,112 +556,119 @@ TEST_CASE("auth-sig: a claim must name the verifier stored with the account's ke
    }
 }
 
-TEST_CASE("auth-sig: an account chooses its verifier")
+TEST_CASE("auth-sig: the verifier is stored with each key")
 {
-   using SystemService::AuthSig::AuthRecord;
    using SystemService::AuthSig::AuthSig;
+   using SystemService::AuthSig::KeySpec;
    Fixture f;
    auto&   t = f.t;
 
-   auto priv = PrivateKeyInfo::create("secp256r1");
-   auto pub  = getSubjectPublicKeyInfo(priv);
-   auto bob  = t.addAccount(AccountNumber{"bobbobbob"}, pub);
+   // Distinct owner and active keys, so that a claim counts for one of them only.
+   auto ownerPriv  = PrivateKeyInfo::create("secp256r1");
+   auto owner      = getSubjectPublicKeyInfo(ownerPriv);
+   auto activePriv = PrivateKeyInfo::create("secp256r1");
+   auto active     = getSubjectPublicKeyInfo(activePriv);
+   auto bob        = AccountNumber{"bobbobbob"};
+   REQUIRE(t.from(f.alice)
+               .to<AuthSig>()
+               .newAccount(bob, KeySpec::of(owner), KeySpec::of(active))
+               .succeeded());
 
    // What auth-sig's query service reports: this is where a signer learns
    // which verifier to name for an account.
    auto stored = [&]
    {
-      auto query = std::format(R"(query {{ account(name: "{}") {{ account pubkey verifier }} }})",
-                               bob.str());
-      auto res   = t.post(AuthSig::service, "/graphql", GraphQLBody{query});
-      auto body  = std::string(res.body.begin(), res.body.end());
+      auto query = std::format(
+          R"(query {{ account(name: "{}") {{ owner {{ verifier key seq }} active {{ verifier key seq }} }} }})",
+          bob.str());
+      auto res  = t.post(AuthSig::service, "/graphql", GraphQLBody{query});
+      auto body = std::string(res.body.begin(), res.body.end());
       UNSCOPED_INFO(body);
       return psio::from_ijson<StoredKeyReply>(body).data.account.value();
    };
-   // An action of bob's, signed with his key, in a claim naming `service`
-   auto signedBy = [&](AccountNumber service, Action action)
+   // An action of bob's, signed with `priv`, in a claim for `key` naming `service`
+   auto signedBy = [&](const PrivateKeyInfo& priv, const SubjectPublicKeyInfo& key,
+                       AccountNumber service, Action action)
    {
       t.startBlock(0);
       auto trx = t.makeTransaction({std::move(action)});
-      trx.claims.push_back({.service = service, .rawData = {pub.data.begin(), pub.data.end()}});
+      trx.claims.push_back({.service = service, .rawData = {key.data.begin(), key.data.end()}});
       return f.push(trx, f.sign(trx, priv));
    };
+   auto byActive = [&](AccountNumber service, Action action)
+   { return signedBy(activePriv, active, service, std::move(action)); };
+   auto byOwner = [&](AccountNumber service, Action action)
+   { return signedBy(ownerPriv, owner, service, std::move(action)); };
    auto nop = [&] { return Action{.sender = bob, .service = AccountNumber{"nop"}}; };
    transactor<AuthSig> authSig{bob, AuthSig::service};
 
-   // The default verifier is stored with a new account's key.
-   CHECK(stored().verifier == VerifyR1::service);
-   CHECK(stored().pubkey == pub);
-   CHECK(signedBy(VerifyR1::service, nop()).succeeded());
+   // The default verifier is stored with each key of a new account.
+   CHECK(stored().owner.verifier == VerifyR1::service);
+   CHECK(stored().active.verifier == VerifyR1::service);
+   CHECK(stored().active.key == active);
+   CHECK(byActive(VerifyR1::service, nop()).succeeded());
    // The other allowed verifier checks the signature and finds it good, but
-   // the account did not choose it.
-   CHECK(signedBy(VerifyBr1::service, nop()).failed("Authorization for"));
+   // it is not the one stored with the key.
+   CHECK(byActive(VerifyBr1::service, nop()).failed("Authorization for"));
 
-   SECTION("opting into the second verifier")
+   SECTION("choosing the second verifier for the active key")
    {
-      // Still under the old verifier while the change is made
-      REQUIRE(
-          signedBy(VerifyR1::service, authSig.setKeyVerifier(VerifyBr1::service, pub)).succeeded());
-      CHECK(stored().verifier == VerifyBr1::service);
-      CHECK(stored().pubkey == pub);
+      REQUIRE(byOwner(VerifyR1::service, authSig.setActive(KeySpec{active, 5, VerifyBr1::service}))
+                  .succeeded());
+      CHECK(stored().active.verifier == VerifyBr1::service);
+      CHECK(stored().active.key == active);
+      CHECK(stored().active.seq == 5);
+      // The owner key is as it was.
+      CHECK(stored().owner.verifier == VerifyR1::service);
 
-      CHECK(signedBy(VerifyBr1::service, nop()).succeeded());
+      CHECK(byActive(VerifyBr1::service, nop()).succeeded());
       // The default verifier's claims are now refused, though the signature is good.
-      CHECK(signedBy(VerifyR1::service, nop()).failed("Authorization for"));
-      CHECK(signedBy(VerifyK1::service, nop()).failed("unsupported public key"));
+      CHECK(byActive(VerifyR1::service, nop()).failed("Authorization for"));
+      CHECK(byActive(VerifyK1::service, nop()).failed("unsupported public key"));
+      CHECK(byOwner(VerifyR1::service, nop()).succeeded());
+      CHECK(byOwner(VerifyBr1::service, nop()).failed("Authorization for"));
 
-      // setKey goes back to the default
-      REQUIRE(signedBy(VerifyBr1::service, authSig.setKey(pub)).succeeded());
-      CHECK(stored().verifier == VerifyR1::service);
-      CHECK(signedBy(VerifyR1::service, nop()).succeeded());
-      CHECK(signedBy(VerifyBr1::service, nop()).failed("Authorization for"));
-   }
-   SECTION("choosing the default explicitly")
-   {
-      REQUIRE(
-          signedBy(VerifyR1::service, authSig.setKeyVerifier(VerifyR1::service, pub)).succeeded());
-      CHECK(stored().verifier == VerifyR1::service);
-      CHECK(signedBy(VerifyR1::service, nop()).succeeded());
+      // Back to the default
+      REQUIRE(byOwner(VerifyR1::service, authSig.setActive(KeySpec::of(active))).succeeded());
+      CHECK(stored().active.verifier == VerifyR1::service);
+      CHECK(byActive(VerifyR1::service, nop()).succeeded());
+      CHECK(byActive(VerifyBr1::service, nop()).failed("Authorization for"));
    }
    SECTION("a verifier that is not allowed for the key")
    {
       const char* notAllowed = "verifier is not allowed for this type of key";
+      auto        with       = [&](AccountNumber verifier, const SubjectPublicKeyInfo& key)
+      { return byOwner(VerifyR1::service, authSig.setActive(KeySpec{key, 0, verifier})); };
       // The other curve's verifier
-      CHECK(signedBy(VerifyR1::service, authSig.setKeyVerifier(VerifyK1::service, pub))
-                .failed(notAllowed));
+      CHECK(with(VerifyK1::service, active).failed(notAllowed));
       // A service that is not a verifier
-      CHECK(signedBy(VerifyR1::service, authSig.setKeyVerifier(AuthSig::service, pub))
-                .failed(notAllowed));
-      CHECK(signedBy(VerifyR1::service, authSig.setKeyVerifier(AccountNumber{}, pub))
-                .failed(notAllowed));
+      CHECK(with(AuthSig::service, active).failed(notAllowed));
+      CHECK(with(AccountNumber{}, active).failed(notAllowed));
       // A verify service that runs an allowed verifier's code under another name
       auto copy = AccountNumber{"copycopy"};
       t.addService(copy, "VerifyBr1.wasm", CodeRow::isVerify);
-      CHECK(
-          signedBy(VerifyR1::service, authSig.setKeyVerifier(copy, pub)).failed(notAllowed));
+      CHECK(with(copy, active).failed(notAllowed));
 
       // A secp256k1 key has one verifier.
       auto k1 = getSubjectPublicKeyInfo(PrivateKeyInfo::create("secp256k1"));
-      CHECK(signedBy(VerifyR1::service, authSig.setKeyVerifier(VerifyBr1::service, k1))
-                .failed(notAllowed));
-      CHECK(signedBy(VerifyR1::service, authSig.setKeyVerifier(VerifyR1::service, k1))
-                .failed(notAllowed));
+      CHECK(with(VerifyBr1::service, k1).failed(notAllowed));
+      CHECK(with(VerifyR1::service, k1).failed(notAllowed));
       // A key nothing verifies
-      auto bad = pub;
+      auto bad = active;
       bad.data.push_back(0);
-      CHECK(signedBy(VerifyR1::service, authSig.setKeyVerifier(VerifyBr1::service, bad))
-                .failed("unsupported public key"));
+      CHECK(with(VerifyBr1::service, bad).failed("unsupported public key"));
 
       // Nothing changed.
-      CHECK(stored().verifier == VerifyR1::service);
-      CHECK(stored().pubkey == pub);
-      CHECK(signedBy(VerifyR1::service, nop()).succeeded());
+      CHECK(stored().active.verifier == VerifyR1::service);
+      CHECK(stored().active.key == active);
+      CHECK(byActive(VerifyR1::service, nop()).succeeded());
    }
 }
 
 TEST_CASE("auth-sig: only keys that have a verifier are stored")
 {
    using SystemService::AuthSig::AuthSig;
+   using SystemService::AuthSig::KeySpec;
    Fixture f;
    auto&   t       = f.t;
    auto    authSig = t.from(f.alice).to<AuthSig>();
@@ -669,11 +683,11 @@ TEST_CASE("auth-sig: only keys that have a verifier are stored")
          for (const Bytes& encoded : {key, compressed(key)})
          {
             INFO("key size " << encoded.size());
-            if (target.service == verifierFor(target.type))
-               REQUIRE(authSig.setKey(SubjectPublicKeyInfo{encoded}).succeeded());
-            else
-               REQUIRE(authSig.setKeyVerifier(target.service, SubjectPublicKeyInfo{encoded})
-                           .succeeded());
+            // The default verifier is stored when none is named.
+            KeySpec spec{SubjectPublicKeyInfo{encoded}, 0, {}};
+            if (target.service != verifierFor(target.type))
+               spec.verifier = target.service;
+            REQUIRE(authSig.setKeys(spec, spec).succeeded());
             REQUIRE(t.from(f.alice)
                         .to<SystemService::Accounts>()
                         .setAuthServ(AuthSig::service)
@@ -711,20 +725,27 @@ TEST_CASE("auth-sig: only keys that have a verifier are stored")
       auto unusedBits                    = good;
       unusedBits[unusedBits.size() - 66] = 1;
 
-      int n = 0;
+      auto ok = KeySpec::of(SubjectPublicKeyInfo{good});
+      int  n  = 0;
       for (const Bytes& key : {p384, otherCurve, trailing, unusedBits, Bytes{}, Bytes{0x30, 0x00}})
       {
          INFO("key " << n++ << ", size " << key.size());
-         CHECK(authSig.setKey(SubjectPublicKeyInfo{key}).failed("unsupported public key"));
+         auto bad = KeySpec::of(SubjectPublicKeyInfo{key});
+         // As the owner key and as the active key
+         CHECK(authSig.setKeys(bad, ok).failed("unsupported public key"));
          t.startBlock(0);
-         CHECK(authSig.setKeyVerifier(VerifyR1::service, SubjectPublicKeyInfo{key})
+         CHECK(authSig.setKeys(ok, bad).failed("unsupported public key"));
+         t.startBlock(0);
+         CHECK(authSig.setKeys(KeySpec{SubjectPublicKeyInfo{key}, 0, VerifyR1::service}, ok)
                    .failed("unsupported public key"));
          t.startBlock(0);
-         CHECK(authSig.newAccount(AccountNumber{"carolcarol"}, SubjectPublicKeyInfo{key})
+         CHECK(authSig.newAccount(AccountNumber{"carolcarol"}, bad, ok)
+                   .failed("unsupported public key"));
+         t.startBlock(0);
+         CHECK(authSig.newAccount(AccountNumber{"carolcarol"}, ok, bad)
                    .failed("unsupported public key"));
          t.startBlock(0);
       }
-      CHECK(
-          authSig.newAccount(AccountNumber{"carolcarol"}, SubjectPublicKeyInfo{good}).succeeded());
+      CHECK(authSig.newAccount(AccountNumber{"carolcarol"}, ok, ok).succeeded());
    }
 }
