@@ -101,6 +101,16 @@ if(DEFINED WASI_SDK_PREFIX)
     #
     # It is built with 64-bit words: see wasm/patch-botan-word64.cmake.
     # -mwide-arithmetic makes the 64x64->128 multiply one instruction.
+    #
+    # verify-r1 is written on Botan's fixed-size curve arithmetic
+    # (botan/internal/pcurves.h), which is not part of Botan's public
+    # interface and is not installed by its "make install". The internal
+    # headers are therefore installed here too, apart from the public ones, in
+    # include/botan-3-internal. That service depends on Botan's internals as
+    # they are in exactly this version; the version is pinned by the hash
+    # below, and a change of version means reading verify-r1 against the new
+    # source again (packages/system/VerifyR1/src/VerifyR1.cpp says what to
+    # compare).
     ExternalProject_Add(wasm-botan
         URL https://botan.randombit.net/releases/Botan-3.14.1.tar.xz
         URL_HASH SHA256=5b85cba0f014d344eb8e9919aee0a3bdc31e16acb05816410025be9bee1e0930
@@ -111,6 +121,8 @@ if(DEFINED WASI_SDK_PREFIX)
         CONFIGURE_COMMAND <SOURCE_DIR>/configure.py --cc-bin=${WASI_SDK_PREFIX}/bin/clang++ --cc=gcc --cpu=generic --os=none --ar-command=${WASI_SDK_PREFIX}/bin/llvm-ar --build-targets=static --with-sysroot-dir=${WASI_SDK_PREFIX}/share/wasi-sysroot --minimized-build --enable-modules=ecdsa,bcrypt,raw_hash,auto_rng,sha2_64,getentropy,pcurves_secp256r1,pcurves_secp256k1 --with-os-feature=getentropy "--cxxflags=--target=wasm32-wasip1 -O3 -msign-ext -mnontrapping-fptoint -mbulk-memory -mwide-arithmetic" --without-stack-protector --prefix=<INSTALL_DIR>
         BUILD_COMMAND make -j${NUM_PROCS}
         INSTALL_COMMAND make install
+        COMMAND ${CMAKE_COMMAND} -E rm -rf <INSTALL_DIR>/include/botan-3-internal
+        COMMAND cp -RL <BINARY_DIR>/build/include/internal <INSTALL_DIR>/include/botan-3-internal
     )
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/lib/libbotan-3.a
         DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib

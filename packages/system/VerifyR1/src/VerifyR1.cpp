@@ -1,9 +1,7 @@
 #include <services/system/VerifyR1.hpp>
 
-#include <botan/ec_apoint.h>
-#include <botan/ec_group.h>
-#include <botan/ecdsa.h>
-#include <botan/pubkey.h>
+#include <botan/internal/pcurves.h>
+#include <botan/internal/pcurves_instance.h>
 #include <psibase/api.hpp>
 #include <psibase/check.hpp>
 #include <psibase/dispatch.hpp>
@@ -11,10 +9,11 @@
 #include <psibase/verifier.hpp>
 
 #include <cstdint>
-#include <optional>
+#include <memory>
 #include <span>
 
-// Verifies ECDSA signatures over secp256r1 (R1, P-256) with Botan.
+// Verifies ECDSA signatures over secp256r1 (R1, P-256) with Botan's
+// fixed-size curve arithmetic.
 //
 // This is the default verifier for the curve. verify-br1 is a second,
 // independent implementation that an account may choose instead; both
@@ -24,11 +23,7 @@
 // r || s over the transaction hash.
 //
 // Everything about the encoding is decided here, with the functions of
-// psibase/verifier.hpp, before Botan is called. Botan is given only a point
-// encoding of the right size and form and a signature of 64 bytes in the
-// low-S form; its X.509 parser is not used at all.
-//
-// Accepted encodings:
+// psibase/verifier.hpp, before Botan is called:
 // - Keys: exactly the DER SubjectPublicKeyInfo for the curve, holding an
 //   uncompressed (04 || X || Y) or compressed (02/03 || X) point. Nothing else
 //   that a general DER parser would tolerate is accepted: no trailing bytes,
@@ -38,34 +33,88 @@
 //   signature would have a second encoding that anyone could produce. A
 //   signer normalizes with s = n - s when s > n/2.
 //
-// Setting up the curve (Botan computes its tables at run time) costs several
-// times a verification. It is done once, when the service is built: prestart
-// below is run by wasm-ctor-eval and the module that is deployed starts with
-// the memory that left behind. See CMakeLists.txt.
+// BOTAN INTERNALS. The verification itself (verify, below) is written on
+// Botan::PCurve::PrimeOrderCurve, declared in botan/internal/pcurves.h. That
+// is not Botan's public interface: nothing of Botan's key, signature, X.509,
+// big-integer or EC_Group code is used or linked, which is what keeps this
+// service small and quick to start. It is written against Botan 3.14.1, the
+// version the build pins by hash (wasm-botan in the root CMakeLists.txt), and
+// performs the same steps, in the same order, as that version's own
+//
+//    ECDSA_Verification_Operation::verify   src/lib/pubkey/ecdsa/ecdsa.cpp:260
+//
+// which calls, through EC_Scalar and EC_Group::Mul2Table (ec_scalar.cpp,
+// ec_inner_data.cpp, ec_inner_pc.cpp), the functions used here:
+//
+//    Botan 3.14.1                               here
+//    EC_Scalar::deserialize_pair(group, sig)    deserialize_scalar for r and for s
+//    r.is_nonzero() && s.is_nonzero()           deserialize_scalar refuses zero
+//    EC_Scalar::from_bytes_with_trunc(msg)      scalar_from_wide_bytes (a 32-byte
+//                                               digest is not truncated: reduced mod n)
+//    s.invert_vartime()                         scalar_invert_vartime
+//    m_gy_mul.mul2_vartime_x_mod_order_eq(      scalar_mul twice, then
+//        r, w, m, r)                            mul2_vartime_x_mod_order_eq(table, r, m*w, r*w)
+//    EC_Group::Mul2Table(public point)          mul2_setup_g
+//
+// When the pinned version changes, read that function again and compare.
+// The differential test (test_verifier_differential.cpp) holds this service
+// to the decisions of the BearSSL verifier on several thousand cases.
+//
+// Setting up the curve (Botan computes its generator tables at run time)
+// costs several times a verification. It is done once, when the service is
+// built: prestart below is run by wasm-ctor-eval and the module that is
+// deployed starts with the memory that left behind. See CMakeLists.txt.
 
 using namespace psibase;
 
 namespace
 {
    using Bytes = std::span<const std::uint8_t>;
+   using Curve = Botan::PCurve::PrimeOrderCurve;
 
    // Created by prestart. Never destroyed.
-   const Botan::EC_Group* curve = nullptr;
+   const Curve* curve = nullptr;
 
-   const Botan::EC_Group& getCurve()
+   const Curve& getCurve()
    {
       // Only reached with a null pointer if the module was not pre-initialized.
       if (!curve)
-         curve = new Botan::EC_Group(Botan::EC_Group::from_name("secp256r1"));
+         curve = (new std::shared_ptr<const Curve>(Botan::PCurve::PCurveInstance::secp256r1()))
+                     ->get();
       return *curve;
    }
 
-   bool verify(const Botan::EC_AffinePoint& point, Bytes hash, Bytes signature)
+   // Nothing unless `encoded` is 04 || X || Y or 02/03 || X with coordinates
+   // below the field prime that are those of a point on the curve.
+   std::optional<Curve::AffinePoint> point(Bytes encoded)
    {
-      Botan::ECDSA_PublicKey key(getCurve(), point);
-      // "Raw": the message is the digest. Standard: r || s (IEEE 1363).
-      Botan::PK_Verifier verifier(key, "Raw", Botan::Signature_Format::Standard);
-      return verifier.verify_message(hash, signature);
+      if (encoded.size() == 33)
+         return getCurve().deserialize_point_compressed(encoded);
+      else
+         return getCurve().deserialize_point_uncompressed(encoded);
+   }
+
+   // ECDSA verification of the signature r || s over a 32-byte digest.
+   // See BOTAN INTERNALS above for the correspondence with Botan's own.
+   bool verify(const Curve::AffinePoint& q, Bytes hash, std::span<const std::uint8_t, 64> signature)
+   {
+      const Curve& c = getCurve();
+      // Each is nothing unless it is in [1, n-1].
+      auto r = c.deserialize_scalar(signature.first(32));
+      auto s = c.deserialize_scalar(signature.last(32));
+      if (!r || !s)
+         return false;
+      // The digest as an integer, reduced modulo n
+      auto m = c.scalar_from_wide_bytes(hash);
+      if (!m)
+         return false;
+      // Nothing here is secret, so the variable-time functions are used.
+      auto w  = c.scalar_invert_vartime(*s);
+      auto u1 = c.scalar_mul(*m, w);
+      auto u2 = c.scalar_mul(*r, w);
+      // r == x(u1 * G + u2 * Q) mod n; false also if that is the point at infinity
+      auto table = c.mul2_setup_g(q);
+      return c.mul2_vartime_x_mod_order_eq(*table, *r, u1, u2);
    }
 
    // The generator of the curve, uncompressed
@@ -94,14 +143,13 @@ extern "C" void called(AccountNumber thisService, AccountNumber sender)
    // No hybrid points (06/07 || X || Y), a third encoding of the same point.
    check(encoded[0] == (encoded.size() == 65 ? 0x04 : (0x02 | (encoded[0] & 1))),
          "invalid public key");
-   // Botan accepts any s in [1, n-1].
+   // The arithmetic accepts any s in [1, n-1].
    check(verifier::isLowS(signature, KeyType::secp256r1), "signature invalid");
 
-   // Nothing unless the coordinates are in range and the point is on the curve
-   auto point = Botan::EC_AffinePoint::deserialize(getCurve(), encoded);
-   check(point.has_value(), "invalid public key");
+   auto q = point(encoded);
+   check(q.has_value(), "invalid public key");
 
-   check(verify(*point, Bytes{data.transactionHash.data(), data.transactionHash.size()}, signature),
+   check(verify(*q, Bytes{data.transactionHash.data(), data.transactionHash.size()}, signature),
          "signature invalid");
 }
 
@@ -110,20 +158,25 @@ extern "C" void __wasm_call_ctors();
 #ifndef VERIFY_R1_NOT_PREINITIALIZED
 
 // Run by wasm-ctor-eval when the service is built; not present in the
-// deployed module. Loads the curve and takes one verification through every
-// path, so that whatever Botan sets up on first use is already set up.
+// deployed module. Creates the curve and takes one complete verification,
+// with each encoding of a point, so that whatever is set up on first use is
+// already set up.
 extern "C" [[clang::export_name("prestart")]] void prestart()
 {
    __wasm_call_ctors();
-   if (auto point = Botan::EC_AffinePoint::deserialize(getCurve(), generator))
-   {
-      // Not a valid signature; it only has to be computed.
-      std::uint8_t hash[32]      = {1};
-      std::uint8_t signature[64] = {};
-      signature[31]              = 1;
-      signature[63]              = 1;
-      (void)verify(*point, hash, signature);
-   }
+   // Not a valid signature; it only has to be computed.
+   std::uint8_t hash[32]      = {1};
+   std::uint8_t signature[64] = {};
+   signature[31]              = 1;
+   signature[63]              = 1;
+   if (auto q = point(generator))
+      (void)verify(*q, hash, signature);
+   // Gy is odd
+   std::uint8_t compressed[33] = {0x03};
+   for (int i = 0; i < 32; ++i)
+      compressed[1 + i] = generator[1 + i];
+   if (auto q = point(compressed))
+      (void)verify(*q, hash, signature);
 }
 
 // Caution! Don't replace with version in dispatcher!
