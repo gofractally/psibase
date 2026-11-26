@@ -172,9 +172,9 @@ This section was written by the author of the migration.
 - Account names keep psibase's own coding; method names use PSIO's coder.
 
 **Where to look.**
-- `doc/team-review.md`: everything the team must decide or confirm. Start with sections 12 and 13.
-- `doc/pssz-conversion.md`: the mapping from each old call to the new one (sections 3 and 6.6), the merge handover and classes of failure (section 7).
-- `doc/flip-interop.md`: the rules that keep C++ and Rust twins of a type identical. `doc/merge-checklist.md`.
+- `doc/migrations/2026-11-fracpack-to-pssz/team-review.md`: everything the team must decide or confirm. Start with sections 12 and 13.
+- `doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md`: the mapping from each old call to the new one (sections 3 and 6.6), the merge handover and classes of failure (section 7).
+- `doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md`: the rules that keep C++ and Rust twins of a type identical. `doc/migrations/2026-11-fracpack-to-pssz/merge-checklist.md`.
 - Code: `libraries/psibase/common/include/psibase/{Table,Rpc,Actor,schema}.hpp`, `libraries/psibase/native/src/{BlockContext,TransactionContext}.cpp`, `rust/psibase`, `rust/psibase_macros`, `packages/system/Transact`.
 - The library itself: start with its `docs/annotations.md`, `docs/tutorial-annotations.md` and `docs/pssz-spec.md`.
 
@@ -182,7 +182,7 @@ This section was written by the author of the migration.
 - macOS, wasmtime: full ctest 88/88 (the count fell because the old library's own tests were deleted with it).
 - x86-64 Linux at e93c2e64d: wasmtime native 19/19, end-to-end 39/39, Rust 29/29, plugins 1/1; LLVM AOT native 20/20 and end-to-end 39/39.
 - A fixture that C++ and Rust both encode is byte-identical for types, JSON, service schemas, leaf types and wrappers, and every Rust workspace type-checks.
-- End to end by hand: boot, account creation, GraphQL on a C++ and on a Rust service, the schema endpoint, pushing a transaction, and stopping and restarting a node that continues. Commands and output are in `doc/pssz-conversion.md` section 7.
+- End to end by hand: boot, account creation, GraphQL on a C++ and on a Rust service, the schema endpoint, pushing a transaction, and stopping and restarting a node that continues. Commands and output are in `doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md` section 7.
 - PSIO's own suites: C++ 424/424 in both JSON-parser configurations, Rust 1,141, JavaScript 252, Python 90.
 
 **Questions for reviewers.**
@@ -190,7 +190,7 @@ This section was written by the author of the migration.
 2. Trust. Rows a service reads from its own tables are decoded with validation today. The intended rule is trusted reads of own rows and validated action and cross-service data.
 3. Naming. The implementing language is the authority for a name; a blanket camelCase rename is held for team discussion.
 4. Members that exist in a struct but are absent from reflection, listed as questions of intent.
-5. JSON and GraphQL behaviour that clients will notice (`doc/team-review.md` sections 8 and 12).
+5. JSON and GraphQL behaviour that clients will notice (`doc/migrations/2026-11-fracpack-to-pssz/team-review.md` sections 8 and 12).
 
 **Closed since the migration merged.**
 - Transaction size: the guest's strict check now walks the transaction in place, and Transact accepts one up to its 32 MiB of memory (31.6 MiB measured). A test pins 1, 4.5, 8 and 16 MiB and passes on both machines and both engines.
@@ -198,7 +198,7 @@ This section was written by the author of the migration.
 - Variant labels follow one rule in every language, so C++ and Rust service schemas compare with no special case.
 - The fracpack-named calls and helpers are renamed or deleted.
 
-**Known gaps.** The living list is `doc/team-review.md`, sections 12 and 13.
+**Known gaps.** The living list is `doc/migrations/2026-11-fracpack-to-pssz/team-review.md`, sections 12 and 13.
 1. Large transactions over HTTP (#2233, partly fixed). Up to 1.6 MiB the client gets the whole trace; above that, a 200 with the outcome only; above 5 MiB, a 413 naming the limit; from 8 MiB a service ahead of `r-transact` traps and the client gets a 500. The two limits are new constants chosen by measurement and need the team's confirmation. Receiving from a peer has no size limit of its own.
 2. Names and pages still describing the old format (#2234): a `block.frac` file name in the consensus replay test, and the documentation pages `fracpack.md`, `schema.md`, `js-libraries.md` and the end of `rust-service/tables.md`. `demo/` has not been built.
 3. Not exercised by anyone (#2236): front ends and plugins in a browser, the snapshot tools at run time and validation on snapshot import, `demo/`, and a service that reads a multi-megabyte argument. `psibase boot` returns before the boot transactions are applied, which needs confirming as intended.
@@ -265,7 +265,7 @@ Open items are tracked as issues and closed as they are fixed.
 - The verifier's differential and Wycheproof checks are not an in-tree test: #2225.
 - The team's CI image cannot configure the head (CMake 3.28, binaryen 133): #2238.
 - psitri, ucc and psio have no license file.
-- Serialization: large transactions over HTTP (#2233), names and pages still describing the old format (#2234), and what nobody has exercised yet, including front ends and plugins in a browser (#2236). The rest is in section 9 and `doc/team-review.md`.
+- Serialization: large transactions over HTTP (#2233), names and pages still describing the old format (#2234), and what nobody has exercised yet, including front ends and plugins in a browser (#2236). The rest is in section 9 and `doc/migrations/2026-11-fracpack-to-pssz/team-review.md`.
 - Throughput has not been remeasured since the serialization change.
 - `doc/verify-sig/` records measurements taken before the serialization change; its harness and case generator use the old library's calls and will not build against this head as written.
 - psitri: the legacy engine's compatibility leg ([psitri#2](https://github.com/gofractally/psitri/issues/2)); freed space that can stay uncompacted ([psitri#7](https://github.com/gofractally/psitri/issues/7)); a debug mode that aborts on a partly filled segment ([psitri#6](https://github.com/gofractally/psitri/issues/6)).

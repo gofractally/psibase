@@ -1,4 +1,5 @@
-// The service schema over the PSIO Schema IR (doc/flip-interop.md section 2):
+// The service schema over the PSIO Schema IR
+// (doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md section 2):
 // the record, its two encodings, schema-driven packing and printing of
 // action arguments (the Action handler included) and schema comparison.
 // Runs natively and in a WASM guest.
@@ -35,7 +36,8 @@ namespace schema_test
    using TwoKeyTable = Table<Row, &Row::owner, ByN{}>;
    PSIO_REFLECT_TYPENAME(TwoKeyTable)
 
-   // The service of the example in doc/flip-interop.md section 2
+   // The service of the example in section 2 of
+   // doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md
    struct Svc
    {
       static constexpr auto service = AccountNumber{"svc"};

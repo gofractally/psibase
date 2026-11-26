@@ -3,7 +3,8 @@
 // The schema of a service: its actions, events and tables over one PSIO
 // Schema IR document (psio/schema_ir.hpp). The record and its two encodings
 // (I-JSON in files and over HTTP, PSSZ as an action argument and a table
-// row) are specified in doc/flip-interop.md section 2.
+// row) are specified in section 2 of
+// doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md.
 
 #include <map>
 #include <optional>

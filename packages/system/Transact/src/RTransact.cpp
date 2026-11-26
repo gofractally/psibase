@@ -276,7 +276,7 @@ namespace
    // x-http, which each hold the text three times in their 32 MiB.
    // Measured, a trace of 4.55 MiB of many small actions is answered and
    // one of 4.65 MiB is not; with one large argument, 5.21 and 5.31 MiB
-   // (doc/pssz-conversion.md 7.12).
+   // (doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md 7.12).
    constexpr std::size_t maxFullTraceSize = 13 * 1024 * 1024 / 4;
 
    bool isFullSize(psio::pssz_view<TransactionTrace> trace)
@@ -1131,7 +1131,7 @@ namespace
    // twice, the token of that run where it carries the action (the tester),
    // the stored row, and the call of sendProds, which is one buffer.
    // Measured, 6 MiB is handed on and 6.5 MiB is not
-   // (doc/pssz-conversion.md 7.11).
+   // (doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md 7.11).
    constexpr std::size_t maxPushedTransactionSize = 5 * 1024 * 1024;
 
    std::uint64_t scheduleSpeculative(const Checksum256& id, psio::pssz_view<SignedTransaction> trx)

@@ -232,6 +232,130 @@ namespace
       return repeated(count, {std::uint8_t(type == 0x7f ? 0x41 : 0x42), 0});
    }
 
+   // The body of a function () -> () whose measure (max_branch_local_pairs,
+   // defined at vmOptionCeilings) is exactly `pairs`: a block with
+   // pairs / 1,000 edges into its end in which 1,000 locals are written,
+   // and a block with one edge in which the remainder are. No local is
+   // read, so a compiler has nothing to merge: the function is cheap to
+   // compile at any size.
+   Bytes pairsFunction(std::uint32_t pairs)
+   {
+      constexpr std::uint32_t locals = 1000;
+      Bytes                   body{1};
+      leb(body, locals);
+      body.push_back(0x7f);
+      auto region = [&](std::uint32_t edges, std::uint32_t written)
+      {
+         body.insert(body.end(), {0x02, 0x40});
+         for (std::uint32_t local = 0; local < written; ++local)
+         {
+            body.insert(body.end(), {0x41, 0, 0x21});
+            leb(body, local);
+         }
+         append(body, repeated(edges - 1, {0x41, 0, 0x0d, 0}));  // i32.const 0, br_if 0
+         body.push_back(0x0b);
+      };
+      if (pairs / locals)
+         region(pairs / locals, locals);
+      if (pairs % locals)
+         region(1, pairs % locals);
+      body.push_back(0x0b);
+      return body;
+   }
+
+   // The module family of the compile-cost measurements
+   // (gofractally/psibase#2267; gen_compile_cost_modules.py writes the same
+   // shapes): a function (i32) -> i64 with `locals` parameters and locals.
+   // `merges` times in sequence, a block is reached by an arm that writes
+   // every local and by `edges` more edges, from one br_table or from as
+   // many br_if. `written` false leaves the locals unwritten; `read` false
+   // drops their sum after the last merge instead of returning it.
+   struct CostFunction
+   {
+      std::uint32_t locals;
+      std::uint32_t edges;
+      std::uint32_t merges  = 1;
+      bool          table   = true;
+      bool          written = true;
+      bool          read    = true;
+      Bytes         body() const
+      {
+         Bytes body{1};
+         leb(body, locals - 1);
+         body.push_back(0x7e);
+         auto readAll = [&]
+         {
+            body.insert(body.end(), {0x20, 1});
+            for (std::uint32_t local = 2; local < locals; ++local)
+            {
+               body.push_back(0x20);
+               leb(body, local);
+               body.push_back(0x7c);
+            }
+         };
+         for (std::uint32_t merge = 0; merge < merges; ++merge)
+         {
+            body.insert(body.end(), {0x02, 0x40, 0x02, 0x40, 0x20, 0, 0x04, 0x40});
+            for (std::uint32_t local = 1; written && local < locals; ++local)
+            {
+               body.insert(body.end(), {0x42, std::uint8_t((local + merge) % 64), 0x21});
+               leb(body, local);
+            }
+            body.insert(body.end(), {0x0c, 2, 0x0b});
+            if (table)
+            {
+               body.insert(body.end(), {0x20, 0, 0x0e});
+               leb(body, edges);
+               body.resize(body.size() + edges, 1);
+               body.push_back(0);
+            }
+            else
+               append(body, repeated(edges, {0x20, 0, 0x0d, 1}));
+            body.insert(body.end(), {0x0b, 0x0b});
+         }
+         readAll();
+         if (!read)
+            body.insert(body.end(), {0x1a, 0x42, 7});
+         body.push_back(0x0b);
+         return body;
+      }
+   };
+   // `depth` nested ifs; every local is written in the innermost and read
+   // after the outermost. The shape that costs a compiler the most memory
+   // for its measure.
+   Bytes nestedIfs(std::uint32_t locals, std::uint32_t depth)
+   {
+      Bytes body{1};
+      leb(body, locals - 1);
+      body.push_back(0x7e);
+      append(body, repeated(depth, {0x20, 0, 0x04, 0x40}));
+      for (std::uint32_t local = 1; local < locals; ++local)
+      {
+         body.insert(body.end(), {0x42, std::uint8_t(local % 64), 0x21});
+         leb(body, local);
+      }
+      append(body, Bytes(depth, 0x0b));
+      body.insert(body.end(), {0x20, 1});
+      for (std::uint32_t local = 2; local < locals; ++local)
+      {
+         body.push_back(0x20);
+         leb(body, local);
+         body.push_back(0x7c);
+      }
+      body.push_back(0x0b);
+      return body;
+   }
+   // A service with `copies` functions (i32) -> i64 of this body, the first
+   // of which is function 2.
+   Bytes costModule(const Bytes& body, std::uint32_t copies = 1)
+   {
+      ServiceModule m;
+      auto          type = m.addType({0x7f}, {0x7e});
+      for (std::uint32_t i = 0; i < copies; ++i)
+         m.addFunction(type, body);
+      return m.build();
+   }
+
    struct LimitProbe
    {
       std::string_view          member;
@@ -529,6 +653,32 @@ namespace
               auto probe   = m.addFunction(2, body);
               m.calledBody = {0x10};
               leb(m.calledBody, probe);
+              return m.build();
+           }},
+          {"max_branch_local_pairs", &VMOptions::max_branch_local_pairs,
+           [](std::uint32_t pairs)
+           {
+              ServiceModule m;
+              auto          probe = m.addFunction(2, pairsFunction(pairs));
+              m.calledBody        = {0x10};
+              leb(m.calledBody, probe);
+              return m.build();
+           }},
+          {"max_module_branch_local_pairs", &VMOptions::max_module_branch_local_pairs,
+           [](std::uint32_t pairs)
+           {
+              // Functions of at most 500,000 each, which is below the
+              // default of max_branch_local_pairs.
+              ServiceModule m;
+              m.calledBody = {};
+              for (std::uint32_t left = pairs; left;)
+              {
+                 const auto part  = std::min<std::uint32_t>(left, 500'000);
+                 auto       probe = m.addFunction(2, pairsFunction(part));
+                 m.calledBody.push_back(0x10);
+                 leb(m.calledBody, probe);
+                 left -= part;
+              }
               return m.build();
            }},
       };
@@ -906,6 +1056,184 @@ TEST_CASE("What wasmtime refuses is refused by admission under the default limit
       m.data        = {0, 0x23, 0, 0x0b, 0};
       m.dataCount   = 1;
       refused(m.build(), definedGlobal);
+   }
+}
+
+TEST_CASE("The measure of branch edges times locals is the one defined", "[limits]")
+{
+   // The definition is at vmOptionCeilings (PsizamPolicy.hpp). Each body is
+   // a function () -> () with four i32 locals unless it says otherwise; the
+   // measures of start and called, which have no region and no result, are 0.
+   struct Case
+   {
+      std::string_view name;
+      Bytes            instructions;
+      std::uint64_t    pairs;
+      Bytes            results = {};
+   };
+   const Bytes set0{0x41, 0, 0x21, 0}, set1{0x41, 0, 0x21, 1}, brIf0{0x41, 0, 0x0d, 0};
+   auto        all = [](std::initializer_list<Bytes> parts)
+   {
+      Bytes result;
+      for (const auto& part : parts)
+         append(result, part);
+      return result;
+   };
+   const std::vector<Case> cases = {
+       {"no region", all({set0, set1}), 0},
+       {"a block: its end and two branches, one local", all({{0x02, 0x40}, set0, brIf0, brIf0, {0x0b}}),
+        3},
+       {"a loop: its entry and a back edge, two locals",
+        all({{0x03, 0x40}, set0, set1, brIf0, {0x0b}}), 4},
+       {"an if: two arms, a local written in each",
+        all({{0x41, 0, 0x04, 0x40}, set0, {0x05}, set1, {0x0b}}), 4},
+       {"an if without else has two edges as well", all({{0x41, 0, 0x04, 0x40}, set0, {0x0b}}), 2},
+       {"a local written twice is one; local.tee is a write",
+        all({{0x02, 0x40}, set0, {0x41, 0, 0x22, 0, 0x1a}, {0x0b}}), 1},
+       {"a write before the region is not in it", all({set0, {0x02, 0x40}, brIf0, {0x0b}}), 0},
+       {"a write inside an inner region is inside the outer one",
+        all({{0x02, 0x40, 0x02, 0x40}, set0, {0x0c, 1, 0x0b}, set1, {0x0b}}), 1 * 1 + 2 * 2},
+       {"the same local in the outer and the inner region",
+        all({{0x02, 0x40}, set0, {0x02, 0x40}, set0, {0x0b, 0x0b}}), 1 + 1},
+       {"written in an inner region, again after it, with a region between",
+        all({{0x02, 0x40, 0x02, 0x40}, set0, {0x0b}, set0, {0x02, 0x40, 0x0b}, set1, {0x0b}}),
+        1 + 0 + 2},
+       {"a br_table: every entry and the default",
+        all({{0x02, 0x40}, set0, {0x41, 0, 0x0e, 3, 0, 0, 0, 0, 0x0b}}), 5},
+       {"a branch counts for the region it names",
+        all({{0x02, 0x40}, set0, {0x02, 0x40}, set1, {0x41, 0, 0x0d, 1}, {0x0b, 0x0b}}),
+        1 * 1 + 2 * 2},
+       {"operands a branch carries: the result of a block",
+        all({{0x02, 0x7f, 0x41, 1}, brIf0, {0x0b, 0x1a}}), 2 * 1},
+       {"operands a branch carries: the function's results",
+        all({{0x41, 1, 0x41, 0, 0x0d, 0}}), 2 * 1, {0x7f}},
+       {"unreachable code counts", all({{0x02, 0x40, 0x00}, set0, {0x0c, 0, 0x0b}}), 2},
+   };
+   for (const auto& c : cases)
+   {
+      INFO(c.name);
+      ServiceModule m;
+      Bytes         body{1, 4, 0x7f};
+      append(body, c.instructions);
+      body.push_back(0x0b);
+      m.addFunction(c.results.empty() ? 2 : m.addType({}, c.results), body);
+      CHECK(psibase::nativeBranchLocalPairs(m.build(), {}).functions ==
+            std::vector<std::uint64_t>{0, 0, c.pairs});
+   }
+   // The functions of a module do not see each other's writes.
+   {
+      ServiceModule m;
+      Bytes         body{1, 4, 0x7f};
+      append(body, all({{0x02, 0x40}, set0, set1, brIf0, {0x0b, 0x0b}}));
+      m.addFunction(2, body);
+      m.addFunction(2, body);
+      CHECK(psibase::nativeBranchLocalPairs(m.build(), {}).functions ==
+            std::vector<std::uint64_t>{0, 0, 4, 4});
+   }
+   {
+      ServiceModule m;
+      m.addFunction(2, pairsFunction(1'234'567));
+      CHECK(psibase::nativeBranchLocalPairs(m.build(), {}).functions ==
+            std::vector<std::uint64_t>{0, 0, 1'234'567});
+   }
+}
+
+TEST_CASE("A function or module above the branch-local limit is refused by name and index",
+          "[limits]")
+{
+   using Catch::Matchers::ContainsSubstring;
+   const psibase::VMOptions defaults;
+   auto                     one = [](std::uint32_t imports, std::uint32_t pairs)
+   {
+      ServiceModule m;
+      m.imports = imports;
+      m.addFunction(2, pairsFunction(pairs));
+      return m.build();
+   };
+   CHECK_NOTHROW(psibase::admitNativeWasm(one(0, defaults.max_branch_local_pairs), {}, 0));
+   CHECK_THROWS_WITH(
+       psibase::admitNativeWasm(one(0, defaults.max_branch_local_pairs + 1), {}, 0),
+       ContainsSubstring("exceeds max_branch_local_pairs: 524289 is more than 524288 in function 2"));
+   // The index is the one of the function index space: imports count.
+   CHECK_THROWS_WITH(
+       psibase::admitNativeWasm(one(3, defaults.max_branch_local_pairs + 1), {}, 0),
+       ContainsSubstring("exceeds max_branch_local_pairs: 524289 is more than 524288 in function 5"));
+   // The module's sum: nine functions of 500,000 are 4,500,000, and the
+   // ninth (function 10) is where the sum passes the limit.
+   {
+      ServiceModule m;
+      for (int i = 0; i < 9; ++i)
+         m.addFunction(2, pairsFunction(500'000));
+      CHECK_THROWS_WITH(psibase::admitNativeWasm(m.build(), {}, 0),
+                        ContainsSubstring("exceeds max_module_branch_local_pairs: 4500000 is more "
+                                          "than 4194304 at function 10"));
+      // With that limit raised nothing else refuses it.
+      auto limits                          = defaults;
+      limits.max_module_branch_local_pairs = 4'500'000;
+      CHECK_NOTHROW(psibase::admitNativeWasm(m.build(), limits, 0));
+   }
+}
+
+TEST_CASE("The modules that cost the compiler minutes and gigabytes are refused", "[limits]")
+{
+   // gofractally/psibase#2267. Each was admitted before these limits; what
+   // each cost wasmtime's compiler is in the issue.
+   using Catch::Matchers::ContainsSubstring;
+   auto refused = [](const Bytes& code, const psibase::VMOptions& limits, std::string_view reason)
+   {
+      CHECK_THROWS_WITH(psibase::admitNativeWasm(code, limits, 0),
+                        ContainsSubstring(std::string(reason)));
+   };
+   const std::string_view function = "exceeds max_branch_local_pairs: ";
+   const std::string_view module   = "exceeds max_module_branch_local_pairs: ";
+   // 2,047 locals and a br_table of 4,096 targets, 24 KB: 38 CPU seconds
+   // and 1.4 GiB. Its measure is 4,098 edges x 2,046 locals written, and
+   // 2 x 2,046 for each of the block and the if around the writes, and 1.
+   {
+      INFO("one br_table");
+      const auto code = costModule(CostFunction{2047, 4096, 1, true, true, false}.body());
+      CHECK(code.size() < 32 * 1024);
+      CHECK(psibase::nativeBranchLocalPairs(code, {}).functions.back() ==
+            4098u * 2046 + 2 * 2 * 2046 + 1);
+      refused(code, {}, std::string(function) + "8392693 is more than 524288 in function 2");
+   }
+   {
+      INFO("the same with br_if: max_br_table_elements does not see it");
+      refused(costModule(CostFunction{2047, 4096, 1, false}.body()), {}, function);
+   }
+   {
+      INFO("two merges of 512 x 512: 29 CPU seconds in 9 KB");
+      refused(costModule(CostFunction{512, 512, 2}.body()), {}, function);
+   }
+   {
+      INFO("four tables, 97 KB: 5 GiB, and days on the pinned register allocator");
+      refused(costModule(CostFunction{2047, 4096, 4, true, true, false}.body()), {}, function);
+   }
+   {
+      INFO("1,000 nested ifs, no branch instruction at all, 23 KB: 3.5 GiB");
+      const auto code = costModule(nestedIfs(2047, 1000));
+      CHECK(code.size() < 32 * 1024);
+      refused(code, {}, std::string(function) + "4092001 is more than 524288 in function 2");
+   }
+   {
+      INFO("the survey's 4,000 x 4,000, on a chain with every limit at its ceiling");
+      refused(costModule(CostFunction{4000, 4000}.body()), psibase::vmOptionsAtCeiling(),
+              function);
+   }
+   {
+      INFO("sixteen functions that each pass, compiled at once");
+      const auto body = CostFunction{512, 1000}.body();
+      CHECK_NOTHROW(psibase::admitNativeWasm(costModule(body), {}, 0));
+      refused(costModule(body, 16), {}, module);
+   }
+   {
+      // The measure is not the product of locals and targets: where no
+      // local is written there is nothing to merge, the compiler needs
+      // nothing extra (measured), and the module is admitted.
+      INFO("2,047 locals never written and 4,096 targets");
+      const auto code = costModule(CostFunction{2047, 4096, 1, true, false}.body());
+      CHECK(psibase::nativeBranchLocalPairs(code, {}).functions.back() == 1);
+      CHECK_NOTHROW(psibase::admitNativeWasm(code, {}, 0));
    }
 }
 

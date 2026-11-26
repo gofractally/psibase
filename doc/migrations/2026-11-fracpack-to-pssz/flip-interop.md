@@ -1,7 +1,7 @@
 # Flip interop: every format that crosses the C++ / Rust boundary
 
 Written by the C++ side of the PSIO flip (branch `claude/pssz-flip-cpp`);
-since the merge of the two halves (`doc/pssz-conversion.md` section 7) it
+since the merge of the two halves (`doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md` section 7) it
 describes the one tree, and what the merge found is marked "(merge)".
 For each artifact: who produces it, who consumes it, the format today
 (legacy `psio1` / fracpack) and the format after the flip (the PSIO type and
@@ -11,7 +11,7 @@ column.
 
 Status of this file: **every section is definitive.** Keys flipped in
 section 1.18 and the binary wire in section 1.19 of
-`doc/pssz-conversion.md`; string kinds were applied in its section 1.20;
+`doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md`; string kinds were applied in its section 1.20;
 schemas flipped in its section 1.21 (stage S2); JSON in its section 1.22
 (stage S4); GraphQL in its section 1.24 (stage S5): a C++ GraphQL answer
 is written by PSIO's engine. The legacy library is deleted (section 1.25).
@@ -21,7 +21,7 @@ PSIO pin for both languages: `e11fd099f5a584d259357dad0764502c91b992db`
 JSON text of a value changed since `f811c6f9`, on which the two halves were
 merged; at `66abb1b5` the *schemas* changed (variant alternative labels,
 section 0.1; method results, section 1 "Return values"):
-`doc/pssz-conversion.md` section 7.10. Nothing changed at `2c64a245`: a
+`doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md` section 7.10. Nothing changed at `2c64a245`: a
 call is packed into one buffer, with the same bytes (its section 7.11), nor
 at `842a538b` (its section 7.12). At `e11fd099` the *schemas* changed again:
 a record member whose C++ initialiser is a scalar that is not zero carries
@@ -57,7 +57,7 @@ it does, every Rust client of a C++ service that calls one of these fails;
 in particular the Rust CLI's boot (`psibase boot`) and the Rust tester call
 `transact::regEvIdx` and get "unknown service action: regevidzts". This is
 what fails in the baseline test run on this pin (section 1.17 of
-`doc/pssz-conversion.md`).
+`doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md`).
 
 **Exact spelling.** A hashed method name is the hash of its exact bytes
 (the coder is case-sensitive on the hash path). Wherever a `method` string
@@ -103,7 +103,7 @@ half of `rust/psibase_names` is gone.
   44 action / event parameters); 83 were applied and one was already
   annotated (`Memo::contents`); the per-row result is
   `~/psibase-flip-cpp-scratch/utf8/applied.txt`, and
-  `doc/pssz-conversion.md` section 1.20 has the counts and consequences.
+  `doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md` section 1.20 has the counts and consequences.
   Six rows spell a `Tokens` parameter `subAccount` where the mirror header
   says `sub_account`: annotated, not renamed. A value of such a member
   that is not UTF-8 is refused by every validating reader and by the
@@ -138,13 +138,13 @@ worktree):
 ## 1. Binary values
 
 **Definitive since S1 (the binary wire of C++ flipped; section 1.19 of
-`doc/pssz-conversion.md`), except the two rows marked "schema stage".**
+`doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md`), except the two rows marked "schema stage".**
 Every value below is PSSZ in its automatic profile (`psio::to_pssz`): offset
 widths are inferred from the declared types; psibase declares no bound
 except `Memo` (UTF-8, at most 80 bytes) and one `maxDynamicData` cap, on
 the error callback of an HTTP request (below).
 
-**Changed with section 1.23 of `doc/pssz-conversion.md` (pin `f03f7304`):**
+**Changed with section 1.23 of `doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md` (pin `f03f7304`):**
 
 * **The error callback of a request or websocket handshake is capped.**
   `XProxy::onError(socket: i32, reply: optional<HttpReply>)` and
@@ -188,7 +188,7 @@ arguments of `Tokens::recall` and of the `Accounts` events `froze` /
 `Nft::setAutoDebit`, `CpuLimit::setCpuLimit`. The websocket close
 callbacks (`(socket)`, 1 byte) and the request error callbacks (4 bytes)
 could share one shape if all were capped alike. File and line for each,
-and how the list was made, are in section 1.23 of `doc/pssz-conversion.md`.
+and how the list was made, are in section 1.23 of `doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md`.
 
 | Artifact | Producer | Consumers | Format |
 |---|---|---|---|
@@ -202,7 +202,7 @@ and how the list was made, are in section 1.23 of `doc/pssz-conversion.md`.
 | Transaction (`psibase::Transaction`) and its id | clients, C++ tester, Rust | Transact, the node | PSSZ of `Transaction {tapos, actions, claims}`. **The id is SHA-256 of exactly those bytes**: the content of `SignedTransaction::transaction`, without the length that frames it inside the signed transaction (`sha256(signedTrx.transaction.data(), signedTrx.transaction.size())` = `sha256(transaction)`). Signatures (proofs) sign that id. Transact refuses a transaction that is not valid, canonical PSSZ or that has members it does not know |
 | `SignedTransaction` | clients, C++ tester, Rust | the node (`pushTransaction`), Transact, RTransact (`/push_transaction`, `/login`) | PSSZ of `SignedTransaction {transaction, proofs: list<bytes>, subjectiveData: optional<list<bytes>>}`. `transaction` is declared `psio::shared_pssz<Transaction>`: on the wire **a byte list holding the PSSZ of the transaction** — the same bytes as a `std::vector<char>` member holding `to_pssz(transaction)`, or a `psio::nested<Transaction>` (pinned in `methods.cpp`, "a signed transaction holds its transaction packed"). Every checking reader of a signed transaction validates those bytes as a `Transaction`. `ProcessTransactionArgs::transaction` is the same |
 | Genesis transaction (first boot transaction) | C++ `DefaultTestChain.cpp` `pushGenesisTransaction`, `libraries/net/test/test_util.cpp` `makeBoot`; Rust `boot.rs` `genesis_transaction` | native transaction context (psinode, psitest) | PSSZ `SignedTransaction` whose transaction has exactly one action; its `rawData` is the PSSZ of `GenesisActionData` (`nativeTables.hpp`), checked with `psio::validate_strict` (no unknown members, canonical) |
-| Boot transactions | C++ `DefaultTestChain.cpp` (`getInitialActions`, `makeTransactions`, `TestChain::boot`), `test_util.cpp` `makeBoot`; Rust `boot.rs` | `Transact::startBoot(list<Checksum256>)`, then each service | PSSZ. `startBoot` is given the ids of the boot transactions: each is SHA-256 of the PSSZ `Transaction`. C++ and Rust must produce identical bytes for identical input. The two builders group differently and need not agree (each computes the ids of its own transactions): Rust flushes before 1 MiB of action arguments is exceeded (`rust/psibase/src/transaction_builder.rs`), the C++ tester once 1 MiB is reached (`DefaultTestChain.cpp` `makeTransactions`), which makes one transaction of 4.37 MB. Transact processes a transaction up to its memory less five pages, 31.6 MiB (`doc/pssz-conversion.md` 7.9) |
+| Boot transactions | C++ `DefaultTestChain.cpp` (`getInitialActions`, `makeTransactions`, `TestChain::boot`), `test_util.cpp` `makeBoot`; Rust `boot.rs` | `Transact::startBoot(list<Checksum256>)`, then each service | PSSZ. `startBoot` is given the ids of the boot transactions: each is SHA-256 of the PSSZ `Transaction`. C++ and Rust must produce identical bytes for identical input. The two builders group differently and need not agree (each computes the ids of its own transactions): Rust flushes before 1 MiB of action arguments is exceeded (`rust/psibase/src/transaction_builder.rs`), the C++ tester once 1 MiB is reached (`DefaultTestChain.cpp` `makeTransactions`), which makes one transaction of 4.37 MB. Transact processes a transaction up to its memory less five pages, 31.6 MiB (`doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md` 7.9) |
 | Block header, block id, signatures | C++ only (`BlockContext`, `ForkDb.hpp`) | C++; Rust mirrors of `BlockHeader` / `SignedBlock` | PSSZ of `BlockHeader` / `Block` / `SignedBlock`. **Block id** (`BlockInfo`): SHA-256 of the PSSZ of the `BlockHeader` with `authCode` cleared, then the block number written big-endian over the first four bytes of the digest (unchanged rule; the hashed bytes are PSSZ now). A producer signs `BlockSignatureInfo`: the four bytes `00 CE A8 42` followed by the block id (unchanged). |
 | Merkle roots (transaction / event Merkle trees, `psibase::Merkle`, `crypto.hpp`) | the node | light validators, Rust tools | A leaf is SHA-256 of `00` followed by the PSSZ of the value; an inner node is SHA-256 of `01` · left · right (unchanged rule; leaves hash PSSZ now). `psibase::sha256(const T&)` is SHA-256 of `psio::to_pssz(value)` |
 | P2P messages, snapshots | C++ only (`libraries/net`, `programs/snapshot`) | C++ only | One byte for the message type, then the PSSZ of the message. `SignedMessage<M>::data`, `BlockMessage::block` and `BlockHeaderMessage::block` are `psio::shared_pssz` members (a byte list holding the PSSZ of the message / block); a signature signs the type byte followed by the PSSZ of the message. Snapshot rows are the PSSZ rows of the tables they copy |
@@ -554,7 +554,7 @@ refused):
 |---|---|---|
 | `AccountNumber` | the name, `"alice"`; `""` is the null account | any text that is not the canonical name of an account (upper case, characters outside the alphabet, more than 10 characters, a non-canonical subaccount): `AccountNumber: not an account name` |
 | `MethodNumber` | the declared name or the `#…` hash form | text that names no method |
-| time points, `Decimal`, `Precision`, `Memo` | as before the flip (`docs/time.md`; sections 1.2, 1.13 of `doc/pssz-conversion.md`) | |
+| time points, `Decimal`, `Precision`, `Memo` | as before the flip (`docs/time.md`; sections 1.2, 1.13 of `doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md`) | |
 | `IPAddress` (`psibase/SocketInfo.hpp`) | `"127.0.0.1"`, `"::1"` (what `to_string` writes and `parseIPAddress` reads) | anything else, an endpoint included: `IPAddress: not an IP address` |
 | `SocketEndpoint` | `"127.0.0.1:8080"`, `"[::1]:8080"`; any other text is the path of a local socket (`"/run/psinode.sock"`) | no string is refused; a value that is not a string is |
 | `SubjectPublicKeyInfo` (`services/system/Spki.hpp`) | the PEM armor of the DER bytes: `-----BEGIN PUBLIC KEY-----\n`, base64 in lines of 64 characters, `-----END PUBLIC KEY-----\n`. White space around the armor and inside the body is ignored on input | text that is not that armor around valid base64 (`SubjectPublicKeyInfo: not a PEM encoded public key`), and armor whose bytes are not DER `SEQUENCE { SEQUENCE { OBJECT IDENTIFIER … }, BIT STRING }` with lengths that fit exactly (`SubjectPublicKeyInfo: the PEM content is not a SubjectPublicKeyInfo`). The algorithm and the key material are **not** examined when JSON is read; `AuthSig::setKey` / `newAccount` check them |
@@ -665,7 +665,7 @@ Explorer allows complexity 1 000 000: its UI asks for `blocks(last: 720)`
 with transactions and their actions, about 360 000.
 
 **Clients of the C++ GraphQL services and what they must change**
-(`doc/pssz-conversion.md` section 1.24 has the full survey):
+(`doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md` section 1.24 has the full survey):
 
 | Client | Change |
 |---|---|
