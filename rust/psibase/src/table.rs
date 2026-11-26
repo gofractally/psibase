@@ -37,6 +37,9 @@ custom_error! {
 /// - Nothing but services writes these databases: genesis writes native
 ///   rows only, and a snapshot carries the service database under a signed
 ///   state root.
+/// - A privileged service can write under any account. It is part of what
+///   the chain trusts: when it does, it is responsible for writing valid
+///   rows, and the reading service does not defend against it.
 ///
 /// A native database is never "own"; neither is anything when there is no
 /// running service (a test, a tool: `get_service()` is 0). Trusted is not

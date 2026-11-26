@@ -869,7 +869,9 @@ namespace psibase
    /// Who can write a row: the node opens a database only for a privileged
    /// service; every other service gets its handle from the `db` / `x-db`
    /// services, which give a write handle only under the caller's own
-   /// account. A privileged service is part of what the chain trusts.
+   /// account. A privileged service is part of what the chain trusts: one
+   /// that writes under another account is responsible for writing valid
+   /// rows, and the reading service does not defend against it.
    ///
    /// Trusted is not unchecked. `get` (the trusted decode) ends the action
    /// with the decoder's message when the stored bytes are not a frame of
