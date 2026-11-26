@@ -287,8 +287,8 @@ namespace psibase
    VMOptions vmOptionsAtCeiling();
 
    // The proposal set, in one place. Admission accepts exactly this, and the
-   // wasmtime adapter enables exactly this (ExecutionContextWasmtime.cpp,
-   // engineOptions: simd, relaxed_simd, bulk_memory, sign_extension,
+   // wasmtime adapter and the tester enable exactly this (WasmtimeHost.hpp,
+   // wasmFeatures: simd, relaxed_simd, bulk_memory, sign_extension,
    // saturating_float_to_int, reference_types, multi_value, threads; mutable
    // globals, floats and wide arithmetic come with the engine's base set).
    //

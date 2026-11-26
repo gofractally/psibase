@@ -1325,3 +1325,585 @@ TEST_CASE("A module too large for an instance-pool slot is loaded from the artif
    CHECK(stats.loadedPoolless == 1);
    CHECK(stats.discarded == 0);
 }
+
+// Abandoning a speculative run's compile (gofractally/psibase#2267).
+namespace
+{
+   // An artifact store a test can read: what the engine stored, by key.
+   struct RecordedArtifacts
+   {
+      using Records = std::map<psibase::NativeArtifactStore::Key, std::vector<char>>;
+      std::mutex mutex;
+      Records    records;
+      Records    snapshot()
+      {
+         std::lock_guard lock{mutex};
+         return records;
+      }
+   };
+   struct RecordingStore : psibase::NativeArtifactStore
+   {
+      std::shared_ptr<RecordedArtifacts> to;
+      explicit RecordingStore(std::shared_ptr<RecordedArtifacts> to) : to(std::move(to)) {}
+      bool                             usable() const noexcept override { return true; }
+      std::optional<std::vector<char>> read(const Key& key) noexcept override
+      {
+         std::lock_guard lock{to->mutex};
+         auto            it = to->records.find(key);
+         if (it == to->records.end())
+            return std::nullopt;
+         return it->second;
+      }
+      void write(const Key& key, std::span<const char> record) noexcept override
+      {
+         std::lock_guard lock{to->mutex};
+         to->records[key].assign(record.begin(), record.end());
+      }
+      void erase(const Key& key) noexcept override
+      {
+         std::lock_guard lock{to->mutex};
+         to->records.erase(key);
+      }
+   };
+   std::shared_ptr<psibase::NativeAotCache> recording(std::shared_ptr<RecordedArtifacts> to)
+   {
+      return std::make_shared<psibase::NativeAotCache>(
+          std::make_unique<RecordingStore>(std::move(to)));
+   }
+
+   // The most a module may ask of the compiler under the default limits:
+   // eight functions of 512 locals and 1,000 branch edges, each just under
+   // max_branch_local_pairs and together just under
+   // max_module_branch_local_pairs. Compiling it takes the pinned compiler
+   // some hundreds of milliseconds on an idle machine.
+   Bytes slowToCompile()
+   {
+      return costModule(CostFunction{512, 1000}.body(), 8);
+   }
+   std::span<const char> chars(const Bytes& code)
+   {
+      return {reinterpret_cast<const char*>(code.data()), code.size()};
+   }
+}  // namespace
+
+TEST_CASE("A speculative run's compile is stopped in the compiler when its bound passes",
+          "[limits]")
+{
+   if (!isWasmtime())
+      SKIP("only the wasmtime engine's compiler can be stopped");
+   using namespace std::chrono;
+   using Catch::Matchers::ContainsSubstring;
+
+   // The module, sized on this machine: what an undisturbed compile of it
+   // takes must be at least 20 times the bound, and the bound at least a
+   // millisecond, so that the bound passes while the compiler is at work
+   // however fast the machine is. It starts as the most the default limits
+   // admit (slowToCompile) and, where that compiles in under 20 ms, grows
+   // by more functions of the same shape under a raised module limit.
+   const auto               body        = CostFunction{512, 1000}.body();
+   const auto               perFunction = psibase::nativeBranchLocalPairs(costModule(body), {})
+                                              .functions.back();
+   const psibase::VMOptions defaults;
+   CHECK(perFunction > defaults.max_branch_local_pairs / 100 * 97);
+   CHECK(perFunction * 8 > defaults.max_module_branch_local_pairs / 100 * 97);
+   psibase::VMOptions                 limits;
+   Bytes                              code;
+   psibase::Checksum256               hash;
+   nanoseconds                        undisturbedTime{0};
+   std::shared_ptr<RecordedArtifacts> undisturbed;
+   std::uint32_t                      copies = 8;
+   for (;; copies *= 2)
+   {
+      limits = defaults;
+      limits.max_module_branch_local_pairs =
+          std::max<std::uint64_t>(limits.max_module_branch_local_pairs,
+                                  std::uint64_t(copies) * perFunction);
+      code = costModule(body, copies);
+      hash = CodeWriter::row(code).codeHash;
+      REQUIRE_NOTHROW(psibase::admitNativeWasm(code, limits, 0));
+      // What a compile that nothing disturbs stores for this code, and how
+      // long it takes here: the faster of two, each on a node of its own.
+      undisturbedTime = nanoseconds::max();
+      for (int i = 0; i < 2; ++i)
+      {
+         undisturbed = std::make_shared<RecordedArtifacts>();
+         NativeService reference{recording(undisturbed)};
+         const auto    start = steady_clock::now();
+         reference.cache.compileAhead(hash, chars(code), limits, 0);
+         undisturbedTime = std::min<nanoseconds>(undisturbedTime, steady_clock::now() - start);
+         REQUIRE(reference.cache.contains(hash, limits, 0));
+         REQUIRE(undisturbed->snapshot().size() == 1);
+      }
+      if (undisturbedTime >= milliseconds(20))
+         break;
+      REQUIRE(copies < 4096);
+   }
+   const auto bound = std::max<nanoseconds>(undisturbedTime / 20, milliseconds(1));
+
+   auto          stored = std::make_shared<RecordedArtifacts>();
+   NativeService fixture{recording(stored)};
+   if (limits != defaults)
+      setLimits(fixture, limits);
+   std::atomic<int> compilesBegun{0};
+   fixture.cache.setCompileHook(
+       [&](const psibase::Checksum256& compiling)
+       {
+          if (compiling == hash)
+             ++compilesBegun;
+       });
+   RecordedArtifacts::Records storedBefore;
+   nanoseconds                slowestReturn{0};
+   {
+      CodeWriter writer{fixture, psibase::DbMode::speculative()};
+      storedBefore = stored->snapshot();
+      fixture.cache.setSpeculativeCompileWait(bound);
+      const auto chargedBefore = writer.transaction.startedCompileTime;
+      // A run whose compile is abandoned at the bound, and what is left of
+      // it afterwards: nothing.
+      auto abandonedRun = [&](std::uint64_t abandoned)
+      {
+         CHECK_THROWS_WITH(writer.put(psibase::DbId::native, code),
+                           ContainsSubstring("took too long to compile"));
+         // The run is given up at the moment the compile's handle is set.
+         // From here until the compile thread has left the compiler is what
+         // the compiler does not interrupt: at the default limits a few tens
+         // of milliseconds (gofractally/psizam#8; the fork's worst stretch is
+         // 0.21 s at the admission ceiling). The limit is that with room for
+         // a loaded machine.
+         const auto given = steady_clock::now();
+         CHECK(fixture.cache.awaitCompile(hash, limits, 0, seconds(2)));
+         slowestReturn = std::max<nanoseconds>(slowestReturn, steady_clock::now() - given);
+         fixture.cache.finishCompiles();
+         CHECK_FALSE(writer.stored(psibase::DbId::native, code));
+         CHECK(fixture.cache.stats().compilesAbandoned == abandoned);
+         CHECK(compilesBegun == int(abandoned));
+         // No module, in memory or stored.
+         CHECK(writer.compiled() == 0);
+         CHECK_FALSE(fixture.cache.contains(hash, limits, 0));
+         CHECK(stored->snapshot() == storedBefore);
+      };
+      {
+         INFO("the first run");
+         abandonedRun(1);
+      }
+      {
+         // The transaction is sent again. The node has just abandoned this
+         // compile at this bound: the run fails at once, nothing is compiled
+         // and nothing is charged.
+         INFO("the same again, at once");
+         const auto charged = writer.transaction.startedCompileTime;
+         CHECK_THROWS_WITH(writer.put(psibase::DbId::native, code),
+                           ContainsSubstring("is not being retried until"));
+         CHECK(compilesBegun == 1);
+         CHECK(fixture.cache.stats().compilesNotRetried == 1);
+         CHECK(fixture.cache.stats().compilesAbandoned == 1);
+         CHECK(writer.transaction.startedCompileTime == charged);
+      }
+      {
+         // On a node that does not keep that memory, every run compiles
+         // again, under the bound again: the abandoned compile left nothing
+         // that would say otherwise.
+         INFO("again, compiled again");
+         fixture.cache.setSpeculativeCompileRetry(nanoseconds(0));
+         abandonedRun(2);
+      }
+      // What the node can charge the submitter is the time its runs waited
+      // for a compile: the bound, twice.
+      CHECK(writer.transaction.startedCompileTime - chargedBefore >= 2 * bound);
+   }
+   WARN("module of " << copies << " functions, " << code.size() << " bytes: undisturbed compile "
+                     << duration_cast<microseconds>(undisturbedTime).count() << " us, bound "
+                     << duration_cast<microseconds>(bound).count()
+                     << " us; from the compile being given up to its thread having returned, at "
+                        "most "
+                     << duration_cast<microseconds>(slowestReturn).count() << " us");
+
+   // A producer is offered a transaction that stores the code. Had the
+   // abandoned compiles been recorded as the compiler refusing the code,
+   // the transaction would be taken as it is; it is deferred, and the
+   // compile started for it has no bound: it runs to completion.
+   fixture.block.deferUncompiledCode = true;
+   CodeWriter writer{fixture};
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK(fixture.block.deferral.has_value());
+   fixture.cache.finishCompiles();
+   CHECK(fixture.cache.contains(hash, limits, 0));
+   CHECK(writer.compiled() == 1);
+   CHECK(compilesBegun == 3);
+   CHECK(fixture.cache.stats().compilesAbandoned == 2);
+   // Offered again it is taken, and the code runs.
+   fixture.block.deferral.reset();
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK_FALSE(fixture.block.deferral.has_value());
+   CHECK(writer.stored(psibase::DbId::native, code));
+   const psibase::AccountNumber account{"vm-slow"};
+   psibase::CodeRow             row{.codeNum = account, .codeHash = hash};
+   fixture.block.db.kvPut(row.db, row.key(), row);
+   CHECK_NOTHROW(fixture.called(writer.transaction, account));
+   CHECK(writer.compiled() == 1);
+   // What was stored for it is, byte for byte, what the undisturbed compile
+   // stored: the two abandoned compiles left nothing in the engine.
+   auto added = stored->snapshot();
+   for (const auto& [key, record] : storedBefore)
+      added.erase(key);
+   CHECK(added.size() == 1);
+   CHECK(added == undisturbed->snapshot());
+}
+
+TEST_CASE("Code whose compile was abandoned at the bound is not compiled again for a while",
+          "[limits]")
+{
+   if (!isWasmtime())
+      SKIP("only the wasmtime engine's compiler can be stopped");
+   using namespace std::chrono;
+   using Catch::Matchers::ContainsSubstring;
+   using Start = psibase::WasmCache::CompileStart;
+   using Wait  = psibase::WasmCache::CompileWait;
+
+   CompileGate   gate;
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   auto          release = psibase::finally{[&] { gate.release(); }};
+   gate.attach(fixture.cache);
+   auto& cache = fixture.cache;
+   CHECK(cache.speculativeCompileRetry() == minutes(10));
+   CodeWriter writer{fixture, psibase::DbMode::speculative()};
+   // A speculative run of this code is given up at a bound of 1 ms, with
+   // the compile thread held where it cannot finish; then the thread is let
+   // go and finds its compile abandoned.
+   auto abandon = [&](const Bytes& code)
+   {
+      const auto before = gate.count();
+      cache.setSpeculativeCompileWait(milliseconds(1));
+      gate.close();
+      CHECK_THROWS_WITH(writer.put(psibase::DbId::native, code),
+                        ContainsSubstring("took too long to compile"));
+      gate.awaitStarted(before + 1);
+      gate.release();
+      cache.finishCompiles();
+      REQUIRE_FALSE(cache.contains(CodeWriter::row(code).codeHash, {}, 0));
+   };
+   auto hashOf = [](const Bytes& code) { return CodeWriter::row(code).codeHash; };
+
+   {
+      INFO("not compiled again; the bound raised, compiled again");
+      const auto code = otherService(20);
+      abandon(code);
+      const auto compiles  = gate.count();
+      const auto abandoned = cache.stats().compilesAbandoned;
+      const auto charged   = writer.transaction.startedCompileTime;
+      // At once, and as often as it is asked: no compile, no compile time.
+      for (std::uint64_t again = 1; again <= 3; ++again)
+      {
+         CHECK_THROWS_WITH(
+             writer.put(psibase::DbId::native, code),
+             ContainsSubstring("service code did not compile within 1 ms on this node at 20") &&
+                 ContainsSubstring("Z and is not being retried until 20"));
+         CHECK(cache.stats().compilesNotRetried == again);
+      }
+      CHECK(gate.count() == compiles);
+      CHECK(cache.stats().compilesAbandoned == abandoned);
+      CHECK(writer.transaction.startedCompileTime == charged);
+      CHECK_FALSE(writer.stored(psibase::DbId::native, code));
+      // What the node's rule itself answers.
+      const auto direct = cache.compileForSpeculativeRun(hashOf(code), chars(code), {}, 0);
+      CHECK(direct.start == Start::notRetried);
+      CHECK(direct.wait == Wait::abandoned);
+      REQUIRE(direct.notRetried.has_value());
+      CHECK(direct.notRetried->bound == milliseconds(1));
+      CHECK(direct.notRetried->until - direct.notRetried->at == minutes(10));
+      // The operator raises the bound: what was abandoned at a lower one
+      // says nothing any more.
+      cache.setSpeculativeCompileWait(seconds(5));
+      CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+      CHECK(writer.stored(psibase::DbId::native, code));
+      CHECK(gate.count() == compiles + 1);
+      CHECK(cache.contains(hashOf(code), {}, 0));
+   }
+   {
+      INFO("the time is up: compiled again");
+      const auto code = otherService(21);
+      cache.setSpeculativeCompileRetry(milliseconds(50));
+      abandon(code);
+      cache.setSpeculativeCompileRetry(minutes(10));
+      std::this_thread::sleep_for(milliseconds(60));
+      const auto compiles = gate.count();
+      const auto skipped  = cache.stats().compilesNotRetried;
+      // Under the same bound of 1 ms; whether this compile makes it or is
+      // abandoned too, it was started.
+      const auto run = cache.compileForSpeculativeRun(hashOf(code), chars(code), {}, 0);
+      CHECK(run.start == Start::started);
+      cache.finishCompiles();
+      CHECK(gate.count() == compiles + 1);
+      CHECK(cache.stats().compilesNotRetried == skipped);
+   }
+   {
+      INFO("a block asks for the code: forgotten");
+      const auto code = otherService(22);
+      abandon(code);
+      auto run = cache.compileForSpeculativeRun(hashOf(code), chars(code), {}, 0);
+      CHECK(run.start == Start::notRetried);
+      const auto compiles = gate.count();
+      const auto skipped  = cache.stats().compilesNotRetried;
+      // The block's compile is held, so that the module does not exist yet:
+      // what a speculative run now meets is a compile in flight like any
+      // other, not the memory of the abandoned one.
+      gate.close();
+      CHECK(cache.compileInBackground(hashOf(code), chars(code), {}, 0) == Start::started);
+      gate.awaitStarted(compiles + 1);
+      run = cache.compileForSpeculativeRun(hashOf(code), chars(code), {}, 0);
+      CHECK(run.start == Start::inFlight);
+      CHECK(run.wait == Wait::inFlight);
+      CHECK(cache.stats().compilesNotRetried == skipped);
+      gate.release();
+      cache.finishCompiles();
+      CHECK(cache.contains(hashOf(code), {}, 0));
+      CHECK(gate.count() == compiles + 1);
+   }
+   {
+      INFO("turned off: every run compiles again");
+      const auto code = otherService(23);
+      cache.setSpeculativeCompileRetry(nanoseconds(0));
+      abandon(code);
+      const auto abandoned = cache.stats().compilesAbandoned;
+      const auto skipped   = cache.stats().compilesNotRetried;
+      abandon(code);
+      CHECK(cache.stats().compilesAbandoned == abandoned + 1);
+      CHECK(cache.stats().compilesNotRetried == skipped);
+      cache.setSpeculativeCompileRetry(minutes(10));
+   }
+   {
+      INFO("it is the node's memory only: a node started over the same store compiles");
+      const auto code = otherService(24);
+      abandon(code);
+      CHECK(cache.compileForSpeculativeRun(hashOf(code), chars(code), {}, 0).start ==
+            Start::notRetried);
+      NativeService restarted{artifacts.path / "modules"};
+      const auto    run =
+          restarted.cache.compileForSpeculativeRun(hashOf(code), chars(code), {}, 0);
+      CHECK(run.start == Start::started);
+      CHECK(run.wait == Wait::finished);
+      CHECK(restarted.cache.stats().compilesNotRetried == 0);
+      CHECK(restarted.cache.stats().compiled == 1);
+   }
+}
+
+TEST_CASE("A block that needs code whose speculative compile was given up has it compiled",
+          "[limits]")
+{
+   if (!isWasmtime())
+      SKIP("only the wasmtime engine's compiler can be stopped");
+   using Catch::Matchers::ContainsSubstring;
+   const auto                   code = otherService(7);
+   const auto                   hash = CodeWriter::row(code).codeHash;
+   const psibase::AccountNumber account{"vm-given-up"};
+
+   CompileGate   gate;
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   auto          release = psibase::finally{[&] { gate.release(); }};
+   gate.attach(fixture.cache);
+   // The node is applying blocks.
+   fixture.block.isProducing = false;
+   std::size_t before        = 0;
+   {
+      CodeWriter speculative{fixture, psibase::DbMode::speculative()};
+      before = gate.count();
+      gate.close();
+      fixture.cache.setSpeculativeCompileWait(std::chrono::milliseconds(1));
+      CHECK_THROWS_WITH(speculative.put(psibase::DbId::native, code),
+                        ContainsSubstring("took too long to compile"));
+   }
+   // The compile is given up, and its thread is still where the gate holds
+   // it. A block arrives that stores the same code: the write does not wait,
+   // and no second compile is started beside the one in flight.
+   gate.awaitStarted(before + 1);
+   CodeWriter writer{fixture};
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK(writer.stored(psibase::DbId::native, code));
+   CHECK(gate.count() == before + 1);
+   CHECK_FALSE(fixture.cache.contains(hash, {}, 0));
+   // Another speculative run needs the code now. The compile it finds in
+   // flight is one a block needs, which will leave a module: the run waits
+   // for it as for any block's compile, and when its wait has passed the
+   // answer is that the code is still being compiled ("try again
+   // shortly"), not that the compile was stopped or is not being retried.
+   {
+      const auto run = fixture.cache.compileForSpeculativeRun(hash, chars(code), {}, 0);
+      CHECK(run.start == psibase::WasmCache::CompileStart::inFlight);
+      CHECK(run.wait == psibase::WasmCache::CompileWait::inFlight);
+      CHECK(fixture.cache.stats().compilesNotRetried == 0);
+   }
+   // The block then executes it. The compile thread finds its compile
+   // abandoned and, because a block needs the module, compiles the code
+   // again without a bound; the execution waits for that and runs the
+   // module. The block never sees the abandoned compile as a result.
+   psibase::CodeRow row{.codeNum = account, .codeHash = hash};
+   fixture.block.db.kvPut(row.db, row.key(), row);
+   gate.release();
+   CHECK(NativeService::value(fixture.called(writer.transaction, account)) == 8);
+   CHECK(fixture.cache.contains(hash, {}, 0));
+   CHECK(fixture.cache.stats().compilesAbandoned == 1);
+   CHECK(writer.compiled() == 1);
+   CHECK(gate.count() == before + 2);
+   CHECK_FALSE(gate.compiledHere(before));
+   // And a speculative run that needs it now has it.
+   CHECK(fixture.cache.compileForSpeculativeRun(hash, chars(code), {}, 0).start ==
+         psibase::WasmCache::CompileStart::ready);
+}
+
+TEST_CASE("A block that needs code while a speculative run compiles it lifts the bound",
+          "[limits]")
+{
+   if (!isWasmtime())
+      SKIP("only the wasmtime engine's compiler can be stopped");
+   using namespace std::chrono;
+   using Start = psibase::WasmCache::CompileStart;
+   using Wait  = psibase::WasmCache::CompileWait;
+   const auto                   code = otherService(8);
+   const auto                   hash = CodeWriter::row(code).codeHash;
+   const psibase::AccountNumber account{"vm-lifted"};
+
+   CompileGate   gate;
+   TempDirectory artifacts;
+   NativeService fixture{artifacts.path / "modules"};
+   auto          release = psibase::finally{[&] { gate.release(); }};
+   gate.attach(fixture.cache);
+   fixture.block.isProducing = false;
+   CodeWriter writer{fixture};
+   const auto before = gate.count();
+   gate.close();
+   // A speculative run starts the compile, which the gate holds, and waits,
+   // under a bound that does not pass while this test runs.
+   fixture.cache.setSpeculativeCompileWait(minutes(10));
+   std::optional<psibase::WasmCache::SpeculativeCompile> run;
+   std::thread speculative{[&, cache = fixture.cache]() mutable
+                           { run = cache.compileForSpeculativeRun(hash, chars(code), {}, 0); }};
+   gate.awaitStarted(before + 1);
+   // The block stores the code: the compile in flight is now one that a
+   // block needs, and has no bound.
+   CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+   CHECK(writer.stored(psibase::DbId::native, code));
+   // The node is asked to stop. The run stops waiting; the compile is a
+   // block's and is not abandoned, which would only have it compiled again.
+   const auto stop = steady_clock::now();
+   fixture.cache.abandonSpeculativeCompiles();
+   speculative.join();
+   CHECK(steady_clock::now() - stop < minutes(1));
+   REQUIRE(run.has_value());
+   CHECK(run->start == Start::started);
+   CHECK(run->wait == Wait::inFlight);
+   CHECK_FALSE(fixture.cache.awaitCompile(hash, {}, 0, nanoseconds(0)));
+   psibase::CodeRow row{.codeNum = account, .codeHash = hash};
+   fixture.block.db.kvPut(row.db, row.key(), row);
+   gate.release();
+   CHECK(NativeService::value(fixture.called(writer.transaction, account)) == 8);
+   CHECK(fixture.cache.contains(hash, {}, 0));
+   CHECK(writer.compiled() == 1);
+   CHECK_FALSE(gate.compiledHere(before));
+   // Compiled once, by the compile the run started, and never abandoned.
+   CHECK(fixture.cache.stats().compilesAbandoned == 0);
+   CHECK(gate.count() == before + 1);
+}
+
+TEST_CASE("A node that stops abandons the compiles speculative runs are waiting for", "[limits]")
+{
+   if (!isWasmtime())
+      SKIP("only the wasmtime engine's compiler can be stopped");
+   using namespace std::chrono;
+   using Start = psibase::WasmCache::CompileStart;
+   using Wait  = psibase::WasmCache::CompileWait;
+   // Compiling needs no chain: the node's cache over the engine's, which
+   // the test keeps to ask it afterwards what it did.
+   NativeService registersHostFunctions;
+   const auto    code = slowToCompile();
+   const auto    hash = CodeWriter::row(code).codeHash;
+   auto          stored = std::make_shared<RecordedArtifacts>();
+   auto          engine = psibase::vm::selected().makeCache(4, recording(stored));
+   std::promise<void> inCompiler;
+   engine->compileHook = [&](const psibase::Checksum256&) { inCompiler.set_value(); };
+   std::optional<psibase::WasmCache> cache{std::in_place, psibase::vm::selected(), engine};
+   // A bound that does not pass: only the node stopping ends this compile.
+   cache->setSpeculativeCompileWait(hours(1));
+   std::optional<psibase::WasmCache::SpeculativeCompile> run;
+   std::thread speculative{[&, waiting = *cache]() mutable
+                           { run = waiting.compileForSpeculativeRun(hash, chars(code), {}, 0); }};
+   // The compile thread is about to enter the compiler, where this module
+   // keeps it for a couple of hundred milliseconds at least; a moment later
+   // it is at work there.
+   inCompiler.get_future().wait();
+   std::this_thread::sleep_for(milliseconds(10));
+   const auto stop = steady_clock::now();
+   cache->abandonSpeculativeCompiles();
+   // The run is given up at once, and with every copy of the cache gone
+   // the compile thread is waited for: it returns instead of compiling on.
+   speculative.join();
+   cache.reset();
+   const auto took = steady_clock::now() - stop;
+   REQUIRE(run.has_value());
+   CHECK(run->start == Start::started);
+   CHECK(run->wait == Wait::abandoned);
+   CHECK(took < seconds(5));
+   const auto stats = engine->stats();
+   CHECK(stats.compilesAbandoned == 1);
+   CHECK(stats.compiled == 0);
+   CHECK_FALSE(engine->contains(hash, {}, 0));
+   CHECK_FALSE(engine->refused(hash, {}, 0));
+   CHECK(stored->snapshot().empty());
+}
+
+TEST_CASE("A node that goes with a speculative run's compile in flight does not wait it out",
+          "[limits]")
+{
+   if (!isWasmtime())
+      SKIP("only the wasmtime engine's compiler can be stopped");
+   using namespace std::chrono;
+   using Start = psibase::WasmCache::CompileStart;
+   using Wait  = psibase::WasmCache::CompileWait;
+   // The cache is destroyed while a compile that a speculative run started
+   // is in the compiler with no run waiting for it and no bound: a block
+   // came to need it, and the run was given up when its own wait passed.
+   // Nothing calls abandonSpeculativeCompiles; the last copy going is enough.
+   NativeService registersHostFunctions;
+   const auto    code   = slowToCompile();
+   const auto    hash   = CodeWriter::row(code).codeHash;
+   auto          stored = std::make_shared<RecordedArtifacts>();
+   auto          engine = psibase::vm::selected().makeCache(4, recording(stored));
+   CompileGate   gate;
+   auto          release = psibase::finally{[&] { gate.release(); }};
+   std::optional<psibase::WasmCache> cache{std::in_place, psibase::vm::selected(), engine};
+   gate.attach(*cache);
+   gate.close();
+   // Long enough for the block's request below to come before it passes.
+   cache->setSpeculativeCompileWait(seconds(2));
+   std::optional<psibase::WasmCache::SpeculativeCompile> run;
+   std::thread speculative{[&, waiting = *cache]() mutable
+                           { run = waiting.compileForSpeculativeRun(hash, chars(code), {}, 0); }};
+   gate.awaitStarted(1);
+   CHECK(cache->compileInBackground(hash, chars(code), {}, 0) == Start::inFlight);
+   speculative.join();
+   REQUIRE(run.has_value());
+   CHECK(run->start == Start::started);
+   if (run->wait != Wait::inFlight)
+   {
+      // The machine kept this thread from asking for two seconds: the
+      // compile was abandoned by its bound instead, which is not what this
+      // test is about.
+      CHECK(run->wait == Wait::abandoned);
+      gate.release();
+      cache->finishCompiles();
+      SKIP("the bound passed before the block's request was made");
+   }
+   // The compile thread goes on into the compiler, and the node goes.
+   gate.release();
+   const auto stop = steady_clock::now();
+   cache.reset();
+   const auto took = steady_clock::now() - stop;
+   CHECK(took < seconds(5));
+   const auto stats = engine->stats();
+   CHECK(stats.compilesAbandoned == 1);
+   CHECK(stats.compiled == 0);
+   CHECK_FALSE(engine->contains(hash, {}, 0));
+   CHECK_FALSE(engine->refused(hash, {}, 0));
+   CHECK(stored->snapshot().empty());
+}

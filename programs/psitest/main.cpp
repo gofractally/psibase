@@ -1,14 +1,16 @@
 #include <boost/filesystem/operations.hpp>
 #include <psibase/ActionContext.hpp>
 #include <psibase/LogSocket.hpp>
+#include <psibase/NativeAotCache.hpp>
 #include <psibase/NativeFunctions.hpp>
-#include <psibase/NativeVM.hpp>
 #include <psibase/Prover.hpp>
 #include <psibase/PsizamPolicy.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/VmEngine.hpp>
+#include <psibase/WasmtimeHost.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/api.hpp>
+#include <psibase/crypto.hpp>
 #include <psibase/finally.hpp>
 #include <psibase/log.hpp>
 #include <psibase/prefix.hpp>
@@ -17,8 +19,10 @@
 #include <psio/json.hpp>
 #include <psio/json_value.hpp>
 #include <psio/pssz_view.hpp>
-#include <psizam/debug/debug.hpp>
+#include <psizam/utils.hpp>
 #include "VmConsensusReplay.hpp"
+
+#include <cxxabi.h>
 
 #include <stdio.h>
 #include <time.h>
@@ -36,19 +40,21 @@ static char** host_environment()
 }
 #include <bitset>
 #include <chrono>
+#include <condition_variable>
+#include <mutex>
 #include <optional>
 #include <random>
+#include <thread>
 
 #include <sys/stat.h>
 
 using namespace std::literals;
 
 using std::span;
-namespace dwarf = psizam::debug;
+namespace wt = psizam::wasmtime;
 using psibase::WatchdogManager;
 
 struct callbacks;
-using rhf_t = psizam::registered_host_functions<callbacks>;
 
 using cl_flags_t = std::bitset<16>;
 enum cl_flags
@@ -58,29 +64,141 @@ enum cl_flags
 
 void backtrace();
 
-struct vm_options : psibase::NativeVMOptions
+// ── The engine of the test module ───────────────────────────────────────────
+//
+// The test module (the wasm psitest is given) runs on wasmtime, through the
+// same psizam backend the node runs services on (psibase/WasmtimeHost.hpp has
+// what the two share). It is the only engine psitest has for it: a module
+// wasmtime does not take is an error, never a reason to try another engine.
+//
+// A test module is a program of the developer's, not chain code, so none of
+// the chain's policy for services applies to it, and this is where that is
+// stated:
+//
+//  - No admission: psizam's validator and the chain's VMOptions limits
+//    (function count and size, locals, nesting, table and memory sections,
+//    imports) are not applied. wasmtime validates the module under the
+//    proposal set below, and that is all.
+//  - No stack byte budget: the module is compiled without psizam's stack
+//    metering. Its recursion is bounded by a native stack allowance
+//    (testModuleStackBytes), not by max_stack_bytes.
+//  - No memory or table limit beyond the format's (4 GiB, 2^32-1 elements).
+//  - No CPU limit and no watchdog. --timeout is the only bound on run time.
+//  - Its imports are the tester's (register_callbacks), not the services'.
+//  - No instance pool: there is one instance per process.
+//
+// What it does share with services: the wasmtime build, the proposal set
+// (vm_wasmtime::wasmFeatures), deterministic floats, and the store of
+// compiled modules (PSIBASE_NATIVE_AOT_CACHE, or the user's cache directory),
+// under keys of its own.
+namespace test_module
 {
-   static constexpr std::uint32_t max_func_local_bytes = 1024 * 1024;
-   vm_options()
-       : NativeVMOptions(testerLimits(), psibase::nativeAotCacheFromEnvironment())
-   {
-   }
-   // A test program is not service code: no limit but those of the format.
-   static psibase::VMOptions testerLimits()
-   {
-      auto result = psibase::uniformVMOptions(std::numeric_limits<std::uint32_t>::max());
-      result.max_pages                   = 65536;
-      result.max_stack_bytes             = 1024 * 1024;
-      result.max_table_section_elements  = 1;
-      result.max_memory_section_elements = 1;
-      return result;
-   }
-};
+   inline constexpr std::string_view engineName = "wasmtime";
 
-using backend_t =
-    psizam::backend<rhf_t, psibase::NativeVM, vm_options, psizam::debug::debug_instr_map>;
+   // Test modules contain no relaxed-SIMD madd, the one operation the two
+   // float profiles differ in. Strict is what the tester's psizam engine ran
+   // them under, and what version 0 services run under.
+   inline constexpr auto floatProfile = wt::float_profile::strict;
 
-inline constexpr int max_backtrace_frames = 512;
+   // Native stack the test module's own wasm frames may use. Beyond it the
+   // module traps (call stack exhausted).
+   inline constexpr std::uint64_t testModuleStackBytes = std::uint64_t(64) << 20;
+   // The whole native stack the module is entered on. Services the module
+   // runs are entered from its host functions, so they run on this stack
+   // too, below the module's frames, and their engine counts on a stack of
+   // serviceNativeStackBytes to itself.
+   inline constexpr std::uint64_t nativeStackBytes =
+       testModuleStackBytes + psibase::vm_wasmtime::serviceNativeStackBytes +
+       (std::uint64_t(64) << 20);
+
+   inline constexpr std::uint32_t backtraceFrames = 512;
+
+   // `debugger`: also give gdb/lldb the module's code and source lines
+   // (--debug-module). Slower to compile, and compiled separately.
+   inline wt::engine_options engineOptions(bool debugger)
+   {
+      wt::engine_options o;
+      o.features       = psibase::vm_wasmtime::wasmFeatures;
+      o.fp             = floatProfile;
+      o.max_wasm_stack = testModuleStackBytes;
+      o.native_stack   = nativeStackBytes;
+      // What --timeout stops the module with.
+      o.epoch_interruption = true;
+      // testerAbort, abortMessage and a trap print where the module was.
+      o.backtrace            = true;
+      o.backtrace_details    = true;
+      o.backtrace_max_frames = backtraceFrames;
+      o.debug_info           = debugger;
+      return o;
+   }
+
+   inline constexpr wt::instance_limits instanceLimits{
+       .max_memory_bytes   = std::uint64_t(65536) * 65536,
+       .max_table_elements = 0xffff'ffffu,
+   };
+
+   // Everything that determines the compiled code. The stack sizes are not
+   // part of it: they are limits the engine applies at run time.
+   inline psibase::NativeAotCache::Key artifactKey(std::span<const std::uint8_t> wasm,
+                                                   const wt::engine_options&     options)
+   {
+      auto digest = psibase::sha256(std::tuple{
+          std::string("psitest-wasmtime-test-module-v1"),
+          psibase::sha256(reinterpret_cast<const char*>(wasm.data()), wasm.size()),
+          options.features, std::uint32_t(options.fp), options.epoch_interruption,
+          options.backtrace_details, options.debug_info, std::string(wt::build_identity())});
+      psibase::NativeAotCache::Key key;
+      std::copy(digest.begin(), digest.end(), key.begin());
+      return key;
+   }
+
+   // The module for `wasm`: from the store of compiled modules, which returns
+   // only what it has verified (NativeAotCache.hpp), or compiled now and
+   // stored. Throws wasmtime's error if it does not compile.
+   template <typename Host>
+   wt::module obtain(const wt::runtime<Host>&      runtime,
+                     std::span<const std::uint8_t> wasm,
+                     const wt::engine_options&     options)
+   {
+      auto       artifacts = psibase::nativeAotCacheFromEnvironment();
+      const auto key       = artifactKey(wasm, options);
+      const auto start     = std::chrono::steady_clock::now();
+      auto       elapsed   = [&]
+      {
+         return std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - start)
+             .count();
+      };
+      if (artifacts)
+         if (auto stored = artifacts->load(key))
+            try
+            {
+               auto module = runtime.load(std::span(
+                   reinterpret_cast<const std::uint8_t*>(stored->data()), stored->size()));
+               PSIBASE_LOG(psibase::loggers::generic::get(), debug)
+                   << "Test module loaded from the compiled-module cache in " << elapsed()
+                   << " ms";
+               return module;
+            }
+            catch (const std::exception&)
+            {
+               // Intact, but this engine will not take it: compile again.
+            }
+      auto        module = runtime.compile(wasm);
+      std::size_t stored = 0;
+      if (artifacts)
+      {
+         auto artifact = module.serialize();
+         stored        = artifact.size();
+         artifacts->store(
+             key, std::span(reinterpret_cast<const char*>(artifact.data()), artifact.size()));
+      }
+      PSIBASE_LOG(psibase::loggers::generic::get(), debug)
+          << "Test module compiled by " << engineName << " in " << elapsed()
+          << " ms: " << wasm.size() << " bytes of wasm, " << stored << " bytes of native code";
+      return module;
+   }
+}  // namespace test_module
 
 inline constexpr int      block_interval_ms   = 500;
 inline constexpr int      block_interval_us   = block_interval_ms * 1000;
@@ -224,9 +342,8 @@ struct WasmMemoryCache
 struct state
 {
    const char*                              wasm;
-   dwarf::info&                             dwarf_info;
-   psizam::wasm_allocator&                  wa;
-   backend_t&                               backend;
+   // Set once the test module is instantiated.
+   wt::instance<callbacks>*                 instance = nullptr;
    std::vector<std::string>                 args;
    cl_flags_t                               additional_args;
    std::vector<file>                        files;
@@ -240,7 +357,7 @@ struct state
 };
 
 template <typename T>
-using wasm_ptr = psizam::argument_proxy<T*>;
+using wasm_ptr = psizam::detail::argument_proxy<T*>;
 
 struct test_chain;
 
@@ -682,34 +799,79 @@ struct callbacks
    callbacks(::state& state) : state{state} { single = this; }
    ~callbacks() { single = nullptr; }
 
+   static std::string demangle(const std::string& name)
+   {
+      int   status = 0;
+      char* text   = abi::__cxa_demangle(name.c_str(), nullptr, nullptr, &status);
+      std::string result = status == 0 && text ? text : name;
+      std::free(text);
+      return result;
+   }
+
+   // Innermost first: source file and line where the module's DWARF has
+   // them, and the function's name from the DWARF-less name section.
+   static void printFrames(const std::vector<wt::frame>& frames)
+   {
+      for (std::size_t i = 0; i < frames.size(); ++i)
+      {
+         const auto& frame = frames[i];
+         if (!frame.file.empty())
+            fprintf(stderr, "%s:%u", frame.file.c_str(), frame.line);
+         else if (frame.module_offset)
+            fprintf(stderr, "<wasm offset 0x%08llx>",
+                    static_cast<unsigned long long>(*frame.module_offset));
+         else
+            fprintf(stderr, "<wasm function %u>", frame.function_index);
+         if (!frame.function_name.empty())
+            fprintf(stderr, ": %s", demangle(frame.function_name).c_str());
+         // Runaway recursion is the same frame over and over.
+         std::size_t same = 0;
+         while (i + 1 < frames.size() && frames[i + 1].function_index == frame.function_index &&
+                frames[i + 1].module_offset == frame.module_offset)
+            ++i, ++same;
+         if (same)
+            fprintf(stderr, " (and %zu more of the same)", same);
+         fprintf(stderr, "\n");
+      }
+      if (frames.size() == test_module::backtraceFrames)
+         fprintf(stderr, "(outer frames not shown)\n");
+   }
+
    void backtrace()
    {
       fprintf(stderr, "Generating backtrace...\n");
-      void* data[max_backtrace_frames];
-      int   count =
-          state.backend.get_context().backtrace(data, sizeof(data) / sizeof(data[0]), nullptr);
-      for (int i = 0; i < count; ++i)
-      {
-         auto& di          = state.dwarf_info;
-         auto  file_offset = state.backend.get_debug().translate(data[i]);
-         if (file_offset == 0xffff'ffff)
-            continue;
-         const auto* loc = di.get_location(file_offset - di.wasm_code_offset);
-         const auto* sub = di.get_subprogram(file_offset - di.wasm_code_offset);
-         if (loc)
-            fprintf(stderr, "%s:%d", di.files[loc->file_index].c_str(), loc->line);
-         else
-            fprintf(stderr, "<wasm address 0x%08x>", file_offset - di.wasm_code_offset);
-         if (sub)
-            fprintf(stderr, ": %s", sub->demangled_name.c_str());
-         fprintf(stderr, "\n");
-      }
+      if (state.instance)
+         printFrames(state.instance->backtrace());
    }
 
-   void check_bounds(void* data, size_t size)
+   // The test module's linear memory.
+   std::span<char> memory()
    {
-      volatile auto check = *((const char*)data + size - 1);
-      psizam::ignore_unused_variable_warning(check);
+      if (!state.instance)
+         throw std::runtime_error("the test module has no memory yet");
+      return state.instance->memory();
+   }
+
+   // `size` bytes of it at `ptr`.
+   char* memoryAt(std::uint32_t ptr, std::uint64_t size)
+   {
+      auto all = memory();
+      if (ptr > all.size() || size > all.size() - ptr)
+         throw wt::host_memory_error("host pointer is outside linear memory");
+      return all.data() + ptr;
+   }
+
+   // WASI passes an array of (pointer, length): read without assuming the
+   // guest aligned it.
+   wasi_iovec_t iovec(std::uint32_t iovs, std::uint32_t index)
+   {
+      const auto at = iovs + std::uint64_t(index) * sizeof(wasi_iovec_t);
+      if (at > 0xffff'ffffu)
+         throw wt::host_memory_error("host pointer is outside linear memory");
+      wasi_iovec_t result;
+      std::memcpy(&result, memoryAt(static_cast<std::uint32_t>(at), sizeof(result)),
+                  sizeof(result));
+      return result;
    }
 
    std::string span_str(span<const char> str) { return {str.data(), str.size()}; }
@@ -752,22 +914,19 @@ struct callbacks
    // uint8_t** argv, uint8_t* argv_buf
    int32_t wasi_args_get(uint32_t argv, uint32_t argv_buf)
    {
-      auto* memory   = state.backend.get_context().linear_memory();
-      auto  get_argv = [&]() -> uint32_t& { return *reinterpret_cast<uint32_t*>(memory + argv); };
-      auto  get_argv_buf = [&]() -> uint8_t&
-      { return *reinterpret_cast<uint8_t*>(memory + argv_buf); };
-
+      auto        all = memory();
+      std::size_t end = all.size();
+      if (argv > end || argv_buf > end)
+         return wasi_errno_fault;
       for (auto& a : state.args)
       {
-         get_argv() = argv_buf;
+         auto size = a.size() + 1;
+         if (end - argv_buf < size || end - argv < 4)
+            return wasi_errno_fault;
+         std::memcpy(all.data() + argv, &argv_buf, 4);
+         std::memcpy(all.data() + argv_buf, a.c_str(), size);
          argv += 4;
-         for (auto ch : a)
-         {
-            get_argv_buf() = ch;
-            ++argv_buf;
-         }
-         get_argv_buf() = 0;
-         ++argv_buf;
+         argv_buf += size;
       }
       return 0;
    };
@@ -793,13 +952,11 @@ struct callbacks
 
    int32_t wasi_environ_get(uint32_t env, uint32_t buf)
    {
-      auto pages = state.backend.get_context().current_linear_memory();
-      if (pages < 0)
-         return wasi_errno_fault;
-      std::size_t end = static_cast<std::size_t>(pages) * psizam::page_size;
+      auto        all = this->memory();
+      std::size_t end = all.size();
       if (env > end || buf > end)
          return wasi_errno_fault;
-      char* memory = state.backend.get_context().linear_memory();
+      char* memory = all.data();
 
       for (char** p = host_environment(); *p; ++p)
       {
@@ -1119,9 +1276,10 @@ struct callbacks
       return 0;
    }
 
-   uint32_t wasi_fd_write(wasi_fd_t                fd,
-                          span<const wasi_iovec_t> iovs,
-                          wasm_ptr<wasi_size_t>    nwritten)
+   uint32_t wasi_fd_write(wasi_fd_t             fd,
+                          uint32_t              iovs,
+                          uint32_t              iovs_len,
+                          wasm_ptr<wasi_size_t> nwritten)
    {
       auto* file = get_file(fd);
       if (!file)
@@ -1129,12 +1287,10 @@ struct callbacks
 
       *nwritten = 0;
 
-      for (auto iovs_item : iovs)
+      for (uint32_t i = 0; i < iovs_len; ++i)
       {
-         char* memory   = state.backend.get_context().linear_memory();
-         void* iovs_buf = memory + iovs_item.buf;
-
-         check_bounds(iovs_buf, iovs_item.buf_len);
+         auto  iovs_item = iovec(iovs, i);
+         void* iovs_buf  = memoryAt(iovs_item.buf, iovs_item.buf_len);
 
          if (iovs_item.buf_len && fwrite(iovs_buf, iovs_item.buf_len, 1, file->f) != 1)
          {
@@ -1150,7 +1306,10 @@ struct callbacks
       return 0;
    }
 
-   uint32_t wasi_fd_read(wasi_fd_t fd, span<const wasi_iovec_t> iovs, wasm_ptr<wasi_size_t> nread)
+   uint32_t wasi_fd_read(wasi_fd_t             fd,
+                         uint32_t              iovs,
+                         uint32_t              iovs_len,
+                         wasm_ptr<wasi_size_t> nread)
    {
       auto* file = get_file(fd);
       if (!file)
@@ -1158,12 +1317,10 @@ struct callbacks
 
       *nread = 0;
 
-      for (auto iovs_item : iovs)
+      for (uint32_t i = 0; i < iovs_len; ++i)
       {
-         char* memory   = state.backend.get_context().linear_memory();
-         void* iovs_buf = memory + iovs_item.buf;
-
-         check_bounds(iovs_buf, iovs_item.buf_len);
+         auto  iovs_item = iovec(iovs, i);
+         void* iovs_buf  = memoryAt(iovs_item.buf, iovs_item.buf_len);
 
          size_t bytes_read = fread(iovs_buf, 1, iovs_item.buf_len, file->f);
          *nread += bytes_read;
@@ -1741,62 +1898,65 @@ void backtrace()
       callbacks::single->backtrace();
 }
 
-void register_callbacks()
+// The imports a test module may have. One it has that is not here fails its
+// instantiation, with the import named.
+void register_callbacks(wt::runtime<callbacks>& rt)
 {
    // Psibase Intrinsics
-   rhf_t::add<&callbacks::abortMessage>("psibase", "abortMessage");
-   rhf_t::add<&callbacks::getResult>("psibase", "getResult");
-   rhf_t::add<&callbacks::getKey>("psibase", "getKey");
-   rhf_t::add<&callbacks::kvGet>("psibase", "kvGet");
-   rhf_t::add<&callbacks::kvGreaterEqual>("psibase", "kvGreaterEqual");
-   rhf_t::add<&callbacks::kvLessThan>("psibase", "kvLessThan");
-   rhf_t::add<&callbacks::kvMax>("psibase", "kvMax");
-   rhf_t::add<&callbacks::kvPut>("psibase", "kvPut");
-   rhf_t::add<&callbacks::kvRemove>("psibase", "kvRemove");
-   rhf_t::add<&callbacks::kvGetTransactionUsage>("psibase", "kvGetTransactionUsage");
+   rt.add<&callbacks::abortMessage>("psibase", "abortMessage");
+   rt.add<&callbacks::getResult>("psibase", "getResult");
+   rt.add<&callbacks::getKey>("psibase", "getKey");
+   rt.add<&callbacks::kvGet>("psibase", "kvGet");
+   rt.add<&callbacks::kvGreaterEqual>("psibase", "kvGreaterEqual");
+   rt.add<&callbacks::kvLessThan>("psibase", "kvLessThan");
+   rt.add<&callbacks::kvMax>("psibase", "kvMax");
+   rt.add<&callbacks::kvPut>("psibase", "kvPut");
+   rt.add<&callbacks::kvRemove>("psibase", "kvRemove");
+   rt.add<&callbacks::kvGetTransactionUsage>("psibase", "kvGetTransactionUsage");
 
    // Tester Intrinsics
-   rhf_t::add<&callbacks::testerCreateChain>("psibase", "createChain");
-   rhf_t::add<&callbacks::testerOpenChain>("psibase", "openChain");
-   rhf_t::add<&callbacks::testerCloneChain>("psibase", "cloneChain");
-   rhf_t::add<&callbacks::testerGetFork>("psibase", "getFork");
-   rhf_t::add<&callbacks::testerDestroyChain>("psibase", "destroyChain");
-   rhf_t::add<&callbacks::testerStartBlock>("psibase", "startBlock");
-   rhf_t::add<&callbacks::testerFinishBlock>("psibase", "finishBlock");
-   rhf_t::add<&callbacks::checkoutSubjective>("psibase", "checkoutSubjective");
-   rhf_t::add<&callbacks::commitSubjective>("psibase", "commitSubjective");
-   rhf_t::add<&callbacks::abortSubjective>("psibase", "abortSubjective");
-   rhf_t::add<&callbacks::commitState>("psibase", "commitState");
-   rhf_t::add<&callbacks::testerRunAction>("psibase", "runAction");
-   rhf_t::add<&callbacks::testerPushTransaction>("psibase", "pushTransaction");
-   rhf_t::add<&callbacks::testerHttpRequest>("psibase", "httpRequest");
-   rhf_t::add<&callbacks::testerSocketRecv>("psibase", "socketRecv");
-   rhf_t::add<&callbacks::testerExecute>("env", "testerExecute");
+   rt.add<&callbacks::testerCreateChain>("psibase", "createChain");
+   rt.add<&callbacks::testerOpenChain>("psibase", "openChain");
+   rt.add<&callbacks::testerCloneChain>("psibase", "cloneChain");
+   rt.add<&callbacks::testerGetFork>("psibase", "getFork");
+   rt.add<&callbacks::testerDestroyChain>("psibase", "destroyChain");
+   rt.add<&callbacks::testerStartBlock>("psibase", "startBlock");
+   rt.add<&callbacks::testerFinishBlock>("psibase", "finishBlock");
+   rt.add<&callbacks::checkoutSubjective>("psibase", "checkoutSubjective");
+   rt.add<&callbacks::commitSubjective>("psibase", "commitSubjective");
+   rt.add<&callbacks::abortSubjective>("psibase", "abortSubjective");
+   rt.add<&callbacks::commitState>("psibase", "commitState");
+   rt.add<&callbacks::testerRunAction>("psibase", "runAction");
+   rt.add<&callbacks::testerPushTransaction>("psibase", "pushTransaction");
+   rt.add<&callbacks::testerHttpRequest>("psibase", "httpRequest");
+   rt.add<&callbacks::testerSocketRecv>("psibase", "socketRecv");
+   rt.add<&callbacks::testerExecute>("env", "testerExecute");
 
    // WASI functions
-   rhf_t::add<&callbacks::wasi_args_get>("wasi_snapshot_preview1", "args_get");
-   rhf_t::add<&callbacks::wasi_args_sizes_get>("wasi_snapshot_preview1", "args_sizes_get");
-   rhf_t::add<&callbacks::wasi_clock_time_get>("wasi_snapshot_preview1", "clock_time_get");
-   rhf_t::add<&callbacks::wasi_environ_get>("wasi_snapshot_preview1", "environ_get");
-   rhf_t::add<&callbacks::wasi_environ_sizes_get>("wasi_snapshot_preview1", "environ_sizes_get");
-   rhf_t::add<&callbacks::wasi_fd_close>("wasi_snapshot_preview1", "fd_close");
-   rhf_t::add<&callbacks::wasi_fd_fdstat_get>("wasi_snapshot_preview1", "fd_fdstat_get");
-   rhf_t::add<&callbacks::wasi_fd_fdstat_set_flags>("wasi_snapshot_preview1",
+   rt.add<&callbacks::wasi_args_get>("wasi_snapshot_preview1", "args_get");
+   rt.add<&callbacks::wasi_args_sizes_get>("wasi_snapshot_preview1", "args_sizes_get");
+   rt.add<&callbacks::wasi_clock_time_get>("wasi_snapshot_preview1", "clock_time_get");
+   rt.add<&callbacks::wasi_environ_get>("wasi_snapshot_preview1", "environ_get");
+   rt.add<&callbacks::wasi_environ_sizes_get>("wasi_snapshot_preview1", "environ_sizes_get");
+   rt.add<&callbacks::wasi_fd_close>("wasi_snapshot_preview1", "fd_close");
+   rt.add<&callbacks::wasi_fd_fdstat_get>("wasi_snapshot_preview1", "fd_fdstat_get");
+   rt.add<&callbacks::wasi_fd_fdstat_set_flags>("wasi_snapshot_preview1",
                                                     "fd_fdstat_set_flags");
-   rhf_t::add<&callbacks::wasi_fd_filestat_get>("wasi_snapshot_preview1", "fd_filestat_get");
-   rhf_t::add<&callbacks::wasi_fd_prestat_dir_name>("wasi_snapshot_preview1",
+   rt.add<&callbacks::wasi_fd_filestat_get>("wasi_snapshot_preview1", "fd_filestat_get");
+   rt.add<&callbacks::wasi_fd_prestat_dir_name>("wasi_snapshot_preview1",
                                                     "fd_prestat_dir_name");
-   rhf_t::add<&callbacks::wasi_fd_prestat_get>("wasi_snapshot_preview1", "fd_prestat_get");
-   rhf_t::add<&callbacks::wasi_fd_read>("wasi_snapshot_preview1", "fd_read");
-   rhf_t::add<&callbacks::wasi_fd_readdir>("wasi_snapshot_preview1", "fd_readdir");
-   rhf_t::add<&callbacks::wasi_fd_seek>("wasi_snapshot_preview1", "fd_seek");
-   rhf_t::add<&callbacks::wasi_fd_tell>("wasi_snapshot_preview1", "fd_tell");
-   rhf_t::add<&callbacks::wasi_fd_write>("wasi_snapshot_preview1", "fd_write");
-   rhf_t::add<&callbacks::wasi_path_filestat_get>("wasi_snapshot_preview1", "path_filestat_get");
-   rhf_t::add<&callbacks::wasi_path_open>("wasi_snapshot_preview1", "path_open");
-   rhf_t::add<&callbacks::wasi_proc_exit>("wasi_snapshot_preview1", "proc_exit");
-   rhf_t::add<&callbacks::wasi_random_get>("wasi_snapshot_preview1", "random_get");
-   rhf_t::add<&callbacks::wasi_sched_yield>("wasi_snapshot_preview1", "sched_yield");
+   rt.add<&callbacks::wasi_fd_prestat_get>("wasi_snapshot_preview1", "fd_prestat_get");
+   rt.add<&callbacks::wasi_fd_read>("wasi_snapshot_preview1", "fd_read");
+   rt.add<&callbacks::wasi_fd_readdir>("wasi_snapshot_preview1", "fd_readdir");
+   rt.add<&callbacks::wasi_fd_seek>("wasi_snapshot_preview1", "fd_seek");
+   rt.add<&callbacks::wasi_fd_tell>("wasi_snapshot_preview1", "fd_tell");
+   rt.add<&callbacks::wasi_fd_write>("wasi_snapshot_preview1", "fd_write");
+   rt.add<&callbacks::wasi_path_filestat_get>("wasi_snapshot_preview1", "path_filestat_get");
+   rt.add<&callbacks::wasi_path_open>("wasi_snapshot_preview1", "path_open");
+   rt.add<&callbacks::wasi_proc_exit>("wasi_snapshot_preview1", "proc_exit");
+   rt.add<&callbacks::wasi_random_get>("wasi_snapshot_preview1", "random_get");
+   rt.add<&callbacks::wasi_sched_yield>("wasi_snapshot_preview1", "sched_yield");
+   rt.link();
 }
 
 void fill_substitutions(::state& state, const std::map<std::string, std::string>& substitutions)
@@ -1831,50 +1991,94 @@ void fill_substitutions(::state& state, const std::map<std::string, std::string>
    }
 }
 
+// Stops the test module once it has run for `limit`: the one bound psitest
+// itself puts on a test's run time, and only when asked (--timeout). The
+// module stops at its next loop iteration or function entry; a host function
+// in progress, which includes every service call, finishes first.
+struct Deadline
+{
+   Deadline(wt::interrupter interrupter, std::optional<std::chrono::milliseconds> limit)
+   {
+      if (!limit)
+         return;
+      thread = std::thread{[this, interrupter = std::move(interrupter), limit = *limit]
+                           {
+                              std::unique_lock lock{mutex};
+                              if (!done.wait_for(lock, limit, [&] { return finished; }))
+                              {
+                                 expired = true;
+                                 interrupter.fire();
+                              }
+                           }};
+   }
+   ~Deadline()
+   {
+      {
+         std::lock_guard lock{mutex};
+         finished = true;
+      }
+      done.notify_all();
+      if (thread.joinable())
+         thread.join();
+   }
+   std::mutex              mutex;
+   std::condition_variable done;
+   bool                    finished = false;
+   std::atomic<bool>       expired  = false;
+   std::thread             thread;
+};
+
+struct timeout_exception : std::exception
+{
+   const char* what() const noexcept override { return "timeout"; }
+};
+
+struct RunOptions
+{
+   cl_flags_t                               additional_args;
+   // --timeout
+   std::optional<std::chrono::milliseconds> timeout;
+   // --debug-module
+   bool debugger = false;
+};
+
 static void run(const char*                               wasm,
                 const std::vector<std::string>&           args,
                 const std::map<std::string, std::string>& substitutions,
-                const cl_flags_t&                         additional_args)
+                const RunOptions&                         options)
 {
-   psizam::wasm_allocator wa;
-   auto                   code = psizam::read_wasm(wasm);
-   vm_options             options;
-   psibase::validateNativeWasm(code, options);
-   backend_t backend(code, nullptr, options);
-   psizam::debug::binary::input_stream s{(const char*)code.data(), code.size()};
-   //
-   auto dwarf_info = dwarf::get_info_from_wasm(s);
-   auto reg        = psizam::debug::enable_debug(code, backend, dwarf_info, s);
+   auto code = psizam::read_wasm(wasm);
 
-   ::state state{wasm, dwarf_info, wa, backend, args, additional_args};
+   const auto             engineOptions = test_module::engineOptions(options.debugger);
+   wt::runtime<callbacks> runtime{engineOptions};
+   register_callbacks(runtime);
+   auto module = test_module::obtain(runtime, code, engineOptions);
+
+   ::state state{wasm, nullptr, args, options.additional_args};
    fill_substitutions(state, substitutions);
    callbacks cb{state};
    state.files.emplace_back(stdin, false);
    state.files.emplace_back(stdout, false);
    state.files.emplace_back(stderr, false);
    state.files.emplace_back();  // reserve space for fd 3: root dir
-   backend.set_wasm_allocator(&wa);
 
-   psizam::detail::scoped_trap_observer observe_traps{
-       +[](const char* message, void* data) noexcept
-       {
-          auto& cb = *static_cast<callbacks*>(data);
-          if (std::string_view(message) == "unreachable" &&
-              psizam::detail::active_code_allocator == &cb.state.backend.get_module().allocator)
-          {
-             try
-             {
-                cb.backtrace();
-             }
-             catch (...)
-             {
-             }
-          }
-       },
-       &cb};
-   rhf_t::resolve(backend.get_module());
-   backend.initialize(&cb);
-   backend(cb, "env", "_start");
+   wt::instance<callbacks> instance{runtime, module, cb, test_module::instanceLimits};
+   state.instance = &instance;
+   auto detach    = psibase::finally{[&] { state.instance = nullptr; }};
+   Deadline deadline{instance.make_interrupter(), options.timeout};
+   try
+   {
+      instance.call<void>("_start");
+   }
+   catch (const wt::trap& e)
+   {
+      if (e.kind == wt::trap_kind::interrupt && deadline.expired)
+         throw timeout_exception{};
+      // Where the module was. A host function that threw has said so itself.
+      fprintf(stderr, "Generating backtrace...\n");
+      callbacks::printFrames(instance.failure_backtrace());
+      throw;
+   }
 }
 
 struct ConsoleLog
@@ -1927,6 +2131,18 @@ OPTIONS:
 
             Show how long transactions take in µs.
 
+      --timeout seconds
+
+            Stop the test module, and fail, once it has run this long. Can
+            also be set with PSITEST_TIMEOUT. Without it psitest does not
+            limit how long a test runs.
+
+      --debug-module
+
+            Give an attached debugger (gdb, lldb) the test module's compiled
+            code and source lines. The module is compiled again for this,
+            more slowly. Can also be turned on with PSITEST_DEBUG_MODULE=1.
+
       --debug-services
 
             Run the services of test chains with debugging support: log
@@ -1952,7 +2168,28 @@ int main(int argc, char* argv[])
    int                                verbose      = 0;
    Loggers                            logConfig;
    std::map<std::string, std::string> substitutions;
-   cl_flags_t                         additional_args;
+   RunOptions                         options;
+   auto&                              additional_args = options.additional_args;
+   // Fractions of a second are accepted. False if `text` is not a time.
+   auto parseTimeout = [&](const char* text)
+   {
+      char*  end     = nullptr;
+      double seconds = std::strtod(text, &end);
+      if (end == text || *end || !(seconds > 0) || seconds > 1e9)
+         return false;
+      options.timeout = std::chrono::milliseconds{static_cast<std::int64_t>(seconds * 1000)};
+      return true;
+   };
+   if (const char* text = std::getenv("PSITEST_TIMEOUT"); text && *text)
+   {
+      if (!parseTimeout(text))
+      {
+         std::cerr << "PSITEST_TIMEOUT is not a number of seconds: " << text << "\n";
+         return 1;
+      }
+   }
+   if (const char* text = std::getenv("PSITEST_DEBUG_MODULE"))
+      options.debugger = std::string_view(text) == "1";
 
    int next_arg = 1;
    while (next_arg < argc && argv[next_arg][0] == '-')
@@ -1987,6 +2224,19 @@ int main(int argc, char* argv[])
       {
          psibase::vm::setServiceDebugging(true);
       }
+      else if (!strcmp(argv[next_arg], "--debug-module"))
+      {
+         options.debugger = true;
+      }
+      else if (!strcmp(argv[next_arg], "--timeout"))
+      {
+         ++next_arg;
+         if (next_arg >= argc || !parseTimeout(argv[next_arg]))
+         {
+            std::cerr << "--timeout needs a number of seconds\n";
+            error = true;
+         }
+      }
       // TODO
       // else if (!strcmp(argv[next_arg], "-s") || !strcmp(argv[next_arg], "--subst"))
       // {
@@ -2008,14 +2258,18 @@ int main(int argc, char* argv[])
       }
       ++next_arg;
    }
-   if (next_arg >= argc)
-      error = true;
    if (show_version)
    {
+      // The engines are part of what a test result means: say which.
       std::cerr << "psitest " << PSIBASE_VERSION_MAJOR << "." << PSIBASE_VERSION_MINOR << "."
-                << PSIBASE_VERSION_PATCH << "\n";
+                << PSIBASE_VERSION_PATCH << "\n"
+                << "test module engine: " << test_module::engineName << " ("
+                << wt::build_identity() << ")\n"
+                << "service engine: " << psibase::vm::selected().name << "\n";
       return 0;
    }
+   if (next_arg >= argc)
+      error = true;
    if (show_usage || error)
    {
       std::cerr << usage;
@@ -2043,17 +2297,34 @@ int main(int argc, char* argv[])
           psio::from_ijson<psio::json_value>(psio::to_ijson(logConfig))));
       std::vector<std::string> args{argv + next_arg, argv + argc};
       psibase::ExecutionContext::registerHostFunctions();
-      register_callbacks();
-      run(argv[next_arg], args, substitutions, additional_args);
+      run(argv[next_arg], args, substitutions, options);
       return 0;
+   }
+   catch (::timeout_exception&)
+   {
+      std::cerr << "psitest: the test module was stopped: it ran longer than the "
+                << options.timeout->count() / 1000.0 << " s it was given (--timeout)\n";
+      return 124;
    }
    catch (::assert_exception& e)
    {
       std::cerr << "tester wasm asserted: " << e.what() << "\n";
    }
-   catch (psizam::exception& e)
+   catch (wt::trap& e)
    {
-      std::cerr << "vm::exception: " << e.detail() << "\n";
+      std::cerr << "test module trapped: " << e.what() << "\n";
+   }
+   catch (wt::host_memory_error& e)
+   {
+      std::cerr << "test module passed a host function memory it does not have: " << e.what()
+                << "\n";
+   }
+   catch (wt::error& e)
+   {
+      // Nothing else is tried: the test module runs on this engine or not
+      // at all.
+      std::cerr << "test module failed on " << test_module::engineName << ": " << e.what()
+                << "\n";
    }
    catch (::exit_exception& e)
    {
