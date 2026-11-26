@@ -21,7 +21,7 @@ function(psibase_declare_dependencies)
     # psibase_acquire_dependency(psio) adds PSIO's project itself; see there.
     FetchContent_Declare(psio
         GIT_REPOSITORY https://github.com/gofractally/psio.git
-        GIT_TAG be3376bbc2ef4073d1ad57759d91f97a58663384
+        GIT_TAG 9a68f4842031132f493f6f5bd161f9fa57825760
         GIT_SHALLOW FALSE
         SOURCE_DIR "${psibase_root}/external/psio"
         SOURCE_SUBDIR .psibase-no-top-level-cmake)
