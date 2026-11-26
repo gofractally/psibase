@@ -43,9 +43,12 @@ custom_error! {
 ///
 /// A native database is never "own"; neither is anything when there is no
 /// running service (a test, a tool: `get_service()` is 0). Trusted is not
-/// unchecked: `psio::from_pssz_trusted` is safe Rust and panics on bytes
-/// that are not a frame of the type (a row left by an incompatible change
-/// of the record), which ends the action.
+/// unchecked: `psio::from_pssz_trusted` reads nothing outside the row, and
+/// on bytes that are not a frame of the type (a row left by an incompatible
+/// change of the record: truncated, an offset outside the row, a required
+/// member missing, a list that claims more than the row holds) it panics
+/// with `from_pssz_trusted: the bytes are not a frame of <type>: ...`,
+/// which ends the action.
 pub(crate) fn is_own_table(db: DbId, service: AccountNumber) -> bool {
     matches!(
         db,

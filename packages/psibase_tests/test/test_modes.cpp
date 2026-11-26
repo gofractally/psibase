@@ -23,6 +23,13 @@ namespace
    };
    PSIO_REFLECT(LooseNote, id, text)
 
+   // NoteRow as an older version of the service had it: no text yet
+   struct OldNote
+   {
+      std::uint32_t id;
+   };
+   PSIO_REFLECT(OldNote, id)
+
    const std::string fits    = "12345678";
    const std::string tooLong = "123456789";
    const std::string notUtf8 = "ab\xff";
@@ -136,24 +143,31 @@ TEST_CASE("two modes: only the service writes under its own account")
 }
 
 // A trusted read holds nothing against what the row's type declares, but it
-// is not a read of arbitrary memory: bytes that are not a frame of the type
-// (here: what a wrong change of the type would leave in the table) end the
-// action with the decoder's message.
+// stays inside the row: bytes that are not a frame of the type (what a wrong
+// change of the type would leave in the table) end the action that reads
+// them, through the decode (Table::get) and through a view (Table::getView),
+// each with its message (gofractally/psio#15).
 TEST_CASE("two modes: an own row that is not a frame of its type ends the action")
 {
    DefaultTestChain t;
    t.addService(TestModes::service, "TestModes.wasm");
    auto svc = t.from(TestModes::service).to<TestModes>();
 
+   const std::string_view view = "view: the bytes are not a frame of the type: ";
+   auto viewFails = [&](std::uint32_t id, std::string_view why)
+   { return svc.viewLength(id).failed(std::string(view) + std::string(why)); };
+
    // header (size of the fixed part), id, offset of the text, text
    const auto row = psio::to_pssz(NoteRow{7, "abcdefgh"});
    REQUIRE(row.size() == 14);
    REQUIRE(svc.storeBytes(7, row).succeeded());
    CHECK(svc.length(7).returnVal() == 8);
+   CHECK(svc.viewLength(7).returnVal() == 8);
 
    // Cut inside the fixed part
    REQUIRE(svc.storeBytes(8, std::vector<char>(row.begin(), row.begin() + 3)).succeeded());
    CHECK(svc.length(8).failed("pssz: record fixed region truncated"));
+   CHECK(viewFails(8, "a record's header announces more than the record holds"));
    CHECK(!svc.valid(8).returnVal());
    // No bytes at all
    REQUIRE(svc.storeBytes(9, std::vector<char>{}).succeeded());
@@ -163,9 +177,36 @@ TEST_CASE("two modes: an own row that is not a frame of its type ends the action
    past[5]   = static_cast<char>(200);
    REQUIRE(svc.storeBytes(10, past).succeeded());
    CHECK(svc.length(10).failed("pssz: invalid record payload offset"));
+   CHECK(viewFails(10, "the offsets of a record member are out of order or out of range"));
    // The header claims a fixed part larger than the row
    auto header = row;
    header[0]   = static_cast<char>(200);
    REQUIRE(svc.storeBytes(11, header).succeeded());
    CHECK(svc.length(11).failed("pssz: record fixed region truncated"));
+   CHECK(viewFails(11, "a record's header announces more than the record holds"));
+   // A row of an older layout of the type, from before it had its text
+   REQUIRE(svc.storeBytes(12, psio::to_pssz(OldNote{12})).succeeded());
+   CHECK(svc.length(12).failed("pssz: required record field missing"));
+   CHECK(viewFails(12, "a record's header omits a required member"));
+
+   // A list whose count is corrupted. The count of a list of strings is its
+   // first offset (the size of the offset table): one byte makes it claim
+   // more elements than the row holds.
+   const auto tags = psio::to_pssz(TagsRow{7, {"ab", "cde"}});
+   REQUIRE(tags.size() == 25);
+   REQUIRE(svc.storeTagBytes(7, tags).succeeded());
+   CHECK(svc.tagCount(7).returnVal() == 2);
+   CHECK(svc.viewTagCount(7).returnVal() == 2);
+   auto count = tags;
+   count[12]  = static_cast<char>(0xff);
+   REQUIRE(svc.storeTagBytes(8, count).succeeded());
+   CHECK(svc.tagCount(8).failed("pssz: offset table past the end of the list"));
+   CHECK(svc.viewTagCount(8).failed(std::string(view) +
+                                    "the offset table of a list is cut short"));
+   count     = tags;
+   count[15] = static_cast<char>(0x7f);
+   REQUIRE(svc.storeTagBytes(9, count).succeeded());
+   CHECK(svc.tagCount(9).failed("pssz: offset table past the end of the list"));
+   CHECK(svc.viewTagCount(9).failed(std::string(view) +
+                                    "the offset table of a list is cut short"));
 }

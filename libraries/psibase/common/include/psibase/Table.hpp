@@ -873,13 +873,18 @@ namespace psibase
    /// that writes under another account is responsible for writing valid
    /// rows, and the reading service does not defend against it.
    ///
-   /// Trusted is not unchecked. `get` (the trusted decode) ends the action
-   /// with the decoder's message when the stored bytes are not a frame of
-   /// `T`: a truncated row, an offset outside the row, a required member
-   /// missing (what an incompatible change of `T` leaves behind). A view
-   /// (`getView`) is for rows that are frames of `T`: over other bytes it
-   /// does not end the action, and a member it cannot place reads as empty
-   /// or zero.
+   /// Trusted is not unchecked: neither kind of read leaves the row. `get`
+   /// (the trusted decode) and a view (`getView`) both end the action when
+   /// the stored bytes are not a frame of `T`: a truncated row, an offset
+   /// outside the row, a required member missing, a list that claims more
+   /// elements than the row holds (what an incompatible change of `T` leaves
+   /// behind). The decode fails with the decoder's message
+   /// (`pssz: record fixed region truncated`, ...); a view fails where it
+   /// cannot place a member, at `getView` for the record's header and at the
+   /// access for an offset, with
+   /// `view: the bytes are not a frame of the type: ...`. Bytes that place
+   /// every member are read as some value of `T`; whether that value is
+   /// what `T` declares is not checked.
    template <typename T, auto Primary, auto... Secondary>
    class Table
    {

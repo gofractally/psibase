@@ -32,6 +32,15 @@ mod service {
         pub memo: Memo,
     }
 
+    /// A row that holds a list.
+    #[table(name = "TagsTable", index = 2)]
+    #[derive(psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+    pub struct Tags {
+        #[primary_key]
+        pub id: u32,
+        pub tags: Vec<String>,
+    }
+
     #[derive(SimpleObject, Deserialize)]
     pub struct AddEvent {
         #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -125,6 +134,20 @@ mod service {
         let table = NoteTable::new();
         let key = table.serialize_key(0, &id);
         kv_put_bytes(table.handle(), &psio::to_key(&key), &row);
+    }
+
+    /// The same for row `id` of `TagsTable`.
+    #[action]
+    pub fn store_tag_bytes(id: u32, row: Vec<u8>) {
+        let table = TagsTable::new();
+        let key = table.serialize_key(0, &id);
+        kv_put_bytes(table.handle(), &psio::to_key(&key), &row);
+    }
+
+    /// The number of tags of row `id` of `TagsTable`.
+    #[action]
+    pub fn tag_count(id: u32) -> u32 {
+        TagsTable::new().get_index_pk().get(&id).unwrap().tags.len() as u32
     }
 
     /// The length of the memo of row `id`, read as a service reads its own
@@ -247,6 +270,8 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
             "store_raw": {"id": 0, "extra": 0},
             "note_len": {"id": 0},
             "store_bytes": {"id": 0, "row": ""},
+            "store_tag_bytes": {"id": 0, "row": ""},
+            "tag_count": {"id": 0},
             "serveSys": {
                 "request": {
                     "body": "",
@@ -312,9 +337,9 @@ fn test_two_modes(chain: psibase::Chain) -> Result<(), psibase::Error> {
     Wrapper::push(&chain).store_raw(4, 0).get()?;
     assert_eq!(Wrapper::push(&chain).note_len(4).get()?, 80);
 
-    // A trusted read is still a safe one. Bytes that are not a frame of the
-    // row's type (what a wrong change of the type would leave in the table)
-    // end the action; nothing outside the row is read.
+    // A trusted read stays inside the row. Bytes that are not a frame of
+    // the row's type (what a wrong change of the type would leave in the
+    // table) end the action with PSIO's message (gofractally/psio#15).
     let row = psio::to_pssz(&service::Note {
         id: 5,
         memo: Memo::new("abcdefgh".to_string()).unwrap(),
@@ -323,6 +348,7 @@ fn test_two_modes(chain: psibase::Chain) -> Result<(), psibase::Error> {
     assert_eq!(row.len(), 14);
     Wrapper::push(&chain).store_bytes(5, row.clone()).get()?;
     assert_eq!(Wrapper::push(&chain).note_len(5).get()?, 8);
+    let not_a_frame = "the bytes are not a frame of";
     let refused = |id: u32, bytes: Vec<u8>| -> String {
         Wrapper::push(&chain).store_bytes(id, bytes).get().unwrap();
         let error = Wrapper::push(&chain)
@@ -334,17 +360,42 @@ fn test_two_modes(chain: psibase::Chain) -> Result<(), psibase::Error> {
         error
     };
     // Cut inside the fixed part
-    assert!(refused(6, row[..3].to_vec()).contains("out of range"));
+    assert!(refused(6, row[..3].to_vec()).contains(not_a_frame));
     // No bytes at all
-    assert!(refused(7, vec![]).contains("out of range"));
+    assert!(refused(7, vec![]).contains(not_a_frame));
     // The offset of the memo points past the end of the row
     let mut past = row.clone();
     past[5] = 200;
-    assert!(refused(8, past).contains("out of range"));
+    assert!(refused(8, past).contains(not_a_frame));
     // The header claims a fixed part larger than the row
     let mut header = row.clone();
     header[0] = 200;
-    assert!(refused(9, header).contains("out of range"));
+    assert!(refused(9, header).contains(not_a_frame));
+    // A row of an older layout of the type, from before it had its memo
+    assert!(refused(10, psio::to_pssz(&(10u32,))).contains(not_a_frame));
+
+    // A list whose count is corrupted: the count of a list of strings is
+    // its first offset, and one byte makes it claim more elements than the
+    // row holds.
+    let tags = psio::to_pssz(&service::Tags {
+        id: 7,
+        tags: vec!["ab".to_string(), "cde".to_string()],
+    });
+    assert_eq!(tags.len(), 25);
+    Wrapper::push(&chain).store_tag_bytes(7, tags.clone()).get()?;
+    assert_eq!(Wrapper::push(&chain).tag_count(7).get()?, 2);
+    for (id, at, byte) in [(8u32, 12usize, 0xffu8), (9, 15, 0x7f)] {
+        let mut count = tags.clone();
+        count[at] = byte;
+        Wrapper::push(&chain).store_tag_bytes(id, count).get()?;
+        let error = Wrapper::push(&chain)
+            .tag_count(id)
+            .get()
+            .expect_err("a corrupted list count ends the action")
+            .to_string();
+        println!("tags {id}: {error}");
+        assert!(error.contains(not_a_frame));
+    }
 
     Ok(())
 }

@@ -266,8 +266,6 @@ namespace psibase
          // The runTable is only processed subjectively
          if (psio::validate_pssz<RunRow>(value).ok())
          {
-            auto row =
-                psio::pssz_view<NotifyRow>(value);
             db.setCallbackFlags(DatabaseCallbacks::runQueueFlag);
          }
       }

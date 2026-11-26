@@ -36,12 +36,47 @@ bool TestModes::valid(std::uint32_t id)
    return psio::validate_pssz<NoteRow>(row->bytes()).ok();
 }
 
+namespace
+{
+   // Puts `row` where row `id` of table number `table` of this service is
+   void putBytes(std::uint16_t table, std::uint32_t id, std::span<const char> row)
+   {
+      // The table's primary index
+      auto prefix = psio::to_key(std::tuple{getReceiver(), table, std::uint8_t{0}});
+      auto handle = proxyKvOpen(DbId::service, prefix, KvMode::write);
+      kvPutRaw(handle, psio::to_key(id), row);
+   }
+}  // namespace
+
 void TestModes::storeBytes(std::uint32_t id, std::vector<char> row)
 {
-   // Table 0, its primary index
-   auto prefix = psio::to_key(std::tuple{getReceiver(), std::uint16_t{0}, std::uint8_t{0}});
-   auto handle = proxyKvOpen(DbId::service, prefix, KvMode::write);
-   kvPutRaw(handle, psio::to_key(id), row);
+   putBytes(0, id, row);
+}
+
+void TestModes::storeTagBytes(std::uint32_t id, std::vector<char> row)
+{
+   putBytes(1, id, row);
+}
+
+std::uint32_t TestModes::viewLength(std::uint32_t id)
+{
+   auto row = Tables{}.open<NoteTable>().getIndex<0>().getView(id);
+   check(row.has_value(), "no such note");
+   return std::string_view{(*row)->text()}.size();
+}
+
+std::uint32_t TestModes::tagCount(std::uint32_t id)
+{
+   auto row = Tables{}.open<TagsTable>().getIndex<0>().get(id);
+   check(row.has_value(), "no such tags");
+   return row->tags.size();
+}
+
+std::uint32_t TestModes::viewTagCount(std::uint32_t id)
+{
+   auto row = Tables{}.open<TagsTable>().getIndex<0>().getView(id);
+   check(row.has_value(), "no such tags");
+   return (*row)->tags().size();
 }
 
 void TestModes::writeOther(AccountNumber other, std::uint8_t db)
