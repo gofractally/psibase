@@ -14,6 +14,7 @@
 #include <psio/json_value.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/VerifyBear1.hpp>
+#include <services/system/VerifyK1.hpp>
 #include <services/system/VerifyR1.hpp>
 
 #include <array>
@@ -474,58 +475,78 @@ TEST_CASE("P-256 verifiers agree: Wycheproof ECDSA P-256 SHA-256 P1363 vectors")
 
 // verify-r1 is deployed with its curve already set up (prestart in
 // VerifyR1.cpp, evaluated when the service is built). The same code without
-// that step sets the curve up in every instance that verifies. Here both
-// verify the same signatures, one transaction and so one instance each, and
-// the deployed one must not be paying for the set-up.
-TEST_CASE("verify-r1 is pre-initialized")
+// that step sets the curve up in every instance that verifies. Here every
+// verifier, and that comparison build, verifies one signature in a
+// transaction of its own, and so in an instance of its own; the deployed
+// verify-r1 must not be paying for the set-up.
+//
+// The figures are the time of the whole transaction as the tester sees it,
+// most of which is not the verification. The rounds are interleaved, so that
+// whatever else the machine is doing falls on all of them alike.
+TEST_CASE("verifiers: time of one verification in its own transaction")
 {
+   using SystemService::VerifyK1;
    Differential d;
    auto         lazy = AccountNumber{"lazy-r1"};
    d.t.addService(lazy, "VerifyR1NotPreinitialized.wasm", CodeRow::isVerify);
 
-   auto priv = PrivateKeyInfo::create("secp256r1");
-   auto key  = getSubjectPublicKeyInfo(priv).data;
-
-   auto elapsed = [&](AccountNumber service, int rounds)
+   struct Subject
    {
-      std::vector<std::int64_t> times;
-      for (int i = 0; i < rounds; ++i)
-      {
-         Bytes message{'t', static_cast<unsigned char>(i), static_cast<unsigned char>(i >> 8)};
-         auto  hash = sha256(message.data(), message.size());
-         auto  sig  = SystemService::AuthSig::sign(priv, hash);
-         Case  c{"timing", key, hash, Bytes(sig.begin(), sig.end()), true};
-         auto  begin = std::chrono::steady_clock::now();
-         auto  reason = d.decide(service, c);
-         auto  end    = std::chrono::steady_clock::now();
-         REQUIRE(reason == "");
-         times.push_back(
-             std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count());
-      }
-      std::ranges::sort(times);
-      return times;
+      std::string               name;
+      AccountNumber             service;
+      PrivateKeyInfo            priv;
+      Bytes                     key;
+      std::vector<std::int64_t> times = {};
    };
+   auto k1 = PrivateKeyInfo::create("secp256k1");
+   auto r1 = PrivateKeyInfo::create("secp256r1");
+   std::vector<Subject> subjects;
+   subjects.push_back({"verify-k1", VerifyK1::service, k1, getSubjectPublicKeyInfo(k1).data});
+   subjects.push_back({"verify-r1 as deployed", VerifyR1::service, r1,
+                       getSubjectPublicKeyInfo(r1).data});
+   subjects.push_back({VerifyBear1::service.str(), VerifyBear1::service, r1,
+                       getSubjectPublicKeyInfo(r1).data});
+   subjects.push_back({"verify-r1 code, not pre-initialized", lazy, r1,
+                       getSubjectPublicKeyInfo(r1).data});
 
-   // Warm both once: the first use of a service compiles it.
-   elapsed(VerifyR1::service, 3);
-   elapsed(lazy, 3);
-   d.t.startBlock();
-   const int rounds = 200;
-   auto      ready  = elapsed(VerifyR1::service, rounds);
-   d.t.startBlock();
-   auto unprepared = elapsed(lazy, rounds);
+   const int rounds = 300;
+   // The first rounds are not counted: the first use of a service compiles it.
+   const int warmup = 5;
+   for (int i = 0; i < warmup + rounds; ++i)
+   {
+      if (i % 40 == 0)
+         d.t.startBlock();
+      Bytes message{'t', static_cast<unsigned char>(i), static_cast<unsigned char>(i >> 8)};
+      auto  hash = sha256(message.data(), message.size());
+      for (auto& subject : subjects)
+      {
+         auto sig    = SystemService::AuthSig::sign(subject.priv, hash);
+         Case c{"timing", subject.key, hash, Bytes(sig.begin(), sig.end()), true};
+         auto begin  = std::chrono::steady_clock::now();
+         auto reason = d.decideNew(subject.service, c);
+         auto end    = std::chrono::steady_clock::now();
+         REQUIRE(reason == "");
+         if (i >= warmup)
+            subject.times.push_back(
+                std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count());
+      }
+   }
 
-   std::printf(
-       "one verification in its own transaction, microseconds (min / median / max of %d):\n"
-       "  verify-r1 as deployed:        %lld / %lld / %lld\n"
-       "  same code, not pre-initialized: %lld / %lld / %lld\n",
-       rounds, (long long)ready.front(), (long long)ready[rounds / 2], (long long)ready.back(),
-       (long long)unprepared.front(), (long long)unprepared[rounds / 2],
-       (long long)unprepared.back());
+   std::printf("one verification in its own transaction, microseconds, %d interleaved rounds\n"
+               "  %-38s %8s %8s\n",
+               rounds, "", "min", "median");
+   for (auto& subject : subjects)
+   {
+      std::ranges::sort(subject.times);
+      std::printf("  %-38s %8lld %8lld\n", subject.name.c_str(), (long long)subject.times.front(),
+                  (long long)subject.times[rounds / 2]);
+   }
    std::fflush(stdout);
 
    // The set-up is several times a verification. The machine may be busy,
-   // so the fastest runs are compared.
+   // so the fastest runs and the medians are compared, not single runs.
+   auto& ready      = subjects[1].times;
+   auto& unprepared = subjects[3].times;
    CHECK(ready.front() < unprepared.front());
    CHECK(ready[rounds / 2] < unprepared[rounds / 2]);
 }
