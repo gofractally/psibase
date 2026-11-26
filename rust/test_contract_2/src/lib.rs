@@ -23,6 +23,15 @@ mod service {
         pub result: i32,
     }
 
+    /// A row with a declared member: a memo is UTF-8 of at most 80 bytes.
+    #[table(name = "NoteTable", index = 1)]
+    #[derive(psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+    pub struct Note {
+        #[primary_key]
+        pub id: u32,
+        pub memo: Memo,
+    }
+
     #[derive(SimpleObject, Deserialize)]
     pub struct AddEvent {
         #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -84,6 +93,37 @@ mod service {
             value,
             message,
         });
+    }
+
+    /// The memo is declared: the dispatcher refuses an argument list that
+    /// holds a longer one.
+    #[action]
+    pub fn note(id: u32, memo: Memo) {
+        NoteTable::new().put(&Note { id, memo }).unwrap();
+    }
+
+    /// Writes row `id` of this service's own `NoteTable` with a memo of
+    /// `80 + extra` bytes: the bytes a fast write leaves for a row that is
+    /// outside its declaration (the memo is the last member, so the longer
+    /// text still has a frame).
+    #[action]
+    pub fn store_raw(id: u32, extra: u32) {
+        let table = NoteTable::new();
+        let mut row = psio::to_pssz(&Note {
+            id,
+            memo: Memo::new("a".repeat(80)).unwrap(),
+        });
+        row.extend(std::iter::repeat(b'a').take(extra as usize));
+        let key = table.serialize_key(0, &id);
+        kv_put_bytes(table.handle(), &psio::to_key(&key), &row);
+    }
+
+    /// The length of the memo of row `id`, read as a service reads its own
+    /// table: trusted.
+    #[action]
+    pub fn note_len(id: u32) -> u32 {
+        let note = NoteTable::new().get_index_pk().get(&id).unwrap();
+        note.memo.to_string().len() as u32
     }
 
     #[event(history)]
@@ -194,6 +234,9 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
             "multiply": {"a": 0, "b": 0},
             "init": {},
             "create_record": {"count": 0, "value": 0, "message": ""},
+            "note": {"id": 0, "memo": ""},
+            "store_raw": {"id": 0, "extra": 0},
+            "note_len": {"id": 0},
             "serveSys": {
                 "request": {
                     "body": "",
@@ -208,6 +251,56 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
     );
 
     println!("{}", chain.get(SERVICE, "/schema")?.text()?);
+
+    Ok(())
+}
+
+/// Where PSIO's read and write modes meet a Rust service
+/// (gofractally/psibase#2281): an action argument is validated at dispatch;
+/// a row of the service's own table is read trusted.
+#[psibase::test_case(packages("TestContract2"))]
+fn test_two_modes(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    use psibase::{
+        method_raw, Action, Memo, MethodNumber, Push, SignedTransaction, Transaction,
+    };
+
+    let longest = Memo::new("a".repeat(80)).unwrap();
+    Wrapper::push(&chain).note(1, longest.clone()).get()?;
+    assert_eq!(Wrapper::push(&chain).note_len(1).get()?, 80);
+
+    // An argument list that holds a memo of 81 bytes. No `Memo` is that
+    // long, so these are the bytes of the longest valid call and one more
+    // byte of text. The dispatcher refuses them before the action runs.
+    let mut args = psio::to_pssz(&(2u32, longest));
+    assert!(psio::from_pssz::<(u32, Memo)>(&args).is_ok());
+    args.push(b'a');
+    assert!(psio::from_pssz::<(u32, Memo)>(&args).is_err());
+    let mut trx = Transaction {
+        tapos: Default::default(),
+        actions: vec![Action {
+            sender: SERVICE,
+            service: SERVICE,
+            method: MethodNumber::new(method_raw!("note")),
+            rawData: args.into(),
+        }],
+        claims: vec![],
+    };
+    chain.fill_tapos(&mut trx, 2);
+    let trace = chain.push(&SignedTransaction {
+        transaction: psio::pssz::Nested::new(&trx).unwrap(),
+        proofs: Default::default(),
+        subjectiveData: None,
+    });
+    let error = trace.error_text().expect("an 81-byte memo is refused at dispatch");
+    println!("refused: {error}");
+    chain.start_block();
+
+    // The same 81 bytes in a row of the service's own table: the service
+    // reads its row back as it was written.
+    Wrapper::push(&chain).store_raw(3, 1).get()?;
+    assert_eq!(Wrapper::push(&chain).note_len(3).get()?, 81);
+    Wrapper::push(&chain).store_raw(4, 0).get()?;
+    assert_eq!(Wrapper::push(&chain).note_len(4).get()?, 80);
 
     Ok(())
 }

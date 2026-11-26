@@ -21,14 +21,36 @@ custom_error! {
     DuplicatedKey       = "Duplicated secondary key",
 }
 
+/// Whether a table of `service` in `db` is the running service's own.
+///
+/// In the databases keyed by service, only the service itself is let to
+/// write under its own account (`Db::open`, `XDb::open`), so a row found
+/// there is one this service wrote. A native database is never "own";
+/// neither is anything when there is no running service (a test, a tool:
+/// `get_service()` is 0).
+pub(crate) fn is_own_table(db: DbId, service: AccountNumber) -> bool {
+    matches!(
+        db,
+        DbId::Service | DbId::WriteOnly | DbId::Subjective | DbId::Session | DbId::Temporary
+    ) && service.value != 0
+        && service == crate::get_service()
+}
+
 /// The one place a table row is decoded.
 ///
-/// Every row read through a table is validated (`psio::from_pssz`), as it
-/// always was. A service's own rows are bytes it wrote itself; to trust
-/// them, this is the function to change (`psio::from_pssz_trusted` when the
-/// table belongs to the running service).
-pub(crate) fn decode_row<Record: TableRecord>(bytes: &[u8]) -> Record {
-    psio::from_pssz::<Record>(bytes).unwrap()
+/// A row of the running service's own table (`own`) is bytes this service
+/// wrote: it is read trusted (`psio::from_pssz_trusted`), which holds
+/// nothing against what `Record` declares, so a row written by the fast
+/// write (`psio::to_pssz`, which checks no bound or invariant) is read back
+/// as it was written. A row of any other table (another service's, a native
+/// table, a table opened from a handle or a prefix, any table read outside
+/// a service) is validated (`psio::from_pssz`).
+pub(crate) fn decode_row<Record: TableRecord>(own: bool, bytes: &[u8]) -> Record {
+    if own {
+        psio::from_pssz_trusted::<Record>(bytes)
+    } else {
+        psio::from_pssz::<Record>(bytes).unwrap()
+    }
 }
 
 pub trait TableRecord: PsszPack<Pssz> + PsszUnpack<Pssz> {
@@ -52,9 +74,21 @@ pub trait Table<Record: TableRecord>: Sized {
     const TABLE_INDEX: u16;
     const SERVICE: AccountNumber;
 
-    fn from_handle(handle: KvHandle) -> Self;
+    /// A table on `handle`. `own` states that the rows under the handle
+    /// are the running service's own (it wrote them): they are then read
+    /// trusted.
+    fn from_handle_owned(handle: KvHandle, own: bool) -> Self;
     fn prefix(&self) -> &[u8];
     fn handle(&self) -> &KvHandle;
+    /// Whether the rows of this table are read trusted
+    /// ([Table::from_handle_owned])
+    fn is_own(&self) -> bool;
+
+    /// A table on a handle whose owner is not known: its rows are
+    /// validated when they are read.
+    fn from_handle(handle: KvHandle) -> Self {
+        Self::from_handle_owned(handle, false)
+    }
 
     fn with_prefix(db_id: DbId, prefix: Vec<u8>, mode: KvMode) -> Self {
         Self::from_handle(KvHandle::new(db_id, &prefix, mode))
@@ -81,8 +115,9 @@ pub trait Table<Record: TableRecord>: Sized {
     }
 
     fn with_service_mode(service: AccountNumber, mode: KvMode) -> Self {
+        let db = <Record as TableRecord>::DB;
         let prefix = psio::to_key(&(service, Self::TABLE_INDEX));
-        Self::with_prefix(<Record as TableRecord>::DB, prefix, mode)
+        Self::from_handle_owned(KvHandle::new(db, &prefix, mode), is_own_table(db, service))
     }
 
     /// Returns one of the table indexes: 0 = Primary Key Index, else secondary indexes
@@ -90,7 +125,7 @@ pub trait Table<Record: TableRecord>: Sized {
         let mut idx_prefix = self.prefix().to_owned();
         idx_prefix.extend_from_slice(&psio::to_key(&idx));
 
-        TableIndex::new(self.handle(), idx_prefix, idx > 0)
+        TableIndex::new(self.handle(), idx_prefix, idx > 0, self.is_own())
     }
 
     /// Returns the Primary Key Index
@@ -142,7 +177,7 @@ pub trait Table<Record: TableRecord>: Sized {
 
         let secondary_keys = value.get_secondary_keys();
 
-        let old_record: Option<Record> = kv_get_bytes(self.handle(), pk).map(|row| decode_row(&row));
+        let old_record: Option<Record> = kv_get_bytes(self.handle(), pk).map(|row| decode_row(self.is_own(), &row));
 
         if let Some(old_record) = old_record {
             self.replace_secondary_keys(pk, &secondary_keys, old_record)
@@ -251,17 +286,26 @@ pub struct TableIndex<Key: KeyPack, Record: TableRecord> {
     pub db: KvHandle,
     pub prefix: Vec<u8>,
     pub is_secondary: bool,
+    /// The rows are the running service's own and are read trusted
+    /// ([Table::is_own])
+    pub own: bool,
     pub key_type: PhantomData<Key>,
     pub record_type: PhantomData<Record>,
 }
 
 impl<Key: KeyPack, Record: TableRecord> TableIndex<Key, Record> {
     /// Instantiate a new Table Index (Primary or Secondary)
-    pub fn new(db: &KvHandle, prefix: Vec<u8>, is_secondary: bool) -> TableIndex<Key, Record> {
+    pub fn new(
+        db: &KvHandle,
+        prefix: Vec<u8>,
+        is_secondary: bool,
+        own: bool,
+    ) -> TableIndex<Key, Record> {
         TableIndex {
             db: db.subtree(&[], KvMode::Read),
             prefix,
             is_secondary,
+            own,
             key_type: PhantomData,
             record_type: PhantomData,
         }
@@ -342,9 +386,9 @@ impl<Key: KeyPack, Record: TableRecord> TableIndex<Key, Record> {
 
     fn get_value_from_bytes(&self, bytes: Vec<u8>) -> Option<Record> {
         if self.is_secondary {
-            kv_get_bytes(&self.db, &bytes).map(|row| decode_row(&row))
+            kv_get_bytes(&self.db, &bytes).map(|row| decode_row(self.own, &row))
         } else {
-            Some(decode_row(&bytes))
+            Some(decode_row(self.own, &bytes))
         }
     }
 }
@@ -463,5 +507,61 @@ impl<'a, Key: KeyPack, Record: TableRecord> DoubleEndedIterator for TableIter<'a
             self.is_end = true;
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Memo;
+
+    #[derive(Debug, psio::PsszPack, psio::PsszUnpack)]
+    struct Note {
+        id: u32,
+        memo: Memo,
+    }
+    impl TableRecord for Note {
+        type PrimaryKey = u32;
+        const SECONDARY_KEYS: u8 = 0;
+        fn get_primary_key(&self) -> RawKey {
+            RawKey::new(psio::to_key(&self.id))
+        }
+    }
+
+    // A row whose memo is 81 bytes. No `Memo` is that long: these are the
+    // bytes of the row with the longest memo and one more byte of text (the
+    // memo is the last member, so it ends where the row ends).
+    fn over_bound_row() -> Vec<u8> {
+        let mut row = psio::to_pssz(&Note {
+            id: 1,
+            memo: Memo::new("a".repeat(80)).unwrap(),
+        });
+        row.push(b'a');
+        row
+    }
+
+    /// Outside a service nothing is the running service's own table: a
+    /// row is validated, and a memo of 81 bytes is refused.
+    #[test]
+    #[should_panic]
+    fn a_row_of_a_table_that_is_not_the_services_own_is_validated() {
+        let _: Note = decode_row(false, &over_bound_row());
+    }
+
+    /// The service's own table: the trusted read gives back the row as it
+    /// was written, bound or no bound.
+    #[test]
+    fn the_trusted_read_does_not_hold_a_row_against_its_declaration() {
+        let row = over_bound_row();
+        assert!(psio::from_pssz::<Note>(&row).is_err());
+        let note: Note = decode_row(true, &row);
+        assert_eq!(note.id, 1);
+        assert_eq!(note.memo.to_string().len(), 81);
+        // No service is running here: no table is its own.
+        let alice = AccountNumber::from_exact("alice").unwrap();
+        assert!(!is_own_table(DbId::Service, alice));
+        assert!(!is_own_table(DbId::Service, crate::get_service()));
+        // A native table is never a service's own.
+        assert!(!is_own_table(DbId::Native, alice));
     }
 }
