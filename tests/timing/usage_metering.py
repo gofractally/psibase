@@ -113,11 +113,12 @@ def main():
 
     psinode = os.path.join(build, 'psinode')
     tool = os.path.join(build, 'rust', 'release', 'psibase-load')
-    if not os.path.exists(tool):
-        print('building psibase-load ...', file=sys.stderr, flush=True)
-        subprocess.run(['cargo', 'build', '-r', '--bin', 'psibase-load',
-                        '--manifest-path', os.path.join(SOURCE_DIR, 'rust', 'Cargo.toml'),
-                        '--target-dir', os.path.join(build, 'rust')], check=True)
+    # Always build: cargo does nothing when the tool is current, and a binary
+    # left by an older checkout would not know the options used below.
+    print('building psibase-load ...', file=sys.stderr, flush=True)
+    subprocess.run(['cargo', 'build', '-r', '--bin', 'psibase-load',
+                    '--manifest-path', os.path.join(SOURCE_DIR, 'rust', 'Cargo.toml'),
+                    '--target-dir', os.path.join(build, 'rust')], check=True)
 
     faucet = {"token_id": 1, "creditor": "faucet-tok", "amount": {"value": 1000000000}, "memo": ""}
     work = tempfile.mkdtemp(prefix='usage-metering-')
