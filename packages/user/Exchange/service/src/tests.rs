@@ -1061,17 +1061,26 @@ fn recalled_old_spot_book_cannot_drain_new_guaranteed_market(chain: Chain) -> Re
         .get(&(account!("lp"), f.market))
         .unwrap()
         .shares;
-    let before = state(&chain);
-    assert!(Wrapper::push_from(&chain, account!("lp"))
+    let old_base = native_market_balance(&chain, f.market, f.base);
+    let old_quote = native_market_balance(&chain, f.market, f.quote);
+    let (base_out, quote_out) = Wrapper::push_from(&chain, account!("lp"))
         .remliq(f.market, owned)
-        .trace
-        .error
-        .is_some());
+        .get()?;
+    assert!(base_out > 0 && quote_out == 0);
     assert_eq!(
-        state(&chain),
-        before,
-        "failed old phantom withdrawal must roll back all markets/native rows"
+        native_market_balance(&chain, f.market, f.base),
+        old_base - base_out
     );
+    assert_eq!(native_market_balance(&chain, f.market, f.quote), old_quote);
+    let old = chain
+        .open::<_, MarketTable>()
+        .get_index_pk()
+        .get(&f.market)
+        .unwrap();
+    assert_eq!(old.y, 100_000_000);
+    assert!(old.x < 1_000_000 && old.x > 0);
+    assert_eq!(old.x as u128 * old.y as u128, old.k.get());
+    audit_with_deficits(&chain, &deficits);
     assert_eq!(native_market_balance(&chain, fresh, f.base), safe_base);
     assert_eq!(native_market_balance(&chain, fresh, f.quote), safe_quote);
     assert_eq!(

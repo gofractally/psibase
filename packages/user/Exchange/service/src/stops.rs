@@ -605,6 +605,7 @@ pub fn execute(
     refund_seed: bool,
 ) -> (u64, u64, u32) {
     use crate::service as native;
+    native::require_book(m);
     let original = snapshot(m, native::now());
     let p = plan(&original, seed.as_ref());
     if let Some(seed) = &seed {
