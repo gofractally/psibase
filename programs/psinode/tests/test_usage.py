@@ -10,6 +10,7 @@
 
 import testutil
 import unittest
+import json
 import os
 import time
 from predicates import *
@@ -221,6 +222,13 @@ class TestUsage(unittest.TestCase):
             reply.raise_for_status()
         with a.post('/quota', service='x-usage', json={'identity': 'nobody', 'perWindow': limits}) as reply:
             self.assertEqual(reply.status_code, 400)
+        # A body that is not what the endpoint declares is refused by the
+        # validating read and stores nothing
+        bad_limits = dict(limits)
+        bad_limits['requests'] = 'many'
+        for body in [json.dumps({'identity': 'account:bob', 'perWindow': bad_limits}), '{"identity": 7}', 'not json', '']:
+            with a.post('/quota', service='x-usage', data=body, headers={'Content-Type': 'application/json'}) as reply:
+                self.assertGreaterEqual(reply.status_code, 400, body)
         with a.get('/quotas', service='x-usage') as reply:
             reply.raise_for_status()
             quotas = {q['identity']: int(q['perWindow']['requests']) for q in reply.json()}
