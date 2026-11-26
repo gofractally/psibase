@@ -1765,7 +1765,7 @@ mod tests {
             "full unwind must not pay Alice with Mallory's unbacked IOU"
         );
         assert_eq!(exp(&chain, alice, bob, usd), 100);
-        assert_eq!(exp(&chain, mallory, bob, usd), 100);
+        assert_eq!(exp(&chain, bob, mallory, usd), 100);
         assert_eq!(exp(&chain, alice, mallory, usd), 0);
 
         Wrapper::push_from(&chain, alice)
@@ -6197,7 +6197,10 @@ mod tests {
             .filter(|row| row.get("kind").and_then(|k| k.as_str()) == Some("credit_line"))
             .collect::<Vec<_>>();
         assert!(
-            !lines.is_empty() && lines.iter().all(|row| row.get("actor").and_then(|a| a.as_str()) == Some("alice")),
+            !lines.is_empty()
+                && lines
+                    .iter()
+                    .all(|row| row.get("actor").and_then(|a| a.as_str()) == Some("alice")),
             "invite hook recorded the submitter, not the inviter: {lines:?}"
         );
         let stored = BanxInvite::get_assert(invite_id);
@@ -7713,12 +7716,11 @@ mod tests {
             .into_iter()
             .filter(|row| row.get("kind").and_then(|k| k.as_str()) == Some("path_draw"))
             .collect::<Vec<_>>();
+        assert!(!draws.is_empty(), "payee-run emitted no path_draw rows");
         assert!(
-            !draws.is_empty(),
-            "payee-run emitted no path_draw rows"
-        );
-        assert!(
-            draws.iter().all(|row| row.get("actor").and_then(|a| a.as_str()) == Some("alice")),
+            draws
+                .iter()
+                .all(|row| row.get("actor").and_then(|a| a.as_str()) == Some("alice")),
             "path_draw recorded the submitter, not the payer: {draws:?}"
         );
         Ok(())
@@ -8450,7 +8452,14 @@ mod tests {
         let net = relay_net(&chain);
         post_relay(&chain, net.john, net.usd, net.aud);
         Wrapper::push_from(&chain, net.john)
-            .st_glb_fwd(net.aud, Quantity::new(0), PPM_SCALE / 10, PPM_SCALE, never(), true)
+            .st_glb_fwd(
+                net.aud,
+                Quantity::new(0),
+                PPM_SCALE / 10,
+                PPM_SCALE,
+                never(),
+                true,
+            )
             .get()?;
         Wrapper::push_from(&chain, net.bob)
             .path_pay(
@@ -8662,7 +8671,14 @@ mod tests {
             .st_tok_relay(aud, gas, Quantity::new(10_000), Quantity::new(15_000))
             .get()?;
         Wrapper::push_from(&chain, john)
-            .st_glb_fwd(aud, Quantity::new(0), PPM_SCALE / 10, PPM_SCALE, never(), true)
+            .st_glb_fwd(
+                aud,
+                Quantity::new(0),
+                PPM_SCALE / 10,
+                PPM_SCALE,
+                never(),
+                true,
+            )
             .get()?;
         Wrapper::push_from(&chain, john)
             .st_crd_lne(alice, aud, Quantity::new(100_000), false, 0, 0)
@@ -9557,7 +9573,12 @@ mod tests {
             .deposit(dave, wow, Quantity::new(WEIGHT_GOLD), 0, 0)
             .get()?;
         Wrapper::push_from(&chain, john)
-            .st_relay(aud, Quantity::new(WEIGHT_AUD), wow, Quantity::new(WEIGHT_GOLD))
+            .st_relay(
+                aud,
+                Quantity::new(WEIGHT_AUD),
+                wow,
+                Quantity::new(WEIGHT_GOLD),
+            )
             .get()?;
         assert_eq!(exp(&chain, dave, john, wow), WEIGHT_GOLD);
         assert_eq!(aud_wow(john, aud, wow), (WEIGHT_AUD, WEIGHT_GOLD));
@@ -9651,7 +9672,12 @@ mod tests {
             .st_glb_fwd(aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
             .get()?;
         Wrapper::push_from(&chain, john)
-            .st_relay(aud, Quantity::new(WEIGHT_AUD), wow, Quantity::new(WEIGHT_GOLD))
+            .st_relay(
+                aud,
+                Quantity::new(WEIGHT_AUD),
+                wow,
+                Quantity::new(WEIGHT_GOLD),
+            )
             .get()?;
         assert_eq!(aud_wow(john, aud, wow), (WEIGHT_AUD, WEIGHT_GOLD));
 

@@ -227,7 +227,9 @@ interface api {
     /// `max-cost` is the cap you sign on the claim you will owe the seller.
     /// A positive bound rejects a replaced offer that costs more. Zero does
     /// not cap. New exposure needs your credit line to `debtor` and is
-    /// capped by that line.
+    /// capped by that line. The cost is a 0% draw on the seller's credit
+    /// line to you, capped by what they already owe you plus that line's
+    /// headroom. A cost that only pays down what they owe you needs no line.
     buy-claim: func(
         seller: string,
         debtor: string,

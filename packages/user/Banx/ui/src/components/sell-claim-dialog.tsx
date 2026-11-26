@@ -194,6 +194,52 @@ function claimHeldRaw(
     return sum;
 }
 
+/**
+ * What a `buy_claim` cost can draw: what the seller already owes the buyer,
+ * plus headroom on the seller's line to the buyer.
+ */
+function costCapacityRaw(
+    lines: CreditLine[],
+    obligations: Obligation[],
+    seller: string,
+    buyer: string,
+    assetId: number,
+    precision: number,
+): bigint {
+    const reverse = claimHeldRaw(
+        obligations,
+        buyer,
+        seller,
+        assetId,
+        precision,
+    );
+    const line = lines.find(
+        (l) =>
+            l.creditor === seller &&
+            l.debtor === buyer &&
+            l.assetId === assetId,
+    );
+    if (!line) return reverse;
+    const headroom = lineAvailableRaw(
+        humanToRaw(line.limit || "0", precision),
+        humanToRaw(line.exposure || "0", precision),
+        humanToRaw(line.remaining || "0", precision),
+        line.depleteOnDebit,
+    );
+    return reverse + (headroom > 0n ? headroom : 0n);
+}
+
+/** Largest face whose `buy_claim` cost fits `capRaw`. Inverts `applyTakeFee` for a sell post. */
+function maxFaceForCost(
+    capRaw: bigint,
+    feeFixedRaw: bigint,
+    feePercentPpm: number,
+): bigint {
+    const keep = BigInt(PPM_SCALE + feePercentPpm);
+    if (capRaw <= 0n || keep <= 0n) return 0n;
+    return ((capRaw + feeFixedRaw + 1n) * BigInt(PPM_SCALE) - 1n) / keep;
+}
+
 /** Prefer specific counterparty offer over global; lower fee wins ties. */
 function pickOffer(
     offers: ClaimOffer[],
@@ -329,6 +375,12 @@ export function SellClaimDialog({
         enabled: open && takingAsk && !!user,
     });
 
+    const userObligationsQuery = useQuery({
+        queryKey: QueryKey.obligations(user),
+        queryFn: () => fetchObligations(user!),
+        enabled: open && takingAsk && !!user,
+    });
+
     const options: BuyerOption[] = useMemo(() => {
         if (!target || !user) return [];
         const maxClaim = BigInt(target.maxRaw || "0");
@@ -336,7 +388,8 @@ export function SellClaimDialog({
         const debtorObs = debtorObligationsQuery.data;
         if (!debtorLines || !debtorObs) return [];
         const buyerLinesForCap = takingAsk ? userLinesQuery.data : null;
-        if (takingAsk && !buyerLinesForCap) return [];
+        const userObs = takingAsk ? userObligationsQuery.data : null;
+        if (takingAsk && (!buyerLinesForCap || !userObs)) return [];
         const out: BuyerOption[] = [];
         loadAccounts.forEach((account, i) => {
             const offers = offerQueries[i]?.data;
@@ -389,6 +442,23 @@ export function SellClaimDialog({
             if (held <= 0n) return;
             let maxFace = capacity < held ? capacity : held;
             if (offerLeft < maxFace) maxFace = offerLeft;
+            if (takingAsk) {
+                // The cost is a draw on the seller's line to the buyer.
+                if (!buyerLinesForCap || !userObs) return;
+                const byCost = maxFaceForCost(
+                    costCapacityRaw(
+                        buyerLinesForCap,
+                        userObs,
+                        seller,
+                        buyer,
+                        target.assetId,
+                        target.precision,
+                    ),
+                    humanToRaw(offer.feeFixed || "0", target.precision),
+                    offer.feePercentPpm,
+                );
+                if (byCost < maxFace) maxFace = byCost;
+            }
             if (maxFace <= 0n) return;
             const contact = (contacts as LocalContact[]).find(
                 (c) => c.account === account,
@@ -412,6 +482,7 @@ export function SellClaimDialog({
         debtorLinesQuery.data,
         debtorObligationsQuery.data,
         userLinesQuery.data,
+        userObligationsQuery.data,
         nowSec,
         contacts,
         takingAsk,
@@ -425,7 +496,8 @@ export function SellClaimDialog({
             (!takingAsk && lineQueries.some((q) => q.isLoading)) ||
             debtorLinesQuery.isLoading ||
             debtorObligationsQuery.isLoading ||
-            (takingAsk && userLinesQuery.isLoading));
+            (takingAsk &&
+                (userLinesQuery.isLoading || userObligationsQuery.isLoading)));
 
     const precision = target?.precision ?? 0;
 
@@ -525,7 +597,9 @@ export function SellClaimDialog({
                                 you already owe them needs neither. You get
                                 the claim on {target.debtor}; the seller
                                 receives face after their spread as a claim
-                                on you.
+                                on you. That cost needs the seller's credit
+                                line to you, unless it only pays down what
+                                they already owe you.
                             </>
                             ) : (
                             <>
@@ -596,7 +670,7 @@ export function SellClaimDialog({
                             ) : options.length === 0 ? (
                                 <p className="text-muted-foreground text-sm">
                                     {takingAsk
-                                        ? `No contacts (or typed account) currently have a live sell-claim offer on ${target.debtor} in ${target.symbol} you can take. A new draw needs ${target.debtor} to know you; unwinding what you already owe them does not.`
+                                        ? `No contacts (or typed account) currently have a live sell-claim offer on ${target.debtor} in ${target.symbol} you can take. A new draw needs ${target.debtor} to know you; unwinding what you already owe them does not. The cost needs the seller's credit line to you, unless it only pays down what they already owe you.`
                                         : `No contacts (or typed account) currently have a live buy-claim offer on ${target.debtor} in ${target.symbol} you can fill. A new draw needs ${target.debtor} to know the buyer; unwinding what the buyer already owes does not.`}
                                 </p>
                             ) : (
