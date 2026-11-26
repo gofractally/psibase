@@ -53,6 +53,8 @@ psibase - The psibase blockchain command line client
   - A file containing a PEM or DER encoded private key
   - A PKCS #11 URI
 
+  The claim for the key names the default verify service for its type. For an account that chose another verify service (see `modify`), write *verifier*`=`*private-key*, for example `-s verify-br1=alice.pem`.
+
 - `--trace` *format*
 
   For commands that push transactions to the chain, determines how the result is reported.
@@ -274,6 +276,8 @@ Modify an account
   Set the account to authenticate using this key. The public key can be any of the following:
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
+
+  Signatures are verified by the default verify service for the key's type (`verify-k1` for secp256k1, `verify-r1` for P-256). To choose another verify service allowed for the key, write *verifier*`=`*public-key*, for example `-k verify-br1=alice.pub`. Transactions for the account are then signed with `-s verify-br1=alice.pem`.
 
 - `-o`, `--owner` *owner*
 

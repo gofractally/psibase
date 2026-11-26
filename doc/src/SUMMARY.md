@@ -102,6 +102,7 @@
   - [symbol]()
   - [tokens]()
   - [transact](default-apps/transact.md)
+  - [verify-br1]()
   - [verify-k1]()
   - [verify-r1]()
   - [x-admin](default-apps/x-admin.md)

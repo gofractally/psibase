@@ -83,7 +83,7 @@ A typical boot sequence contains more configuration than is able to fit in a sin
 | `rawData` | String | A hex string containing private key information. The interpretation depends on the verify service. If `rawData` is not present, the server will generate a new key. |
 | `device`  | String | The id of the cryptographic device which will hold the new key. The device must be unlocked.                                                                        |
 
-Each kind of key has its own verify service, so `service` also selects the kind of key: `verify-k1` for secp256k1 and `verify-r1` for secp256r1 (P-256). A new key is generated on that curve, and an uploaded key is refused unless `service` is the verify service for it.
+Each verify service handles one kind of key, so `service` also selects the kind of key: `verify-k1` for secp256k1, and `verify-r1` or `verify-br1` for secp256r1 (P-256). A new key is generated on that curve, and an uploaded key is refused unless `service` is one of the verify services for it. A key signs for any verify service allowed for it, whichever one it was added with.
 
 `GET` on `/native/admin/keys/devices` lists available cryptographic devices that can store keys.
 
