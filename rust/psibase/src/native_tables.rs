@@ -140,6 +140,10 @@ pub struct VMOptions {
     max_nested_structures: u32,
     #[psio(default = 16)]
     max_block_params: u32,
+    #[psio(default = 524288)]
+    max_branch_local_pairs: u32,
+    #[psio(default = 4194304)]
+    max_module_branch_local_pairs: u32,
 }
 
 #[derive(

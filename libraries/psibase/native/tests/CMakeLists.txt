@@ -148,6 +148,18 @@ if(PSIBASE_VM_BACKEND STREQUAL "WASMTIME")
             --psizam "${vm_admission_psizam}"
             --dir "${CMAKE_CURRENT_BINARY_DIR}/vm-admission-corpus")
     set_tests_properties(VmAdmissionCorpus PROPERTIES TIMEOUT 300 PROCESSORS 2)
+    # What max_branch_local_pairs limits, as admission computes it from
+    # psizam's parser, against the same definition written independently
+    # (branch_local_pairs.py), for every function of every module admission
+    # admits of psizam's corpus and of the compile-cost family
+    # (gen_compile_cost_modules.py). Compiles nothing.
+    add_test(NAME VmBranchLocalPairs
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/branch_local_pairs.py"
+            --compare "$<TARGET_FILE:VmAdmissionFuzz>"
+            --cost-modules "${CMAKE_CURRENT_SOURCE_DIR}/gen_compile_cost_modules.py"
+            --corpus "${vm_admission_psizam}/wasmtime/tests/gen_admission_corpus.py"
+            --dir "${CMAKE_CURRENT_BINARY_DIR}/vm-branch-local-pairs")
+    set_tests_properties(VmBranchLocalPairs PROPERTIES TIMEOUT 300)
 endif()
 
 add_executable(NativeAotCacheTests NativeAotCacheTests.cpp ../src/NativeAotCache.cpp)
