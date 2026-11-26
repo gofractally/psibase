@@ -702,34 +702,30 @@ namespace psibase
           (!dbMode.isSubjective && dbMode.isSync && !dbMode.sockets && !dbMode.verifyOnly);
       if (speculative)
       {
-         // The run waits for the compile, but not on its own thread: a
-         // thread that is compiling cannot be given up.
+         // The run waits for the compile, but not on its own thread: the
+         // compile has a bound of its own, after which it is abandoned
+         // (WasmCache). A run that finds the module being compiled waits
+         // like the one that started the compile, but only that one caused
+         // it.
          const auto begin   = RunClock::now();
-         bool       started = false;
-         switch (cache.compileInBackground(hash, code(), options, vmVersion,
-                                           WasmCache::maxSpeculativeCompiles))
-         {
-            case WasmCache::CompileStart::ready:
-               return;
-            case WasmCache::CompileStart::full:
-               throw std::runtime_error(
-                   "this node is compiling as many services as it does at once; try again "
-                   "shortly");
-            case WasmCache::CompileStart::started:
-               started = true;
-               break;
-            case WasmCache::CompileStart::inFlight:
-               break;
-         }
-         // A run that finds the module being compiled waits like the one
-         // that started the compile, but only that one caused it.
-         const bool done = cache.awaitCompile(hash, options, vmVersion,
-                                              cache.speculativeCompileWait());
-         if (started)
+         const auto compile = cache.compileForSpeculativeRun(hash, code(), options, vmVersion);
+         if (compile.start == WasmCache::CompileStart::ready)
+            return;
+         if (compile.start == WasmCache::CompileStart::full)
+            throw std::runtime_error(
+                "this node is compiling as many services as it does at once; try again "
+                "shortly");
+         if (compile.start == WasmCache::CompileStart::started)
             startedCompileTime += RunClock::now() - begin;
-         if (!done)
+         if (compile.wait == WasmCache::CompileWait::inFlight)
             throw std::runtime_error(
                 "service code is still being compiled on this node; try again shortly");
+         // The same outcome for the run. The compile is not going on: a
+         // retry starts it again, under the same bound.
+         if (compile.wait == WasmCache::CompileWait::abandoned)
+            throw std::runtime_error(
+                "service code took too long to compile on this node and the compile was "
+                "stopped");
       }
       else if (inBlock && blockContext.deferUncompiledCode)
       {

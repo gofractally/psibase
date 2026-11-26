@@ -106,6 +106,44 @@ namespace psibase::vm
       // running.
       virtual std::size_t compilesInFlight() const { return 0; }
 
+      // Abandoning a compile (gofractally/psibase#2267). Only a speculative
+      // run's compile is ever abandoned, and only by WasmCache: when the
+      // node's bound on it passes, or when the node stops. Whatever a block
+      // needs is compiled without a handle, to completion.
+      //
+      // One handle is for one compile. Once set it stays set.
+      struct CompileCancel
+      {
+         virtual ~CompileCancel() = default;
+         // From any thread, any number of times.
+         virtual void cancel() = 0;
+      };
+      // A handle for a compile that compileCancellable is about to be given,
+      // or null if nothing can stop this engine's compiler once it has
+      // started. With null the node behaves as before there were handles:
+      // the run stops waiting and the compile runs to its end.
+      virtual std::unique_ptr<CompileCancel> makeCompileCancel() const { return nullptr; }
+      enum class CompileEnd
+      {
+         finished,   ///< as compileAhead: a module, or a refusal that is recorded
+         abandoned,  ///< the handle was set: no module, and nothing recorded
+      };
+      // compileAhead, for a compile that `cancel` (from makeCompileCancel of
+      // this cache) can abandon. An abandoned compile says nothing about the
+      // code: it must leave no module, no stored artifact and no refusal
+      // (refused() stays false), so that the same code is compiled again
+      // whenever it is next asked for.
+      virtual CompileEnd compileCancellable(const Checksum256&    hash,
+                                            std::span<const char> code,
+                                            const VMOptions&      options,
+                                            std::uint8_t          vmVersion,
+                                            CompileCancel&        cancel)
+      {
+         (void)cancel;
+         compileAhead(hash, code, options, vmVersion);
+         return CompileEnd::finished;
+      }
+
       // Tests only: called on the thread that is about to compile a module
       // from wasm, by engines that report compiles (wasmtime). Set before the
       // cache is used.

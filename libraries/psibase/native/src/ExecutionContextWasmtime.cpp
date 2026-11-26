@@ -194,6 +194,8 @@ namespace psibase::vm_wasmtime
       // Of those, the modules that went to the engine without a pool.
       std::atomic<std::uint64_t>                   compiledPoolless{0};
       std::atomic<std::uint64_t>                   loadedPoolless{0};
+      // Compiles given up through their handle (compileCancellable).
+      std::atomic<std::uint64_t>                   compilesAbandoned{0};
       // Whether the services of this cache run with debugging support. Fixed
       // for the cache's lifetime: its modules belong to that mode's engines.
       const bool                                   debug = vm::serviceDebugging();
@@ -234,12 +236,17 @@ namespace psibase::vm_wasmtime
       // Called on the thread that needs the module, with no lock held: two
       // threads that need the same new module both compile it and store the
       // same artifact, and different modules compile side by side.
+      //
+      // With a `cancel`, a compile from wasm that is abandoned through it
+      // throws wt::compile_cancelled: nothing was compiled, counted or
+      // stored.
       template <typename Code>
-      Compiled obtain(const Checksum256&    hash,
-                        const VMOptions&      vmOptions,
-                        std::uint8_t          vmVersion,
-                        psizam::float_profile profile,
-                        Code&&                code)
+      Compiled obtain(const Checksum256&        hash,
+                      const VMOptions&          vmOptions,
+                      std::uint8_t              vmVersion,
+                      psizam::float_profile     profile,
+                      Code&&                    code,
+                      const wt::compile_cancel* cancel = nullptr)
       {
          // An artifact stored under this key was admitted and compiled from
          // this exact service under these exact limits by this build, and
@@ -290,14 +297,20 @@ namespace psibase::vm_wasmtime
          {
             try
             {
-               return Compiled{runtimes(debug).pooled(profile).compile_metered(wasm, admitted.costs)};
+               return Compiled{
+                   runtimes(debug).pooled(profile).compile_metered(wasm, admitted.costs, cancel)};
+            }
+            catch (const wt::compile_cancelled&)
+            {
+               throw;
             }
             catch (const std::exception& e)
             {
                if (!exceedsPool(e))
                   throw;
                return Compiled{
-                   runtimes(debug).unpooled(profile).compile_metered(wasm, admitted.costs), true};
+                   runtimes(debug).unpooled(profile).compile_metered(wasm, admitted.costs, cancel),
+                   true};
             }
          }();
          auto& module = result.module;
@@ -369,6 +382,36 @@ namespace psibase::vm_wasmtime
                         const VMOptions&      vmOptions,
                         std::uint8_t          vmVersion) override
       {
+         compile(hash, code, vmOptions, vmVersion, nullptr);
+      }
+
+      // Cranelift can be stopped: between the functions of a module, between
+      // the passes over a function and inside register allocation. What it
+      // does not interrupt is short (psizam's wasmtime/README.md).
+      struct Cancel : CompileCancel
+      {
+         wt::compile_cancel handle;
+         void               cancel() override { handle.cancel(); }
+      };
+      std::unique_ptr<CompileCancel> makeCompileCancel() const override
+      {
+         return std::make_unique<Cancel>();
+      }
+      CompileEnd compileCancellable(const Checksum256&    hash,
+                                    std::span<const char> code,
+                                    const VMOptions&      vmOptions,
+                                    std::uint8_t          vmVersion,
+                                    CompileCancel&        cancel) override
+      {
+         return compile(hash, code, vmOptions, vmVersion, &static_cast<Cancel&>(cancel).handle);
+      }
+
+      CompileEnd compile(const Checksum256&        hash,
+                         std::span<const char>     code,
+                         const VMOptions&          vmOptions,
+                         std::uint8_t              vmVersion,
+                         const wt::compile_cancel* cancel)
+      {
          try
          {
             auto profile = nativeFloatProfile(vmVersion);
@@ -377,17 +420,30 @@ namespace psibase::vm_wasmtime
                // Nothing here compiles it, now or later.
                std::lock_guard lock{mutex};
                refusedCode.record(Key{hash, vmOptions, vmVersion});
-               return;
+               return CompileEnd::finished;
             }
             if (contains(hash, vmOptions, vmVersion))
-               return;
+               return CompileEnd::finished;
             add(hash, vmOptions, vmVersion,
-                obtain(hash, vmOptions, vmVersion, *profile,
-                       [&]
-                       {
-                          return std::span(reinterpret_cast<const std::uint8_t*>(code.data()),
-                                           code.size());
-                       }));
+                obtain(
+                    hash, vmOptions, vmVersion, *profile,
+                    [&]
+                    {
+                       return std::span(reinterpret_cast<const std::uint8_t*>(code.data()),
+                                        code.size());
+                    },
+                    cancel));
+         }
+         catch (const wt::compile_cancelled&)
+         {
+            // Not a refusal and not a failure: the node stopped waiting.
+            // Nothing is recorded, so the code is compiled again when it is
+            // next asked for.
+            ++compilesAbandoned;
+            PSIBASE_LOG(loggers::generic::get(), info)
+                << "Service code " << loggers::to_string(hash) << " (vmVersion "
+                << unsigned(vmVersion) << "): the compile was abandoned";
+            return CompileEnd::abandoned;
          }
          catch (const std::exception& e)
          {
@@ -400,6 +456,7 @@ namespace psibase::vm_wasmtime
             std::lock_guard lock{mutex};
             refusedCode.record(Key{hash, vmOptions, vmVersion});
          }
+         return CompileEnd::finished;
       }
 
       bool refused(const Checksum256& hash,
@@ -421,7 +478,7 @@ namespace psibase::vm_wasmtime
       WasmCacheStats stats() const override
       {
          return {compiled.load(), loaded.load(), artifacts ? artifacts->discarded() : 0,
-                 compiledPoolless.load(), loadedPoolless.load()};
+                 compiledPoolless.load(), loadedPoolless.load(), compilesAbandoned.load()};
       }
 
       void add(const Checksum256& hash,

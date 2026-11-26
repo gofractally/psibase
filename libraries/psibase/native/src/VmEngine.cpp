@@ -15,7 +15,9 @@
 #include <cstdlib>
 #include <deque>
 #include <map>
+#include <memory>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -168,11 +170,34 @@ namespace psibase
    // compiles before it returns (wasmtime) the compile threads are here.
    struct WasmCacheImpl
    {
-      using Key = std::tuple<Checksum256, VMOptions, std::uint8_t>;
+      using Key   = std::tuple<Checksum256, VMOptions, std::uint8_t>;
+      using Clock = std::chrono::steady_clock;
+      // One compile, queued or running here. Everything but key and code is
+      // read and written under `mutex`.
       struct Job
       {
          Key               key;
          std::vector<char> code;
+         // The compile's own handle, if a speculative run started it and the
+         // engine's compiler can be stopped (gofractally/psibase#2267).
+         // Compiles a block needs have none: they run to completion.
+         std::unique_ptr<vm::Cache::CompileCancel> cancel;
+         // When the compile is abandoned: the node's bound, counted from the
+         // moment the speculative run started it. None once something that
+         // must have the module is waiting for it.
+         std::optional<Clock::time_point> deadline;
+         // cancel() has been called. The compile thread is still in the
+         // compiler until it notices.
+         bool cancelRequested = false;
+         // The compiler returned without a module because of that.
+         bool abandoned = false;
+         // A block, or anything else that compiles to completion, needs the
+         // module: if the compile is abandoned it is run again, unbounded,
+         // before the job ends.
+         bool wanted = false;
+         // The compile thread is out of the compiler and the job is no
+         // longer in flight.
+         bool done = false;
       };
       // As the LLVM AOT adapter's own queue: beyond this, code waits for
       // its first execution.
@@ -181,14 +206,20 @@ namespace psibase
       const vm::Engine*          engine;
       std::shared_ptr<vm::Cache> cache;
 
-      std::mutex               mutex;
-      std::condition_variable  jobReady;
-      std::condition_variable  compileDone;
-      std::deque<Job>          jobs;
-      // Queued or running here.
-      std::set<Key>            inFlight;
-      std::vector<std::thread> workers;
-      bool                     stopping = false;
+      std::mutex                       mutex;
+      std::condition_variable          jobReady;
+      std::condition_variable          compileDone;
+      std::deque<std::shared_ptr<Job>> jobs;
+      // Queued or running here. A job leaves when its compile thread has
+      // returned from the compiler, not when its compile is given up: until
+      // then it holds one of the places speculative runs may fill.
+      std::map<Key, std::shared_ptr<Job>> inFlight;
+      std::vector<std::thread>            workers;
+      // Abandons the compiles whose deadline has passed. Started with the
+      // first compile that has one.
+      std::thread             deadlines;
+      std::condition_variable deadlineChanged;
+      bool                    stopping = false;
       // WasmCache::onCompilesFinished; called and replaced under its mutex.
       std::mutex               finishedMutex;
       std::function<void()>    finished;
@@ -215,16 +246,76 @@ namespace psibase
             std::lock_guard lock{mutex};
             stopping = true;
             // What has not started is dropped: it is compiled when it is
-            // first executed. What is running finishes; a thread inside the
-            // compiler is never stopped.
+            // first executed. Of what is running, a compile with a handle (a
+            // speculative run's) is abandoned, so that the node's exit does
+            // not wait for it; one without (a block's, or any compile of an
+            // engine that cannot stop its compiler) finishes.
             for (const auto& job : jobs)
-               inFlight.erase(job.key);
+               inFlight.erase(job->key);
             jobs.clear();
+            for (const auto& [key, job] : inFlight)
+               if (job->cancel && !job->cancelRequested)
+                  requestCancel(*job);
          }
          jobReady.notify_all();
          compileDone.notify_all();
+         deadlineChanged.notify_all();
          for (auto& worker : workers)
             worker.join();
+         if (deadlines.joinable())
+            deadlines.join();
+      }
+
+      // With `mutex` held. The speculative runs waiting for the job stop
+      // waiting now; the job stays in flight until its thread returns.
+      void requestCancel(Job& job)
+      {
+         job.cancelRequested = true;
+         job.deadline.reset();
+         job.cancel->cancel();
+         compileDone.notify_all();
+      }
+
+      // With `mutex` held: something that must have the module needs this
+      // compile. It is no longer bounded, and if it has been abandoned
+      // already it is run again before the job ends.
+      void want(Job& job)
+      {
+         job.wanted = true;
+         job.deadline.reset();
+      }
+
+      // The node is stopping: nothing waits for a speculative run's compile
+      // any longer.
+      void abandonSpeculative()
+      {
+         std::lock_guard lock{mutex};
+         for (const auto& [key, job] : inFlight)
+            if (job->cancel && !job->cancelRequested)
+               requestCancel(*job);
+      }
+
+      void watchDeadlines()
+      {
+         std::unique_lock lock{mutex};
+         while (!stopping)
+         {
+            std::optional<Clock::time_point> next;
+            const auto                       now = Clock::now();
+            for (const auto& [key, job] : inFlight)
+            {
+               if (!job->deadline)
+                  continue;
+               if (*job->deadline <= now)
+                  requestCancel(*job);
+               else if (!next || *job->deadline < *next)
+                  next = job->deadline;
+            }
+            if (next)
+               deadlineChanged.wait_until(lock, *next);
+            else
+               deadlineChanged.wait(lock);
+         }
       }
 
       void runCompiles()
@@ -240,22 +331,43 @@ namespace psibase
             jobReady.wait(lock, [&] { return stopping || !jobs.empty(); });
             if (stopping)
                return;
-            Job job = std::move(jobs.front());
+            auto job = std::move(jobs.front());
             jobs.pop_front();
-            lock.unlock();
-            try
+            for (;;)
             {
-               const auto& [hash, options, vmVersion] = job.key;
-               // Logs what it cannot compile and does not throw. A refusal
-               // is recorded by the engine (vm::Cache::refused) before this
-               // returns, so it is known by the time the key leaves inFlight.
-               cache->compileAhead(hash, job.code, options, vmVersion);
+               // The handle outlives the compile it is given to: it is
+               // released only below, once the compiler has returned.
+               auto* cancel = job->cancel.get();
+               lock.unlock();
+               bool abandoned = false;
+               try
+               {
+                  const auto& [hash, options, vmVersion] = job->key;
+                  // Logs what it cannot compile and does not throw. A refusal
+                  // is recorded by the engine (vm::Cache::refused) before
+                  // this returns, so it is known by the time the key leaves
+                  // inFlight. An abandoned compile is no refusal and leaves
+                  // nothing behind.
+                  if (cancel)
+                     abandoned =
+                         cache->compileCancellable(hash, job->code, options, vmVersion, *cancel) ==
+                         vm::Cache::CompileEnd::abandoned;
+                  else
+                     cache->compileAhead(hash, job->code, options, vmVersion);
+               }
+               catch (...)
+               {
+               }
+               lock.lock();
+               job->abandoned = abandoned;
+               if (!abandoned || !job->wanted || stopping)
+                  break;
+               // Abandoned, and since then a block has come to need the
+               // module: compiled again here, without a handle.
+               job->cancel.reset();
             }
-            catch (...)
-            {
-            }
-            lock.lock();
-            inFlight.erase(job.key);
+            job->done = true;
+            inFlight.erase(job->key);
             compileDone.notify_all();
             if (inFlight.empty())
             {
@@ -288,9 +400,20 @@ namespace psibase
          return inFlight.count(key) != 0;
       }
 
-      WasmCache::CompileStart start(const Key&                 key,
-                                    std::span<const char>      code,
-                                    std::optional<std::size_t> cap)
+      // With `mutex` held.
+      std::shared_ptr<Job> enqueue(const Key& key, std::span<const char> code)
+      {
+         auto job = std::make_shared<Job>(Job{key, {code.begin(), code.end()}});
+         inFlight.emplace(key, job);
+         jobs.push_back(job);
+         if (workers.size() < WasmCache::maxSpeculativeCompiles && workers.size() < inFlight.size())
+            workers.emplace_back([this] { runCompiles(); });
+         jobReady.notify_one();
+         return job;
+      }
+
+      // A compile for something that must have the module: never bounded.
+      WasmCache::CompileStart start(const Key& key, std::span<const char> code)
       {
          const auto& [hash, options, vmVersion] = key;
          if (cache->contains(hash, options, vmVersion))
@@ -299,25 +422,80 @@ namespace psibase
          {
             if (compiling(key))
                return WasmCache::CompileStart::inFlight;
-            if (cap && cache->compilesInFlight() >= *cap)
-               return WasmCache::CompileStart::full;
             cache->compileAhead(hash, code, options, vmVersion);
             return WasmCache::CompileStart::started;
          }
          std::lock_guard lock{mutex};
-         if (inFlight.count(key))
+         if (auto it = inFlight.find(key); it != inFlight.end())
+         {
+            want(*it->second);
             return WasmCache::CompileStart::inFlight;
-         if (cap && inFlight.size() >= *cap)
-            return WasmCache::CompileStart::full;
+         }
          // Not queued: it is compiled where it is first executed.
          if (stopping || jobs.size() >= maxQueuedCompiles)
             return WasmCache::CompileStart::inFlight;
-         inFlight.insert(key);
-         jobs.push_back(Job{key, {code.begin(), code.end()}});
-         if (workers.size() < WasmCache::maxSpeculativeCompiles && workers.size() < inFlight.size())
-            workers.emplace_back([this] { runCompiles(); });
-         jobReady.notify_one();
+         enqueue(key, code);
          return WasmCache::CompileStart::started;
+      }
+
+      // A speculative run's compile: started unless one is in flight or the
+      // node has as many as it allows, and waited for under the node's bound.
+      WasmCache::SpeculativeCompile speculative(const Key& key, std::span<const char> code)
+      {
+         using Start = WasmCache::CompileStart;
+         using Wait  = WasmCache::CompileWait;
+         const auto& [hash, options, vmVersion] = key;
+         if (cache->contains(hash, options, vmVersion))
+            return {Start::ready, Wait::finished};
+         const auto limit = std::chrono::nanoseconds(speculativeWait.load());
+         if (cache->compilesInBackground())
+         {
+            // The engine's own compile threads: nothing here can stop them.
+            // The run stops waiting and the compile runs on.
+            auto started = Start::inFlight;
+            if (!compiling(key))
+            {
+               if (cache->compilesInFlight() >= WasmCache::maxSpeculativeCompiles)
+                  return {Start::full, Wait::inFlight};
+               cache->compileAhead(hash, code, options, vmVersion);
+               started = Start::started;
+            }
+            const bool done = cache->awaitCompile(hash, options, vmVersion, limit);
+            return {started, done ? Wait::finished : Wait::inFlight};
+         }
+         std::unique_lock     lock{mutex};
+         std::shared_ptr<Job> job;
+         auto                 started = Start::inFlight;
+         if (auto it = inFlight.find(key); it != inFlight.end())
+            job = it->second;
+         else if (stopping || inFlight.size() >= WasmCache::maxSpeculativeCompiles)
+            return {Start::full, Wait::inFlight};
+         else
+         {
+            started     = Start::started;
+            job         = enqueue(key, code);
+            job->cancel = cache->makeCompileCancel();
+            // The bound is the compile's: the runs that join it later do not
+            // extend it, and none of them giving up ends it early.
+            if (job->cancel)
+            {
+               job->deadline = Clock::now() + limit;
+               if (!deadlines.joinable())
+                  deadlines = std::thread{[this] { watchDeadlines(); }};
+               deadlineChanged.notify_all();
+            }
+         }
+         // This run waits for its own bound, or until the compile is given
+         // up; it does not wait for the compile thread to notice.
+         compileDone.wait_for(lock, limit, [&] { return job->done || job->cancelRequested; });
+         // The run that started the compile stops waiting at the moment the
+         // compile's bound passes, and may get here before the thread that
+         // watches the bounds: the compile is given up either way.
+         if (!job->done && job->deadline && *job->deadline <= Clock::now())
+            requestCancel(*job);
+         if (job->done)
+            return {started, job->abandoned ? Wait::abandoned : Wait::finished};
+         return {started, job->cancelRequested ? Wait::abandoned : Wait::inFlight};
       }
 
       bool await(const Key& key, std::optional<std::chrono::nanoseconds> limit)
@@ -329,6 +507,9 @@ namespace psibase
          auto             done = [&] { return inFlight.count(key) == 0; };
          if (!limit)
          {
+            // The caller is going to have the module however long it takes.
+            if (auto it = inFlight.find(key); it != inFlight.end())
+               want(*it->second);
             compileDone.wait(lock, done);
             return true;
          }
@@ -395,13 +576,20 @@ namespace psibase
       return impl->cache->stats();
    }
 
-   WasmCache::CompileStart WasmCache::compileInBackground(const Checksum256&         hash,
-                                                          std::span<const char>      code,
-                                                          const VMOptions&           options,
-                                                          std::uint8_t               vmVersion,
-                                                          std::optional<std::size_t> cap)
+   WasmCache::CompileStart WasmCache::compileInBackground(const Checksum256&    hash,
+                                                          std::span<const char> code,
+                                                          const VMOptions&      options,
+                                                          std::uint8_t          vmVersion)
    {
-      return impl->start({hash, options, vmVersion}, code, cap);
+      return impl->start({hash, options, vmVersion}, code);
+   }
+
+   WasmCache::SpeculativeCompile WasmCache::compileForSpeculativeRun(const Checksum256&    hash,
+                                                                     std::span<const char> code,
+                                                                     const VMOptions&      options,
+                                                                     std::uint8_t vmVersion)
+   {
+      return impl->speculative({hash, options, vmVersion}, code);
    }
 
    bool WasmCache::awaitCompile(const Checksum256&                      hash,
@@ -441,7 +629,7 @@ namespace psibase
       // Anything else that is absent is not compiled yet (never compiled,
       // or compiled and evicted since): start a compile and defer. If it
       // arrived in the meantime there is nothing to wait for.
-      return impl->start(key, code(), std::nullopt) != CompileStart::ready;
+      return impl->start(key, code()) != CompileStart::ready;
    }
 
    std::chrono::nanoseconds WasmCache::speculativeCompileWait() const
@@ -451,6 +639,11 @@ namespace psibase
    void WasmCache::setSpeculativeCompileWait(std::chrono::nanoseconds limit)
    {
       impl->speculativeWait.store(limit.count());
+   }
+
+   void WasmCache::abandonSpeculativeCompiles()
+   {
+      impl->abandonSpeculative();
    }
 
    void WasmCache::onCompilesFinished(std::function<void()> callback)
