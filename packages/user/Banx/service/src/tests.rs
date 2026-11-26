@@ -8508,7 +8508,14 @@ mod tests {
             .get()?;
 
         let tokens = Wrapper::push_from(&chain, alice)
-            .tok_relay_out(john, aud, gas, Quantity::new(1_000), Quantity::new(1_363))
+            .tok_relay_out(
+                john,
+                aud,
+                gas,
+                Quantity::new(1_000),
+                Quantity::new(1_363),
+                Quantity::new(1_000),
+            )
             .get();
         assert!(tokens.is_ok(), "{tokens:?}");
         assert_eq!(exp(&chain, john, alice, aud), 1_000);
@@ -8562,6 +8569,7 @@ mod tests {
                 gas,
                 ghost,
                 Quantity::new(1),
+                Quantity::new(1_000),
             )
             .get()
             .expect_err("path_cash must name an existing account");
@@ -8581,6 +8589,7 @@ mod tests {
                 gas,
                 alice,
                 Quantity::new(1_363),
+                Quantity::new(1_000),
             )
             .get()?;
         assert_eq!(exp(&chain, brandon, bob, aud), 1_000);
@@ -8684,8 +8693,33 @@ mod tests {
             .st_crd_lne(alice, aud, Quantity::new(100_000), false, 0, 0)
             .get()?;
 
+        let face_only = Wrapper::push_from(&chain, alice)
+            .tok_relay_out(
+                john,
+                aud,
+                gas,
+                Quantity::new(1_000),
+                Quantity::new(1),
+                Quantity::new(1_000),
+            )
+            .get()
+            .expect_err("10% forward grosses the face above the cap");
+        assert!(
+            face_only.to_string().contains("relay banx above max_owed"),
+            "{face_only}"
+        );
+        assert_eq!(exp(&chain, john, alice, aud), 0);
+        assert_eq!(pair_bal(&chain, john, aud, gas), 15_000);
+
         Wrapper::push_from(&chain, alice)
-            .tok_relay_out(john, aud, gas, Quantity::new(1_000), Quantity::new(1))
+            .tok_relay_out(
+                john,
+                aud,
+                gas,
+                Quantity::new(1_000),
+                Quantity::new(1),
+                Quantity::new(1_112),
+            )
             .get()?;
         // Curve prices 1,000 and pays 1,363 tokens. The forward is extra Banx Alice owes.
         assert_eq!(exp(&chain, john, alice, aud), 1_112);
@@ -8734,6 +8768,24 @@ mod tests {
         let tokens_before = shared_from_banx(&chain, gas, alice);
         let pair_before = pair_bal(&chain, john, aud, gas);
         let weight_before = TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value;
+        let face_only = Wrapper::push_from(&chain, alice)
+            .path_cash(
+                vec![hop(john, aud)],
+                Quantity::new(1_000),
+                gas,
+                alice,
+                Quantity::new(1),
+                Quantity::new(1_000),
+            )
+            .get()
+            .expect_err("one-hop forward grosses the face above the cap");
+        assert!(
+            face_only.to_string().contains("relay banx above max_owed"),
+            "{face_only}"
+        );
+        assert_eq!(exp(&chain, john, alice, aud), 437);
+        assert_eq!(shared_from_banx(&chain, gas, alice), tokens_before);
+
         Wrapper::push_from(&chain, alice)
             .path_cash(
                 vec![hop(john, aud)],
@@ -8741,6 +8793,7 @@ mod tests {
                 gas,
                 alice,
                 Quantity::new(1),
+                Quantity::new(1_112),
             )
             .get()?;
         assert_eq!(exp(&chain, john, alice, aud), 437 + 1_112);
@@ -8757,6 +8810,7 @@ mod tests {
             gas,
             john,
             Quantity::new(1),
+            Quantity::new(1),
         );
         assert!(
             self_hop
@@ -8767,6 +8821,104 @@ mod tests {
                 .contains("path cannot draw on self"),
             "{}",
             self_hop.trace.error.as_deref().unwrap_or("")
+        );
+        Ok(())
+    }
+
+    /// A replaced fixed forward can gross a 100 face up to the whole claim.
+    /// The signed cap stops that. The curve still prices the face.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_token_relay_out_caps_forward_against_a_claim(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let john = account!("john");
+        chain.new_account(alice).unwrap();
+        chain.new_account(john).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let gas = mint_gas(&chain, john, john, 20_000);
+        post_token_pool(&chain, john, aud, gas, 10_000, 15_000);
+        Wrapper::push_from(&chain, john)
+            .deposit(alice, aud, Quantity::new(10_000), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_glb_fwd(aud, Quantity::new(9_900), 0, PPM_SCALE, never(), true)
+            .get()?;
+
+        let face = Wrapper::push_from(&chain, alice)
+            .tok_relay_out(
+                john,
+                aud,
+                gas,
+                Quantity::new(100),
+                Quantity::new(1),
+                Quantity::new(100),
+            )
+            .get()
+            .expect_err("fee of 9,900 grosses 100 up to the whole claim");
+        assert!(
+            face.to_string().contains("relay banx above max_owed"),
+            "{face}"
+        );
+        let under = Wrapper::push_from(&chain, alice)
+            .tok_relay_out(
+                john,
+                aud,
+                gas,
+                Quantity::new(100),
+                Quantity::new(1),
+                Quantity::new(9_999),
+            )
+            .get()
+            .expect_err("one below the grossed debt still fails");
+        assert!(
+            under.to_string().contains("relay banx above max_owed"),
+            "{under}"
+        );
+        let path = Wrapper::push_from(&chain, alice)
+            .path_cash(
+                vec![hop(john, aud)],
+                Quantity::new(100),
+                gas,
+                alice,
+                Quantity::new(1),
+                Quantity::new(100),
+            )
+            .get()
+            .expect_err("one-hop path_cash uses the same cap");
+        assert!(
+            path.to_string().contains("relay banx above max_owed"),
+            "{path}"
+        );
+        assert_eq!(exp(&chain, alice, john, aud), 10_000);
+        assert_eq!(exp(&chain, john, alice, aud), 0);
+        assert_eq!(shared_from_banx(&chain, gas, alice), 0);
+        assert_eq!(pair_bal(&chain, john, aud, gas), 15_000);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            10_000
+        );
+
+        // 15,000 * 100 / 10,100 = 148. The cap equals the grossed debt, so
+        // the claim unwinds in full and the curve still prices 100.
+        Wrapper::push_from(&chain, alice)
+            .tok_relay_out(
+                john,
+                aud,
+                gas,
+                Quantity::new(100),
+                Quantity::new(148),
+                Quantity::new(10_000),
+            )
+            .get()?;
+        assert_eq!(exp(&chain, alice, john, aud), 0);
+        assert_eq!(exp(&chain, john, alice, aud), 0);
+        assert_eq!(shared_from_banx(&chain, gas, alice), 148);
+        assert_eq!(pair_bal(&chain, john, aud, gas), 15_000 - 148);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            10_100
         );
         Ok(())
     }
@@ -8788,7 +8940,14 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, alice)
-            .tok_relay_out(john, aud, gas, Quantity::new(1_000), Quantity::new(1_363))
+            .tok_relay_out(
+                john,
+                aud,
+                gas,
+                Quantity::new(1_000),
+                Quantity::new(1_363),
+                Quantity::new(1_000),
+            )
             .get()?;
         assert_eq!(exp(&chain, alice, john, aud), 0);
         assert_eq!(exp(&chain, john, alice, aud), 0);
@@ -9009,7 +9168,14 @@ mod tests {
         );
 
         Wrapper::push_from(&chain, alice)
-            .tok_relay_out(john, aud, gas, Quantity::new(1_000), Quantity::new(1_363))
+            .tok_relay_out(
+                john,
+                aud,
+                gas,
+                Quantity::new(1_000),
+                Quantity::new(1_363),
+                Quantity::new(1_000),
+            )
             .get()?;
         assert_eq!(pair_bal(&chain, john, aud, gas), 13_637);
         assert_eq!(vault_bal(&chain, john, gas), 0);

@@ -1201,6 +1201,7 @@ impl Api for BanxPlugin {
         token_id: u32,
         amount_banx: String,
         min_tokens: String,
+        max_owed: String,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::token_relay_out)?;
         let packed = banx::action_structs::tok_relay_out {
@@ -1209,6 +1210,7 @@ impl Api for BanxPlugin {
             token_id,
             amount_banx: parse_amount_nonzero(asset_id, &amount_banx)?,
             min_tokens: parse_token_amount(token_id, &min_tokens)?,
+            max_owed: parse_amount(asset_id, &max_owed)?,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::tok_relay_out::ACTION_NAME, &packed)
@@ -1239,6 +1241,7 @@ impl Api for BanxPlugin {
         token_id: u32,
         recipient: String,
         min_tokens: String,
+        max_owed: String,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::path_cash)?;
         if hops.is_empty() {
@@ -1249,6 +1252,7 @@ impl Api for BanxPlugin {
         let first_asset = hops[0].asset_id;
         let amount = parse_amount_nonzero(first_asset, &amount)?;
         let min_tokens = parse_token_amount(token_id, &min_tokens)?;
+        let max_owed = parse_amount(first_asset, &max_owed)?;
         let mut path = Vec::with_capacity(hops.len());
         for h in hops {
             path.push(banx::tables::PathHop {
@@ -1262,6 +1266,7 @@ impl Api for BanxPlugin {
             token_id,
             recipient: parse_account(&recipient)?,
             min_tokens,
+            max_owed,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::path_cash::ACTION_NAME, &packed)

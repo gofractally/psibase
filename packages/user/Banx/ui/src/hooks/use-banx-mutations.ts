@@ -1295,6 +1295,8 @@ export function usePathCash() {
             tokenId: number;
             recipient: string;
             minTokens: string;
+            /** One-hop only: most Banx this call may book, before netting. Human decimal of that hop. A longer path ignores it. */
+            maxOwed: string;
         }) =>
             banxCall("pathCash", [
                 p.hops.map((h) => ({
@@ -1305,6 +1307,7 @@ export function usePathCash() {
                 p.tokenId,
                 p.recipient,
                 p.minTokens,
+                p.maxOwed,
             ]),
         onSuccess: () => {
             invalidate();

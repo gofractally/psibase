@@ -103,6 +103,14 @@ impl TokenRelay {
         invert_hop_fee(face, fwd.fee_fixed, fwd.fee_percent)
     }
 
+    /// `drawn` is Banx this call books before netting. A claim it unwinds counts.
+    pub fn assert_max_owed(drawn: Quantity, max_owed: Quantity) {
+        assert!(
+            drawn.value <= max_owed.value,
+            "relay banx above max_owed"
+        );
+    }
+
     /// Banx the owner owes after that same forward. The curve still prices face.
     fn neighbor_receives(owner: AccountNumber, asset_id: u16, face: Quantity) -> Quantity {
         let Some(fwd) = ForwardOffer::get(owner, ForwardOffer::GLOBAL, asset_id) else {
@@ -184,6 +192,9 @@ impl TokenRelay {
     }
 
     /// Taker draws `amount_banx` on the owner and receives tokens from the pair.
+    ///
+    /// The curve prices the face. A live global forward grosses it into the
+    /// Banx booked on the taker. `max_owed` caps that amount before netting.
     pub fn cash_out(
         owner: AccountNumber,
         taker: AccountNumber,
@@ -191,17 +202,20 @@ impl TokenRelay {
         token_id: u32,
         amount_banx: Quantity,
         min_tokens: Quantity,
+        max_owed: Quantity,
     ) -> Quantity {
         assert!(taker != owner, "cannot swap with self");
         assert!(amount_banx.value > 0, "relay amount must be positive");
+        // The owner can replace the forward before inclusion. Check the cap
+        // before the curve or the claim moves.
+        let owed = Self::neighbor_owes(owner, asset_id, amount_banx);
+        Self::assert_max_owed(owed, max_owed);
         let mut relay = Self::get_assert(owner, asset_id, token_id);
         let tokens_out = relay.take_banx(amount_banx);
         assert!(
             tokens_out.value >= min_tokens.value,
             "relay tokens below min_tokens"
         );
-        // Curve prices the face. The global forward is extra Banx the neighbor owes.
-        let owed = Self::neighbor_owes(owner, asset_id, amount_banx);
         let netted = Connection::get_live(owner, taker, asset_id).apply_draw(owed);
         relay.pay_tokens(taker, tokens_out);
         emit_pair_activity(

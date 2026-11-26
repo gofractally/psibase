@@ -469,12 +469,18 @@ interface api {
     remove-token-relay: func(asset-id: u16, token-id: u32) -> result<_, error>;
 
     /// Draw Banx on `owner`'s relay and receive tokens from their pair.
+    /// The curve prices `amount-banx`. A live global forward on that IOU
+    /// grosses it into the Banx the sender owes. `max-owed` is the most
+    /// this call may book, before netting, as a human decimal of that IOU.
+    /// Unwinding a claim counts. A replaced forward above it fails.
+    /// Zero is a cap of zero.
     token-relay-out: func(
         owner: string,
         asset-id: u16,
         token-id: u32,
         amount-banx: string,
         min-tokens: string,
+        max-owed: string,
     ) -> result<_, error>;
 
     /// Send tokens from the sender's cash vault into `owner`'s pair. The curve
@@ -491,15 +497,18 @@ interface api {
     /// Path-pay that ends by selling the last hop's Banx for that account's
     /// tokens. The last hop must have posted a token relay for that asset.
     /// They pay `recipient` the tokens and do not also owe them the Banx
-    /// asset. A one-hop path is a direct swap: the last hop's global forward
-    /// is extra Banx the sender owes. `amount` is a human decimal in the first
-    /// hop's asset. `min-tokens` floors the token output.
+    /// asset. A one-hop path books the last hop's global forward on top of
+    /// `amount`. `max-owed` caps that Banx before netting, as a human decimal
+    /// of that hop's asset, and zero is a cap of zero. A longer path draws
+    /// exactly `amount` on the first hop and does not use `max-owed`.
+    /// `min-tokens` floors the token output.
     path-cash: func(
         hops: list<path-hop>,
         amount: string,
         token-id: u32,
         recipient: string,
         min-tokens: string,
+        max-owed: string,
     ) -> result<_, error>;
 
     /// Discover a multi-hop path from `from-account` to `to-account` (TokenSwap-style

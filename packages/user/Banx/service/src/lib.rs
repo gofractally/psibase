@@ -593,7 +593,13 @@ pub mod service {
         reserve_banx: Quantity,
         reserve_tokens: Quantity,
     ) {
-        TokenRelay::upsert(get_sender(), asset_id, token_id, reserve_banx, reserve_tokens);
+        TokenRelay::upsert(
+            get_sender(),
+            asset_id,
+            token_id,
+            reserve_banx,
+            reserve_tokens,
+        );
     }
 
     /// Delete the sender's token relay. Tokens still in the pair return to the sender.
@@ -604,7 +610,9 @@ pub mod service {
 
     /// Draw `amount_banx` on `owner` and receive tokens from their relay.
     /// The curve prices that amount. A live global forward on `asset_id`
-    /// is extra Banx the sender owes. It is not taken from the tokens.
+    /// grosses it into the Banx the sender owes. `max_owed` is the most
+    /// this call may book, before netting. Unwinding a claim counts.
+    /// A replaced forward above `max_owed` fails. Zero is a cap of zero.
     #[action]
     fn tok_relay_out(
         owner: AccountNumber,
@@ -612,6 +620,7 @@ pub mod service {
         token_id: u32,
         amount_banx: Quantity,
         min_tokens: Quantity,
+        max_owed: Quantity,
     ) {
         TokenRelay::cash_out(
             owner,
@@ -620,6 +629,7 @@ pub mod service {
             token_id,
             amount_banx,
             min_tokens,
+            max_owed,
         );
     }
 
@@ -926,9 +936,10 @@ pub mod service {
     /// `token_id`. The path draws the Banx amount on them, then their vault
     /// pays `recipient`. They do not also owe `recipient` the Banx asset.
     /// `min_tokens` floors the token output. The curve has no fee. A one-hop
-    /// path is a direct swap, so the owner's global forward is extra Banx the
-    /// sender owes, same as `tok_relay_out`. A longer path already paid the
-    /// previous hop's forward.
+    /// path books the owner's global forward on top of `amount`, same as
+    /// `tok_relay_out`. `max_owed` caps that Banx before netting, and zero
+    /// is a cap of zero. A longer path draws exactly `amount` on the first
+    /// hop and does not use `max_owed`.
     #[action]
     fn path_cash(
         hops: Vec<PathHop>,
@@ -936,6 +947,7 @@ pub mod service {
         token_id: u32,
         recipient: AccountNumber,
         min_tokens: Quantity,
+        max_owed: Quantity,
     ) {
         assert!(!hops.is_empty(), "path_cash must include at least one hop");
         assert!(amount.value > 0, "path_cash amount must be positive");
@@ -945,6 +957,7 @@ pub mod service {
         let banx_in = if hops.len() == 1 {
             assert!(last.account != sender, "path cannot draw on self");
             let owed = TokenRelay::neighbor_owes(last.account, last.asset_id, amount);
+            TokenRelay::assert_max_owed(owed, max_owed);
             Connection::get_live(last.account, sender, last.asset_id).draw(owed, sender);
             amount
         } else {
