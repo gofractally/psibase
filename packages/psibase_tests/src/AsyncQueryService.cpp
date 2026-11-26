@@ -60,6 +60,7 @@ void AsyncQueryService::onBlock()
    std::vector<AsyncResponseRow> rows;
    PSIBASE_SUBJECTIVE_TX
    {
+      rows.clear();
       auto table = open<AsyncResponseTable>();
       for (auto row : table.getIndex<0>())
       {

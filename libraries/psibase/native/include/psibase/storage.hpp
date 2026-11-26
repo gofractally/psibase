@@ -128,10 +128,6 @@ namespace psibase::storage
                    std::vector<char>*,
                    std::vector<char>*);
       bool is_empty(const shared_root&, std::span<const char> lower, std::span<const char> upper);
-      bool is_equal_weak(const shared_root&,
-                         const shared_root&,
-                         std::span<const char> lower,
-                         std::span<const char> upper);
    };
 
    class write_session : public read_session
@@ -157,10 +153,6 @@ namespace psibase::storage
       void        apply(shared_root&, delta&, const delta::mark* at = nullptr);
       // Throws on a read-only database.
       void        require_writable() const;
-      void        splice(shared_root&,
-                         const shared_root&,
-                         std::span<const char> lower,
-                         std::span<const char> upper);
    };
 
    struct database_state;

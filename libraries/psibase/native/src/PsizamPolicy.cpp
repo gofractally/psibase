@@ -244,9 +244,12 @@ namespace psibase
             return size;
          }
          // A value type as one byte. The two-byte forms (ref null? heaptype)
-         // belong to the typed function references proposal, which is off:
-         // psizam's parser reads them as funcref or externref, wasmtime
-         // refuses the non-null one.
+         // belong to the typed function references proposal, which is off.
+         // psizam's parser refuses them too (enable_typed_references in
+         // NativeVMOptions, which is what covers instructions); this pass
+         // reads one byte per type, so it has to refuse them where it meets
+         // them or it would go on reading out of step, and it names the
+         // proposal where the parser would say "invalid local type".
          void valueType()
          {
             auto type = byte();

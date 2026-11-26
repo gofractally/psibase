@@ -63,19 +63,22 @@ std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest      
       }
       auto package      = psio::from_ijson<LocalPackage>(request.body);
       auto pendingTable = open<PendingLocalPackagesTable>();
+      // Built before the body, which may run again and would then put a
+      // row of moved-from members.
+      PendingLocalPackage pending{
+          .name        = std::move(package.name),
+          .version     = std::move(package.version),
+          .description = std::move(package.description),
+          .depends     = std::move(package.depends),
+          .accounts    = std::move(package.accounts),
+          .services    = std::move(package.services),
+          .exports     = std::move(package.exports),
+          .sha256      = std::move(package.sha256),
+          .removing    = target == "/prerm",
+      };
       PSIBASE_SUBJECTIVE_TX
       {
-         pendingTable.put({
-             .name        = std::move(package.name),
-             .version     = std::move(package.version),
-             .description = std::move(package.description),
-             .depends     = std::move(package.depends),
-             .accounts    = std::move(package.accounts),
-             .services    = std::move(package.services),
-             .exports     = std::move(package.exports),
-             .sha256      = std::move(package.sha256),
-             .removing    = target == "/prerm",
-         });
+         pendingTable.put(pending);
       }
       return HttpReply{.headers = allowCors(request, XAdmin::service)};
    }

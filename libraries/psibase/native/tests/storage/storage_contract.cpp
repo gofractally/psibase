@@ -250,25 +250,6 @@ int main(int argc, char** argv)
                       "aliased key buffers");
               require(w->is_empty(r, span("a"), span("a")), "empty half-open range");
            });
-      test("optimistic range comparison and splice",
-           [&]
-           {
-              database    db(base / "occ", config, open_mode::create_new);
-              auto        w = db.start_write_session();
-              shared_root original;
-              put(*w, original, "a", "1");
-              put(*w, original, "z", "1");
-              auto current = original, updated = original;
-              put(*w, current, "z", "2");
-              put(*w, updated, "a", "2");
-              require(w->is_equal_weak(original, current, span("a"), span("b")),
-                      "unrelated write conflicts");
-              require(!w->is_equal_weak(original, current, span("z"), {}), "overlap not detected");
-              w->splice(current, updated, span("a"), span("b"));
-              require(get(*w, current, "a") == "2" && get(*w, current, "z") == "2",
-                      "splice overwrote unrelated keys");
-              require(get(*w, original, "a") == "1", "splice changed owned base");
-           });
       test("large opaque value and exception cleanup",
            [&]
            {
@@ -388,14 +369,15 @@ int main(int argc, char** argv)
                  put(*w, small, "key" + std::to_string(i), "value" + std::to_string(i));
               for (unsigned i = 0; i < 20000; ++i)
                  put(*w, large, "bulk" + std::to_string(i), std::string(64, 'x'));
-              // One long writer operation: it holds the single-writer gate throughout.
+              // A long run of writer operations.
               std::atomic<bool> writing{false}, written{false};
               std::thread       writer(
                   [&]
                   {
-                     shared_root copy;
+                     shared_root copy = large;
                      writing = true;
-                     w->splice(copy, large, {}, {});
+                     for (unsigned i = 0; i < 20000; ++i)
+                        put(*w, copy, "more" + std::to_string(i), std::string(64, 'y'));
                      written = true;
                   });
               while (!writing)
