@@ -52,25 +52,27 @@ namespace psibase
       {
          const auto now  = RunClock::now();
          auto       look = now + idlePeriod;
-         auto       keep = children.begin();
          for (Watchdog* child : children)
          {
+            if (child->cancelled)
+            {
+               // Still here after it was cancelled: deliver it again. Its
+               // owner removes it when the run has ended.
+               child->handler();
+               continue;
+            }
             // The deadline is read here, under the mutex, so it reflects every
             // setLimit that has returned. A deadline that has moved later since
             // the worker went to sleep simply is not due yet.
             const auto deadline = child->deadline();
             if (deadline && *deadline <= now)
             {
+               child->cancelled = true;
                child->interrupt();
             }
-            else
-            {
-               if (deadline && *deadline < look)
-                  look = *deadline;
-               *keep++ = child;
-            }
+            else if (deadline && *deadline < look)
+               look = *deadline;
          }
-         children.erase(keep, children.end());
          nextLook = look;
          cond.wait_until(l, toSteady(look));
       }
