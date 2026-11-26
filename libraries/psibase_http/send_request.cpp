@@ -162,8 +162,9 @@ namespace
                               std::string_view{self->parser.get()[bhttp::field::content_type]})
                               .ok())
                 {
-                   // HttpReply::contentType is declared UTF-8: packing this response
-                   // for the service would throw. Treat it as a failed read.
+                   // HttpReply::contentType is declared UTF-8. Packing does not check
+                   // it (psio::to_pssz is the fast write) and the service that receives
+                   // the reply would refuse it: treat it as a failed read here.
                    PSIBASE_LOG(self->logger, warning)
                        << "Failed to read HTTP response: Content-Type is not valid UTF-8";
                    self->do_error(std::make_error_code(std::errc::illegal_byte_sequence));

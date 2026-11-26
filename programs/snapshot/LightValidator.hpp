@@ -30,8 +30,8 @@ namespace psibase
          auto v = kvGetRaw(db, psio::encode(psio::key{}, key));
          if (!v)
             return std::nullopt;
-         // TODO: validate (allow opt-in or opt-out)
-         return psio::from_pssz<V>(psio::trusted{*v});
+         // A row of a database this program did not write: validate.
+         return psio::from_pssz<V>(*v);
       }
 
       void kvPutRaw(psibase::DbId db, std::span<const char> key, std::span<const char> value)

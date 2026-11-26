@@ -803,7 +803,8 @@ TEST_CASE("methods: actions and events of the service schema", "[methods]")
 
 // Strings declared UTF-8 (`attr(m, utf8)`): the bytes of a valid value are
 // those of a raw string; a value that is not UTF-8 is refused when it is
-// validated, decoded and packed.
+// validated or decoded by a validating reader, and by the validated write.
+// The ordinary write packs it (gofractally/psio#14).
 namespace utf8_test
 {
    struct Notes
@@ -876,30 +877,41 @@ TEST_CASE("methods: a string declared UTF-8 refuses other bytes", "[methods][utf
    CHECK(psio::validate_pssz<LogMessage>(psio::to_pssz(message)).ok());
    CHECK(!psio::validate_pssz<LogMessage>(spoiled(message, "started")).ok());
 
-#ifndef COMPILING_WASM
-   // Packing refuses too (in a guest it aborts the action).
+   // The ordinary write is the fast write: it packs text that is not UTF-8,
+   // and what refuses the bytes is the reader that validates them. The
+   // validated write refuses the value itself.
    {
+      auto refused = [](const auto& bad)
+      {
+         const auto bytes = psio::to_pssz(bad);
+         CHECK(!psio::validate_pssz<std::remove_cvref_t<decltype(bad)>>(bytes).ok());
+         std::vector<char> out;
+         CHECK(!psio::encode_pssz_checked(psio::pssz{}, bad, out).ok());
+         CHECK(out.empty());
+#ifndef COMPILING_WASM
+         CHECK_THROWS_AS(psio::to_pssz_checked(bad), psio::codec_exception);
+#endif
+      };
       HttpRequest bad = request;
       bad.host        = notUtf8;
-      CHECK_THROWS_AS(psio::to_pssz(bad), psio::codec_exception);
+      refused(bad);
       bad             = request;
       bad.contentType = notUtf8;
-      CHECK_THROWS_AS(psio::to_pssz(bad), psio::codec_exception);
+      refused(bad);
       bad                 = request;
       bad.headers[0].name = notUtf8;
-      CHECK_THROWS_AS(psio::to_pssz(bad), psio::codec_exception);
+      refused(bad);
       // What the node packs for x-http::serve.
       bad      = request;
       bad.host = notUtf8;
-      CHECK_THROWS_AS(psio::to_pssz(std::tuple(std::int32_t{1}, bad)), psio::codec_exception);
+      refused(std::tuple(std::int32_t{1}, bad));
       HttpReply badReply   = reply;
       badReply.contentType = notUtf8;
-      CHECK_THROWS_AS(psio::to_pssz(badReply), psio::codec_exception);
+      refused(badReply);
       LogMessage badMessage = message;
       badMessage.message    = notUtf8;
-      CHECK_THROWS_AS(psio::to_pssz(badMessage), psio::codec_exception);
+      refused(badMessage);
    }
-#endif
 
    // A parameter: the argument bytes are those of the plain tuple, and the
    // dispatcher's validation refuses text that is not UTF-8.
@@ -909,7 +921,13 @@ TEST_CASE("methods: a string declared UTF-8 refuses other bytes", "[methods][utf
    const auto badArgs = psio::to_pssz(std::tuple{std::int32_t{7}, notUtf8});
    CHECK(!psio::validate_method_args<Notes, 0>(badArgs).ok());
    CHECK(psio::validate_method_args<Notes, 1>(psio::to_pssz(std::tuple{notUtf8})).ok());
+   // A caller packs such an argument (the fast write, as every action
+   // builder and Actor does): the bytes are the ones the dispatcher refuses.
+   // The validated write refuses the argument at the caller.
+   CHECK(psio::method_args_to_pssz<Notes, 0>(7, notUtf8) == badArgs);
+   CHECK(psio::to_pssz(psio::reflect<Notes>::method_arg_tuple<0>{7, notUtf8}) == badArgs);
 #ifndef COMPILING_WASM
-   CHECK_THROWS_AS((psio::method_args_to_pssz<Notes, 0>(7, notUtf8)), psio::codec_exception);
+   CHECK_THROWS_AS((psio::method_args_to_pssz_checked<Notes, 0>(7, notUtf8)),
+                   psio::codec_exception);
 #endif
 }

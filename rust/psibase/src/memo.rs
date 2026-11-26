@@ -11,9 +11,12 @@ custom_error! { pub MemoError
 /// 80 bytes.
 ///
 /// For PSIO a memo is its text (`transparent`) and the bound is declared on
-/// it, so every pSSZ and JSON reader and writer refuses a longer one. It is
-/// not a key: PSIO's key derive does not enforce the bound of a transparent
-/// type's member.
+/// it, so every validating pSSZ and JSON reader (`from_pssz`, `from_ijson`)
+/// and every validated writer (`try_to_pssz`, ...) refuses a longer one. The
+/// ordinary writers (`to_pssz`, `to_json`) and the trusted readers do not
+/// check it; a `Memo` is always within its bound because its constructors
+/// refuse any other text. It is not a key: PSIO's key derive does not
+/// enforce the bound of a transparent type's member.
 #[derive(
     Debug,
     Clone,

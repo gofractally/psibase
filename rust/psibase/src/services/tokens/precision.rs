@@ -6,7 +6,9 @@ use crate::services::tokens::TokensError;
 /// The number of decimal places of a token amount, 0 to 8.
 ///
 /// For PSIO a precision is its number (`transparent`) and the range is an
-/// invariant, so every reader and writer refuses a value above 8.
+/// invariant, so every validating reader and validated writer refuses a
+/// value above 8. The ordinary writers and the trusted readers do not run
+/// the invariant; `Precision::new` is what keeps a value in range.
 #[derive(
     PartialEq,
     Debug,

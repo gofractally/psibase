@@ -45,6 +45,10 @@ namespace psibase
    /// method then receives each parameter as it declares it: a view, a
    /// `std::string_view` or a span into the bytes, anything else unpacked.
    /// The method's result is set as the return value of the current action.
+   /// It is written with the fast write (`psio::call_method_pssz`): nothing
+   /// the method's `returns(...)` or the result's type declares is checked
+   /// here. The reader of a result is who validates it: a calling service
+   /// (`callPacked`, `callUnpacked`), the tester, a client.
    template <typename Service, std::size_t I>
    void callAction(Service& service, const psio::shared_pssz<Action>& act)
    {

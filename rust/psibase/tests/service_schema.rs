@@ -224,14 +224,21 @@ fn an_annotated_result_is_in_the_schema_and_is_what_a_caller_reads() {
     assert_eq!(list.maxCount, 4);
     assert_eq!(utf8_max(&list.r#type), 16);
 
-    // The service: a value outside returns(...) has no encoding.
+    // The service writes its result with the fast write: a value outside
+    // returns(...) is written as it is, and the caller is what refuses it.
+    // The validated write (`try_result_to_pssz`) refuses it at the service.
     assert_eq!(symbol::result_to_pssz(&"USD".to_string()).unwrap(), b"USD");
-    assert!(symbol::result_to_pssz(&"123456789".to_string()).is_err());
+    let nine = symbol::result_to_pssz(&"123456789".to_string()).unwrap();
+    assert_eq!(nine, b"123456789");
+    assert!(symbol::result_from_pssz(&nine).is_err());
+    assert!(symbol::try_result_to_pssz(&"123456789".to_string()).is_err());
     let two = vec!["alice".to_string(), "alice".to_string()];
     // One-byte offsets, where the plain list has four.
     assert_eq!(names::result_to_pssz(&two).unwrap().len(), 2 + 10);
     assert_eq!(psio::to_pssz(&two).len(), 2 * 4 + 10);
-    assert!(names::result_to_pssz(&vec![String::new(); 5]).is_err());
+    let five = names::result_to_pssz(&vec![String::new(); 5]).unwrap();
+    assert!(names::result_from_pssz(&five).is_err());
+    assert!(names::try_result_to_pssz(&vec![String::new(); 5]).is_err());
 
     // The caller: what a callee that promises less may return is refused.
     assert_eq!(symbol::result_from_pssz(b"USD").unwrap(), "USD");

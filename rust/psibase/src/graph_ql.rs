@@ -1,5 +1,5 @@
 use crate::{
-    get_key_bytes, kv_get, kv_greater_equal_bytes, kv_less_than_bytes, kv_max_bytes, BlockNum,
+    get_key_bytes, kv_greater_equal_bytes, kv_less_than_bytes, kv_max_bytes, BlockNum,
     BlockTime, EventDb, MethodNumber, RawKey, ServiceWrapper, TableIndex, TableRecord,
 };
 use async_graphql::connection::{query_with, Connection, Edge, EmptyFields};
@@ -74,7 +74,12 @@ impl<Key: KeyPack, Record: TableRecord + OutputType> TableQuery<Key, Record> {
         let mut prefix = table_index.prefix;
         prefix.extend_from_slice(&psio::to_key(&subkey));
         TableQuery {
-            index: TableIndex::new(&table_index.db, prefix, table_index.is_secondary),
+            index: TableIndex::new(
+                &table_index.db,
+                prefix,
+                table_index.is_secondary,
+                table_index.own,
+            ),
             first: None,
             last: None,
             before: None,
@@ -226,9 +231,10 @@ impl<Key: KeyPack, Record: TableRecord + OutputType> TableQuery<Key, Record> {
 
     fn get_value_from_bytes(&self, bytes: Vec<u8>) -> Option<Record> {
         if self.index.is_secondary {
-            kv_get(&self.index.db, &RawKey::new(bytes)).unwrap()
+            crate::kv_get_bytes(&self.index.db, &bytes)
+                .map(|row| crate::table::decode_row(self.index.own, &row))
         } else {
-            Some(psio::from_pssz::<Record>(&bytes[..]).unwrap())
+            Some(crate::table::decode_row(self.index.own, &bytes))
         }
     }
 
