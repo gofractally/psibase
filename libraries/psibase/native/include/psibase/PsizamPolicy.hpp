@@ -204,8 +204,13 @@ namespace psibase
    // reads a reference type or a heap type: block types, table and element
    // declarations, ref.null. A constant expression that reads a global the
    // module defines is refused by enable_const_defined_globals
-   // (gofractally/psizam#7). It has no switch for extended constant
-   // expressions: validateNativeWasm refuses them.
+   // (gofractally/psizam#7), a 64-bit memory or table by enable_memory64,
+   // and a constant expression of more than one instruction by
+   // enable_extended_const.
+   //
+   // That admission under these switches refuses whatever wasmtime, as the
+   // node configures it, refuses is tested with psizam's structured corpus
+   // (ctest VmAdmissionCorpus).
    struct NativeVMOptions : VMOptions
    {
       static constexpr auto          fp                          = psizam::fp_mode::softfloat;
@@ -222,7 +227,7 @@ namespace psibase
       static constexpr bool          enable_nontrapping_fptoint  = true;
       static constexpr bool          enable_typed_references     = false;
       static constexpr bool          enable_const_defined_globals = false;
-      // Not a parser switch: enforced by validateNativeWasm.
+      static constexpr bool          enable_memory64             = false;
       static constexpr bool          enable_extended_const       = false;
       // Incoming arguments remain live across normal and tail calls. Count
       // their storage in the same deterministic logical budget on every engine.

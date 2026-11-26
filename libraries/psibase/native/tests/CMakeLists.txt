@@ -133,6 +133,21 @@ if(PSIBASE_VM_BACKEND STREQUAL "WASMTIME")
     add_executable(VmAdmissionFuzz VmAdmissionFuzz.cpp)
     target_link_directories(VmAdmissionFuzz PRIVATE ${ICU_LIBRARY_DIR})
     target_link_libraries(VmAdmissionFuzz PRIVATE psibase Threads::Threads)
+    # psizam's structured corpus (about 8,200 modules, written at test time
+    # by its generator) through the chain's admission and wasmtime's compiler:
+    # none may be admitted and refused. See run_vm_admission_corpus.py.
+    # The psizam this build compiles, wherever it was acquired from.
+    include(FetchContent)
+    FetchContent_GetProperties(psizam SOURCE_DIR vm_admission_psizam)
+    if(NOT EXISTS "${vm_admission_psizam}/wasmtime/tests/gen_admission_corpus.py")
+        message(FATAL_ERROR "psizam at \"${vm_admission_psizam}\" has no admission corpus generator")
+    endif()
+    add_test(NAME VmAdmissionCorpus
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/run_vm_admission_corpus.py"
+            --tool "$<TARGET_FILE:VmAdmissionFuzz>"
+            --psizam "${vm_admission_psizam}"
+            --dir "${CMAKE_CURRENT_BINARY_DIR}/vm-admission-corpus")
+    set_tests_properties(VmAdmissionCorpus PROPERTIES TIMEOUT 300 PROCESSORS 2)
 endif()
 
 add_executable(NativeAotCacheTests NativeAotCacheTests.cpp ../src/NativeAotCache.cpp)

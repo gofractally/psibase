@@ -971,36 +971,45 @@ namespace
       }
    };
 
-   // A service the chain admits and wasmtime refuses to compile. With every
-   // limit a chain value below the engines' own (gofractally/psibase#2262),
-   // the typed-reference forms refused by admission (gofractally/psizam#6)
-   // and the five disagreements of gofractally/psizam#7 closed, what is
-   // left is where psizam's validator and wasmtime's still disagree
-   // (gofractally/psibase#2266). This is one, found by the probe set of
-   // that issue: a function body with ref.func of a function that no
-   // element segment, export or global declares, which the specification
-   // refuses and psizam does not check. When psizam refuses it the tests
-   // that use this need another example, or a hook that makes the compile
-   // fail.
-   // start and called, both empty, and a third function: ref.func 2; drop.
-   constexpr std::string_view compilerRefusal = "undeclared function reference";
-   std::vector<std::uint8_t>  admittedButRefusedByWasmtime()
+   // A service the chain admits and the engine's compiler refuses. No
+   // module that occurs naturally is known as of psizam 2e3ef65: the last
+   // one used here, a function body with ref.func of a function nothing
+   // declares, is now refused by psizam's parser, and psizam's structured
+   // corpus of about 8,200 modules has none that admission accepts and
+   // wasmtime refuses (the test VmAdmissionCorpus is the evidence, and
+   // fails when one appears; gofractally/psibase#2262). The case still has
+   // to be handled, because another engine or a later wasmtime may refuse
+   // what this one compiles, so the tests make it: a valid service, and a
+   // compile hook that fails this engine's compile of it as its compiler
+   // would. The hook runs where the compile does, after the code is stored
+   // and before the engine's compiler is called.
+   constexpr std::string_view compilerRefusal = "refused by the compiler (test hook)";
+   std::vector<std::uint8_t>  admittedButRefusedByCompiler()
    {
       const EntryPoints         entry{0, 0};
-      std::vector<std::uint8_t> types{3}, declared{3}, exported{2}, bodies{3};
+      std::vector<std::uint8_t> types{2}, declared{2}, exported{2}, bodies{2};
       types.insert(types.end(), entry.types.begin(), entry.types.end());
-      types.insert(types.end(), {0x60, 0, 0});  // type 2: () -> ()
       declared.insert(declared.end(), entry.functions.begin(), entry.functions.end());
-      declared.push_back(2);
       exported.insert(exported.end(), entry.exports.begin(), entry.exports.end());
       bodies.insert(bodies.end(), entry.bodies.begin(), entry.bodies.end());
-      bodies.insert(bodies.end(), {5, 0, 0xd2, 2, 0x1a, 0x0b});
+      // What tells this module from the other tests' empty service.
       auto code = wasmModule({});
       section(code, 1, types);
       section(code, 3, declared);
       section(code, 7, exported);
       section(code, 10, bodies);
+      section(code, 0, {7, 'r', 'e', 'f', 'u', 's', 'e', 'd'});
       return code;
+   }
+   template <typename Cache>
+   void refuseCompileOf(Cache& cache, const psibase::Checksum256& refused)
+   {
+      cache.setCompileHook(
+          [refused](const psibase::Checksum256& hash)
+          {
+             if (hash == refused)
+                throw std::runtime_error(std::string(compilerRefusal));
+          });
    }
 
    // A valid module that takes far longer to compile than to admit:
@@ -1172,10 +1181,11 @@ TEST_CASE("Code the engine's compiler refuses after admission is stored, not a t
 {
    // Such a refusal must not decide the transaction: another engine
    // compiles the code.
-   const auto code = admittedButRefusedByWasmtime();
+   const auto code = admittedButRefusedByCompiler();
    CHECK_NOTHROW(psibase::admitNativeWasm(code, {}, 0));
    TempDirectory artifacts;
    NativeService fixture{artifacts.path / "modules"};
+   refuseCompileOf(fixture.cache, CodeWriter::row(code).codeHash);
    CodeWriter    writer{fixture};
    CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
    CHECK(writer.stored(psibase::DbId::native, code));
@@ -1939,12 +1949,13 @@ TEST_CASE("Code this node's compiler refuses does not keep a producer deferring"
 {
    if (!isWasmtime())
       SKIP("the refusal is wasmtime's");
-   // Admitted by the chain, refused by wasmtime's compiler.
-   const auto code = admittedButRefusedByWasmtime();
+   // Admitted by the chain, refused by the compiler (by the hook).
+   const auto code = admittedButRefusedByCompiler();
    const auto hash = CodeWriter::row(code).codeHash;
 
    TempDirectory artifacts;
    NativeService fixture{artifacts.path / "modules"};
+   refuseCompileOf(fixture.cache, hash);
    CodeWriter    writer{fixture};
    fixture.block.deferUncompiledCode = true;
    CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
