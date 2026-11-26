@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <csignal>
 #include <cstdlib>
+#include <ctime>
 #include <map>
 
 // Optional call profile: with PSIBASE_CALL_PROFILE set, the time spent in each
@@ -715,6 +716,26 @@ namespace psibase
             throw std::runtime_error(
                 "this node is compiling as many services as it does at once; try again "
                 "shortly");
+         if (compile.start == WasmCache::CompileStart::notRetried)
+         {
+            // Nothing was compiled for this run, and nothing is charged.
+            auto utc = [](std::chrono::system_clock::time_point time)
+            {
+               const std::time_t seconds = std::chrono::system_clock::to_time_t(time);
+               std::tm           parts{};
+               gmtime_r(&seconds, &parts);
+               char text[32];
+               std::strftime(text, sizeof(text), "%Y-%m-%dT%H:%M:%SZ", &parts);
+               return std::string(text);
+            };
+            const auto& given = *compile.notRetried;
+            throw std::runtime_error(
+                "service code did not compile within " +
+                std::to_string(
+                    std::chrono::duration_cast<std::chrono::milliseconds>(given.bound).count()) +
+                " ms on this node at " + utc(given.at) + " and is not being retried until " +
+                utc(given.until));
+         }
          if (compile.start == WasmCache::CompileStart::started)
             startedCompileTime += RunClock::now() - begin;
          if (compile.wait == WasmCache::CompileWait::inFlight)

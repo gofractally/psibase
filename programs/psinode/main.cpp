@@ -1307,7 +1307,8 @@ void run(const std::string&              db_path,
           PSIBASE_LOG(psibase::loggers::generic::get(), info)
               << "Service modules: " << stats.compiled << " compiled, " << stats.loaded
               << " loaded from the cache, " << stats.discarded << " cache entries discarded, "
-              << stats.compilesAbandoned << " compiles abandoned";
+              << stats.compilesAbandoned << " compiles abandoned, " << stats.compilesNotRetried
+              << " speculative runs not compiled for";
        }};
    auto sharedState = std::make_shared<psibase::SharedState>(std::move(database), wasmCache);
    auto system      = sharedState->getSystemContext();

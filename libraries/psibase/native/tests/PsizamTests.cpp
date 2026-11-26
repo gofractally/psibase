@@ -2431,10 +2431,11 @@ TEST_CASE("Speculative runs start no more compiles than the node allows at once"
    CHECK_THROWS_WITH(writer.put(psibase::DbId::native, beyond),
                      Catch::Matchers::ContainsSubstring("compiling as many services"));
    CHECK_FALSE(writer.stored(psibase::DbId::native, beyond));
-   // Code already being compiled is not a further compile: the run joins
-   // the one in flight, which has been given up.
+   // Code whose compile was just given up is not compiled again so soon,
+   // whether or not its thread has returned: no further compile.
    CHECK_THROWS_WITH(writer.put(psibase::DbId::native, largeModule(40, 4, 10)),
-                     Catch::Matchers::ContainsSubstring("took too long to compile"));
+                     Catch::Matchers::ContainsSubstring("is not being retried until"));
+   CHECK(fixture.cache.stats().compilesNotRetried == 1);
    // A block being applied is not refused: its compile queues.
    CHECK(fixture.cache.compileInBackground(
              CodeWriter::row(beyond).codeHash,
