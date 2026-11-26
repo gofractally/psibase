@@ -37,7 +37,7 @@ pub mod token_stream;
 pub mod token_swap;
 pub mod tokens;
 pub mod transact;
-pub mod verify_bear1;
+pub mod verify_br1;
 pub mod verify_k1;
 pub mod verify_r1;
 pub mod virtual_server;

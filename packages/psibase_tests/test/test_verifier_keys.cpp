@@ -10,14 +10,14 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/SetCode.hpp>
-#include <services/system/VerifyBear1.hpp>
+#include <services/system/VerifyBr1.hpp>
 #include <services/system/VerifyK1.hpp>
 #include <services/system/VerifyR1.hpp>
 
 #include <array>
 
 using namespace psibase;
-using SystemService::VerifyBear1;
+using SystemService::VerifyBr1;
 using SystemService::VerifyK1;
 using SystemService::VerifyR1;
 using SystemService::AuthSig::PrivateKeyInfo;
@@ -99,7 +99,7 @@ namespace
       else if (service == VerifyR1::service)
          return "VerifyR1.wasm";
       else
-         return "VerifyBear1.wasm";
+         return "VerifyBr1.wasm";
    }
 
    struct StoredKey
@@ -360,25 +360,25 @@ TEST_CASE("verifierFor: the verifiers for a key")
       CHECK(service.str() == name);
       CHECK(AccountNumber{name} == service);
    }
-   for (auto service : {VerifyK1::service, VerifyR1::service, VerifyBear1::service})
+   for (auto service : {VerifyK1::service, VerifyR1::service, VerifyBr1::service})
    {
       CHECK(service.value != 0);
       CHECK(AccountNumber{service.str()}.value == service.value);
       CHECK(!service.str().empty());
    }
    CHECK(VerifyK1::service != VerifyR1::service);
-   CHECK(VerifyK1::service != VerifyBear1::service);
-   CHECK(VerifyR1::service != VerifyBear1::service);
+   CHECK(VerifyK1::service != VerifyBr1::service);
+   CHECK(VerifyR1::service != VerifyBr1::service);
 
    // The default for each type, and what is allowed
    CHECK(verifierFor(KeyType::secp256k1) == VerifyK1::service);
    CHECK(verifierFor(KeyType::secp256r1) == VerifyR1::service);
    CHECK(std::ranges::equal(allowedVerifiers(KeyType::secp256k1), std::array{VerifyK1::service}));
    CHECK(std::ranges::equal(allowedVerifiers(KeyType::secp256r1),
-                            std::array{VerifyR1::service, VerifyBear1::service}));
+                            std::array{VerifyR1::service, VerifyBr1::service}));
    CHECK(verifiedKeyType(VerifyK1::service) == KeyType::secp256k1);
    CHECK(verifiedKeyType(VerifyR1::service) == KeyType::secp256r1);
-   CHECK(verifiedKeyType(VerifyBear1::service) == KeyType::secp256r1);
+   CHECK(verifiedKeyType(VerifyBr1::service) == KeyType::secp256r1);
    CHECK(!verifiedKeyType(SystemService::AuthSig::AuthSig::service));
    CHECK(!verifiedKeyType(AccountNumber{}));
 
@@ -405,7 +405,7 @@ TEST_CASE("verifierFor: the verifiers for a key")
 
          for (const Bytes& encoded : {key, small})
          {
-            for (auto candidate : {VerifyK1::service, VerifyR1::service, VerifyBear1::service})
+            for (auto candidate : {VerifyK1::service, VerifyR1::service, VerifyBr1::service})
             {
                bool allowed = std::ranges::contains(allowedVerifiers(type), candidate);
                CHECK(isAllowedVerifier(candidate, encoded) == allowed);
@@ -446,7 +446,7 @@ TEST_CASE("verifierFor: the verifiers for a key")
          INFO("key size " << key.size());
          CHECK(!verifierFor(key));
          CHECK(!keyType(key));
-         for (auto candidate : {VerifyK1::service, VerifyR1::service, VerifyBear1::service})
+         for (auto candidate : {VerifyK1::service, VerifyR1::service, VerifyBr1::service})
             CHECK(!isAllowedVerifier(candidate, key));
       }
    }
@@ -588,26 +588,26 @@ TEST_CASE("auth-sig: an account chooses its verifier")
    CHECK(signedBy(VerifyR1::service, nop()).succeeded());
    // The other allowed verifier checks the signature and finds it good, but
    // the account did not choose it.
-   CHECK(signedBy(VerifyBear1::service, nop()).failed("Authorization for"));
+   CHECK(signedBy(VerifyBr1::service, nop()).failed("Authorization for"));
 
    SECTION("opting into the second verifier")
    {
       // Still under the old verifier while the change is made
       REQUIRE(
-          signedBy(VerifyR1::service, authSig.setKeyVerifier(VerifyBear1::service, pub)).succeeded());
-      CHECK(stored().verifier == VerifyBear1::service);
+          signedBy(VerifyR1::service, authSig.setKeyVerifier(VerifyBr1::service, pub)).succeeded());
+      CHECK(stored().verifier == VerifyBr1::service);
       CHECK(stored().pubkey == pub);
 
-      CHECK(signedBy(VerifyBear1::service, nop()).succeeded());
+      CHECK(signedBy(VerifyBr1::service, nop()).succeeded());
       // The default verifier's claims are now refused, though the signature is good.
       CHECK(signedBy(VerifyR1::service, nop()).failed("Authorization for"));
       CHECK(signedBy(VerifyK1::service, nop()).failed("unsupported public key"));
 
       // setKey goes back to the default
-      REQUIRE(signedBy(VerifyBear1::service, authSig.setKey(pub)).succeeded());
+      REQUIRE(signedBy(VerifyBr1::service, authSig.setKey(pub)).succeeded());
       CHECK(stored().verifier == VerifyR1::service);
       CHECK(signedBy(VerifyR1::service, nop()).succeeded());
-      CHECK(signedBy(VerifyBear1::service, nop()).failed("Authorization for"));
+      CHECK(signedBy(VerifyBr1::service, nop()).failed("Authorization for"));
    }
    SECTION("choosing the default explicitly")
    {
@@ -629,20 +629,20 @@ TEST_CASE("auth-sig: an account chooses its verifier")
                 .failed(notAllowed));
       // A verify service that runs an allowed verifier's code under another name
       auto copy = AccountNumber{"copycopy"};
-      t.addService(copy, "VerifyBear1.wasm", CodeRow::isVerify);
+      t.addService(copy, "VerifyBr1.wasm", CodeRow::isVerify);
       CHECK(
           signedBy(VerifyR1::service, authSig.setKeyVerifier(copy, pub)).failed(notAllowed));
 
       // A secp256k1 key has one verifier.
       auto k1 = getSubjectPublicKeyInfo(PrivateKeyInfo::create("secp256k1"));
-      CHECK(signedBy(VerifyR1::service, authSig.setKeyVerifier(VerifyBear1::service, k1))
+      CHECK(signedBy(VerifyR1::service, authSig.setKeyVerifier(VerifyBr1::service, k1))
                 .failed(notAllowed));
       CHECK(signedBy(VerifyR1::service, authSig.setKeyVerifier(VerifyR1::service, k1))
                 .failed(notAllowed));
       // A key nothing verifies
       auto bad = pub;
       bad.data.push_back(0);
-      CHECK(signedBy(VerifyR1::service, authSig.setKeyVerifier(VerifyBear1::service, bad))
+      CHECK(signedBy(VerifyR1::service, authSig.setKeyVerifier(VerifyBr1::service, bad))
                 .failed("unsupported public key"));
 
       // Nothing changed.

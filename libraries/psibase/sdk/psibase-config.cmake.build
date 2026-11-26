@@ -63,7 +63,7 @@ function(add_libs suffix)
         @ROOT_SOURCE_DIR@/packages/system/SetCode/include
         @ROOT_SOURCE_DIR@/packages/system/StagedTx/service/cpp/include
         @ROOT_SOURCE_DIR@/packages/system/Transact/include
-        @ROOT_SOURCE_DIR@/packages/system/VerifyBear1/include
+        @ROOT_SOURCE_DIR@/packages/system/VerifyBr1/include
         @ROOT_SOURCE_DIR@/packages/system/VerifyK1/include
         @ROOT_SOURCE_DIR@/packages/system/VerifyR1/include
         @ROOT_SOURCE_DIR@/packages/system/VirtualServer/service/cpp/include

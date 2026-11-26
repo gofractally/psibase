@@ -27,11 +27,11 @@ pub const VERIFY_K1: AccountNumber = AccountNumber::new(account_raw!("verify-k1"
 pub const VERIFY_R1: AccountNumber = AccountNumber::new(account_raw!("verify-r1"));
 /// Verifies secp256r1 (P-256) signatures with a second, independent
 /// implementation. An account may choose it in place of the default.
-pub const VERIFY_BEAR1: AccountNumber = AccountNumber::new(account_raw!("verify-br1"));
+pub const VERIFY_BR1: AccountNumber = AccountNumber::new(account_raw!("verify-br1"));
 
 // The verifiers allowed for each key type, the default first.
 const K1_VERIFIERS: [AccountNumber; 1] = [VERIFY_K1];
-const R1_VERIFIERS: [AccountNumber; 2] = [VERIFY_R1, VERIFY_BEAR1];
+const R1_VERIFIERS: [AccountNumber; 2] = [VERIFY_R1, VERIFY_BR1];
 
 // AlgorithmIdentifier { id-ecPublicKey, namedCurve }
 const K1_ALGORITHM: [u8; 18] = [
@@ -151,11 +151,11 @@ mod tests {
         assert_eq!(VERIFY_R1.to_string(), "verify-r1");
         assert_eq!("verify-k1".parse::<AccountNumber>().unwrap(), VERIFY_K1);
         assert_eq!("verify-r1".parse::<AccountNumber>().unwrap(), VERIFY_R1);
-        assert_eq!(VERIFY_BEAR1.to_string(), "verify-br1");
-        assert_eq!("verify-br1".parse::<AccountNumber>().unwrap(), VERIFY_BEAR1);
+        assert_eq!(VERIFY_BR1.to_string(), "verify-br1");
+        assert_eq!("verify-br1".parse::<AccountNumber>().unwrap(), VERIFY_BR1);
         assert_ne!(VERIFY_K1, VERIFY_R1);
-        assert_ne!(VERIFY_R1, VERIFY_BEAR1);
-        assert_ne!(VERIFY_K1, VERIFY_BEAR1);
+        assert_ne!(VERIFY_R1, VERIFY_BR1);
+        assert_ne!(VERIFY_K1, VERIFY_BR1);
     }
 
     #[test]
@@ -165,19 +165,19 @@ mod tests {
         let k1 = spki(KeyType::Secp256k1, &point);
         let r1 = spki(KeyType::Secp256r1, &point);
         assert_eq!(allowed_verifiers(&k1), &[VERIFY_K1]);
-        assert_eq!(allowed_verifiers(&r1), &[VERIFY_R1, VERIFY_BEAR1]);
+        assert_eq!(allowed_verifiers(&r1), &[VERIFY_R1, VERIFY_BR1]);
         assert!(allowed_verifiers(&[]).is_empty());
 
         assert!(is_allowed_verifier(VERIFY_K1, &k1));
         assert!(!is_allowed_verifier(VERIFY_R1, &k1));
-        assert!(!is_allowed_verifier(VERIFY_BEAR1, &k1));
+        assert!(!is_allowed_verifier(VERIFY_BR1, &k1));
         assert!(is_allowed_verifier(VERIFY_R1, &r1));
-        assert!(is_allowed_verifier(VERIFY_BEAR1, &r1));
+        assert!(is_allowed_verifier(VERIFY_BR1, &r1));
         assert!(!is_allowed_verifier(VERIFY_K1, &r1));
         assert!(!is_allowed_verifier(VERIFY_R1, &[]));
         assert!(!is_allowed_verifier(AccountNumber::new(account_raw!("auth-sig")), &r1));
 
-        assert_eq!(verified_key_type(VERIFY_BEAR1), Some(KeyType::Secp256r1));
+        assert_eq!(verified_key_type(VERIFY_BR1), Some(KeyType::Secp256r1));
         // The default is the first of the allowed verifiers.
         assert_eq!(verifier_for(&r1), Some(VERIFY_R1));
         assert_eq!(verifier_for(&k1), Some(VERIFY_K1));

@@ -1,4 +1,4 @@
-#include <services/system/VerifyBear1.hpp>
+#include <services/system/VerifyBr1.hpp>
 
 #include <psibase/api.hpp>
 #include <psibase/check.hpp>
@@ -189,7 +189,7 @@ extern "C" void start(AccountNumber thisService)
 
 int main(int argc, const char* const* argv)
 {
-   return ::psibase::serviceMain<SystemService::VerifyBear1>(argc, argv);
+   return ::psibase::serviceMain<SystemService::VerifyBr1>(argc, argv);
 }
 
 #endif

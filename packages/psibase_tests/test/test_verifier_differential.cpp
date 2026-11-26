@@ -13,7 +13,7 @@
 #include <psibase/verifier.hpp>
 #include <psio/json_value.hpp>
 #include <services/system/AuthSig.hpp>
-#include <services/system/VerifyBear1.hpp>
+#include <services/system/VerifyBr1.hpp>
 #include <services/system/VerifyK1.hpp>
 #include <services/system/VerifyR1.hpp>
 
@@ -22,7 +22,7 @@
 #include <map>
 
 using namespace psibase;
-using SystemService::VerifyBear1;
+using SystemService::VerifyBr1;
 using SystemService::VerifyR1;
 using SystemService::AuthSig::PrivateKeyInfo;
 
@@ -205,7 +205,7 @@ namespace
             t.startBlock();
             inBlock = 0;
          }
-         std::string decisions[2] = {decide(VerifyR1::service, c), decide(VerifyBear1::service, c)};
+         std::string decisions[2] = {decide(VerifyR1::service, c), decide(VerifyBr1::service, c)};
          bool        accepted[2]  = {decisions[0].empty(), decisions[1].empty()};
          ++tally.cases;
          for (int i = 0; i < 2; ++i)
@@ -222,7 +222,7 @@ namespace
                    toHex(std::span<const unsigned char>{c.hash.data(), c.hash.size()}) +
                    "\n  sig  " + toHex(c.signature) + "\n  verify-r1: " +
                    (accepted[0] ? "accepted" : decisions[0]) + "\n  " +
-                   VerifyBear1::service.str() + ": " + (accepted[1] ? "accepted" : decisions[1]);
+                   VerifyBr1::service.str() + ": " + (accepted[1] ? "accepted" : decisions[1]);
          };
          if (accepted[0] != accepted[1])
          {
@@ -256,7 +256,7 @@ namespace
          for (int i = 0; i < 2; ++i)
          {
             text += i == 0 ? "  reasons given by verify-r1:"
-                           : "  reasons given by " + VerifyBear1::service.str() + ":";
+                           : "  reasons given by " + VerifyBr1::service.str() + ":";
             for (auto& [reason, count] : tally.reasons[i])
                text += " \"" + reason + "\" x" + std::to_string(count);
             text += "\n";
@@ -504,7 +504,7 @@ TEST_CASE("verifiers: time of one verification in its own transaction")
    subjects.push_back({"verify-k1", VerifyK1::service, k1, getSubjectPublicKeyInfo(k1).data});
    subjects.push_back({"verify-r1 as deployed", VerifyR1::service, r1,
                        getSubjectPublicKeyInfo(r1).data});
-   subjects.push_back({VerifyBear1::service.str(), VerifyBear1::service, r1,
+   subjects.push_back({VerifyBr1::service.str(), VerifyBr1::service, r1,
                        getSubjectPublicKeyInfo(r1).data});
    subjects.push_back({"verify-r1 code, not pre-initialized", lazy, r1,
                        getSubjectPublicKeyInfo(r1).data});

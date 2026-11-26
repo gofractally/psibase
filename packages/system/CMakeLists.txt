@@ -58,7 +58,7 @@ function(add suffix)
         SetCode/include
         StagedTx/service/cpp/include
         Transact/include
-        VerifyBear1/include
+        VerifyBr1/include
         VerifyK1/include
         VerifyR1/include
         VirtualServer/service/cpp/include
@@ -81,7 +81,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(HttpServer)
     add_subdirectory(SetCode)
     add_subdirectory(Transact)
-    add_subdirectory(VerifyBear1)
+    add_subdirectory(VerifyBr1)
     add_subdirectory(VerifyK1)
     add_subdirectory(VerifyR1)
 

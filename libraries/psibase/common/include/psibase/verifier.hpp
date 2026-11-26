@@ -40,13 +40,13 @@ namespace psibase
       /// implementation. An account may choose it in place of the default.
       /// (BearSSL. "verify-bear1" would be two characters longer than an
       /// account name can be.)
-      inline constexpr AccountNumber bear1{"verify-br1"};
-      static_assert(k1.value != 0 && r1.value != 0 && bear1.value != 0,
+      inline constexpr AccountNumber br1{"verify-br1"};
+      static_assert(k1.value != 0 && r1.value != 0 && br1.value != 0,
                     "a verifier's name is not a valid account name");
 
       // The verifiers allowed for each key type, the default first.
       inline constexpr AccountNumber k1Verifiers[] = {k1};
-      inline constexpr AccountNumber r1Verifiers[] = {r1, bear1};
+      inline constexpr AccountNumber r1Verifiers[] = {r1, br1};
 
       /// n / 2 for each curve, where n is the group order: the largest s of
       /// a signature in the low-S form. Big-endian.
