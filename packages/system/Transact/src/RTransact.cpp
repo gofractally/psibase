@@ -1259,8 +1259,11 @@ namespace
       std::vector<char> key;  // DER SubjectPublicKeyInfo
       std::int64_t      exp;  // seconds since the epoch
       std::vector<char> sig;  // 64-byte r || s, low-S
+      // The service that verifies sig: any verifier allowed for the key
+      // (psibase/verifier.hpp). The default for the key's type if absent.
+      std::optional<AccountNumber> verifier;
    };
-   PSIO_REFLECT(GuestLoginRequest, key, exp, sig)
+   PSIO_REFLECT(GuestLoginRequest, key, exp, sig, verifier)
 
    struct GuestLoginReply
    {
@@ -1657,7 +1660,9 @@ std::optional<HttpReply> RTransact::serveSys(psio::pssz_view<psibase::HttpReques
       auto host    = std::string(rootHost(request));
       auto message = guestLoginMessage(host, data.exp);
       // Aborts the request if the key is unsupported or the proof is wrong.
-      const AccountNumber    verifier = requireVerifierFor(data.key);
+      const AccountNumber verifier = data.verifier.value_or(requireVerifierFor(data.key));
+      if (!isAllowedVerifier(verifier, data.key))
+         return make400("That service does not verify this kind of key");
       Actor<VerifyInterface> verify(RTransact::service, verifier);
       verify.verifySys(sha256(message.data(), message.size()), Claim{verifier, data.key},
                        data.sig);

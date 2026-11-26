@@ -56,11 +56,10 @@ pub mod service {
         claims: Vec<Claim>,
     ) -> bool {
         let has_key = |key: &SubjectPublicKeyInfo| {
-            // A claim counts only if it names the verifier for this key's type.
-            let verifier = psibase::verifier_for(&key.0);
-            claims
-                .iter()
-                .any(|claim| Some(claim.service) == verifier && claim.rawData == key.0)
+            // A claim counts only if it names a verifier allowed for this key's type.
+            claims.iter().any(|claim| {
+                claim.rawData == key.0 && psibase::is_allowed_verifier(claim.service, &key.0)
+            })
         };
         let row = AuthTable::read()
             .get_index_pk()

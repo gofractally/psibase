@@ -4,6 +4,8 @@ use serde::Deserialize;
 #[derive(Deserialize, Debug)]
 pub struct AuthRecord {
     pub pubkey: Pem,
+    /// The service the account's claims must name
+    pub verifier: String,
 }
 
 #[derive(Deserialize, Debug)]

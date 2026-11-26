@@ -24,11 +24,17 @@ namespace SystemService
          /// The public key included in the claims for each transaction sent by this account.
          SubjectPublicKeyInfo pubkey;
 
+         /// The service that verifies signatures made with the key: the service the
+         /// account's claims must name. One of the verifiers allowed for the key's
+         /// type (psibase/verifier.hpp); the default for the type unless the account
+         /// chose another with `setKeyVerifier`.
+         psibase::AccountNumber verifier;
+
          using ByPubkey = psibase::CompositeKey<
              psibase::NestedKey<&AuthRecord::pubkey, &SubjectPublicKeyInfo::fingerprint>{},
              &AuthRecord::account>;
       };
-      PSIO_REFLECT(AuthRecord, account, pubkey)
+      PSIO_REFLECT(AuthRecord, account, pubkey, verifier)
 
       /// The `auth-sig` service is an auth service that can be used to authenticate actions for accounts.
       ///
@@ -49,7 +55,8 @@ namespace SystemService
          /// This action is automatically called by `transact` when an account using this auth service submits a
          /// transaction.
          ///
-         /// This action verifies that the transaction contains a claim for the user's public key.
+         /// This action verifies that the transaction contains a claim for the user's public key
+         /// that names the verifier stored with the key.
          bool checkAuthSys(uint32_t                    flags,
                            psibase::AccountNumber      sender,
                            ServiceMethod               action,
@@ -67,8 +74,16 @@ namespace SystemService
          /// Set the sender's public key
          ///
          /// This is the public key that must be claimed by the transaction whenever a sender using this auth service
-         /// submits a transaction.
+         /// submits a transaction. Signatures are verified by the default verifier for the key's type.
          void setKey(SubjectPublicKeyInfo key);
+
+         /// Set the sender's public key and choose the service that verifies its signatures
+         ///
+         /// `verifier` must be one of the verifiers allowed for the key's type; see
+         /// `psibase/verifier.hpp`. From then on the sender's claims must name `verifier`, and
+         /// claims that name any other service are refused, including the default
+         /// verifier for the key's type.
+         void setKeyVerifier(psibase::AccountNumber verifier, SubjectPublicKeyInfo key);
 
          /// Get the accounts this auth service delegates authority to for a sender.
          std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber sender);
@@ -98,12 +113,14 @@ namespace SystemService
                           std::vector<psibase::AccountNumber> rejecters);
 
          /// Create a new account using this auth service configured with the specified public key.
+         /// Signatures are verified by the default verifier for the key's type.
          void newAccount(psibase::AccountNumber name, SubjectPublicKeyInfo key);
       };
       PSIO_REFLECT(AuthSig,  //
                    method(checkAuthSys, flags, sender, action, claims),
                    method(canAuthUserSys, user),
                    method(setKey, key),
+                   method(setKeyVerifier, verifier, key),
                    method(getDlgsSys, sender),
                    method(isAuthSys, sender, authorizers),
                    method(isRejectSys, sender, rejecters),

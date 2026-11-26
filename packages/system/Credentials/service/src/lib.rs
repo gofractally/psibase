@@ -76,10 +76,9 @@ pub mod service {
             VirtualServer::call_as(CRED_SYS).bill_to_sub(credential.id.to_string());
         }
 
-        assert_eq!(
-            Some(claim.service),
-            psibase::verifier_for(&claim.rawData),
-            "Claim must name the verifier for its key",
+        assert!(
+            psibase::is_allowed_verifier(claim.service, &claim.rawData),
+            "Claim must name a verifier allowed for its key",
         );
 
         assert_eq!(

@@ -28,7 +28,7 @@ struct KeyReply
 void CredResThief::create()
 {
    auto owner = getSender();
-   auto query = std::format(R"(query {{ account(name: "{}") {{ account pubkey }} }})", owner.str());
+   auto query = std::format(R"(query {{ account(name: "{}") {{ account pubkey verifier }} }})", owner.str());
    auto reply = to<RAuthSig>()
                     .serveSys(HttpRequest{
                         .host        = "auth-sig.psibase.localhost:8080",

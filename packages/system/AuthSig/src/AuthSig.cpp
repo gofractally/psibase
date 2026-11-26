@@ -25,10 +25,12 @@ namespace SystemService
       }
 
       // A key is stored only if some verifier accepts it; otherwise nothing
-      // could ever authorize the account.
-      void checkKey(const SubjectPublicKeyInfo& key)
+      // could ever authorize the account. Returns the default verifier.
+      AccountNumber defaultVerifier(const SubjectPublicKeyInfo& key)
       {
-         check(verifierFor(key.data).has_value(), "unsupported public key");
+         auto verifier = verifierFor(key.data);
+         check(verifier.has_value(), "unsupported public key");
+         return *verifier;
       }
 
       bool AuthSig::checkAuthSys(uint32_t                    flags,
@@ -40,15 +42,13 @@ namespace SystemService
 
          check(row.has_value(), "sender does not have a public key");
 
-         // A claim counts only if it names the verifier for the stored key's
-         // type: any other service would be checking something else.
+         // A claim counts only if it names the verifier stored with the key:
+         // any other service would be checking something else, and the
+         // account chose this one.
          const auto& expected = row->pubkey.data;
-         const auto  verifier = verifierFor(expected);
-         if (!verifier)
-            return false;
          for (auto& claim : claims)
          {
-            if (claim.service == *verifier && equalByteVector(claim.rawData, expected))
+            if (claim.service == row->verifier && equalByteVector(claim.rawData, expected))
             {
                return true;
             }
@@ -65,9 +65,20 @@ namespace SystemService
 
       void AuthSig::setKey(SubjectPublicKeyInfo key)
       {
-         checkKey(key);
+         auto verifier  = defaultVerifier(key);
          auto authTable = open<AuthTable>(KvMode::readWrite);
-         authTable.put(AuthRecord{.account = getSender(), .pubkey = std::move(key)});
+         authTable.put(
+             AuthRecord{.account = getSender(), .pubkey = std::move(key), .verifier = verifier});
+      }
+
+      void AuthSig::setKeyVerifier(psibase::AccountNumber verifier, SubjectPublicKeyInfo key)
+      {
+         defaultVerifier(key);
+         check(isAllowedVerifier(verifier, key.data),
+               "verifier is not allowed for this type of key");
+         auto authTable = open<AuthTable>(KvMode::readWrite);
+         authTable.put(
+             AuthRecord{.account = getSender(), .pubkey = std::move(key), .verifier = verifier});
       }
 
       std::vector<psibase::AccountNumber> AuthSig::getDlgsSys(psibase::AccountNumber sender)
@@ -89,9 +100,9 @@ namespace SystemService
 
       void AuthSig::newAccount(psibase::AccountNumber name, SubjectPublicKeyInfo key)
       {
-         checkKey(key);
+         auto verifier  = defaultVerifier(key);
          auto authTable = open<AuthTable>(KvMode::readWrite);
-         authTable.put(AuthRecord{.account = name, .pubkey = std::move(key)});
+         authTable.put(AuthRecord{.account = name, .pubkey = std::move(key), .verifier = verifier});
 
          to<Accounts>().newAccount(name, AuthSig::service, NewAccountMode::requireNew);
       }

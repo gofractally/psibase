@@ -58,13 +58,12 @@ impl HookUserAuth for AuthSig {
             return Err(Unauthorized("on_user_auth_claim".to_string()).into());
         }
 
-        let raw_data = AuthSig::to_der(get_pubkey(&account_name)?)?;
-        let verify_service = psibase::verifier_for(&raw_data)
-            .ok_or_else(|| CryptoError("unsupported public key".to_string()))?
-            .to_string();
+        // The verifier is the one the account stored with its key, which
+        // need not be the default for the key's type.
+        let record = get_key_record(&account_name)?;
         Ok(Some(Claim {
-            verify_service,
-            raw_data,
+            verify_service: record.verifier,
+            raw_data: AuthSig::to_der(record.pubkey)?,
         }))
     }
 

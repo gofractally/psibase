@@ -273,12 +273,16 @@ namespace
       auto row = to<Accounts>().getAccount(account);
       if (!row || row->authService != AuthSig::AuthSig::service)
          return false;
-      auto verifier = verifierFor(key);
-      if (!verifier)
+      auto type = keyType(key);
+      if (!type)
          return false;
-      return to<AuthSig::AuthSig>().checkAuthSys(
-          AuthInterface::firstAuthFlag, account, ServiceMethod{},
-          std::vector<Claim>{Claim{.service = *verifier, .rawData = {key.begin(), key.end()}}});
+      // The account may have chosen any verifier allowed for the key; which
+      // one makes no difference to whose key it is.
+      std::vector<Claim> claims;
+      for (auto verifier : allowedVerifiers(*type))
+         claims.push_back(Claim{.service = verifier, .rawData = {key.begin(), key.end()}});
+      return to<AuthSig::AuthSig>().checkAuthSys(AuthInterface::firstAuthFlag, account,
+                                                 ServiceMethod{}, std::move(claims));
    }
 
    // Notices that an issued creation transaction has landed.

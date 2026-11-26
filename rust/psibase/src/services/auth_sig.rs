@@ -199,6 +199,12 @@ pub struct AuthRecord {
 
     /// The public key included in the claims for each transaction sent by this account.
     pub pubkey: SubjectPublicKeyInfo,
+
+    /// The service that verifies signatures made with the key: the service the
+    /// account's claims must name. One of the verifiers allowed for the key's
+    /// type (`psibase::allowed_verifiers`); the default for the type unless the
+    /// account chose another with `setKeyVerifier`.
+    pub verifier: crate::AccountNumber,
 }
 
 /// The `auth-sig` service is an auth service that can be used to authenticate actions for accounts.
@@ -219,7 +225,8 @@ mod service {
     /// This action is automatically called by `transact` when an account using this auth service submits a
     /// transaction.
     ///
-    /// This action verifies that the transaction contains a claim for the user's public key.
+    /// This action verifies that the transaction contains a claim for the user's public key
+    /// that names the verifier stored with the key.
     #[action]
     fn checkAuthSys(
         flags: u32,
@@ -245,9 +252,20 @@ mod service {
     /// Set the sender's public key
     ///
     /// This is the public key that must be claimed by the transaction whenever a sender using this auth service
-    /// submits a transaction.
+    /// submits a transaction. Signatures are verified by the default verifier for the key's type.
     #[action]
     fn setKey(key: SubjectPublicKeyInfo) {
+        unimplemented!()
+    }
+
+    /// Set the sender's public key and choose the service that verifies its signatures
+    ///
+    /// `verifier` must be one of the verifiers allowed for the key's type; see
+    /// `psibase::allowed_verifiers`. From then on the sender's claims must name `verifier`,
+    /// and claims that name any other service are refused, including the default
+    /// verifier for the key's type.
+    #[action]
+    fn setKeyVerifier(verifier: AccountNumber, key: SubjectPublicKeyInfo) {
         unimplemented!()
     }
 
@@ -286,6 +304,7 @@ mod service {
     }
 
     /// Create a new account using this auth service configured with the specified public key.
+    /// Signatures are verified by the default verifier for the key's type.
     #[action]
     fn newAccount(name: AccountNumber, key: SubjectPublicKeyInfo) {
         unimplemented!()
