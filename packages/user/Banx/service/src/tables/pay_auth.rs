@@ -1,6 +1,6 @@
 use psibase::{services::tokens::Quantity, AccountNumber, Table, TimePointSec};
 
-use super::{assert_account_exists, now, path_required_send, run_path};
+use super::{assert_account_exists, now, path_required_send, run_path, Connection};
 use crate::tables::tables::{Asset, InitRow, PathHop, PayAuth, PayAuthTab};
 
 impl PayAuth {
@@ -89,6 +89,11 @@ impl PayAuth {
             required.value <= row.max_spend.value,
             "pay auth send above max_spend"
         );
+        // A payer-run series is the payer's own transaction, so she chose the
+        // first hop. When the payee runs it, she did not.
+        if sender != row.payer {
+            row.assert_first_hop_agreed(hops[0].account, required);
+        }
         row.next_due.seconds = row
             .next_due
             .seconds
@@ -97,6 +102,25 @@ impl PayAuth {
         row.save();
         let memo = format!("pay-auth {}", row.id);
         run_path(row.payer, hops, expected, required, row.amount, 0, &memo);
+    }
+
+    /// Consent to the first hop of a payee-run series, which the payer did
+    /// not pick. Anyone can extend a line to her unasked, so a line to her is
+    /// not consent. This asks what a forwarder with `allow_unknown` off asks of
+    /// its next hop: the first creditor is the payee she named, or she knows
+    /// them (she lined them, even at 0, or already owes them), or the draw only
+    /// unwinds a claim they owe her and creates no new debt.
+    fn assert_first_hop_agreed(&self, first: AccountNumber, draw: Quantity) {
+        if first == self.payee {
+            return;
+        }
+        if Connection::get_live(first, self.payer, self.asset_id).new_draw(draw) == 0 {
+            return;
+        }
+        assert!(
+            Connection::knows(self.payer, first, self.asset_id),
+            "payer does not know the first hop (she has no line to them or debt to them)"
+        );
     }
 
     /// Erase the row. Does not draw.

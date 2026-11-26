@@ -82,6 +82,17 @@ UI: `/requests` (Plus to create). An account-row Request button opens the same m
 
 **Find path** (`quotePath` on the query service) needs a signed-in caller who is the payer or the payee. It searches a scoped subgraph (lines + reverse claims + clearing + FX), not the full network, and returns the sealed route with amounts in raw units, an expiry, and a hop count. It does not return the hops. Exact-in: amount is what you send. Exact-out: amount is what the payee should receive; the quote finds the send. The UI shows the send, the receive, and the hop count only.
 
+### Repeating payments the payee runs
+
+The payer picks the route of any payment she signs. A repeating payment is different: the payee can run it, so the payee picks the route. A line to the payer is no protection, because anyone can extend one unasked. A payee could open a line to the payer from a second account, charge a high forwarding fee on it, and route the payment through it, collecting up to `max_spend` minus `amount` every period and leaving the payer owing that account.
+
+So when the payee runs a series, the first hop must be one of:
+- the payee, whom the payer named when creating the series,
+- an account the payer **knows**: she has a line to them (even at limit 0) or already owes them, or
+- an account that owes the payer at least the draw, so it only cancels their debt.
+
+This is the same test a forwarder with `allow_unknown` off applies to its next hop. The payer's own run is her own choice of route and has no such limit. The payee's quote only offers starts the chain will accept, so a payer who wants her payee able to collect through a hub should line that hub (limit 0 is enough). A hub that forwards to anyone (`allow_unknown` on) still lets a later hop be chosen by the payee, and `max_spend` remains the ceiling.
+
 ### What the seal does and does not hide
 
 The route is sealed with a 12-slot envelope, padded so the blob does not show how many hops were used. The UI and plugin never handle hops. The key is **objective state** and is passed as an action argument, so it is readable by any service and by anyone reading history. The seal is not secrecy from validators.
@@ -158,7 +169,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `rm_sell_clm` / `rm_glb_sell` | Remove sell claim offer |
 | `path_pay` | Multi-hop draw (`min_return`; optional `request_id` ticks an invoice) |
 | `pay_inv` | Pay invoice: exact remaining, `max_spend` budget |
-| `st_pay_ath` / `run_pay_ath` / `rm_pay_ath` | Repeating payment: create (`max_spend` per period) / run the oldest due period / delete |
+| `st_pay_ath` / `run_pay_ath` / `rm_pay_ath` | Repeating payment: create (`max_spend` per period) / run the oldest due period / delete. A payee-run must start at the payee, an account the payer knows, or an account that owes the payer |
 | `sell_claim` | Sell a claim into a buyer’s offer |
 | `buy_claim` | Buy a claim from a seller’s offer |
 | `deposit` | Book a deposit and auto-net (`request_id` 0 or please-book) |

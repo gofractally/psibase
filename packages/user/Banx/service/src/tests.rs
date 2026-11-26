@@ -1092,6 +1092,10 @@ mod tests {
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         let (alice, gary, steve, usd) = quoted_net(&chain);
+        // Steve routes this, so Alice must know the first hop.
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(gary, usd, Quantity::new(0), false)
+            .get()?;
         let start = chain_seconds(&chain);
         let id = schedule(&chain, alice, steve, usd, 400, 1_000, 100, start, 0);
         let q = quote_between(&chain, steve, alice, steve, (usd, usd), 400, true);
@@ -1120,6 +1124,193 @@ mod tests {
             .get()?;
         assert_eq!(pay_row(id).next_due.seconds, start + 100);
         assert_eq!(exp(&chain, steve, gary, usd), 400);
+        assert_eq!(exp(&chain, gary, alice, usd), q.amount_in);
+        Ok(())
+    }
+
+    /// Alice pays Steve 400 a period (ceiling 1000) through Gary. Steve also
+    /// controls `carol`, who lined Alice unasked and charges 60%.
+    fn skim_net(
+        chain: &psibase::Chain,
+    ) -> (
+        AccountNumber,
+        AccountNumber,
+        AccountNumber,
+        AccountNumber,
+        u16,
+    ) {
+        let (alice, gary, steve, usd) = quoted_net(chain);
+        let carol = account!("carol");
+        chain.new_account(carol).unwrap();
+        // Unsolicited: Alice did not ask Carol for this line.
+        Wrapper::push_from(chain, carol)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false)
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, steve)
+            .st_crd_lne(carol, usd, Quantity::new(10_000), false)
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, carol)
+            .st_glb_fwd(usd, Quantity::new(0), PPM_SCALE * 60 / 100, never(), true)
+            .get()
+            .unwrap();
+        (alice, gary, steve, carol, usd)
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_payee_cannot_start_a_series_run_at_an_account_the_payer_does_not_know(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let (alice, _gary, steve, carol, usd) = skim_net(&chain);
+        let start = chain_seconds(&chain);
+        let id = schedule(&chain, alice, steve, usd, 400, 1_000, 100, start, 0);
+        let skim = vec![hop(carol, usd), hop(steve, usd)];
+
+        // Steve runs it through his own account. 400 at 60% costs Alice 1000.
+        let refused = Wrapper::push_from(&chain, steve)
+            .run_pay_ath(id, seal_auth(&chain, alice, skim.clone(), id))
+            .get()
+            .expect_err("Alice never agreed to Carol");
+        assert!(
+            refused
+                .to_string()
+                .contains("payer does not know the first hop"),
+            "{refused}"
+        );
+        assert_eq!(pay_row(id).next_due.seconds, start);
+        assert_eq!(exp(&chain, carol, alice, usd), 0);
+
+        // Her own run is her own choice of route, and needs no such line.
+        Wrapper::push_from(&chain, alice)
+            .run_pay_ath(id, seal_auth(&chain, alice, skim.clone(), id))
+            .get()?;
+        assert_eq!(exp(&chain, carol, alice, usd), 1_000);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_a_line_from_the_payer_makes_a_first_hop_known(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let (alice, _gary, steve, carol, usd) = skim_net(&chain);
+        let start = chain_seconds(&chain);
+        let id = schedule(&chain, alice, steve, usd, 400, 1_000, 100, start, 0);
+        let route = |chain: &psibase::Chain| {
+            seal_auth(chain, alice, vec![hop(carol, usd), hop(steve, usd)], id)
+        };
+
+        // Carol's line to Alice does not count. Alice's line to Carol does,
+        // even at a limit of 0.
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(carol, usd, Quantity::new(0), false)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .run_pay_ath(id, route(&chain))
+            .get()?;
+        assert_eq!(exp(&chain, carol, alice, usd), 1_000, "she agreed to Carol");
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_a_debt_from_the_payer_makes_a_first_hop_known(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let (alice, _gary, steve, carol, usd) = skim_net(&chain);
+        let start = chain_seconds(&chain);
+        let id = schedule(&chain, alice, steve, usd, 400, 1_000, 100, start, 0);
+
+        // Alice has no line to Carol, but she signs a deposit that makes her
+        // owe Carol 50. That is her own act, so Carol is now known to her.
+        Wrapper::push_from(&chain, alice)
+            .deposit(carol, usd, Quantity::new(50), 0)
+            .get()?;
+        assert_eq!(exp(&chain, carol, alice, usd), 50);
+        Wrapper::push_from(&chain, steve)
+            .run_pay_ath(
+                id,
+                seal_auth(&chain, alice, vec![hop(carol, usd), hop(steve, usd)], id),
+            )
+            .get()?;
+        assert_eq!(exp(&chain, carol, alice, usd), 50 + 1_000);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_a_payee_run_may_start_at_the_payee_or_unwind_what_the_first_hop_owes(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let (alice, gary, steve, _carol, usd) = skim_net(&chain);
+        let start = chain_seconds(&chain);
+        let id = schedule(&chain, alice, steve, usd, 400, 1_000, 100, start, 0);
+
+        // Gary owes Alice more than a period costs, so the draw only cancels
+        // his debt. Alice never lined Gary and creates no new debt.
+        Wrapper::push_from(&chain, gary)
+            .deposit(alice, usd, Quantity::new(1_000), 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .run_pay_ath(
+                id,
+                seal_auth(&chain, alice, vec![hop(gary, usd), hop(steve, usd)], id),
+            )
+            .get()?;
+        assert_eq!(
+            exp(&chain, alice, gary, usd),
+            1_000 - 409,
+            "Gary's debt to Alice shrank"
+        );
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
+
+        // Direct to the payee needs no line either: she named him, and the
+        // first hop carries no fee, so he can only collect `amount`. A second
+        // series, because the first has no period due now.
+        let direct = schedule(&chain, alice, steve, usd, 400, 1_000, 100, start, 0);
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .run_pay_ath(
+                direct,
+                seal_auth(&chain, alice, vec![hop(steve, usd)], direct),
+            )
+            .get()?;
+        assert_eq!(exp(&chain, steve, alice, usd), 400);
+        Ok(())
+    }
+
+    /// The quote the payee asks for must not offer a start the chain refuses.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_a_payees_quote_for_the_payer_starts_only_where_she_agreed(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let (alice, gary, steve, usd) = quoted_net(&chain);
+        let start = chain_seconds(&chain);
+        let id = schedule(&chain, alice, steve, usd, 400, 1_000, 100, start, 0);
+        let ask = |user: AccountNumber| {
+            banx_gql_as(
+                &chain,
+                user,
+                &format!(
+                    r#"{{ quotePath(from: "alice", to: "steve", amount: "0.04", fromAsset: {usd}, toAsset: {usd}, maxHops: 4, exactOut: true) {{ route amountIn }} }}"#
+                ),
+            )
+            .unwrap()
+        };
+
+        // Alice has not lined Gary. Her own quote may start at him. Steve's may not.
+        assert!(ask(alice).pointer("/data/quotePath/route").is_some());
+        let none = ask(steve);
+        assert!(gql_error(&none).contains("agreed to"), "{none}");
+
+        // Once she lines him, Steve's quote starts at Gary and runs.
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(gary, usd, Quantity::new(0), false)
+            .get()?;
+        let q = quote_between(&chain, steve, alice, steve, (usd, usd), 400, true);
+        Wrapper::push_from(&chain, steve)
+            .run_pay_ath(id, q.route)
+            .get()?;
         assert_eq!(exp(&chain, gary, alice, usd), q.amount_in);
         Ok(())
     }
@@ -6831,6 +7022,10 @@ mod tests {
         Wrapper::push_from(&chain, carol)
             .st_fwd_ofr(bob, usd, Quantity::new(0), 0, never(), true)
             .get()?;
+        // The payee routes this, so Alice must know the first hop: a 0 line is enough.
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(carol, usd, Quantity::new(0), false)
+            .get()?;
 
         const START: i64 = 1_700_000_000;
         pin(&chain, START);
@@ -7262,6 +7457,10 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice)
             .st_fwd_ofr(bob, usd, Quantity::new(0), 0, never(), true)
+            .get()?;
+        // The payee routes this, so Alice must know the first hop.
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(carol, usd, Quantity::new(0), false)
             .get()?;
 
         const START: i64 = 1_700_000_000;

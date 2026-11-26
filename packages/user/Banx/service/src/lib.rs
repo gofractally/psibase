@@ -1036,6 +1036,11 @@ pub mod service {
 
     /// Pay the oldest due period. Sender is the payer or the payee.
     /// The stored payer is drawn. This does not fulfill an invoice.
+    ///
+    /// When the payee runs it, the payer did not choose the route, so the
+    /// first hop must be the payee, an account the payer knows (a line to
+    /// them or a debt to them), or a draw that only unwinds a claim they owe
+    /// her. The payer's own run has no such limit.
     #[action]
     fn run_pay_ath(id: u32, route: String) {
         let opened = open_route(&route);

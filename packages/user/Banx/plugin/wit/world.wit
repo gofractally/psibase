@@ -330,6 +330,8 @@ interface api {
 
     /// Pay the oldest due period. `route` is a fresh sealed quote from the
     /// stored payer to the stored payee. Caller is the payer or the payee.
+    /// When the payee runs it, the route must start at the payee, an account
+    /// the payer has a line to or owes, or an account that owes the payer.
     run-pay-auth: func(id: u32, route: string) -> result<_, error>;
 
     /// Delete a repeating payment. Payer or payee. `force-cancel` false

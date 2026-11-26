@@ -6,9 +6,9 @@ import { ArrowDownUp } from "lucide-react";
 
 import { CurrencyPicker } from "@/components/currency-picker";
 import { PageHeader } from "@/components/page-header";
-import { PathRoute } from "@/components/path-route";
+
 import { useAssetMap } from "@/hooks/use-assets";
-import { useBanxContacts } from "@/hooks/use-banx-contacts";
+
 import {
     usePathPay,
     useQuotePath,
@@ -112,7 +112,7 @@ function AmountRow({
 export function SwapPage() {
     const { data: user } = useCurrentUser();
     const { assets, byId, symbolOf, precisionOf } = useAssetMap();
-    const { label } = useBanxContacts("/swap");
+
     const { mutate: quotePath, isPending: quoting } = useQuotePath();
     const pathPay = usePathPay();
     const [searchParams, setSearchParams] = useSearchParams();

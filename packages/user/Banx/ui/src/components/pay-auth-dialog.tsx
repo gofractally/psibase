@@ -135,6 +135,9 @@ export function PayAuthDialog({
                     <DialogDescription>
                         Pay {payee} this amount every period. They can collect
                         it when it is due. Each collection draws your lines.
+                        A collection {payee} runs must start at {payee} or at
+                        someone you have a line to or owe, so add a line (even
+                        a limit of 0) to a hub before relying on it.
                     </DialogDescription>
                 </DialogHeader>
                 <form

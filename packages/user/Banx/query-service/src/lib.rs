@@ -861,7 +861,13 @@ mod service {
             }
             let max_hops = maxHops.unwrap_or(6).clamp(1, 12);
             let graph = build_path_graph(from, to, Some(max_hops));
-            let (lines, routing, fx) = graph_edges(&graph);
+            let (mut lines, routing, fx) = graph_edges(&graph);
+            // A payee quoting for the payer routes a payment she did not
+            // choose, and the chain limits where that route may start.
+            let for_payer = user != from;
+            if for_payer {
+                limit_first_hops_to_payer_consent(&mut lines, from, to);
+            }
             let found = if exact_out {
                 banx::path_find::find_banx_path_exact_out(
                     &lines, &routing, &fx, from, to, amount_raw, fromAsset, toAsset, max_hops,
@@ -874,7 +880,11 @@ mod service {
                 )
             };
             let Some(quote) = found else {
-                return Err(async_graphql::Error::new("no path"));
+                return Err(async_graphql::Error::new(if for_payer {
+                    "no path the payer has agreed to: it must start at the payee, an account the payer has a line to or owes, or an account that owes the payer"
+                } else {
+                    "no path"
+                }));
             };
             let key = banx::tables::RouteKeyTable::with_service(banx::SERVICE)
                 .get_index_pk()
@@ -1142,6 +1152,41 @@ mod service {
             fxOffers: fx_offers,
             relays,
             now,
+        }
+    }
+
+    /// Where the chain lets a payee-run payment start: the payee, an account
+    /// the payer lined (even at 0) or owes, in that asset, or an account that
+    /// owes the payer, where the draw only unwinds the claim. Any other first
+    /// hop can still use what that account already owes the payer, and no more.
+    fn limit_first_hops_to_payer_consent(
+        lines: &mut [banx::path_find::LineEdge],
+        payer: AccountNumber,
+        payee: AccountNumber,
+    ) {
+        let mut known: std::collections::HashSet<(AccountNumber, u16)> =
+            std::collections::HashSet::new();
+        for row in pairs_involving(payer) {
+            for (creditor, debtor, asset_id, _) in pair_lines(&row) {
+                if creditor == payer {
+                    known.insert((debtor, asset_id));
+                }
+            }
+            if let Some((creditor, debtor, _)) = pair_owed(&row) {
+                if debtor == payer {
+                    known.insert((creditor, row.asset_id));
+                }
+            }
+        }
+        for edge in lines.iter_mut() {
+            if edge.debtor == payer
+                && edge.creditor != payee
+                && !known.contains(&(edge.creditor, edge.asset_id))
+            {
+                // Unwind only: the same shape as a reverse-claim-only edge.
+                edge.capacity = edge.reverse_claim;
+                edge.is_line = false;
+            }
         }
     }
 
