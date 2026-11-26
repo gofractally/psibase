@@ -729,8 +729,9 @@ namespace psibase
          auto v = kvGetRaw(db, psio::encode(psio::key{}, key));
          if (!v)
             return std::nullopt;
-         // TODO: validate (allow opt-in or opt-out)
-         return psio::from_pssz<V>(psio::trusted{*v});
+         // The reader is a test or a tool (load-snapshot reads rows that came
+         // from a file), not the service that wrote the row: validate.
+         return psio::from_pssz<V>(*v);
       }
 
       /// Get a key-value pair, if any
