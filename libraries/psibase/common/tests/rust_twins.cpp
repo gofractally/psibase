@@ -44,6 +44,7 @@
 #include <services/system/SetCode.hpp>
 #include <services/system/StagedTx.hpp>
 #include <services/system/Transact.hpp>
+#include <services/system/VerifyBear1.hpp>
 #include <services/system/VerifyK1.hpp>
 #include <services/system/VerifyR1.hpp>
 #include <services/system/VirtualServer.hpp>
@@ -533,6 +534,7 @@ namespace
       f.interfaceNames<SystemService::SetCode>("setcode");
       f.interfaceNames<SystemService::Sites>("sites");
       f.interfaceNames<SystemService::Transact>("transact");
+      f.interfaceNames<SystemService::VerifyBear1>("verify-br1");
       f.interfaceNames<SystemService::VerifyK1>("verify-k1");
       f.interfaceNames<SystemService::VerifyR1>("verify-r1");
       f.interfaceNames<LocalService::XAdmin>("x-admin");

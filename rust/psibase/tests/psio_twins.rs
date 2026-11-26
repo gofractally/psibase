@@ -781,7 +781,7 @@ fn rust_views_name_parameters_as_the_implementation_does() {
         "auth-none" => auth_none, "auth-sig" => auth_sig, "cpu-limit" => cpu_limit, "db" => db,
         "dyn-ld" => dyn_ld, "http" => http_server, "packages" => packages,
         "producers" => producers, "setcode" => setcode, "sites" => sites, "transact" => transact,
-        "verify-k1" => verify_k1, "verify-r1" => verify_r1, "x-admin" => x_admin, "x-db" => x_db, "x-http" => x_http,
+        "verify-br1" => verify_bear1, "verify-k1" => verify_k1, "verify-r1" => verify_r1, "x-admin" => x_admin, "x-db" => x_db, "x-http" => x_http,
         "x-keys" => x_keys, "x-packages" => x_packages, "x-sites" => x_sites,
         "credential" => credentials, "nft" => nft, "staged-tx" => staged_tx, "symbol" => symbol,
         "tokens" => tokens, "vserver" => virtual_server, "wsauth" => ws_auth,

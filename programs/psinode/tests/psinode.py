@@ -167,27 +167,32 @@ class GraphQLError(Exception):
         super().__init__(msg)
         self.json = payload
 
-# Which service verifies signatures made with which kind of key. Each kind of
-# key has its own verifier service, and a claim for a key names the verifier
-# for that key's kind. This mirrors psibase/verifier.hpp; nothing else in the
-# tests should name a verifier for a key.
+# Which services verify signatures made with which kind of key. Each verifier
+# service handles one kind of key; a kind of key has a default verifier and
+# may have others that an account can choose instead. This mirrors
+# psibase/verifier.hpp; nothing else in the tests should name a verifier for
+# a key.
 _VERIFIERS = {
-    # key type: (service, AlgorithmIdentifier { id-ecPublicKey, namedCurve })
-    'secp256k1': ('verify-k1', bytes.fromhex('301006072a8648ce3d020106052b8104000a')),
-    'secp256r1': ('verify-r1', bytes.fromhex('301306072a8648ce3d020106082a8648ce3d030107')),
+    # key type: (allowed verifiers, the default first; AlgorithmIdentifier { id-ecPublicKey, namedCurve })
+    'secp256k1': (['verify-k1'], bytes.fromhex('301006072a8648ce3d020106052b8104000a')),
+    'secp256r1': (['verify-r1', 'verify-br1'], bytes.fromhex('301306072a8648ce3d020106082a8648ce3d030107')),
 }
 
-def verifier_for_key_type(key_type):
-    """The service that verifies signatures made with keys of this type ('secp256k1' or 'secp256r1')"""
-    return _VERIFIERS[key_type][0]
+def allowed_verifiers_for_key_type(key_type):
+    """The verifiers allowed for keys of this type ('secp256k1' or 'secp256r1'), the default first"""
+    return list(_VERIFIERS[key_type][0])
 
-def verifier_for(spki):
-    """The service that verifies signatures made with the key whose DER
-    SubjectPublicKeyInfo is spki, or None if no verifier accepts the key.
+def verifier_for_key_type(key_type):
+    """The default verifier for keys of this type ('secp256k1' or 'secp256r1')"""
+    return _VERIFIERS[key_type][0][0]
+
+def allowed_verifiers(spki):
+    """The verifiers allowed for the key whose DER SubjectPublicKeyInfo is
+    spki, the default first; empty if no verifier accepts the key.
     Only the fixed encoding for each curve is accepted, holding an
     uncompressed or a compressed point."""
     spki = bytes(spki)
-    for (service, algorithm) in _VERIFIERS.values():
+    for (services, algorithm) in _VERIFIERS.values():
         header = 2 + len(algorithm) + 3
         if len(spki) not in (header + 65, header + 33):
             continue
@@ -195,8 +200,18 @@ def verifier_for(spki):
         if (spki[0] == 0x30 and spki[1] == len(spki) - 2
                 and spki[2:2 + len(algorithm)] == algorithm
                 and spki[header - 3:header] == bytes([0x03, point_size + 1, 0x00])):
-            return service
-    return None
+            return list(services)
+    return []
+
+def verifier_for(spki):
+    """The default verifier for the key whose DER SubjectPublicKeyInfo is
+    spki, or None if no verifier accepts the key."""
+    services = allowed_verifiers(spki)
+    return services[0] if services else None
+
+def is_allowed_verifier(service, spki):
+    """Whether service is one of the verifiers allowed for this key"""
+    return service in allowed_verifiers(spki)
 
 class PrivateKey:
     def __init__(self, data=None):
@@ -228,12 +243,25 @@ class PrivateKey:
         if s > n // 2:
             s = n - s
         return r.to_bytes(32, byteorder='big') + s.to_bytes(32, byteorder='big')
+    verifier = None
+    def with_verifier(self, verifier):
+        """The same key, signing for an account that chose verifier for it
+        (auth-sig's setKeyVerifier) in place of the default for its type"""
+        import copy
+        result = copy.copy(self)
+        result.verifier = verifier
+        result.claim()
+        return result
     def claim(self):
+        """The claim for this key. It names the default verifier for the
+        key's type unless another was chosen with with_verifier."""
         from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding
         pub = self.private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
-        service = verifier_for(pub)
+        service = verifier_for(pub) if self.verifier is None else self.verifier
         if service is None:
             raise Exception("No verifier accepts this key")
+        if not is_allowed_verifier(service, pub):
+            raise Exception("%s does not verify this kind of key" % service)
         return {"service": service, "rawData": pub}
     def pkcs8(self):
         from cryptography.hazmat.primitives.serialization import PrivateFormat, Encoding, NoEncryption
