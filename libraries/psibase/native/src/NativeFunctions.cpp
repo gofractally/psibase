@@ -475,6 +475,9 @@ namespace psibase
          if (!socket)
             return;
          auto previous = socket->usage();
+         // A peer connection stays a peer's, whoever the peer logged in as
+         if (previous && previous->identity.kind == UsageKind::peer)
+            return;
          auto record   = meter->find(identity);
          socket->setUsage(record);
          // Only the context that serves this socket's request changes with it

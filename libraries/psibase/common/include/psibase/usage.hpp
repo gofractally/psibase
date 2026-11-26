@@ -33,8 +33,10 @@ namespace psibase
       ip = 1,
       // A request that carried a valid login token: the account it names.
       account = 2,
-      // The owner of a peer (p2p) connection, by the address of that
-      // connection.
+      // A peer (p2p) connection, by the address of that connection. Always
+      // this kind, also when the peer logged in with an account. (A stable
+      // peer identity, the node's key or its producer account,
+      // authenticated, is a later step.)
       peer = 3,
       // Reserved for the guest + passkey tier. Not produced.
       guest = 4,

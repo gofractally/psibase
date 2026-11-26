@@ -305,10 +305,51 @@ class TestUsage(unittest.TestCase):
         self.assertGreaterEqual(total['bytesOut'] - before['bytesOut'], size)
 
     @testutil.psinode_test
+    def test_logged_in_peer(self, cluster):
+        # A peer connection is recorded under the peer kind, also when the
+        # peer logged in with an account: usage is tracked by peer and by
+        # account, and a peer is a peer. Only the HTTP request that asked for
+        # the connection, made before it was one, is the account's.
+        a = cluster.make_node('a', p2p=False)
+        b = cluster.make_node('b', p2p=False)
+        a.boot(packages=['Minimal', 'Explorer'])
+        with a.post('/users', service='x-peers', json={"account":"a","accept":True}) as reply:
+            reply.raise_for_status()
+        # p2p over local sockets uses the hostname psibase.localhost, and so
+        # must the token (see test_connect.py)
+        a.url = "http://psibase.localhost/"
+        token = Transact(a).login('a')
+        with b.post('/authorization', service='x-peers', json={"url": a.socketpath, "token": token}) as reply:
+            reply.raise_for_status()
+        b.connect(a)
+        # b follows a's chain over the connection
+        b.wait(new_block())
+        a.wait(new_block())
+
+        def peer_traffic():
+            row = identity(a, 'peer:unix')
+            return row if row and row['total']['messagesIn'] > 0 and row['total']['messagesOut'] > 0 else None
+        peer = wait_for(peer_traffic)
+        self.assertGreater(peer['total']['bytesOut'], 0)
+        self.assertEqual(peer['total']['requests'], 0)
+        # The account the peer logged in with has the upgrade request and
+        # nothing of the connection's traffic
+        account = wait_for(lambda: identity(a, 'account:a'))
+        self.assertGreaterEqual(account['total']['requests'], 1)
+        self.assertEqual(account['total']['messagesIn'], 0)
+        self.assertEqual(account['total']['messagesOut'], 0)
+        # and it stays that way as the connection goes on
+        before = identity(a, 'peer:unix')['total']['messagesOut']
+        a.wait(new_block())
+        a.wait(new_block())
+        wait_for(lambda: identity(a, 'peer:unix')['total']['messagesOut'] > before)
+        self.assertEqual(identity(a, 'account:a')['total']['messagesOut'], 0)
+
+    @testutil.psinode_test
     def test_forward(self, cluster):
         # A transaction pushed to one producer and forwarded to the others:
         # the node the client talked to charges the client; a node that
-        # received it from a peer charges the owner of that connection.
+        # received it from a peer charges that peer connection (kind `peer`).
         prods = cluster.complete(*testutil.generate_names(3))
         a = testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer', 'TokenUsers'])
         a.push_action('alice', 'tokens', 'debit', FAUCET_DEBIT)
