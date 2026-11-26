@@ -22,6 +22,7 @@
 #include <psibase/NativeHostFunctions.hpp>
 #include <psibase/PsizamPolicy.hpp>
 #include <psibase/VmEngine.hpp>
+#include <psibase/WasmtimeHost.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/db.hpp>
 #include <psibase/finally.hpp>
@@ -30,22 +31,6 @@
 #include <psizam/wasmtime_backend.hpp>
 
 namespace wt = psizam::wasmtime;
-
-// Pointer arguments the host ABI takes through psizam's unaligned proxy: one
-// i32 offset into linear memory, checked for sizeof(T) bytes.
-template <typename T>
-struct wt::detail::value_traits<psizam::detail::argument_proxy<T*>>
-{
-   static constexpr std::array<uint8_t, 1> types{type_i32};
-   static constexpr bool                   reads_memory = true;
-   static psizam::detail::argument_proxy<T*> load(const abi::PzwtValue* v, memory_view m)
-   {
-      std::uint64_t ptr = static_cast<std::uint32_t>(v->i32);
-      if (ptr > m.size || sizeof(T) > m.size - ptr)
-         throw host_memory_error("host pointer is outside linear memory");
-      return {m.base + ptr};
-   }
-};
 
 namespace psibase::vm_wasmtime
 {
@@ -58,7 +43,7 @@ namespace psibase::vm_wasmtime
       // measured at up to 1.72 native bytes per budget byte (psizam's
       // "byte budget ends recursion before the native stack can" test), and
       // each nested service call adds host frames on top.
-      constexpr std::uint64_t nativeStackBytes     = std::uint64_t(256) << 20;
+      constexpr std::uint64_t nativeStackBytes     = serviceNativeStackBytes;
       constexpr std::uint64_t nativeBytesPerBudget = 16;
 
       // Instance slots kept by each pooled engine. A transfer runs about
@@ -89,10 +74,7 @@ namespace psibase::vm_wasmtime
       {
          wt::engine_options o;
          // Mirrors NativeVMOptions; psizam's validator has the final word.
-         o.features = wt::feature::simd | wt::feature::relaxed_simd | wt::feature::bulk_memory |
-                      wt::feature::sign_extension | wt::feature::saturating_float_to_int |
-                      wt::feature::reference_types | wt::feature::multi_value |
-                      wt::feature::threads;
+         o.features           = wasmFeatures;
          o.fp                 = profile == psizam::float_profile::strict
                                     ? wt::float_profile::strict
                                     : wt::float_profile::performance;

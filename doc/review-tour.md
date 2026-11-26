@@ -82,7 +82,7 @@ Visible in traces but not consensus: action trace time, the transaction limit an
 - wasmtime is the engine, and every landing is qualified on it on x86. psizam's interpreter, JIT1 and JIT2 are kept only as a cross-check for wasmtime and for LLVM AOT, and are experimental with their known problems documented. They are largely compatible, with only minor known issues, and could be revived later for something wasmtime lacks, such as debugging.
 - LLVM AOT is the second engine: robust, but slow to compile, and faster than wasmtime at run time for some modules, so engines may later be chosen per application. It is re-verified on x86-64 Linux, most recently with the serialization change in (e93c2e64d): native 20/20, including the consensus test that compares LLVM AOT and saved AOT artifacts with JIT1 bit for bit, and end-to-end 39/39. The Rust suite has not been run under it and macOS has not been run. Getting there needed two fixes: the LLVM AOT build had never linked on Linux, and the consensus test leaves JIT2 out on x86-64, where JIT2 keeps NaN payloads through SIMD float operations.
 - The status of each engine and the known problems of the experimental ones are in psizam's [KNOWN_ISSUES.md](https://github.com/gofractally/psizam/blob/main/KNOWN_ISSUES.md). #2228 stays open for LLVM AOT on macOS and for the experimental engines.
-- `psitest` still runs every test module on JIT2 while the services it drives run on wasmtime: the one place an experimental engine is on the path of the suites (#2231).
+- `psitest` runs the test module on wasmtime, like the services it drives, in every build configuration; no experimental engine is on the path of the suites (#2231). A test module is not chain code: no admission limits, stack budget or CPU limit apply to it (`programs/psitest/main.cpp`, `test_module`).
 - psizam tests a reviewer will see fail, all predating this work: the `memory_grow_2` spec cases on every engine, `psizam_host_tail_reentry_tests` (intentionally red), and on x86 "Test call depth dynamic - jit_llvm".
 - Rust services use wide arithmetic only when built with rustc 1.100 or newer; rustc calls the target feature unstable and warns that using it will become an error (#2230). A test in the Rust suite checks 128-bit arithmetic in a service against a 32-bit-limb reference, so a compiler that gets it wrong fails the suite.
 
@@ -254,7 +254,7 @@ Suite results are recorded per commit under `tests/timing/runs/`. On wasmtime un
 
 Open items are tracked as issues and closed as they are fixed.
 
-- LLVM AOT is re-verified on x86 only (native and end-to-end); not on macOS, and not the Rust suite. The interpreter, JIT1 and JIT2 are experimental and unverified on this head: #2228. `psitest` still runs test modules on JIT2: #2231.
+- LLVM AOT is re-verified on x86 only (native and end-to-end); not on macOS, and not the Rust suite. The interpreter, JIT1 and JIT2 are experimental and unverified on this head: #2228.
 - Deterministic stack check on wasmtime costs memory traffic on every call: #2221.
 - Admission does not cover what only an engine's compiler refuses: such code is stored and fails at its first call. wasmtime refuses modules the chain policy admits (a function with more than 50,000 locals or 1,000 parameters, a name over 100,000 bytes, a function body over 7,654,321 bytes), which a psizam engine would run: #2256.
 - Events: one billing event per transaction and the per-block pipeline: #2218. Objective pricing for events, by size and index count: #2223.
