@@ -18,6 +18,7 @@
 // (run_vm_admission_corpus.py).
 
 #include <psibase/PsizamPolicy.hpp>
+#include <psibase/WasmtimeHost.hpp>
 #include <psizam/wasmtime_admission.hpp>
 #include <psizam/wasmtime_backend.hpp>
 
@@ -38,10 +39,7 @@ int main(int argc, char** argv)
    };
    wt::engine_options options;
    // The node engine's proposal set (ExecutionContextWasmtime.cpp).
-   options.features = wt::feature::simd | wt::feature::relaxed_simd | wt::feature::bulk_memory |
-                      wt::feature::sign_extension | wt::feature::saturating_float_to_int |
-                      wt::feature::reference_types | wt::feature::multi_value |
-                      wt::feature::threads;
+   options.features = psibase::vm_wasmtime::wasmFeatures;
    wt::runtime<none> rt(options);
 
    const auto oneLine = [](std::string text)

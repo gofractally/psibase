@@ -98,12 +98,10 @@ if(PSIBASE_VM_BACKEND STREQUAL "LLVM_AOT")
             string(APPEND host_identity "${relative}:${digest}\n")
         endforeach()
     endforeach()
-    file(SHA256 "${CMAKE_CURRENT_LIST_DIR}/../programs/psitest/main.cpp" tester_host_digest)
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_LIST_DIR}/../programs/psitest/main.cpp")
+    # psitest is not part of this identity: its host functions are bound to
+    # the wasmtime engine of the test module and reach no saved AOT artifact.
     file(SHA256 "${CMAKE_CURRENT_LIST_FILE}" host_build_digest)
-    string(SHA256 host_identity
-        "${host_identity}tester:${tester_host_digest}\nbuild:${host_build_digest}")
+    string(SHA256 host_identity "${host_identity}build:${host_build_digest}")
     file(CONFIGURE OUTPUT "${CMAKE_BINARY_DIR}/generated/psibase-native-aot-host.hpp"
         CONTENT "#pragma once\n#define PSIBASE_NATIVE_AOT_HOST_ID \"${host_identity}\"\n" @ONLY)
     target_include_directories(psibase-psizam PUBLIC "${CMAKE_BINARY_DIR}/generated")
