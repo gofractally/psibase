@@ -42,10 +42,10 @@ impl TokenRelay {
         owner: AccountNumber,
         asset_id: u16,
         token_id: u32,
-        reserve_banx: Quantity,
+        reserve_favor: Quantity,
         reserve_tokens: Quantity,
     ) {
-        assert!(reserve_banx.value > 0, "relay reserve must be positive");
+        assert!(reserve_favor.value > 0, "relay reserve must be positive");
         assert!(
             reserve_tokens.value > 0,
             "relay token reserve must be positive"
@@ -67,7 +67,7 @@ impl TokenRelay {
             owner,
             asset_id,
             token_id,
-            reserve_banx,
+            reserve_favor,
         }
         .save();
     }
@@ -103,15 +103,15 @@ impl TokenRelay {
         invert_hop_fee(face, fwd.fee_fixed, fwd.fee_percent)
     }
 
-    /// `drawn` is Banx this call books before netting. A claim it unwinds counts.
+    /// `drawn` is Favor this call books before netting. A claim it unwinds counts.
     pub fn assert_max_owed(drawn: Quantity, max_owed: Quantity) {
         assert!(
             drawn.value <= max_owed.value,
-            "relay banx above max_owed"
+            "relay favor above max_owed"
         );
     }
 
-    /// Banx the owner owes after that same forward. The curve still prices face.
+    /// Favor the owner owes after that same forward. The curve still prices face.
     fn neighbor_receives(owner: AccountNumber, asset_id: u16, face: Quantity) -> Quantity {
         let Some(fwd) = ForwardOffer::get(owner, ForwardOffer::GLOBAL, asset_id) else {
             return face;
@@ -122,27 +122,27 @@ impl TokenRelay {
         apply_hop_fee(face, fwd.fee_fixed, fwd.fee_percent)
     }
 
-    /// Banx in, tokens out. No curve fee.
-    pub fn take_banx(&mut self, amount_banx: Quantity) -> Quantity {
+    /// Favor in, tokens out. No curve fee.
+    pub fn take_favor(&mut self, amount_favor: Quantity) -> Quantity {
         let tokens = token_reserve(self.owner, self.asset_id, self.token_id);
-        let out = try_swap_out(self.reserve_banx.value, tokens, amount_banx.value, 0)
+        let out = try_swap_out(self.reserve_favor.value, tokens, amount_favor.value, 0)
             .expect("relay swap produced nothing");
-        self.reserve_banx = Quantity::new(
-            self.reserve_banx
+        self.reserve_favor = Quantity::new(
+            self.reserve_favor
                 .value
-                .checked_add(amount_banx.value)
+                .checked_add(amount_favor.value)
                 .expect("relay reserve overflow"),
         );
         self.save();
         Quantity::new(out)
     }
 
-    /// Tokens in, Banx out. No curve fee. Does not move tokens.
-    pub fn quote_banx_out(&self, amount_tokens: Quantity) -> Quantity {
+    /// Tokens in, Favor out. No curve fee. Does not move tokens.
+    pub fn quote_favor_out(&self, amount_tokens: Quantity) -> Quantity {
         let tokens = token_reserve(self.owner, self.asset_id, self.token_id);
         let out = try_swap_out(
             tokens,
-            self.reserve_banx.value,
+            self.reserve_favor.value,
             amount_tokens.value,
             0,
         )
@@ -150,12 +150,12 @@ impl TokenRelay {
         Quantity::new(out)
     }
 
-    pub fn give_banx(&mut self, amount_out: Quantity) {
+    pub fn give_favor(&mut self, amount_out: Quantity) {
         assert!(
-            amount_out.value < self.reserve_banx.value,
-            "relay banx reserve exceeded"
+            amount_out.value < self.reserve_favor.value,
+            "relay favor reserve exceeded"
         );
-        self.reserve_banx = self.reserve_banx - amount_out;
+        self.reserve_favor = self.reserve_favor - amount_out;
         self.save();
     }
 
@@ -170,48 +170,48 @@ impl TokenRelay {
         CashQuote::pay_named(sub, to, self.token_id, amount, "relay");
     }
 
-    /// Path already drew `amount_banx` on `owner`. Pay the curve's tokens to `recipient`.
-    pub fn pay_tokens_for_banx(
+    /// Path already drew `amount_favor` on `owner`. Pay the curve's tokens to `recipient`.
+    pub fn pay_tokens_for_favor(
         owner: AccountNumber,
         asset_id: u16,
         token_id: u32,
-        amount_banx: Quantity,
+        amount_favor: Quantity,
         recipient: AccountNumber,
         min_tokens: Quantity,
     ) -> Quantity {
         let mut relay = Self::get_assert(owner, asset_id, token_id);
-        let tokens_out = relay.take_banx(amount_banx);
+        let tokens_out = relay.take_favor(amount_favor);
         assert!(
             tokens_out.value >= min_tokens.value,
             "relay tokens below min_tokens"
         );
         relay.pay_tokens(recipient, tokens_out);
-        // The path already recorded the Banx draw. Recipient holds tokens,
+        // The path already recorded the Favor draw. Recipient holds tokens,
         // not a claim on `owner`, so this is not another liability row.
         tokens_out
     }
 
-    /// Taker draws `amount_banx` on the owner and receives tokens from the pair.
+    /// Taker draws `amount_favor` on the owner and receives tokens from the pair.
     ///
     /// The curve prices the face. A live global forward grosses it into the
-    /// Banx booked on the taker. `max_owed` caps that amount before netting.
+    /// Favor booked on the taker. `max_owed` caps that amount before netting.
     pub fn cash_out(
         owner: AccountNumber,
         taker: AccountNumber,
         asset_id: u16,
         token_id: u32,
-        amount_banx: Quantity,
+        amount_favor: Quantity,
         min_tokens: Quantity,
         max_owed: Quantity,
     ) -> Quantity {
         assert!(taker != owner, "cannot swap with self");
-        assert!(amount_banx.value > 0, "relay amount must be positive");
+        assert!(amount_favor.value > 0, "relay amount must be positive");
         // The owner can replace the forward before inclusion. Check the cap
         // before the curve or the claim moves.
-        let owed = Self::neighbor_owes(owner, asset_id, amount_banx);
+        let owed = Self::neighbor_owes(owner, asset_id, amount_favor);
         Self::assert_max_owed(owed, max_owed);
         let mut relay = Self::get_assert(owner, asset_id, token_id);
-        let tokens_out = relay.take_banx(amount_banx);
+        let tokens_out = relay.take_favor(amount_favor);
         assert!(
             tokens_out.value >= min_tokens.value,
             "relay tokens below min_tokens"
@@ -233,23 +233,23 @@ impl TokenRelay {
         tokens_out
     }
 
-    /// Taker's cash vault sends tokens into the owner's pair. Owner owes the taker Banx.
+    /// Taker's cash vault sends tokens into the owner's pair. Owner owes the taker Favor.
     pub fn cash_in(
         owner: AccountNumber,
         taker: AccountNumber,
         asset_id: u16,
         token_id: u32,
         amount_tokens: Quantity,
-        min_banx: Quantity,
+        min_favor: Quantity,
     ) -> Quantity {
         assert!(taker != owner, "cannot swap with self");
         assert!(amount_tokens.value > 0, "relay amount must be positive");
         let mut relay = Self::get_assert(owner, asset_id, token_id);
-        let banx = relay.quote_banx_out(amount_tokens);
-        let owed = Self::neighbor_receives(owner, asset_id, banx);
+        let favor = relay.quote_favor_out(amount_tokens);
+        let owed = Self::neighbor_receives(owner, asset_id, favor);
         assert!(
-            owed.value >= min_banx.value,
-            "relay banx below min_banx"
+            owed.value >= min_favor.value,
+            "relay favor below min_favor"
         );
         CashQuote::move_named(
             cash_sub(taker, token_id),
@@ -258,7 +258,7 @@ impl TokenRelay {
             amount_tokens,
         );
         // Weight moves by the curve. The forward keeps the rest.
-        relay.give_banx(banx);
+        relay.give_favor(favor);
         let netted = Connection::get_live(taker, owner, asset_id).deposit(owed);
         emit_pair_activity(
             taker, taker, owner, asset_id, "relay", owed, netted, asset_id, 0, "",

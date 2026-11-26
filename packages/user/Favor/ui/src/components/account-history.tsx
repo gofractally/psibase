@@ -1,6 +1,6 @@
 import { useAssetMap } from "@/hooks/use-assets";
-import { useBanxContacts } from "@/hooks/use-banx-contacts";
-import { useActivity } from "@/hooks/use-banx-data";
+import { useFavorContacts } from "@/hooks/use-favor-contacts";
+import { useActivity } from "@/hooks/use-favor-data";
 import {
     describeEvent,
     formatWhen,
@@ -29,7 +29,7 @@ export function AccountHistoryDialog({
     viewer: string;
 }) {
     const { symbolOf, precisionOf } = useAssetMap();
-    const { label } = useBanxContacts("/accounts");
+    const { label } = useFavorContacts("/accounts");
     const { data: events = [], isLoading, isError } = useActivity(
         counterparty,
         assetId,
@@ -62,7 +62,7 @@ export function AccountHistoryDialog({
                         </p>
                     ) : isError ? (
                         <p className="text-destructive text-sm">
-                            Could not load history. Reinstall Banx if events
+                            Could not load history. Reinstall Favor if events
                             indexes are missing (call init again).
                         </p>
                     ) : events.length === 0 ? (

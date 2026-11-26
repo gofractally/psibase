@@ -1,2 +1,2 @@
-pub use banx;
-pub use r_banx;
+pub use favor;
+pub use r_favor;

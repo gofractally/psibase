@@ -1,8 +1,8 @@
-# How Banx works
+# How Favor works
 
-Banx is a **mutual-credit ledger**. There is no cash balance and no token you “have.” Value is always a directed claim: **A owes B** some amount of a registered asset.
+Favor is a **mutual-credit ledger**. There is no cash balance and no token you “have.” Value is always a directed claim: **A owes B** some amount of a registered asset.
 
-A payment does not move coins. It **creates or shrinks obligations** along a path of credit lines. When two people already owe each other, Banx **nets** and keeps only the leftover.
+A payment does not move coins. It **creates or shrinks obligations** along a path of credit lines. When two people already owe each other, Favor **nets** and keeps only the leftover.
 
 This document is the system: first the idea and stories, then how the book is actually kept.
 
@@ -17,7 +17,7 @@ You never have “$10 in an account.” You only have:
 
 Credit is **interest-free mutual credit**. A claim never grows or shrinks on its own: what is owed is what was booked, less what has been paid back, netted away, or written off.
 
-The rest of Banx is machinery around that:
+The rest of Favor is machinery around that:
 
 | Piece | Meaning |
 |-------|---------|
@@ -48,7 +48,7 @@ They split dinners, petrol, concert tickets. No one else is involved.
 
 **Bob pays the whole dinner, $60.** Alice’s share is $30.
 
-Alice records it. Banx writes:
+Alice records it. Favor writes:
 
 > Alice owes Bob $30.
 
@@ -60,7 +60,7 @@ Bob records it:
 
 > Bob owes Alice $20.
 
-Banx sees both claims and **nets**. Now Alice only owes Bob $10.
+Favor sees both claims and **nets**. Now Alice only owes Bob $10.
 
 That’s Splitwise. Deposit when someone covers you. The book shrinks by itself.
 
@@ -78,7 +78,7 @@ They each fill their own trolley. At the till, **Pippa pays for both baskets**. 
 
 > I just paid $70 for your groceries. Please accept.
 
-Jo hits **accept**. That is Jo’s **deposit**. Banx writes:
+Jo hits **accept**. That is Jo’s **deposit**. Favor writes:
 
 > Jo owes Pippa $70.
 
@@ -87,7 +87,7 @@ Pippa now holds a **claim on Jo**.
 When rent is due, **Oli invoices Pippa $800**. Pippa pays **through Jo**:
 
 1. **Pippa to Jo.** She already has a claim on Jo, so this hop **shrinks** it. No new line needed.
-2. **Jo to Oli.** Jo draws on Oli’s line. Jo has a **path-forward offer**. Banx books Jo’s debt to Oli and nets whatever they already owe each other.
+2. **Jo to Oli.** Jo draws on Oli’s line. Jo has a **path-forward offer**. Favor books Jo’s debt to Oli and nets whatever they already owe each other.
 
 The invoice is paid because the last hop is Oli. Oli never “sees” money from Pippa. What he notices is that **Jo owes him more** (or he owes Jo less).
 
@@ -149,7 +149,7 @@ Nobody has to settle with four hungover people. **Only Mitchell chases or settle
 
 ## The ledger
 
-Everything lives on **Banx**, a psibase service. Quantities on chain are **raw integers** at the asset’s precision (USD 4 dp → `1.0000` is `10000`). GraphQL and the plugin show human decimals.
+Everything lives on **Favor**, a psibase service. Quantities on chain are **raw integers** at the asset’s precision (USD 4 dp → `1.0000` is `10000`). GraphQL and the plugin show human decimals.
 
 ### Assets
 
@@ -316,34 +316,34 @@ Anyone posts `st_fx_ofr`: from-asset → to-asset, `poster_is_creditor` (which d
 
 ### Relays
 
-`st_relay` posts a constant-product curve between two Banx assets. Both reserves are virtual weights, not a debt, and one row prices both directions; posting again replaces them. If the previous hop’s creditor has a relay for the pair, a path that changes asset there uses the curve instead of an FX offer. The curve has no fee: a path that continues pays the forward fee.
+`st_relay` posts a constant-product curve between two Favor assets. Both reserves are virtual weights, not a debt, and one row prices both directions; posting again replaces them. If the previous hop’s creditor has a relay for the pair, a path that changes asset there uses the curve instead of an FX offer. The curve has no fee: a path that continues pays the forward fee.
 
-`st_tok_relay` is the Banx↔token version: `reserve_banx` is a virtual weight, and `reserve_tokens` is pulled into a Tokens sub-account `{owner}/{asset_id}/{token_id}`. `tok_relay_out` draws Banx on the owner for tokens; `tok_relay_in` sends tokens from the sender’s vault for Banx the owner owes. A live global forward on the asset is applied to direct swaps. `path_cash` ends a path by selling the last hop’s Banx for tokens from that account’s relay.
+`st_tok_relay` is the Favor↔token version: `reserve_favor` is a virtual weight, and `reserve_tokens` is pulled into a Tokens sub-account `{owner}/{asset_id}/{token_id}`. `tok_relay_out` draws Favor on the owner for tokens; `tok_relay_in` sends tokens from the sender’s vault for Favor the owner owes. A live global forward on the asset is applied to direct swaps. `path_cash` ends a path by selling the last hop’s Favor for tokens from that account’s relay.
 
 ---
 
-## Cash window (Banx ↔ Tokens)
+## Cash window (Favor ↔ Tokens)
 
-Banx claims stay claims. Tokens stay Tokens. A **cash quote** is the edge: the poster (cashier) says a Tokens `TID` trades for a Banx asset at `fx_rate`, not necessarily 1:1.
+Favor claims stay claims. Tokens stay Tokens. A **cash quote** is the edge: the poster (cashier) says a Tokens `TID` trades for a Favor asset at `fx_rate`, not necessarily 1:1.
 
 `to = (from − fee_fixed) × fx_rate / RATE_SCALE`.
 
 | `is_out` | From | To | Take |
 |----------|------|-----|------|
-| true | Banx | tokens | `cash_out`: draw on the poster’s line, receive tokens from their vault |
-| false | tokens | Banx | `cash_in`: send tokens into the poster’s vault, book a deposit onto the poster |
+| true | Favor | tokens | `cash_out`: draw on the poster’s line, receive tokens from their vault |
+| false | tokens | Favor | `cash_in`: send tokens into the poster’s vault, book a deposit onto the poster |
 
-Inventory is Banx’s Tokens sub-account `{account}/{token_id}`. `csh_fund` is credit Banx, then Banx `toSub` into **your** bucket. `csh_wd` is `fromSub` back to you. `cash_in` `fromSub`s the taker and `toSub`s the cashier (same bucket `cash_out` spends). No Banx vault table.
+Inventory is Favor’s Tokens sub-account `{account}/{token_id}`. `csh_fund` is credit Favor, then Favor `toSub` into **your** bucket. `csh_wd` is `fromSub` back to you. `cash_in` `fromSub`s the taker and `toSub`s the cashier (same bucket `cash_out` spends). No Favor vault table.
 
-Out uses the same capacity / remaining as a path draw. In is the same book as deposit (repay if you owe them; otherwise you hold a claim on them). The quote’s own `remaining` is the taker’s input still available: Banx units on the way out, token units on the way in. A take spends it and leaves the row at 0 so the cashier can top up. The poster’s quote is consent. Tokens history records the coin move; Banx activity is `cash_out` / `cash_in`.
+Out uses the same capacity / remaining as a path draw. In is the same book as deposit (repay if you owe them; otherwise you hold a claim on them). The quote’s own `remaining` is the taker’s input still available: Favor units on the way out, token units on the way in. A take spends it and leaves the row at 0 so the cashier can top up. The poster’s quote is consent. Tokens history records the coin move; Favor activity is `cash_out` / `cash_in`.
 
-Multiple tokens per Banx asset: one quote row per `(poster, asset, token, is_out)`.
+Multiple tokens per Favor asset: one quote row per `(poster, asset, token, is_out)`.
 
 ---
 
 ## History
 
-Each writer emits a bilateral `history.banx-app.activity` event: one row per party as `account`, the other as `counterparty`. Amounts are **human decimals** at emit (asset precision; convert’s `netted` uses the destination asset).
+Each writer emits a bilateral `history.favor-app.activity` event: one row per party as `account`, the other as `counterparty`. Amounts are **human decimals** at emit (asset precision; convert’s `netted` uses the destination asset).
 
 Kinds include `path_draw`, `path_pay`, `deposit`, `book`, `forgive`, `convert`, `take`, `relay`, `cash_out`, `cash_in`, `credit_line`, `rm_credit_line`, `book_auth`, `rm_book_auth`, `sell_claim` / `buy_claim`, `invoice`, `please_book`, `fulfill`, `req_cancel`.
 
@@ -357,10 +357,10 @@ GraphQL `activity(account, counterparty?, assetId?)` is the pair view when both 
 
 | Layer | Role |
 |-------|------|
-| **service** (`banx`) | Tables and actions. Source of truth. |
-| **r-banx** | GraphQL: public assets, offers, FX and relays; your own lines, obligations, requests and `activity` (rows you are a party to); `quotePath`. |
+| **service** (`favor`) | Tables and actions. Source of truth. |
+| **r-favor** | GraphQL: public assets, offers, FX and relays; your own lines, obligations, requests and `activity` (rows you are a party to); `quotePath`. |
 | **plugin** | WIT `api` for the Supervisor (`setCreditLine`, `pathPay`, `quotePath`, …). Human decimals in, raw out. |
-| **ui** | React app on the `banx` subdomain. |
+| **ui** | React app on the `favor` subdomain. |
 
 Off-chain path search lives in the service crate (`path_find`) and is called from the plugin. The query service only serves the subgraph.
 

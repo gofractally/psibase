@@ -39,7 +39,7 @@ export function NavMain() {
 
     return (
         <SidebarGroup>
-            <SidebarGroupLabel>Banx</SidebarGroupLabel>
+            <SidebarGroupLabel>Favor</SidebarGroupLabel>
             <SidebarMenu>
                 {items.map(({ to, label, icon: Icon, end }) => {
                     const active = end

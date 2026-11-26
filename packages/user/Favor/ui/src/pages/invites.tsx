@@ -9,12 +9,12 @@ import { AssetField } from "@/components/form-fields";
 import { formatExpiresAt } from "@/components/expires-at-picker";
 import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
-import { useInvites } from "@/hooks/use-banx-data";
-import { useCreateInvite, useDeleteInvite } from "@/hooks/use-banx-mutations";
+import { useInvites } from "@/hooks/use-favor-data";
+import { useCreateInvite, useDeleteInvite } from "@/hooks/use-favor-mutations";
 import { displayAmount } from "@/lib/amount";
 import { amountFieldValidator, useAppForm } from "@/lib/form";
 import { inviteClaimedBy } from "@/lib/contacts";
-import type { BanxInvite } from "@/lib/graphql";
+import type { FavorInvite } from "@/lib/graphql";
 import {
     forgetInviteToken,
     inviteClaimUrl,
@@ -62,10 +62,10 @@ function InviteTable({
     onRevoke,
     showCopy,
 }: {
-    rows: BanxInvite[];
+    rows: FavorInvite[];
     symbolOf: (id: number) => string;
     revokingId: number | null;
-    onRevoke: (row: BanxInvite) => void;
+    onRevoke: (row: FavorInvite) => void;
     showCopy: boolean;
 }) {
     const showClaimed = rows.some((row) => inviteClaimedBy(row));
@@ -161,8 +161,8 @@ export function InvitesPage() {
     const [revokingId, setRevokingId] = useState<number | null>(null);
 
     const { outstanding, claimed } = useMemo(() => {
-        const outstanding: BanxInvite[] = [];
-        const claimed: BanxInvite[] = [];
+        const outstanding: FavorInvite[] = [];
+        const claimed: FavorInvite[] = [];
         for (const row of invites) {
             if (inviteClaimedBy(row)) claimed.push(row);
             else outstanding.push(row);
@@ -202,7 +202,7 @@ export function InvitesPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [createOpen]);
 
-    const revoke = async (row: BanxInvite) => {
+    const revoke = async (row: FavorInvite) => {
         const claimed = inviteClaimedBy(row);
         if (
             !window.confirm(
@@ -227,7 +227,7 @@ export function InvitesPage() {
         <div>
             <PageHeader
                 title="Invites"
-                description="Invite one person onto the network and Banx. When they claim, you extend them this credit line and can nickname them into Payees."
+                description="Invite one person onto the network and Favor. When they claim, you extend them this credit line and can nickname them into Payees."
                 action={
                     <Button
                         type="button"
@@ -283,9 +283,9 @@ export function InvitesPage() {
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>New Banx invite</DialogTitle>
+                        <DialogTitle>New Favor invite</DialogTitle>
                         <DialogDescription>
-                            Anyone with the link can join Banx and create a new
+                            Anyone with the link can join Favor and create a new
                             account. On claim you extend this credit line.
                         </DialogDescription>
                     </DialogHeader>
@@ -389,7 +389,7 @@ export function InvitesPage() {
                         <DialogDescription>
                             Anyone with this link or who scans the code can
                             create a network account if they need one, then
-                            they land in Banx with your credit line.
+                            they land in Favor with your credit line.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-col items-center gap-6">

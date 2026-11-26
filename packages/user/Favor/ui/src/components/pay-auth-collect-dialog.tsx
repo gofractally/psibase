@@ -4,7 +4,7 @@ import {
     useQuotePath,
     useRunPayAuth,
     type PathQuote,
-} from "@/hooks/use-banx-mutations";
+} from "@/hooks/use-favor-mutations";
 import { displayAmount } from "@/lib/amount";
 import type { PayAuth } from "@/lib/graphql";
 import { dueCount } from "@/lib/pay-auth";

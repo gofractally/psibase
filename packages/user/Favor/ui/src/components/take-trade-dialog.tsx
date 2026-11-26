@@ -4,12 +4,12 @@ import { useAssetMap } from "@/hooks/use-assets";
 import {
     useObligations,
     useTokenPrecisionMap,
-} from "@/hooks/use-banx-data";
+} from "@/hooks/use-favor-data";
 import {
     useCashIn,
     useCashOut,
     useTakeFx,
-} from "@/hooks/use-banx-mutations";
+} from "@/hooks/use-favor-mutations";
 import {
     amountPlaceholder,
     applyQuotedRate,
@@ -349,7 +349,7 @@ export function TakeTradeDialog({
                             cashier: poster,
                             assetId: quote.assetId,
                             tokenId: quote.tokenId,
-                            amountBanx: amount,
+                            amountFavor: amount,
                             minTokens: minOut,
                         },
                         done,
@@ -361,7 +361,7 @@ export function TakeTradeDialog({
                             assetId: quote.assetId,
                             tokenId: quote.tokenId,
                             amountTokens: amount,
-                            minBanx: minOut,
+                            minFavor: minOut,
                         },
                         done,
                     );

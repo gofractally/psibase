@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { defaultAssetId } from "@/components/asset-select";
 import { AssetField } from "@/components/form-fields";
-import { useSetPayAuth } from "@/hooks/use-banx-mutations";
+import { useSetPayAuth } from "@/hooks/use-favor-mutations";
 import { humanToRaw } from "@/lib/amount";
 import { amountFieldValidator, useAppForm } from "@/lib/form";
 import type { Asset } from "@/lib/graphql";

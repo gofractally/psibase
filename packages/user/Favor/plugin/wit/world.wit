@@ -1,4 +1,4 @@
-package banx:plugin;
+package favor:plugin;
 
 interface types {
     /// Token + id from `create-invite` (token is the claim-URL secret).
@@ -12,7 +12,7 @@ interface helpers {
     use host:types/types.{error};
 
     /// Convert a human decimal string (e.g. `"1.45"`) to raw quantity units for `asset-id`.
-    /// Looks up asset precision via Banx GraphQL.
+    /// Looks up asset precision via Favor GraphQL.
     /// Fractions may not exceed the asset's precision; shorter fractions are padded.
     decimal-to-quantity: func(asset-id: u16, amount: string) -> result<u64, error>;
 
@@ -338,10 +338,10 @@ interface api {
     /// throws when a period is payable. True deletes anyway and does not pay.
     cancel-pay-auth: func(id: u32, force-cancel: bool) -> result<_, error>;
 
-    /// Post a cash quote: Banx `asset-id` ↔ Tokens `token-id`.
-    /// `is-out` true: taker draws Banx, receives tokens. False: taker sends
-    /// tokens, books Banx onto the poster.
-    /// `fee-fixed` is a human decimal in Banx units (out) or token units (in).
+    /// Post a cash quote: Favor `asset-id` ↔ Tokens `token-id`.
+    /// `is-out` true: taker draws Favor, receives tokens. False: taker sends
+    /// tokens, books Favor onto the poster.
+    /// `fee-fixed` is a human decimal in Favor units (out) or token units (in).
     /// `to-rate` is how many **to** units per 1 **from** unit (same as
     /// `set-fx-offer`).
     set-cash-quote: func(
@@ -357,35 +357,35 @@ interface api {
     /// Remove a cash quote.
     remove-cash-quote: func(asset-id: u16, token-id: u32, is-out: bool) -> result<_, error>;
 
-    /// Move tokens already credited to Banx into `{sender}/{token-id}`.
-    /// The UI credits Banx first, then calls this.
+    /// Move tokens already credited to Favor into `{sender}/{token-id}`.
+    /// The UI credits Favor first, then calls this.
     cash-fund: func(token-id: u32, amount: string) -> result<_, error>;
 
-    /// Withdraw tokens from `{sender}/{token-id}` on Banx.
+    /// Withdraw tokens from `{sender}/{token-id}` on Favor.
     cash-withdraw: func(token-id: u32, amount: string) -> result<_, error>;
 
-    /// Draw Banx on `cashier`'s line; receive tokens from their vault.
-    /// `amount-banx` / `min-tokens` are human decimals.
+    /// Draw Favor on `cashier`'s line; receive tokens from their vault.
+    /// `amount-favor` / `min-tokens` are human decimals.
     cash-out: func(
         cashier: string,
         asset-id: u16,
         token-id: u32,
-        amount-banx: string,
+        amount-favor: string,
         min-tokens: string,
     ) -> result<_, error>;
 
     /// Send tokens from the sender's `{sender}/{token-id}` vault (filled by
     /// `cash-fund`) at `cashier`'s in quote.
-    /// `amount-tokens` / `min-banx` are human decimals.
+    /// `amount-tokens` / `min-favor` are human decimals.
     cash-in: func(
         cashier: string,
         asset-id: u16,
         token-id: u32,
         amount-tokens: string,
-        min-banx: string,
+        min-favor: string,
     ) -> result<_, error>;
 
-    /// Post a constant-product relay between two Banx assets. Reserves are
+    /// Post a constant-product relay between two Favor assets. Reserves are
     /// virtual weights, one row for both directions. Saving again replaces
     /// them. `reserve-a` and `reserve-b` are human decimals. The curve has
     /// no fee. A path that continues pays the forward fee.
@@ -399,23 +399,23 @@ interface api {
     /// Delete the sender's relay for this pair. Claims already drawn stay.
     remove-relay: func(asset-a: u16, asset-b: u16) -> result<_, error>;
 
-    /// Post a Banx↔token relay. `reserve-banx` is the virtual Banx weight.
-    /// `reserve-tokens` is pulled from the sender's credit to Banx into
+    /// Post a Favor↔token relay. `reserve-favor` is the virtual Favor weight.
+    /// `reserve-tokens` is pulled from the sender's credit to Favor into
     /// `{sender}/{asset-id}/{token-id}`. The same pair cannot be posted twice.
     /// The curve has no fee. A direct swap pays the owner's global forward.
     set-token-relay: func(
         asset-id: u16,
         token-id: u32,
-        reserve-banx: string,
+        reserve-favor: string,
         reserve-tokens: string,
     ) -> result<_, error>;
 
     /// Delete the sender's token relay. Tokens still in the pair return to the sender.
     remove-token-relay: func(asset-id: u16, token-id: u32) -> result<_, error>;
 
-    /// Draw Banx on `owner`'s relay and receive tokens from their pair.
-    /// The curve prices `amount-banx`. A live global forward on that IOU
-    /// grosses it into the Banx the sender owes. `max-owed` is the most
+    /// Draw Favor on `owner`'s relay and receive tokens from their pair.
+    /// The curve prices `amount-favor`. A live global forward on that IOU
+    /// grosses it into the Favor the sender owes. `max-owed` is the most
     /// this call may book, before netting, as a human decimal of that IOU.
     /// Unwinding a claim counts. A replaced forward above it fails.
     /// Zero is a cap of zero.
@@ -423,27 +423,27 @@ interface api {
         owner: string,
         asset-id: u16,
         token-id: u32,
-        amount-banx: string,
+        amount-favor: string,
         min-tokens: string,
         max-owed: string,
     ) -> result<_, error>;
 
     /// Send tokens from the sender's cash vault into `owner`'s pair. The curve
     /// prices the full amount. A live global forward on that IOU is taken off
-    /// the Banx `owner` owes. Fund the cash vault first.
+    /// the Favor `owner` owes. Fund the cash vault first.
     token-relay-in: func(
         owner: string,
         asset-id: u16,
         token-id: u32,
         amount-tokens: string,
-        min-banx: string,
+        min-favor: string,
     ) -> result<_, error>;
 
-    /// Path-pay that ends by selling the last hop's Banx for that account's
+    /// Path-pay that ends by selling the last hop's Favor for that account's
     /// tokens. The last hop must have posted a token relay for that asset.
-    /// They pay `recipient` the tokens and do not also owe them the Banx
+    /// They pay `recipient` the tokens and do not also owe them the Favor
     /// asset. A one-hop path books the last hop's global forward on top of
-    /// `amount`. `max-owed` caps that Banx before netting, as a human decimal
+    /// `amount`. `max-owed` caps that Favor before netting, as a human decimal
     /// of that hop's asset, and zero is a cap of zero. A longer path draws
     /// exactly `amount` on the first hop and does not use `max-owed`.
     /// `min-tokens` floors the token output.
@@ -456,7 +456,7 @@ interface api {
         max-owed: string,
     ) -> result<_, error>;
 
-    /// Create a single-use network+Banx invite that extends a credit line to the claimee.
+    /// Create a single-use network+Favor invite that extends a credit line to the claimee.
     /// `limit` is a human decimal. Returns the invite token for the claim URL.
     create-invite: func(
         asset-id: u16,
@@ -464,10 +464,10 @@ interface api {
         deplete-on-debit: bool,
     ) -> result<created-invite, error>;
 
-    /// Revoke a Banx invite. Inviter only.
+    /// Revoke a Favor invite. Inviter only.
     delete-invite: func(invite-id: u32) -> result<_, error>;
 
-    /// Register a new Banx asset. Anyone may call. `symbol` is a chain name
+    /// Register a new Favor asset. Anyone may call. `symbol` is a chain name
     /// (1–10 chars). `precision` is 0–8 decimal places. `description` max 80 bytes.
     add-asset: func(
         symbol: string,
@@ -481,7 +481,7 @@ interface api {
 interface authorized {
     use host:types/types.{error};
 
-    /// Run a GraphQL query against Banx. Returns the raw JSON response.
+    /// Run a GraphQL query against Favor. Returns the raw JSON response.
     graphql: func(query: string) -> result<string, error>;
 }
 

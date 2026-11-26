@@ -1,4 +1,4 @@
-package banx:plugin;
+package favor:plugin;
 
 world impl {
     include host:client/imports;

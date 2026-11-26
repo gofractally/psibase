@@ -8,22 +8,22 @@ import { PoolPriceFields } from "@/components/pool-price-fields";
 import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
-    useBanxRelays,
+    useFavorRelays,
     useTokenPrecisionMap,
     useTokenRelays,
-} from "@/hooks/use-banx-data";
+} from "@/hooks/use-favor-data";
 import {
     useRemoveRelay,
     useRemoveTokenRelay,
     useSetRelay,
     useSetTokenRelay,
-} from "@/hooks/use-banx-mutations";
+} from "@/hooks/use-favor-mutations";
 import { amountPlaceholder, displayAmount } from "@/lib/amount";
 import {
     amountFieldValidator,
     useAppForm,
 } from "@/lib/form";
-import type { Asset, BanxRelay, TokenRelay } from "@/lib/graphql";
+import type { Asset, FavorRelay, TokenRelay } from "@/lib/graphql";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
@@ -74,7 +74,7 @@ function IouPoolForm({
     assets: Asset[];
     symbolOf: (id: number) => string;
     precisionOf: (id: number) => number;
-    existing?: BanxRelay | null;
+    existing?: FavorRelay | null;
     onPosted: () => void;
 }) {
     const setRelay = useSetRelay();
@@ -320,7 +320,7 @@ function TokenPoolForm({
         defaultValues: {
             assetId: undefined as number | undefined,
             tokenId: "",
-            reserveBanx: "",
+            reserveFavor: "",
             reserveTokens: "",
         },
         onSubmit: async ({ value }) => {
@@ -330,7 +330,7 @@ function TokenPoolForm({
                 value.assetId === undefined ||
                 tokenId === undefined ||
                 state.precision === undefined ||
-                !value.reserveBanx.trim() ||
+                !value.reserveFavor.trim() ||
                 !value.reserveTokens.trim()
             ) {
                 return;
@@ -340,7 +340,7 @@ function TokenPoolForm({
                     {
                         assetId: value.assetId!,
                         tokenId,
-                        reserveBanx: value.reserveBanx.trim(),
+                        reserveFavor: value.reserveFavor.trim(),
                         reserveTokens: value.reserveTokens.trim(),
                     },
                     {
@@ -453,17 +453,17 @@ function TokenPoolForm({
                                 }
                                 precisionA={prec}
                                 precisionB={tokenPrecision ?? 0}
-                                reserveA={values.reserveBanx}
+                                reserveA={values.reserveFavor}
                                 reserveB={values.reserveTokens}
                                 disabled={
                                     values.assetId === undefined ||
                                     tokenId === undefined ||
                                     tokenPrecision === undefined
                                 }
-                                onReserves={(reserveBanx, reserveTokens) => {
+                                onReserves={(reserveFavor, reserveTokens) => {
                                     form.setFieldValue(
-                                        "reserveBanx",
-                                        reserveBanx,
+                                        "reserveFavor",
+                                        reserveFavor,
                                     );
                                     form.setFieldValue(
                                         "reserveTokens",
@@ -473,7 +473,7 @@ function TokenPoolForm({
                             />
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <form.AppField
-                                    name="reserveBanx"
+                                    name="reserveFavor"
                                     validators={{
                                         onChange: amountFieldValidator(prec, {
                                             allowZero: false,
@@ -534,7 +534,7 @@ function TokenPoolForm({
                                     disabled={
                                         values.assetId === undefined ||
                                         tokenId === undefined ||
-                                        !values.reserveBanx.trim() ||
+                                        !values.reserveFavor.trim() ||
                                         !values.reserveTokens.trim() ||
                                         reserveBlocked
                                     }
@@ -555,14 +555,14 @@ function IouPools({
     symbolOf,
     precisionOf,
 }: {
-    mine: BanxRelay[];
+    mine: FavorRelay[];
     loading: boolean;
     assets: Asset[];
     symbolOf: (id: number) => string;
     precisionOf: (id: number) => number;
 }) {
     const removeRelay = useRemoveRelay();
-    const [editing, setEditing] = useState<BanxRelay | null>(null);
+    const [editing, setEditing] = useState<FavorRelay | null>(null);
     return (
         <section className="grid gap-3">
             <h2 className="font-medium">IOU pools</h2>
@@ -714,7 +714,7 @@ function TokenPools({
                                         {row.tokenId}
                                     </TableCell>
                                     <TableCell className="text-right font-mono text-sm">
-                                        {displayAmount(row.reserveBanx)}
+                                        {displayAmount(row.reserveFavor)}
                                     </TableCell>
                                     <TableCell className="text-right font-mono text-sm">
                                         {displayAmount(row.tokenReserve)}
@@ -756,7 +756,7 @@ export function RelaysPage() {
         data: relays = [],
         isLoading: relaysLoading,
         isError: relaysError,
-    } = useBanxRelays();
+    } = useFavorRelays();
     const {
         data: tokenRelays = [],
         isLoading: tokenLoading,

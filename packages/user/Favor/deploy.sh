@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Build Banx and deploy to pinkduck.lol.
+# Build Favor and deploy to pinkduck.lol.
 #
-#   ./packages/user/Banx/deploy.sh
+#   ./packages/user/Favor/deploy.sh
 #
-# Routing key: path payments fail until `banx-app` has one. A deploy sets it
+# Routing key: path payments fail until `favor-app` has one. A deploy sets it
 # only when `routingReady` is false, so redeploying does not invalidate open
 # quotes. `ROTATE_KEY=1` forces a new one, which does.
 set -euo pipefail
 
 API="${API:-https://pinkduck.lol}"
-SENDER=banx-app
+SENDER=favor-app
 QUERY="${SENDER}+1"
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -17,9 +17,9 @@ REPO_ROOT=$(cd "$SCRIPT_DIR/../../.." && pwd)
 PACKAGES="$REPO_ROOT/packages"
 USER_WS="$PACKAGES/user"
 SCHEMA="$USER_WS/target/wasm32-wasip1/release"
-PSI="$SCHEMA/packages/Banx.psi"
+PSI="$SCHEMA/packages/Favor.psi"
 WORKDIR=$(mktemp -d)
-KEY="$WORKDIR/banx-app.pem"
+KEY="$WORKDIR/favor-app.pem"
 EXTRACT="$WORKDIR/psi"
 trap 'rm -rf "$WORKDIR"' EXIT
 
@@ -59,7 +59,7 @@ push_json() {
     psibase push -a "$API" -s "$KEY" "$file"
 }
 
-# Whether `banx-app` has a routing key. Public query, no sign-in.
+# Whether `favor-app` has a routing key. Public query, no sign-in.
 routing_ready() {
     local json
     json=$(curl -sS --max-time 20 \
@@ -71,10 +71,10 @@ routing_ready() {
 
 if [[ "${SKIP_BUILD:-0}" != 1 ]]; then
     echo "==> UI"
-    (cd "$PACKAGES" && yarn install && yarn workspace @psibase/banx-ui build)
+    (cd "$PACKAGES" && yarn install && yarn workspace @psibase/favor-ui build)
 
     echo "==> package"
-    (cd "$SCRIPT_DIR" && cargo-psibase -p banx-pkg package)
+    (cd "$SCRIPT_DIR" && cargo-psibase -p favor-pkg package)
 fi
 
 [[ -f "$PSI" ]] || {
@@ -94,11 +94,11 @@ fi
 
 echo "==> deploy ${SENDER}"
 psibase deploy -a "$API" -s "$KEY" "$SENDER" \
-    "$EXTRACT/service/${SENDER}.wasm" "$SCHEMA/banx.schema.json"
+    "$EXTRACT/service/${SENDER}.wasm" "$SCHEMA/favor.schema.json"
 
 echo "==> deploy ${QUERY}"
 psibase deploy -a "$API" -s "$KEY" "$QUERY" \
-    "$EXTRACT/service/${SENDER}/1.wasm" "$SCHEMA/r-banx.schema.json"
+    "$EXTRACT/service/${SENDER}/1.wasm" "$SCHEMA/r-favor.schema.json"
 
 echo "==> registerServer + dyn-ld + enableSpa + init"
 ACTIONS="$EXTRACT/actions.json"
@@ -115,10 +115,10 @@ cat > "$ACTIONS" <<EOF
     "service": "dyn-ld",
     "method": "link",
     "data": {
-      "group": "Banx",
+      "group": "Favor",
       "deps": [
-        {"name": "banx", "service": "${SENDER}"},
-        {"name": "r-banx", "service": "${QUERY}"},
+        {"name": "favor", "service": "${SENDER}"},
+        {"name": "r-favor", "service": "${QUERY}"},
         {"name": "accounts", "service": "accounts"},
         {"name": "config", "service": "config"},
         {"name": "host", "service": "host"},

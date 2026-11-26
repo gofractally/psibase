@@ -60,12 +60,12 @@ import { PayAuthDialog } from "@/components/pay-auth-dialog";
 import { TransferDialog } from "@/components/transfer-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useAccountGroups } from "@/hooks/use-account-groups";
-import { useBanxContacts } from "@/hooks/use-banx-contacts";
+import { useFavorContacts } from "@/hooks/use-favor-contacts";
 import {
     useBookAuths,
     useFxOffers,
     usePosterFxOffers,
-} from "@/hooks/use-banx-data";
+} from "@/hooks/use-favor-data";
 import {
     liveBookAuth,
     spendableBookAuth,
@@ -97,7 +97,7 @@ export function AccountDetailPage() {
     const params = useParams();
     const account = decodeURIComponent(params.account ?? "").trim();
     const { user, savings, loans, isLoading, isError } = useAccountGroups();
-    const { label } = useBanxContacts("/accounts");
+    const { label } = useFavorContacts("/accounts");
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const { data: bookAuths = [] } = useBookAuths();
     const { data: myPolicies = [] } = useFxOffers();

@@ -28,7 +28,7 @@ impl Asset {
     }
 }
 
-/// Load asset metadata from Banx GraphQL (`POST /graphql` on this app).
+/// Load asset metadata from Favor GraphQL (`POST /graphql` on this app).
 pub fn fetch_asset(asset_id: u16) -> Result<Asset, ErrorType> {
     let query = format!(
         r#"query {{
@@ -70,7 +70,7 @@ struct PrecData {
     token_precision: u8,
 }
 
-/// Tokens precision via Banx GraphQL (`tokenPrecision`).
+/// Tokens precision via Favor GraphQL (`tokenPrecision`).
 pub fn fetch_token_precision(token_id: u32) -> Result<Precision, ErrorType> {
     let query = format!(
         r#"query {{

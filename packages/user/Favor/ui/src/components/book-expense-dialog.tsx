@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { useBook } from "@/hooks/use-banx-mutations";
+import { useBook } from "@/hooks/use-favor-mutations";
 import { displayAmount } from "@/lib/amount";
 import { amountFieldValidator, useAppForm } from "@/lib/form";
 import type { BookAuth } from "@/lib/graphql";

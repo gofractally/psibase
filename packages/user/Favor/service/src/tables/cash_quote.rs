@@ -76,7 +76,7 @@ impl CashQuote {
         kind.to_string().try_into().expect("cash memo")
     }
 
-    /// Pull `amount` tokens from shared(`from`, Banx) into Banx primary.
+    /// Pull `amount` tokens from shared(`from`, Favor) into Favor primary.
     fn tokens_debit(from: AccountNumber, token_id: u32, amount: Quantity, memo: &str) {
         Tokens::call().debit(token_id, from, amount, Self::token_memo(memo));
     }
@@ -89,14 +89,14 @@ impl CashQuote {
         Tokens::call().fromSub(token_id, cash_sub(poster, token_id), amount);
     }
 
-    /// Move tokens from one Banx sub-account to another.
+    /// Move tokens from one Favor sub-account to another.
     pub(crate) fn move_named(from_sub: String, to_sub: String, token_id: u32, amount: Quantity) {
         let tokens = Tokens::call();
         tokens.fromSub(token_id, from_sub, amount);
         tokens.toSub(token_id, to_sub, amount);
     }
 
-    /// Shared(`from`, Banx) → `sub` on Banx.
+    /// Shared(`from`, Favor) → `sub` on Favor.
     pub(crate) fn debit_into_named(
         from: AccountNumber,
         token_id: u32,
@@ -108,15 +108,15 @@ impl CashQuote {
         Tokens::call().toSub(token_id, sub, amount);
     }
 
-    /// Shared(`from`, Banx) → poster's Tokens sub-account on Banx.
+    /// Shared(`from`, Favor) → poster's Tokens sub-account on Favor.
     pub fn take_tokens(from: AccountNumber, token_id: u32, amount: Quantity, memo: &str) {
         Self::tokens_debit(from, token_id, amount, memo);
         Self::to_sub(from, token_id, amount);
     }
 
-    /// Move `sub` onto the Banx primary balance and credit `to`.
+    /// Move `sub` onto the Favor primary balance and credit `to`.
     ///
-    /// A later `tokens.reject` returns that credit to the Banx service
+    /// A later `tokens.reject` returns that credit to the Favor service
     /// account. The tokens do not go back to `sub`, and the draw or curve
     /// from the payout stays. Refusing the credit is the recipient's choice.
     pub(crate) fn pay_named(
@@ -131,7 +131,7 @@ impl CashQuote {
     }
 
     /// Poster's vault sub-account → credit `to`. The recipient debits to take
-    /// the tokens. Refusing them leaves the tokens on the Banx service
+    /// the tokens. Refusing them leaves the tokens on the Favor service
     /// account; see [`Self::pay_named`].
     pub fn pay_tokens(
         poster: AccountNumber,
@@ -153,14 +153,14 @@ impl CashQuote {
         self.save();
     }
 
-    /// Taker draws `amount_banx` on poster; receives tokens. `min_tokens` is
-    /// the cash-out floor. Tokens come from `{poster}/{token_id}` on Banx.
-    pub fn cash_out(&mut self, taker: AccountNumber, amount_banx: Quantity, min_tokens: Quantity) {
+    /// Taker draws `amount_favor` on poster; receives tokens. `min_tokens` is
+    /// the cash-out floor. Tokens come from `{poster}/{token_id}` on Favor.
+    pub fn cash_out(&mut self, taker: AccountNumber, amount_favor: Quantity, min_tokens: Quantity) {
         assert!(self.is_out, "cash quote is not out");
         assert!(taker != self.poster, "cannot cash_out with self");
-        assert!(amount_banx.value > 0, "cash_out amount must be positive");
-        self.spend(amount_banx);
-        let tokens = self.apply(amount_banx);
+        assert!(amount_favor.value > 0, "cash_out amount must be positive");
+        self.spend(amount_favor);
+        let tokens = self.apply(amount_favor);
         assert!(
             tokens.value >= min_tokens.value,
             "cash_out tokens below min_tokens"
@@ -168,7 +168,7 @@ impl CashQuote {
         let creditor = self.poster;
         let debtor = taker;
         let asset_id = self.asset_id;
-        let netted = Connection::get_live(creditor, debtor, asset_id).apply_draw(amount_banx);
+        let netted = Connection::get_live(creditor, debtor, asset_id).apply_draw(amount_favor);
         Self::pay_tokens(creditor, taker, self.token_id, tokens, "cash_out");
         emit_pair_activity(
             taker,
@@ -176,7 +176,7 @@ impl CashQuote {
             debtor,
             asset_id,
             "cash_out",
-            amount_banx,
+            amount_favor,
             netted,
             asset_id,
             0,
@@ -186,30 +186,30 @@ impl CashQuote {
 
     /// Taker sends `amount_tokens` from `{taker}/{token_id}` (filled by
     /// `csh_fund`) into the poster's vault; books a deposit onto the poster.
-    pub fn cash_in(&mut self, taker: AccountNumber, amount_tokens: Quantity, min_banx: Quantity) {
+    pub fn cash_in(&mut self, taker: AccountNumber, amount_tokens: Quantity, min_favor: Quantity) {
         assert!(!self.is_out, "cash quote is not in");
         assert!(taker != self.poster, "cannot cash_in with self");
         assert!(amount_tokens.value > 0, "cash_in amount must be positive");
         self.spend(amount_tokens);
-        let banx_amt = self.apply(amount_tokens);
+        let favor_amt = self.apply(amount_tokens);
         assert!(
-            banx_amt.value >= min_banx.value,
+            favor_amt.value >= min_favor.value,
             "{}",
             &format!(
-                "cash_in Banx {} below min_banx of {}",
-                banx_amt.value, min_banx.value
+                "cash_in Favor {} below min_favor of {}",
+                favor_amt.value, min_favor.value
             )
         );
         Self::from_sub(taker, self.token_id, amount_tokens);
         Self::to_sub(self.poster, self.token_id, amount_tokens);
-        let netted = Connection::get_live(taker, self.poster, self.asset_id).deposit(banx_amt);
+        let netted = Connection::get_live(taker, self.poster, self.asset_id).deposit(favor_amt);
         emit_pair_activity(
             taker,
             taker,
             self.poster,
             self.asset_id,
             "cash_in",
-            banx_amt,
+            favor_amt,
             netted,
             self.asset_id,
             0,

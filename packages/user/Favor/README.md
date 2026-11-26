@@ -1,6 +1,6 @@
-# Banx
+# Favor
 
-Banx is a **mutual-credit** ledger. There is no cash balance and no token you “have.” Value is always a directed claim: **A owes B** some amount of a registered asset.
+Favor is a **mutual-credit** ledger. There is no cash balance and no token you “have.” Value is always a directed claim: **A owes B** some amount of a registered asset.
 
 A payment does not move coins. It **creates or shrinks obligations** along a path of credit lines (and, when the books already run the other way, it **unwinds** those claims).
 
@@ -97,13 +97,13 @@ This is the same test a forwarder with `allow_unknown` off applies to its next h
 
 The route is sealed with a 12-slot envelope, padded so the blob does not show how many hops were used. The UI and plugin never handle hops. The key is **objective state** and is passed as an action argument, so it is readable by any service and by anyone reading history. The seal is not secrecy from validators.
 
-The query service answers private data only to a signed-in caller, and only with rows the caller is a party to: `creditLines`, `obligations`, `bookAuths`, `exposure`, `requests`/`request`, `payAuths`, `forwardOffers` (your own routing fees), `invites` and `activity` (your own history). Asking about another account returns just what is between you and them. There is no network-wide line, forwarding or path-graph query, so Banx has no network map: other people's lines are not shown. Public marketplace data stays public: assets, claim offers, FX offers, relays, token relays, cash quotes and vaults, and a single invite by id (its link is how it is claimed).
+The query service answers private data only to a signed-in caller, and only with rows the caller is a party to: `creditLines`, `obligations`, `bookAuths`, `exposure`, `requests`/`request`, `payAuths`, `forwardOffers` (your own routing fees), `invites` and `activity` (your own history). Asking about another account returns just what is between you and them. There is no network-wide line, forwarding or path-graph query, so Favor has no network map: other people's lines are not shown. Public marketplace data stays public: assets, claim offers, FX offers, relays, token relays, cash quotes and vaults, and a single invite by id (its link is how it is claimed).
 
-This is a limit of the query service, not of the chain. The `Pair`, `ForwardOffer` and other rows are ordinary service tables that any service can read, and executed hops still emit `path_draw` activity events naming each pair. Caller-scoped queries stop Banx's own API from handing out the graph. They do not make the ledger private.
+This is a limit of the query service, not of the chain. The `Pair`, `ForwardOffer` and other rows are ordinary service tables that any service can read, and executed hops still emit `path_draw` activity events naming each pair. Caller-scoped queries stop Favor's own API from handing out the graph. They do not make the ledger private.
 
 ### Routing key
 
-Until a key is set, every route action fails with `routing key is not set`. `deploy.sh` sets one when `routingReady` is false and leaves an existing key alone, so a redeploy does not invalidate open quotes. `ROTATE_KEY=1 ./packages/user/Banx/deploy.sh` replaces it, which does. The GraphQL `routingReady` field says whether a key exists.
+Until a key is set, every route action fails with `routing key is not set`. `deploy.sh` sets one when `routingReady` is false and leaves an existing key alone, so a redeploy does not invalidate open quotes. `ROTATE_KEY=1 ./packages/user/Favor/deploy.sh` replaces it, which does. The GraphQL `routingReady` field says whether a key exists.
 
 ## Path-forward offers
 
@@ -136,7 +136,7 @@ Anyone posts `st_fx_ofr`: from-asset → to-asset, `poster_is_creditor` (which d
 
 Path pay does **not** rebook. It only uses the middle man’s quote to size the next hop.
 
-A **relay** (`st_relay`) is a constant-product curve between two Banx assets. Both reserves are virtual weights, not a debt, and one row prices both directions. If the previous hop’s creditor posted a relay for the pair, a path that changes asset there uses the curve instead of an FX offer. The curve itself has no fee; a path that continues pays the forward fee. `st_tok_relay` is the Banx↔token version (token reserve held in a Tokens sub-account).
+A **relay** (`st_relay`) is a constant-product curve between two Favor assets. Both reserves are virtual weights, not a debt, and one row prices both directions. If the previous hop’s creditor posted a relay for the pair, a path that changes asset there uses the curve instead of an FX offer. The curve itself has no fee; a path that continues pays the forward fee. `st_tok_relay` is the Favor↔token version (token reserve held in a Tokens sub-account).
 
 ## Amounts and units
 
@@ -147,9 +147,9 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | Layer | Role |
 |-------|------|
 | **service** | Tables and actions |
-| **r-banx** | GraphQL: caller-scoped lines, obligations, requests and history; public offers, FX, relays; `quotePath` returns a sealed route |
+| **r-favor** | GraphQL: caller-scoped lines, obligations, requests and history; public offers, FX, relays; `quotePath` returns a sealed route |
 | **plugin** | WIT `api` for the Supervisor (`setCreditLine`, `pathPay`, `quotePath`, …) |
-| **ui** | React app on the `banx` subdomain |
+| **ui** | React app on the `favor-app` subdomain |
 
 ### Actions (service)
 
@@ -157,7 +157,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 |--------|---------|
 | `st_crd_lne` | Set credit line (limit, deplete) |
 | `rm_crd_lne` | Remove a credit line (0-limit is not a remove) |
-| `cr_invite` / `rm_invite` | Create / delete a Banx invite; first accept extends a credit line (limit, deplete) to the claimee |
+| `cr_invite` / `rm_invite` | Create / delete a Favor invite; first accept extends a credit line (limit, deplete) to the claimee |
 | `st_bk_ath` / `rm_bk_ath` | Debtor lets a creditor `book` onto them up to `remaining` (optional expiry) |
 | `book` | Creditor books onto a debtor under their book-auth; same ledger as `deposit`, auto-nets |
 | `st_fwd_ofr` / `st_glb_fwd` | Specific / global path-forward offer (fee, expiry, `allow_unknown`) |
@@ -178,14 +178,14 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `st_fx_ofr` / `rm_fx_ofr` | Post / remove a from→to FX offer |
 | `convert` | Take the counterparty’s FX offer and rebook |
 | `take_fx` | Take a posted FX order (rebook, or open both legs) |
-| `st_relay` / `rm_relay` | Post / remove a Banx↔Banx relay curve |
-| `st_tok_relay` / `rm_tok_relay` | Post / remove a Banx↔token relay |
-| `tok_relay_out` / `tok_relay_in` | Draw Banx on the owner for tokens / send tokens for Banx owed by the owner |
-| `path_cash` | Path-pay that ends by selling the last hop’s Banx for tokens from their relay |
-| `st_csh_qte` / `rm_csh_qte` | Post / remove a Banx↔Tokens cash quote (`is_out` true = out) |
-| `csh_fund` / `csh_wd` | Fund / withdraw Tokens sub-account `{poster}/{token_id}` on Banx |
-| `cash_out` | Draw Banx on the cashier; tokens from their vault |
-| `cash_in` | Take tokens from the sender’s vault; book Banx onto the cashier; tokens stay in the cashier’s vault |
+| `st_relay` / `rm_relay` | Post / remove a Favor↔Favor relay curve |
+| `st_tok_relay` / `rm_tok_relay` | Post / remove a Favor↔token relay |
+| `tok_relay_out` / `tok_relay_in` | Draw Favor on the owner for tokens / send tokens for Favor owed by the owner |
+| `path_cash` | Path-pay that ends by selling the last hop’s Favor for tokens from their relay |
+| `st_csh_qte` / `rm_csh_qte` | Post / remove a Favor↔Tokens cash quote (`is_out` true = out) |
+| `csh_fund` / `csh_wd` | Fund / withdraw Tokens sub-account `{poster}/{token_id}` on Favor |
+| `cash_out` | Draw Favor on the cashier; tokens from their vault |
+| `cash_in` | Take tokens from the sender’s vault; book Favor onto the cashier; tokens stay in the cashier’s vault |
 | `get_exposure` | What a debtor owes a creditor in an asset |
 | `add_asset` | Register an asset (anyone) |
 
@@ -205,16 +205,16 @@ New assets are registered from the currency picker on Accounts. `/assets` redire
 
 ```bash
 # UI
-cd packages/user/Banx/ui && yarn && yarn build
+cd packages/user/Favor/ui && yarn && yarn build
 
-# Package (from Banx root)
+# Package (from Favor root)
 cargo-psibase package
 ```
 
-Install with `cargo-psibase install` against a local psinode. Open `https://banx-app.<root>/`. GraphiQL: `/graphiql`.
+Install with `cargo-psibase install` against a local psinode. Open `https://favor-app.<root>/`. GraphiQL: `/graphiql`.
 
 ## Test
 
 ```bash
-cargo-psibase test   # from packages/user/Banx/service
+cargo-psibase test   # from packages/user/Favor/service
 ```

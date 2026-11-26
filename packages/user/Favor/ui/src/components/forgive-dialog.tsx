@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { useForgive } from "@/hooks/use-banx-mutations";
+import { useForgive } from "@/hooks/use-favor-mutations";
 import {
     amountPlaceholder,
     formatRawAmount,

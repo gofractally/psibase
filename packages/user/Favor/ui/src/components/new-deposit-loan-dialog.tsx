@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 import { AssetField, amountUnit } from "@/components/form-fields";
-import { useDeposit } from "@/hooks/use-banx-mutations";
+import { useDeposit } from "@/hooks/use-favor-mutations";
 import {
     amountPlaceholder,
     isUnitDefault,
@@ -94,8 +94,8 @@ export function NewDepositLoanDialog({
                     <DialogTitle>Book a deposit</DialogTitle>
                     <DialogDescription>
                         {lockedDepositor
-                            ? `You received value outside Banx. You owe ${lockedDepositor}, and they hold the asset. Overlapping claims net on their own.`
-                            : "You received value outside Banx. You owe the depositor, and they hold the asset. Overlapping claims net on their own."}
+                            ? `You received value outside Favor. You owe ${lockedDepositor}, and they hold the asset. Overlapping claims net on their own.`
+                            : "You received value outside Favor. You owe the depositor, and they hold the asset. Overlapping claims net on their own."}
                     </DialogDescription>
                 </DialogHeader>
                 <form

@@ -7,7 +7,7 @@ import {
     UsingGlobalSettingsOverlay,
     amountUnit,
 } from "@/components/form-fields";
-import { useBuyClaimOffers } from "@/hooks/use-banx-data";
+import { useBuyClaimOffers } from "@/hooks/use-favor-data";
 import {
     useRemoveGlobalBuyClaimOffer,
     useRemoveBuyClaimOffer,
@@ -17,7 +17,7 @@ import {
     useRemoveSellClaimOffer,
     useSetGlobalSellClaimOffer,
     useSetSellClaimOffer,
-} from "@/hooks/use-banx-mutations";
+} from "@/hooks/use-favor-mutations";
 import { amountPlaceholder, displayAmount } from "@/lib/amount";
 import {
     MAX_HOP_FEE_PERCENT,

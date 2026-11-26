@@ -9,12 +9,12 @@ import { PageHeader } from "@/components/page-header";
 import { PayAuthCollectDialog } from "@/components/pay-auth-collect-dialog";
 import { RequestDialog } from "@/components/request-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
-import { usePayAuths, useRequests } from "@/hooks/use-banx-data";
+import { usePayAuths, useRequests } from "@/hooks/use-favor-data";
 import {
     useCancelPayAuth,
     useCancelRequest,
     useDeposit,
-} from "@/hooks/use-banx-mutations";
+} from "@/hooks/use-favor-mutations";
 import { displayAmount } from "@/lib/amount";
 import {
     REQUEST_INVOICE,

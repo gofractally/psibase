@@ -11,7 +11,7 @@ import { z } from "zod";
 
 import { ReciprocateLineForm } from "@/components/reciprocate-line-form";
 import { useAssetMap } from "@/hooks/use-assets";
-import { useCreditLines } from "@/hooks/use-banx-data";
+import { useCreditLines } from "@/hooks/use-favor-data";
 import { displayAmount } from "@/lib/amount";
 import { fetchInvite } from "@/lib/graphql";
 import { inviteClaimedBy } from "@/lib/contacts";
@@ -68,7 +68,7 @@ export function InvitePage() {
 
     const imported = useQuery({
         enabled: !!token && !reciprocal,
-        queryKey: ["banx", "importInvite", token],
+        queryKey: ["favor", "importInvite", token],
         queryFn: () => importInviteToken(z.string().parse(token)),
         retry: false,
         staleTime: Infinity,
@@ -77,7 +77,7 @@ export function InvitePage() {
     const inviteId = imported.data;
     const invite = useQuery({
         enabled: inviteId !== undefined && !reciprocal,
-        queryKey: ["banx", "invite", inviteId],
+        queryKey: ["favor", "invite", inviteId],
         queryFn: () => fetchInvite(inviteId!),
         retry: false,
     });
@@ -229,7 +229,7 @@ export function InvitePage() {
                     </div>
                     <CardTitle>Invite not found</CardTitle>
                     <CardDescription>
-                        This Banx invite was already claimed, revoked, or never
+                        This Favor invite was already claimed, revoked, or never
                         existed. Ask the sender for a new one.
                     </CardDescription>
                 </CardHeader>
@@ -247,7 +247,7 @@ export function InvitePage() {
                     </div>
                     <CardTitle>Invite already claimed</CardTitle>
                     <CardDescription>
-                        This Banx invite was claimed by {claimedBy}. Ask the
+                        This Favor invite was claimed by {claimedBy}. Ask the
                         sender for a new one if you still need a line.
                     </CardDescription>
                 </CardHeader>
@@ -283,12 +283,12 @@ export function InvitePage() {
                 <div className="mx-auto">
                     <TicketCheck className="h-12 w-12" />
                 </div>
-                <CardTitle>Join Banx</CardTitle>
+                <CardTitle>Join Favor</CardTitle>
                 <CardDescription>
                     <span className="text-foreground font-medium">
                         {row.inviter}
                     </span>{" "}
-                    invited you onto the network and Banx, with a credit line of{" "}
+                    invited you onto the network and Favor, with a credit line of{" "}
                     <span className="text-foreground font-medium">
                         {limit} {symbol}
                     </span>

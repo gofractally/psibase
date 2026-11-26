@@ -1,12 +1,12 @@
 import { useEffect } from "react";
 
 import { AssetField, amountUnit } from "@/components/form-fields";
-import { useForwardOffers } from "@/hooks/use-banx-data";
+import { useForwardOffers } from "@/hooks/use-favor-data";
 import {
     useRemoveCreditLine,
     useSetCreditLine,
     useSetGlobalForwardOffer,
-} from "@/hooks/use-banx-mutations";
+} from "@/hooks/use-favor-mutations";
 import { liveGlobalForward } from "@/lib/account-groups";
 import { formatRawAmount } from "@/lib/amount";
 import {

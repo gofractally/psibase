@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAssetMap } from "@/hooks/use-assets";
-import { useBanxContacts } from "@/hooks/use-banx-contacts";
-import { useActivityFeed, useActivityWith } from "@/hooks/use-banx-data";
-import { useInvalidateLedger } from "@/hooks/use-banx-mutations";
+import { useFavorContacts } from "@/hooks/use-favor-contacts";
+import { useActivityFeed, useActivityWith } from "@/hooks/use-favor-data";
+import { useInvalidateLedger } from "@/hooks/use-favor-mutations";
 import { isNamedAccount } from "@/lib/contacts";
 import {
     activityMatches,
@@ -49,7 +49,7 @@ export function ActivityFeed({
 } = {}) {
     const { data: user } = useCurrentUser();
     const { symbolOf, precisionOf } = useAssetMap();
-    const { label } = useBanxContacts("/accounts");
+    const { label } = useFavorContacts("/accounts");
     const feed = useActivityFeed();
     const withParty = useActivityWith(counterparty);
     const { data: events = [], isLoading, isError } = counterparty
@@ -125,7 +125,7 @@ export function ActivityFeed({
                 <p className="text-muted-foreground text-sm">Loading history…</p>
             ) : isError ? (
                 <p className="text-destructive text-sm">
-                    Could not load history. Reinstall Banx if event indexes are
+                    Could not load history. Reinstall Favor if event indexes are
                     missing (call init again).
                 </p>
             ) : rows.length === 0 ? (

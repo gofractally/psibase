@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests {
     use crate::tables::{
-        Asset, BanxInvite, BanxInviteTable, BanxRelay, BookAuth, CashQuote, ClaimOffer, FxOffer,
+        Asset, FavorInvite, FavorInviteTable, FavorRelay, BookAuth, CashQuote, ClaimOffer, FxOffer,
         InitTable, Pair, PairTable, PathHop, PayAuth, PayAuthTab, PayRequest, TokenRelay,
         PPM_SCALE, RATE_SCALE,
     };
@@ -133,12 +133,12 @@ mod tests {
             .value
     }
 
-    fn banx_gql(chain: &psibase::Chain, query: &str) -> Result<serde_json::Value, psibase::Error> {
+    fn favor_gql(chain: &psibase::Chain, query: &str) -> Result<serde_json::Value, psibase::Error> {
         Ok(chain.graphql(Wrapper::SERVICE, query)?)
     }
 
     /// A query as `user`, through the same session token the UI uses.
-    fn banx_gql_as(
+    fn favor_gql_as(
         chain: &psibase::Chain,
         user: AccountNumber,
         query: &str,
@@ -158,7 +158,7 @@ mod tests {
 
     /// `account`'s own feed, read as `account`: history is private to its owner.
     fn activity_nodes(chain: &psibase::Chain, account: AccountNumber) -> Vec<serde_json::Value> {
-        let graph = banx_gql_as(
+        let graph = favor_gql_as(
             chain,
             account,
             &format!(
@@ -179,7 +179,7 @@ mod tests {
             .collect()
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_init_seeds_default_assets(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -221,7 +221,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_add_asset_anyone(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -299,12 +299,12 @@ mod tests {
             .unwrap_or_else(|| "(no error: path_pay succeeded)".to_string())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_route_key_unset_blocks_payment_and_reports_not_ready(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         let (alice, _gary, _usd) = route_net(&chain);
-        let ready = banx_gql(&chain, "{ routingReady }")?;
+        let ready = favor_gql(&chain, "{ routingReady }")?;
         assert_eq!(
             ready.pointer("/data/routingReady"),
             Some(&serde_json::json!(false)),
@@ -316,7 +316,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_route_key_provision_rotate_and_permissions(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -338,7 +338,7 @@ mod tests {
 
         // Provision, seal under epoch 1, then rotate: the old quote stops opening.
         let route = seal(&chain, alice, vec![hop(gary, usd)], Quantity::new(10));
-        let ready = banx_gql(&chain, "{ routingReady }")?;
+        let ready = favor_gql(&chain, "{ routingReady }")?;
         assert_eq!(
             ready.pointer("/data/routingReady"),
             Some(&serde_json::json!(true)),
@@ -352,7 +352,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_route_is_bound_to_payer_amount_receive_and_time(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -392,7 +392,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_quote_path_needs_a_signed_in_caller(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -401,14 +401,14 @@ mod tests {
         let query = format!(
             r#"{{ quotePath(from: "alice", to: "gary", amount: "1", fromAsset: {usd}, toAsset: {usd}, maxHops: 3, exactOut: true) {{ route }} }}"#
         );
-        let reply = banx_gql(&chain, &query)?;
+        let reply = favor_gql(&chain, &query)?;
         assert!(gql_error(&reply).contains("sign in"), "{reply}");
         assert!(reply.pointer("/data/quotePath/route").is_none(), "{reply}");
 
         // Signed in as someone who is neither end of the payment.
         let carol = account!("carol");
         chain.new_account(carol).unwrap();
-        let reply = banx_gql_as(&chain, carol, &query)?;
+        let reply = favor_gql_as(&chain, carol, &query)?;
         assert!(gql_error(&reply).contains("payer or the payee"), "{reply}");
         Ok(())
     }
@@ -438,7 +438,7 @@ mod tests {
         (alice, gary, carol, usd)
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_private_queries_need_sign_in(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let (_alice, _gary, _carol, usd) = private_net(&chain);
         for query in [
@@ -453,13 +453,13 @@ mod tests {
             r#"{ invites(inviter: "alice") { id } }"#.to_string(),
             r#"{ activity(account: "alice", last: 5) { edges { node { kind } } } }"#.to_string(),
         ] {
-            let reply = banx_gql(&chain, &query)?;
+            let reply = favor_gql(&chain, &query)?;
             assert!(gql_error(&reply).contains("sign in"), "{query} -> {reply}");
         }
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_network_wide_queries_are_gone(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let (alice, _gary, _carol, _usd) = private_net(&chain);
         for query in [
@@ -468,7 +468,7 @@ mod tests {
             r#"{ pathGraph(from: "alice", to: "gary", maxHops: 3) { now } }"#,
         ] {
             // Not even a signed-in caller can ask for the whole graph.
-            let reply = banx_gql_as(&chain, alice, query)?;
+            let reply = favor_gql_as(&chain, alice, query)?;
             assert!(
                 gql_error(&reply).contains("Unknown field"),
                 "{query} -> {reply}"
@@ -477,7 +477,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_private_queries_return_only_rows_the_caller_is_party_to(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -500,7 +500,7 @@ mod tests {
             rows
         };
         let lines = |who: AccountNumber, about: &str| {
-            banx_gql_as(
+            favor_gql_as(
                 &chain,
                 who,
                 &format!(r#"{{ creditLines(account: "{about}") {{ creditor debtor }} }}"#),
@@ -529,7 +529,7 @@ mod tests {
                 0,
             )
             .get()?;
-        let owed = banx_gql_as(
+        let owed = favor_gql_as(
             &chain,
             alice,
             r#"{ obligations(account: "gary") { creditor debtor } }"#,
@@ -541,7 +541,7 @@ mod tests {
             Some(0),
             "alice is not a party to gary and carol's debt: {owed}"
         );
-        let owed = banx_gql_as(
+        let owed = favor_gql_as(
             &chain,
             carol,
             r#"{ obligations(account: "gary") { creditor debtor } }"#,
@@ -555,27 +555,27 @@ mod tests {
         );
 
         // Things only the owner may read.
-        let routing = banx_gql_as(
+        let routing = favor_gql_as(
             &chain,
             gary,
             r#"{ forwardOffers(poster: "alice") { poster } }"#,
         )?;
         assert!(gql_error(&routing).contains("your own"), "{routing}");
-        let own = banx_gql_as(
+        let own = favor_gql_as(
             &chain,
             alice,
             r#"{ forwardOffers(poster: "alice") { poster } }"#,
         )?;
         assert_eq!(gql_error(&own), "(no error)", "{own}");
-        let feed = banx_gql_as(
+        let feed = favor_gql_as(
             &chain,
             gary,
             r#"{ activity(account: "alice", last: 5) { edges { node { kind } } } }"#,
         )?;
         assert!(gql_error(&feed).contains("your own"), "{feed}");
-        let invites = banx_gql_as(&chain, gary, r#"{ invites(inviter: "alice") { id } }"#)?;
+        let invites = favor_gql_as(&chain, gary, r#"{ invites(inviter: "alice") { id } }"#)?;
         assert!(gql_error(&invites).contains("your own"), "{invites}");
-        let third_party = banx_gql_as(
+        let third_party = favor_gql_as(
             &chain,
             alice,
             &format!(r#"{{ exposure(creditor: "gary", debtor: "carol", assetId: {usd}) }}"#),
@@ -583,7 +583,7 @@ mod tests {
         assert!(gql_error(&third_party).contains("party"), "{third_party}");
 
         // Marketplace data stays public: no sign-in needed.
-        let public = banx_gql(&chain, "{ assets { id } constants { ppmScale } }")?;
+        let public = favor_gql(&chain, "{ assets { id } constants { ppmScale } }")?;
         assert_eq!(gql_error(&public), "(no error)", "{public}");
         Ok(())
     }
@@ -599,7 +599,7 @@ mod tests {
     ) -> Result<(String, u64, u64, u64), psibase::Error> {
         let precision = Asset::get(usd).unwrap().precision;
         let human = Decimal::new(Quantity::new(receive_raw), precision).to_string();
-        let reply = banx_gql_as(
+        let reply = favor_gql_as(
             chain,
             payer,
             &format!(
@@ -644,7 +644,7 @@ mod tests {
         (alice, gary, steve, usd)
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_quoted_route_executes_with_the_quoted_amounts(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -666,7 +666,7 @@ mod tests {
 
     /// The amounts are the protection here, not `min_return`: a floor of 0
     /// would accept any fill, and a replaced fee still fails.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_a_changed_fee_fails_even_with_no_min_return(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -695,7 +695,7 @@ mod tests {
 
     /// A route whose sealed amount for one hop is off by one does not run, even
     /// though the draw would have succeeded and `min_return` is 0.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_each_sealed_hop_amount_must_match_the_live_price(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -767,7 +767,7 @@ mod tests {
         let amount_asset = if exact_out { to_asset } else { from_asset };
         let precision = Asset::get(amount_asset).unwrap().precision;
         let human = Decimal::new(Quantity::new(amount_raw), precision).to_string();
-        let reply = banx_gql_as(
+        let reply = favor_gql_as(
             chain,
             user,
             &format!(
@@ -860,7 +860,7 @@ mod tests {
     }
 
     /// Isabelle pays James in USD while owing John in AUD, across John's offer.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_quoted_fx_route_exact_out_crosses_currencies(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -903,7 +903,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_quoted_fx_route_exact_in_crosses_currencies(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -940,7 +940,7 @@ mod tests {
 
     /// John moves his rate after the quote. Even a better-for-John rate fails
     /// with no floor set: the payer approved a different price.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_a_replaced_fx_rate_fails_the_quoted_route(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -975,7 +975,7 @@ mod tests {
     }
 
     /// Bob pays Alice in AUD through John's USD/AUD relay curve.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_quoted_relay_route_executes_and_goes_stale_after_another_trade(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -1029,7 +1029,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_quoted_route_pays_an_invoice_and_binds_the_price(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -1087,7 +1087,7 @@ mod tests {
 
     /// The payee runs the payer's repeating payment with a route they quoted
     /// for the payer.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_quoted_route_runs_a_repeating_payment_and_binds_the_price(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -1158,7 +1158,7 @@ mod tests {
         (alice, gary, steve, carol, usd)
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_payee_cannot_start_a_series_run_at_an_account_the_payer_does_not_know(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -1189,7 +1189,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_a_line_from_the_payer_makes_a_first_hop_known(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -1212,7 +1212,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_a_debt_from_the_payer_makes_a_first_hop_known(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -1236,7 +1236,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_a_payee_run_may_start_at_the_payee_or_unwind_what_the_first_hop_owes(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -1280,7 +1280,7 @@ mod tests {
     }
 
     /// The quote the payee asks for must not offer a start the chain refuses.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_a_payees_quote_for_the_payer_starts_only_where_she_agreed(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -1288,7 +1288,7 @@ mod tests {
         let start = chain_seconds(&chain);
         let id = schedule(&chain, alice, steve, usd, 400, 1_000, 100, start, 0);
         let ask = |user: AccountNumber| {
-            banx_gql_as(
+            favor_gql_as(
                 &chain,
                 user,
                 &format!(
@@ -1315,7 +1315,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_path_pay_same_asset_hops(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -1358,7 +1358,7 @@ mod tests {
     /// Bandit books $10 AUD of chores (he owes Bluey). Bluey pays Bingo $2.50
     /// for a popper through dad — Bingo will not take Bluey's IOU. No line
     /// from Bandit to Bluey: she can only spend what she is already owed.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_bluey_pays_bingo_popper_through_bandit(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -1460,7 +1460,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_path_pay_cross_asset(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -1526,7 +1526,7 @@ mod tests {
     ///
     /// Atomic path_pay:
     ///   [(mitchell, AUD), (john, AUD), (mike, USD), (brandon, USD)]
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_path_pay_zac_mitchell_john_aud_then_usd_mike_brandon(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -1658,7 +1658,7 @@ mod tests {
     /// path-pays through John and must send more than $5 so $5 arrives.
     /// John is leaving, so he sells $90 of cafe claim to Pippa
     /// at a 5/90 haircut: she takes the $90 claim and owes him $85.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_path_pay_cafe(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -1748,7 +1748,7 @@ mod tests {
     }
 
     /// Same multi-hop graph, but min_return too high after FX + fee → full revert.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_path_pay_currency_hop_min_return_reverts(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -1832,7 +1832,7 @@ mod tests {
 
     /// From-asset `remaining` caps path FX. A hop larger than what is left
     /// is rejected whole. Posting again replaces what is left.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_fx_offer_remaining_caps_path(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -1965,7 +1965,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_rm_fx_ofr_removes_offer(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let gary = account!("gary");
@@ -1997,7 +1997,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_path_pay_requires_routing(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -2034,7 +2034,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_path_pay_min_return(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -2089,7 +2089,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_deposit_auto_nets_full(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -2124,7 +2124,7 @@ mod tests {
     }
 
     /// path_pay / Connection::draw auto-nets mutual claims on the pair.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_path_pay_auto_nets_reverse_draw(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -2192,7 +2192,7 @@ mod tests {
 
     /// Alice holds Bob debt, sells to Peter under Peter's buy-claim offer.
     /// Peter takes Bob face; Alice gets face after fees as claim on Peter.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_sell_claim_discount(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -2245,7 +2245,7 @@ mod tests {
     }
 
     /// Same as buy-claim, but Peter posts a 5% premium: Alice gets 10500 on Peter.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_sell_claim_premium(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -2298,7 +2298,7 @@ mod tests {
 
     /// Alice signs the 5% haircut she was shown. Peter replaces it with 20%.
     /// The take must not land: she would receive 8_000 for the same face.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_sell_claim_min_proceeds_rejects_worse_spread(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -2344,7 +2344,7 @@ mod tests {
 
     /// Pippa signs John's 0% ask. He replaces it with a 5% premium. The take
     /// must not land: she would owe 105 for the same 100 face.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_buy_claim_max_cost_rejects_worse_premium(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -2389,7 +2389,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_specific_buy_claim_does_not_block_global_forward(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -2439,7 +2439,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_expired_specific_falls_back_to_global(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -2488,7 +2488,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_deplete_on_debit_keeps_limit_cap(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -2547,7 +2547,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_sell_claim_consumes_depleting_remaining(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -2597,7 +2597,7 @@ mod tests {
     /// - Peter's depleting line to Bob is 100, remaining still 100
     ///
     /// After a take of 50: pair nets to 0, remaining still 100.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_sell_claim_remaining_only_new_draw(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -2654,7 +2654,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_sell_claim_requires_debtor_line_to_buyer(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -2694,7 +2694,7 @@ mod tests {
     /// Global buy is the rate. New exposure needs the buyer's line to the
     /// debtor and is capped by that line. Steve cannot dump $2,000 of
     /// Carol onto Peter when Peter's empty line to her is $500.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_sell_claim_requires_buyer_line_and_caps_size(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -2745,7 +2745,7 @@ mod tests {
 
     /// Unwind-only take: Peter already owes Carol 500. Steve's 500 claim
     /// nets that away. No new exposure, so no buyer line required.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_sell_claim_unwind_needs_no_buyer_line(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -2778,7 +2778,7 @@ mod tests {
     }
 
     /// Mallory cannot become a claim-buyer on Bob by owing Bob dust.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_sell_claim_dust_deposit_does_not_know_buyer(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -2815,7 +2815,7 @@ mod tests {
 
     /// A full-size deposit makes the claim transfer a pure unwind, which
     /// skips the buyer-line check. The proceeds still need Alice's line.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_buy_claim_full_deposit_needs_seller_line(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -2864,7 +2864,7 @@ mod tests {
     /// The cost is capped by Alice's line to Peter, and what Peter already
     /// owes her counts against it. The debtor side is satisfied throughout,
     /// so only the seller's line can reject.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_buy_claim_cost_capped_by_seller_line(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -2924,7 +2924,7 @@ mod tests {
 
     /// Alice already owes Peter 100. A cost that only unwinds that debt
     /// needs no line from her. Anything past it does.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_buy_claim_unwind_needs_no_seller_line(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -2975,7 +2975,7 @@ mod tests {
 
     /// Closed global forward: Gary must have lined Steve before Steve can be
     /// introduced as Gary's creditor.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_closed_forward_requires_line_to_next_hop(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -3034,7 +3034,7 @@ mod tests {
 
     /// Mallory cannot open Alice's closed forward by owing her dust, then
     /// lining her so a path would new_draw.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_closed_forward_dust_deposit_does_not_know_next_hop(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -3081,7 +3081,7 @@ mod tests {
 
     /// Prepaid reverse claim: cafe owes john, closed forward, hop only
     /// unwinds — no john→cafe line needed.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_closed_forward_unwind_does_not_need_line(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -3122,7 +3122,7 @@ mod tests {
 
     /// Specific path-forward can be posted before the next hop knows the
     /// poster; `path_pay` still fails until they line them.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_specific_forward_may_be_posted_before_next_hop_knows(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -3176,7 +3176,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_st_fwd_unk_opens_closed_forward(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -3231,7 +3231,7 @@ mod tests {
     }
 
     /// Re-posting a forward offer applies `allow_unknown` (not insert-only).
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_st_glb_fwd_update_sets_allow_unknown(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -3290,7 +3290,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_rm_crd_lne_blocks_sell_and_erases_row(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -3330,7 +3330,7 @@ mod tests {
 
     /// John takes 12 weetbix and 80.0g of coffee. Isabelle's later 3 weetbix
     /// net his biscuit claim to 9. The coffee claim stays.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pantry_open_biscuits_and_debtor_priced_coffee(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -3371,7 +3371,7 @@ mod tests {
     /// Michelle left 100.0g of merlo at Isabelle's. John takes it. He has no
     /// line to Michelle, so the draw goes through Isabelle: he owes her the
     /// beans, and her AUD line to her mum carries the $5.00 on.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_merlo_debt_reaches_michelle_through_isabelle(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -3463,7 +3463,7 @@ mod tests {
     /// path. A return to John in AUD would be Isabelle's trade, and she has
     /// not posted one. Isabelle is the debtor of the biscuit claim, so she
     /// is the one who can take Michelle's quote. Ten biscuits become $1.00.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_john_repays_michelle_weetbix_through_isabelle(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -3593,7 +3593,7 @@ mod tests {
     /// Isabelle does. 12 kWh at $0.30 become $3.60 of AUD she owes mum.
     /// John still owes Isabelle the leftover 8 kWh. The biscuits stay
     /// where the path left them.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_isabelle_trades_mums_kwh_john_keeps_his(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -3774,7 +3774,7 @@ mod tests {
     /// The path draws new claims. It does not rebook anything John already
     /// owes, and it does not make him owe Michelle the kWh. 20 kWh becomes
     /// $6.00 of AUD that lands on him, with Isabelle holding both middle books.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_john_borrows_mums_kwh_rate_back_through_isabelle(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -3888,7 +3888,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_path_pay_fx_after_full_reverse_net(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -3950,7 +3950,7 @@ mod tests {
     /// Alice pays Steve 1_000 AUD through Gary. Gary's fee is 100 and his
     /// rate is 0.70, so he is owed the full 1_000 and owes Steve 630.
     /// A debtor-side row at 0.50 must not be the one that prices the hop.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_fx_quote_path_fee_comes_off_what_is_owed_onward(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -4096,7 +4096,7 @@ mod tests {
     /// A debtor-side quote is not a path rate.
     /// fxOffers still lists it. Removing the creditor row makes
     /// the path fail again while the debtor row remains.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_fx_quote_path_ignores_debtor_side(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -4152,7 +4152,7 @@ mod tests {
         let policies_q = r#"{ fxOffers(poster: "gary") {
             poster fromAsset toAsset posterIsCreditor
         } }"#;
-        let listed = banx_gql(&chain, policies_q)?;
+        let listed = favor_gql(&chain, policies_q)?;
         assert_eq!(
             gary_sides(&listed, "/data/fxOffers", aud, usd),
             vec![false],
@@ -4195,7 +4195,7 @@ mod tests {
                 never(),
             )
             .get()?;
-        let listed = banx_gql(&chain, policies_q)?;
+        let listed = favor_gql(&chain, policies_q)?;
         assert_eq!(
             gary_sides(&listed, "/data/fxOffers", aud, usd),
             vec![false, true],
@@ -4254,7 +4254,7 @@ mod tests {
             5_000
         );
 
-        let listed = banx_gql(&chain, policies_q)?;
+        let listed = favor_gql(&chain, policies_q)?;
         assert_eq!(
             gary_sides(&listed, "/data/fxOffers", aud, usd),
             vec![false],
@@ -4264,7 +4264,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_path_pay_fx_after_partial_reverse_net(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -4330,7 +4330,7 @@ mod tests {
     /// Hop 0 nets 400; Alice still owes Gary 600 AUD.
     /// Hop 1: Gary's 0.70 → Steve is owed 700 USD (Gary still owed 600 AUD).
     /// Hop 2: Steve's 0.80 → Sam is owed 560 GBP (Gary still owed 700 USD).
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_path_pay_fx_aud_usd_gbp_after_partial_reverse(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -4426,7 +4426,7 @@ mod tests {
     }
 
     /// Alice's FX quote must not price a hop through Gary.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_path_pay_fx_uses_middle_man_policy_not_sender(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -4516,7 +4516,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_credit_line_and_deposit_reject_bad_args(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -4547,7 +4547,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_named_counterparties_must_exist(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -4607,7 +4607,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_offer_upserts_require_registered_asset(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -4663,7 +4663,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_sell_claim_specific_take_overrides_global(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -4711,7 +4711,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_forgive_writes_off_claim(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -4761,7 +4761,7 @@ mod tests {
     }
 
     /// A balance at the i64 ceiling can still be forgiven.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_deposit_max_principal_can_be_forgiven(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -4785,7 +4785,7 @@ mod tests {
     }
 
     /// Same poster/asset: 5% path hop, 0% buy-claim. Each action uses its own row.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_forward_and_buy_claim_fees_independent(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -4847,7 +4847,7 @@ mod tests {
 
     /// C lined B, B lined A. A pays C via B. C can pay A back by unwinding
     /// those claims — no opposite credit lines required.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_path_pay_unwinds_reverse_claims(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let a = account!("alice");
@@ -4904,7 +4904,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_invoice_path_pay_fulfills(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -4955,7 +4955,7 @@ mod tests {
     }
 
     /// `pay_inv` walks back: $5 invoice, $20 budget, no hop fee → send $5.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pay_inv_walks_back_zero_fee(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let mitchell = account!("mitchell");
@@ -5006,7 +5006,7 @@ mod tests {
     }
 
     /// 1% hop fee: $5 invoice needs send 5.0506, not the $20 budget.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pay_inv_walks_back_hop_fee(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let mitchell = account!("mitchell");
@@ -5055,7 +5055,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pay_inv_max_spend_too_small(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let mitchell = account!("mitchell");
@@ -5108,7 +5108,7 @@ mod tests {
 
     /// Expired FX must fail at invert (`fx offer expired`), not after
     /// sizing a send and hitting `max_spend below required send`.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pay_inv_expired_fx_fails_at_invert(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -5174,7 +5174,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_invoice_rejects_wrong_payer_or_hop(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -5231,7 +5231,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_invoice_counterparty_zero_anyone_pays(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -5267,7 +5267,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_st_req_rejects_unknown_kind(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -5282,7 +5282,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_please_book_rejects_zero_counterparty(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -5304,7 +5304,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_please_book_deposit_fulfills(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -5350,7 +5350,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_request_cancel_blocks_fulfill(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -5378,7 +5378,7 @@ mod tests {
     }
 
     /// Re-posting a depleting line (same or higher limit) must not refill spent remaining.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_want_deplete_edit_does_not_refill_remaining(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -5424,7 +5424,7 @@ mod tests {
     }
 
     /// Toggle deplete off then on must not restore spent remaining.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_deplete_toggle_does_not_refill_remaining(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -5464,7 +5464,7 @@ mod tests {
 
     /// Fully spent remaining (0) then revolving → depleting must not restore
     /// the budget. The upsert used to treat remaining==0 as first enable.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_deplete_toggle_does_not_refill_zero_remaining(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -5518,7 +5518,7 @@ mod tests {
     /// A revolving line keeps remaining equal to its limit, including after the
     /// limit changes, so the first switch to depleting can still be drawn.
     /// Spending that budget is permanent: repayment does not restore it.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_revolving_first_deplete_has_budget(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -5575,7 +5575,7 @@ mod tests {
 
     /// Full unwind on hop 0 is not an unfinished path: FX still forwards the
     /// hop notional (min_return 0 must not look like a prefix-only settlement).
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_want_path_pay_full_unwind_still_forwards_fx(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -5649,7 +5649,7 @@ mod tests {
             .value
     }
 
-    fn shared_from_banx(chain: &psibase::Chain, token_id: u32, who: AccountNumber) -> u64 {
+    fn shared_from_favor(chain: &psibase::Chain, token_id: u32, who: AccountNumber) -> u64 {
         psibase::services::tokens::Wrapper::push(chain)
             .getSharedBal(token_id, Wrapper::SERVICE, who)
             .get()
@@ -5657,7 +5657,7 @@ mod tests {
             .value
     }
 
-    fn take_from_banx(chain: &psibase::Chain, who: AccountNumber, token_id: u32, amount: u64) {
+    fn take_from_favor(chain: &psibase::Chain, who: AccountNumber, token_id: u32, amount: u64) {
         psibase::services::tokens::Wrapper::push_from(chain, who)
             .debit(
                 token_id,
@@ -5768,14 +5768,14 @@ mod tests {
             .unwrap_or(0)
     }
 
-    /// Credit Banx with memo "relay", then post. The service debits that credit
+    /// Credit Favor with memo "relay", then post. The service debits that credit
     /// into the pair sub. A second post of the same pair is rejected.
     fn post_token_pool(
         chain: &psibase::Chain,
         owner: AccountNumber,
         asset_id: u16,
         token_id: u32,
-        reserve_banx: u64,
+        reserve_favor: u64,
         reserve_tokens: u64,
     ) {
         psibase::services::tokens::Wrapper::push_from(chain, owner)
@@ -5791,14 +5791,14 @@ mod tests {
             .st_tok_relay(
                 asset_id,
                 token_id,
-                Quantity::new(reserve_banx),
+                Quantity::new(reserve_favor),
                 Quantity::new(reserve_tokens),
             )
             .get()
             .unwrap();
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_cash_out_and_in_gas_usd(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -5845,9 +5845,9 @@ mod tests {
             )
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 1_000_000);
-        assert_eq!(shared_from_banx(&chain, gas, alice), 1_000_000);
+        assert_eq!(shared_from_favor(&chain, gas, alice), 1_000_000);
         assert_eq!(vault_bal(&chain, bob, gas), 4_000_000);
-        take_from_banx(&chain, alice, gas, 1_000_000);
+        take_from_favor(&chain, alice, gas, 1_000_000);
 
         fund_vault(&chain, alice, gas, 1_000_000);
         Wrapper::push_from(&chain, alice)
@@ -5867,7 +5867,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_cash_out_non_one_to_one(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -5905,11 +5905,11 @@ mod tests {
             )
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 100_000);
-        assert_eq!(shared_from_banx(&chain, gas, alice), 200_000);
+        assert_eq!(shared_from_favor(&chain, gas, alice), 200_000);
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_cash_in_buys_usd_claim(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -5949,7 +5949,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_cash_out_requires_vault(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -5992,7 +5992,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_cash_in_requires_vault(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -6040,7 +6040,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_cash_withdraw_returns_tokens(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let bob = account!("bob");
@@ -6054,14 +6054,14 @@ mod tests {
             .csh_wd(gas, Quantity::new(400_000))
             .get()?;
         assert_eq!(vault_bal(&chain, bob, gas), 0);
-        assert_eq!(shared_from_banx(&chain, gas, bob), 400_000);
-        take_from_banx(&chain, bob, gas, 400_000);
+        assert_eq!(shared_from_favor(&chain, gas, bob), 400_000);
+        take_from_favor(&chain, bob, gas, 400_000);
         assert_eq!(token_balance(&chain, gas, bob), 1_000_000);
         Ok(())
     }
 
     /// A cash-out credits the taker. Debiting that credit is the taker's choice.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_cash_out_credits_without_debit(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -6096,7 +6096,7 @@ mod tests {
             )
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 100_000);
-        assert_eq!(shared_from_banx(&chain, gas, alice), 100_000);
+        assert_eq!(shared_from_favor(&chain, gas, alice), 100_000);
         assert_eq!(token_balance(&chain, gas, alice), 0);
         assert_eq!(vault_bal(&chain, bob, gas), 400_000);
         assert_eq!(Pair::line(bob, alice, usd).unwrap().remaining.value, 0);
@@ -6108,7 +6108,7 @@ mod tests {
     }
 
     /// Withdrawing the vault credits the poster even when auto-debit is off.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_cash_withdraw_credits_without_debit(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -6128,12 +6128,12 @@ mod tests {
             .csh_wd(gas, Quantity::new(400_000))
             .get()?;
         assert_eq!(vault_bal(&chain, bob, gas), 0);
-        assert_eq!(shared_from_banx(&chain, gas, bob), 400_000);
+        assert_eq!(shared_from_favor(&chain, gas, bob), 400_000);
         assert_eq!(token_balance(&chain, gas, bob), 600_000);
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_cash_james_friends(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let james = account!("james");
@@ -6176,10 +6176,10 @@ mod tests {
             .cash_out(james, usd, gas, 5_000.into(), 500.into())
             .get()?;
 
-        assert_eq!(shared_from_banx(&chain, gas, bob), 500);
+        assert_eq!(shared_from_favor(&chain, gas, bob), 500);
         assert_eq!(exp(&chain, james, bob, usd), 5_000);
         assert_eq!(vault_bal(&chain, james, gas), 399_500);
-        take_from_banx(&chain, bob, gas, 500);
+        take_from_favor(&chain, bob, gas, 500);
 
         // James allows his friend to send it back, but only at a 10% worse rate.
         Wrapper::push_from(&chain, james)
@@ -6216,7 +6216,7 @@ mod tests {
         .packed()
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_invite_claim_extends_credit_line(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -6235,11 +6235,11 @@ mod tests {
             .cr_invite(invite_id, invite_payload(1), 1, usd, limit, false)
             .get()?;
 
-        let stored = BanxInvite::get_assert(invite_id);
+        let stored = FavorInvite::get_assert(invite_id);
         assert_eq!(stored.inviter, alice);
         assert_eq!(stored.asset_id, usd);
         assert_eq!(stored.limit.value, limit.value);
-        assert_eq!(BanxInvite::list_by_inviter(alice).len(), 1);
+        assert_eq!(FavorInvite::list_by_inviter(alice).len(), 1);
         assert!(Pair::line(alice, bob, usd).is_none());
 
         Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
@@ -6262,9 +6262,9 @@ mod tests {
                     .all(|row| row.get("actor").and_then(|a| a.as_str()) == Some("alice")),
             "invite hook recorded the submitter, not the inviter: {lines:?}"
         );
-        let stored = BanxInvite::get_assert(invite_id);
+        let stored = FavorInvite::get_assert(invite_id);
         assert_eq!(stored.claimed_by, Some(bob));
-        assert_eq!(BanxInvite::list_by_inviter(alice).len(), 1);
+        assert_eq!(FavorInvite::list_by_inviter(alice).len(), 1);
 
         Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, bob)
@@ -6273,18 +6273,18 @@ mod tests {
             Pair::line(alice, bob, usd).unwrap().limit.value,
             limit.value
         );
-        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, Some(bob));
+        assert_eq!(FavorInvite::get_assert(invite_id).claimed_by, Some(bob));
 
         Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, carol)
             .get()?;
         assert!(Pair::line(alice, carol, usd).is_none());
-        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, Some(bob));
+        assert_eq!(FavorInvite::get_assert(invite_id).claimed_by, Some(bob));
 
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_invite_claim_skips_existing_credit_line(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -6322,18 +6322,18 @@ mod tests {
         assert_eq!(line.limit.value, 1);
         assert!(line.deplete_on_debit);
 
-        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, Some(bob));
+        assert_eq!(FavorInvite::get_assert(invite_id).claimed_by, Some(bob));
 
         Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, carol)
             .get()?;
         assert!(Pair::line(alice, carol, usd).is_none());
-        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, Some(bob));
+        assert_eq!(FavorInvite::get_assert(invite_id).claimed_by, Some(bob));
 
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_invite_rejects_num_accounts_other_than_one(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -6347,12 +6347,12 @@ mod tests {
             .cr_invite(1, invite_payload(5), 2, usd, Quantity::new(5_000), false)
             .get();
         assert!(result.is_err());
-        assert!(BanxInvite::list_by_inviter(alice).is_empty());
+        assert!(FavorInvite::list_by_inviter(alice).is_empty());
 
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_invite_hook_rejects_non_invite_sender(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -6385,7 +6385,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_invite_revoke(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -6413,7 +6413,7 @@ mod tests {
         Wrapper::push_from(&chain, alice)
             .rm_invite(invite_id)
             .get()?;
-        assert!(BanxInviteTable::read()
+        assert!(FavorInviteTable::read()
             .get_index_pk()
             .get(&invite_id)
             .is_none());
@@ -6426,7 +6426,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_invite_rm_after_claim(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -6451,12 +6451,12 @@ mod tests {
         Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, bob)
             .get()?;
-        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, Some(bob));
+        assert_eq!(FavorInvite::get_assert(invite_id).claimed_by, Some(bob));
 
         Wrapper::push_from(&chain, alice)
             .rm_invite(invite_id)
             .get()?;
-        assert!(BanxInviteTable::read()
+        assert!(FavorInviteTable::read()
             .get_index_pk()
             .get(&invite_id)
             .is_none());
@@ -6465,7 +6465,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_book_auth_creditor_books_deposit(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -6489,7 +6489,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_book_auth_revoke_and_expiry(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -6526,7 +6526,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_book_auth_nets_reverse(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -6554,7 +6554,7 @@ mod tests {
 
     /// A claim offer's face budget is spent on each take and stays at 0 so it
     /// can be topped up. The line cap is separate.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_claim_offer_remaining_caps_and_tops_up(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -6620,7 +6620,7 @@ mod tests {
     }
 
     /// Cash quotes spend the taker's input and keep a zero row for a top-up.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_cash_quote_remaining_caps_and_tops_up(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -6694,8 +6694,8 @@ mod tests {
             CashQuote::get_assert(bob, usd, gas, true).remaining.value,
             0
         );
-        assert_eq!(shared_from_banx(&chain, gas, alice), 150);
-        take_from_banx(&chain, alice, gas, 150);
+        assert_eq!(shared_from_favor(&chain, gas, alice), 150);
+        take_from_favor(&chain, alice, gas, 150);
 
         fund_vault(&chain, alice, gas, 80);
         Wrapper::push_from(&chain, bob)
@@ -6758,7 +6758,7 @@ mod tests {
             .unwrap()
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pay_auth_create_rejects(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         assert_eq!(
@@ -6826,7 +6826,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pay_auth_pays_due_period_without_sliding(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -6860,7 +6860,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pay_auth_stacked_periods_pay_one_at_a_time(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -6904,7 +6904,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pay_auth_rejects_bad_path(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -6951,7 +6951,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pay_auth_payee_runs_third_party_cannot(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -7000,7 +7000,7 @@ mod tests {
 
     /// Bob runs Alice's payment through Carol. Alice's feed only has hop 0.
     /// Carol's copy is the hop that drew her line, and that row still names Alice.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pay_auth_payee_runs_later_hop_names_payer(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -7078,7 +7078,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pay_auth_cancel_deletes_without_paying(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -7146,7 +7146,7 @@ mod tests {
     ///
     /// Carol's global forward unwinds the draw, so the books would net to
     /// zero while `remaining` stayed spent.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_path_cannot_round_trip_through_sender(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -7192,7 +7192,7 @@ mod tests {
     /// Alice can end a path on herself once the asset has changed. Bob's rate
     /// sizes the return. Both claims stay. The same asset, or a hop after
     /// Alice, still fails.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_path_return_to_sender_in_another_asset(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -7356,7 +7356,7 @@ mod tests {
     /// `max_spend` is the most that period may draw the payer. Repeating
     /// Bob in `[Bob, Carol, Alice, Bob]` would draw Alice twice, so the
     /// run must fail and leave the books untouched.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pay_auth_cycle_does_not_draw_payer_twice(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -7421,7 +7421,7 @@ mod tests {
 
     /// `[Carol, Dave, Alice, Bob]` does not repeat a creditor, but it draws
     /// the payer onto Carol and then draws the payer's line to Dave.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pay_auth_return_through_payer_does_not_draw_twice(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -7566,7 +7566,7 @@ mod tests {
     }
 
     fn relay_sides(john: AccountNumber, usd: u16, aud: u16) -> (u64, u64) {
-        let row = BanxRelay::get(john, usd, aud).expect("relay");
+        let row = FavorRelay::get(john, usd, aud).expect("relay");
         if row.asset_lo == usd {
             (row.reserve_lo.value, row.reserve_hi.value)
         } else {
@@ -7574,7 +7574,7 @@ mod tests {
         }
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_relay_path_usd_to_aud(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let net = relay_net(&chain);
         post_relay(&chain, net.john, net.usd, net.aud);
@@ -7650,7 +7650,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_relay_exact_out_inverts_curve(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let net = relay_net(&chain);
         post_relay(&chain, net.john, net.usd, net.aud);
@@ -7698,7 +7698,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_relay_replaces_fx_offer(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let net = relay_net(&chain);
         post_relay(&chain, net.john, net.usd, net.aud);
@@ -7714,12 +7714,12 @@ mod tests {
             )
             .get()?;
 
-        let listed = banx_gql(
+        let listed = favor_gql(
             &chain,
-            r#"{ banxRelays(owner: "john") { owner assetLo assetHi } }"#,
+            r#"{ favorRelays(owner: "john") { owner assetLo assetHi } }"#,
         )?;
         let relays = listed
-            .pointer("/data/banxRelays")
+            .pointer("/data/favorRelays")
             .and_then(|v| v.as_array())
             .expect("relays");
         assert_eq!(relays.len(), 1, "{listed}");
@@ -7750,7 +7750,7 @@ mod tests {
         Wrapper::push_from(&chain, net.john)
             .rm_relay(net.usd, net.aud)
             .get()?;
-        assert!(BanxRelay::get(net.john, net.usd, net.aud).is_none());
+        assert!(FavorRelay::get(net.john, net.usd, net.aud).is_none());
         assert_eq!(exp(&chain, net.alice, net.john, net.aud), 1_363);
         assert_eq!(exp(&chain, net.john, net.brandon, net.usd), 1_000);
 
@@ -7776,7 +7776,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     /// The curve has no fee. John's 10% forward takes it off what Alice is owed.
     /// A same-asset draw on John does not.
     fn test_relay_fee_is_the_forward(chain: psibase::Chain) -> Result<(), psibase::Error> {
@@ -7827,7 +7827,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_token_relay_out(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -7853,12 +7853,12 @@ mod tests {
             .get();
         assert!(tokens.is_ok(), "{tokens:?}");
         assert_eq!(exp(&chain, john, alice, aud), 1_000);
-        assert_eq!(shared_from_banx(&chain, gas, alice), 1_363);
+        assert_eq!(shared_from_favor(&chain, gas, alice), 1_363);
         assert_eq!(token_balance(&chain, gas, alice), 0);
         assert_eq!(pair_bal(&chain, john, aud, gas), 13_637);
         assert_eq!(vault_bal(&chain, john, gas), 0);
         assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            TokenRelay::get(john, aud, gas).unwrap().reserve_favor.value,
             11_000
         );
 
@@ -7867,12 +7867,12 @@ mod tests {
             .get()?;
         assert!(TokenRelay::get(john, aud, gas).is_none());
         assert_eq!(pair_bal(&chain, john, aud, gas), 0);
-        assert_eq!(shared_from_banx(&chain, gas, john), 13_637);
+        assert_eq!(shared_from_favor(&chain, gas, john), 13_637);
         assert_eq!(token_balance(&chain, gas, john), 5_000);
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_relay_path_cash_pays_tokens(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let bob = account!("bob");
@@ -7917,7 +7917,7 @@ mod tests {
         assert_eq!(exp(&chain, john, brandon, aud), 0);
         assert_eq!(pair_bal(&chain, john, aud, gas), 15_000);
         assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            TokenRelay::get(john, aud, gas).unwrap().reserve_favor.value,
             10_000
         );
 
@@ -7944,20 +7944,20 @@ mod tests {
             activity_nodes(&chain, alice)
                 .iter()
                 .all(|row| row.get("kind").and_then(|k| k.as_str()) != Some("relay")),
-            "token recipient has no Banx claim on the relay owner"
+            "token recipient has no Favor claim on the relay owner"
         );
-        assert_eq!(shared_from_banx(&chain, gas, alice), 1_363);
+        assert_eq!(shared_from_favor(&chain, gas, alice), 1_363);
         assert_eq!(token_balance(&chain, gas, alice), 0);
         assert_eq!(pair_bal(&chain, john, aud, gas), 13_637);
         assert_eq!(vault_bal(&chain, john, gas), 0);
         assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            TokenRelay::get(john, aud, gas).unwrap().reserve_favor.value,
             11_000
         );
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_token_relay_in(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -7993,15 +7993,15 @@ mod tests {
         assert_eq!(vault_bal(&chain, john, gas), 0);
         assert_eq!(vault_bal(&chain, alice, gas), 0);
         assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            TokenRelay::get(john, aud, gas).unwrap().reserve_favor.value,
             9_375
         );
         Ok(())
     }
 
-    /// 10% of the tokens is John's. The curve prices the rest, and the Banx
+    /// 10% of the tokens is John's. The curve prices the rest, and the Favor
     /// debt is that output, not a second haircut.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_token_relay_fee_is_the_owners_tokens(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -8042,7 +8042,7 @@ mod tests {
             .get()
             .expect_err("10% forward grosses the face above the cap");
         assert!(
-            face_only.to_string().contains("relay banx above max_owed"),
+            face_only.to_string().contains("relay favor above max_owed"),
             "{face_only}"
         );
         assert_eq!(exp(&chain, john, alice, aud), 0);
@@ -8058,13 +8058,13 @@ mod tests {
                 Quantity::new(1_112),
             )
             .get()?;
-        // Curve prices 1,000 and pays 1,363 tokens. The forward is extra Banx Alice owes.
+        // Curve prices 1,000 and pays 1,363 tokens. The forward is extra Favor Alice owes.
         assert_eq!(exp(&chain, john, alice, aud), 1_112);
-        assert_eq!(shared_from_banx(&chain, gas, alice), 1_363);
-        assert_eq!(shared_from_banx(&chain, gas, john), 0);
+        assert_eq!(shared_from_favor(&chain, gas, alice), 1_363);
+        assert_eq!(shared_from_favor(&chain, gas, john), 0);
         assert_eq!(pair_bal(&chain, john, aud, gas), 15_000 - 1_363);
         assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            TokenRelay::get(john, aud, gas).unwrap().reserve_favor.value,
             11_000
         );
 
@@ -8088,23 +8088,23 @@ mod tests {
         Wrapper::push_from(&chain, alice)
             .tok_relay_in(john, aud, gas, Quantity::new(1_000), Quantity::new(1))
             .get()?;
-        // Against the moved pool, 1,000 tokens price 751 Banx. Forward keeps 10%.
+        // Against the moved pool, 1,000 tokens price 751 Favor. Forward keeps 10%.
         // 675 nets the 1,112 draw, so 437 remains.
         assert_eq!(pair_bal(&chain, john, aud, gas), 15_000 - 1_363 + 1_000);
-        assert_eq!(shared_from_banx(&chain, gas, john), 0);
+        assert_eq!(shared_from_favor(&chain, gas, john), 0);
         assert_eq!(vault_bal(&chain, alice, gas), 0);
         assert_eq!(exp(&chain, alice, john, aud), 0);
         assert_eq!(exp(&chain, john, alice, aud), 437);
         assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            TokenRelay::get(john, aud, gas).unwrap().reserve_favor.value,
             11_000 - 751
         );
 
         // A one-hop path_cash is the same swap. The curve prices 1,000 and
-        // pays every token. The 1,112 draw is extra Banx, not a token cut.
-        let tokens_before = shared_from_banx(&chain, gas, alice);
+        // pays every token. The 1,112 draw is extra Favor, not a token cut.
+        let tokens_before = shared_from_favor(&chain, gas, alice);
         let pair_before = pair_bal(&chain, john, aud, gas);
-        let weight_before = TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value;
+        let weight_before = TokenRelay::get(john, aud, gas).unwrap().reserve_favor.value;
         let face_only = Wrapper::push_from(&chain, alice)
             .path_cash(
                 seal(&chain, alice, vec![hop(john, aud)], Quantity::new(1_000)),
@@ -8117,11 +8117,11 @@ mod tests {
             .get()
             .expect_err("one-hop forward grosses the face above the cap");
         assert!(
-            face_only.to_string().contains("relay banx above max_owed"),
+            face_only.to_string().contains("relay favor above max_owed"),
             "{face_only}"
         );
         assert_eq!(exp(&chain, john, alice, aud), 437);
-        assert_eq!(shared_from_banx(&chain, gas, alice), tokens_before);
+        assert_eq!(shared_from_favor(&chain, gas, alice), tokens_before);
 
         Wrapper::push_from(&chain, alice)
             .path_cash(
@@ -8134,10 +8134,10 @@ mod tests {
             )
             .get()?;
         assert_eq!(exp(&chain, john, alice, aud), 437 + 1_112);
-        assert_eq!(shared_from_banx(&chain, gas, alice), tokens_before + 1_301);
+        assert_eq!(shared_from_favor(&chain, gas, alice), tokens_before + 1_301);
         assert_eq!(pair_bal(&chain, john, aud, gas), pair_before - 1_301);
         assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            TokenRelay::get(john, aud, gas).unwrap().reserve_favor.value,
             weight_before + 1_000
         );
 
@@ -8164,7 +8164,7 @@ mod tests {
 
     /// A replaced fixed forward can gross a 100 face up to the whole claim.
     /// The signed cap stops that. The curve still prices the face.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_token_relay_out_caps_forward_against_a_claim(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -8195,7 +8195,7 @@ mod tests {
             .get()
             .expect_err("fee of 9,900 grosses 100 up to the whole claim");
         assert!(
-            face.to_string().contains("relay banx above max_owed"),
+            face.to_string().contains("relay favor above max_owed"),
             "{face}"
         );
         let under = Wrapper::push_from(&chain, alice)
@@ -8210,7 +8210,7 @@ mod tests {
             .get()
             .expect_err("one below the grossed debt still fails");
         assert!(
-            under.to_string().contains("relay banx above max_owed"),
+            under.to_string().contains("relay favor above max_owed"),
             "{under}"
         );
         let path = Wrapper::push_from(&chain, alice)
@@ -8225,15 +8225,15 @@ mod tests {
             .get()
             .expect_err("one-hop path_cash uses the same cap");
         assert!(
-            path.to_string().contains("relay banx above max_owed"),
+            path.to_string().contains("relay favor above max_owed"),
             "{path}"
         );
         assert_eq!(exp(&chain, alice, john, aud), 10_000);
         assert_eq!(exp(&chain, john, alice, aud), 0);
-        assert_eq!(shared_from_banx(&chain, gas, alice), 0);
+        assert_eq!(shared_from_favor(&chain, gas, alice), 0);
         assert_eq!(pair_bal(&chain, john, aud, gas), 15_000);
         assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            TokenRelay::get(john, aud, gas).unwrap().reserve_favor.value,
             10_000
         );
 
@@ -8251,18 +8251,18 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, alice, john, aud), 0);
         assert_eq!(exp(&chain, john, alice, aud), 0);
-        assert_eq!(shared_from_banx(&chain, gas, alice), 148);
+        assert_eq!(shared_from_favor(&chain, gas, alice), 148);
         assert_eq!(pair_bal(&chain, john, aud, gas), 15_000 - 148);
         assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            TokenRelay::get(john, aud, gas).unwrap().reserve_favor.value,
             10_100
         );
         Ok(())
     }
 
-    /// Selling Banx that John already owes is one relay row, netted in full.
+    /// Selling Favor that John already owes is one relay row, netted in full.
     /// It is not a path hop plus a second row that pretends nothing netted.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_token_relay_out_records_the_net(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -8312,8 +8312,8 @@ mod tests {
         Ok(())
     }
 
-    /// Buying Banx that cancels a debt Alice already owes is recorded as that net.
-    #[psibase::test_case(packages("Banx"))]
+    /// Buying Favor that cancels a debt Alice already owes is recorded as that net.
+    #[psibase::test_case(packages("Favor"))]
     fn test_token_relay_in_records_the_net(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -8383,9 +8383,9 @@ mod tests {
         Ok(())
     }
 
-    /// One owner, one pool per Banx asset and token. A second IOU with the
+    /// One owner, one pool per Favor asset and token. A second IOU with the
     /// same token is a different pair. Someone else can post the same pair.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_token_relay_one_pair_per_owner(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -8448,7 +8448,7 @@ mod tests {
             .get()?;
         assert!(TokenRelay::get(john, aud, gas).is_none());
         assert_eq!(pair_bal(&chain, john, aud, gas), 0);
-        assert_eq!(shared_from_banx(&chain, gas, john), 15_000);
+        assert_eq!(shared_from_favor(&chain, gas, john), 15_000);
         assert_eq!(pair_bal(&chain, john, usd, gas), 1_000);
         assert!(TokenRelay::get(john, usd, gas).is_some());
         assert_eq!(token_balance(&chain, gas, john), 3_500);
@@ -8457,7 +8457,7 @@ mod tests {
 
     /// The cash vault is a different sub-account. Funding it, withdrawing it,
     /// and filling a cash quote do not move the pool or its weight.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_token_pool_ignores_cash_vault(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -8489,10 +8489,10 @@ mod tests {
         assert_eq!(vault_bal(&chain, john, gas), 1_000);
         assert_eq!(pair_bal(&chain, john, aud, gas), 15_000);
         assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            TokenRelay::get(john, aud, gas).unwrap().reserve_favor.value,
             10_000
         );
-        assert_eq!(shared_from_banx(&chain, gas, alice), 1_000);
+        assert_eq!(shared_from_favor(&chain, gas, alice), 1_000);
 
         Wrapper::push_from(&chain, john)
             .csh_wd(gas, Quantity::new(1_000))
@@ -8500,7 +8500,7 @@ mod tests {
         assert_eq!(vault_bal(&chain, john, gas), 0);
         assert_eq!(pair_bal(&chain, john, aud, gas), 15_000);
         assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            TokenRelay::get(john, aud, gas).unwrap().reserve_favor.value,
             10_000
         );
 
@@ -8517,7 +8517,7 @@ mod tests {
         assert_eq!(pair_bal(&chain, john, aud, gas), 13_637);
         assert_eq!(vault_bal(&chain, john, gas), 0);
         assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            TokenRelay::get(john, aud, gas).unwrap().reserve_favor.value,
             11_000
         );
         Ok(())
@@ -8525,7 +8525,7 @@ mod tests {
 
     /// A round trip through one relay prices the second swap on the reserves
     /// the first swap saved. 500 exact-out costs 501. 1,000 in delivers 999.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_relay_round_trip_matches_quote(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let net = relay_net(&chain);
         post_relay(&chain, net.john, net.usd, net.aud);
@@ -8600,7 +8600,7 @@ mod tests {
     /// Exact-out through one relay twice, with a currency cap in front.
     /// 1_024 comes back short of 1_400. 2_048 is over the cap. The payable
     /// send, 1_401, is not a power of two.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_exact_out_between_short_output_and_policy_cap(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -8728,7 +8728,7 @@ mod tests {
 
     /// (AUD reserve, WoW reserve). WoW is registered after the seed list, so AUD is the low id.
     fn aud_wow(john: AccountNumber, aud: u16, wow: u16) -> (u64, u64) {
-        let row = BanxRelay::get(john, aud, wow).expect("relay");
+        let row = FavorRelay::get(john, aud, wow).expect("relay");
         assert_eq!((row.asset_lo, row.asset_hi), (aud, wow));
         (row.reserve_lo.value, row.reserve_hi.value)
     }
@@ -8741,7 +8741,7 @@ mod tests {
     /// The gold unwind is the deposit itself. The curve's AUD is a claim
     /// Anthony holds on John, which needs Anthony's line to John. Billy then
     /// spends 500 AUD through that claim.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_wow_billy_sells_through_anthony(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let anthony = account!("anthony");
         let billy = account!("billy");
@@ -8905,7 +8905,7 @@ mod tests {
     /// line to John, which he never posted, so the 625 gold is John owing
     /// Josh. Josh lines John in WOW to hold that gold. John's WOW line to
     /// Josh is the spend direction and stays unused.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_wow_matt_buys_through_josh(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let josh = account!("josh");
         let matt = account!("matt");
@@ -9010,7 +9010,7 @@ mod tests {
     /// That deposit is not spendable the other way: John still needs Dave's
     /// gold line before the quote can add another 9g. $4.50 at 2g per dollar
     /// is 9g. The quote keeps the last $0.50.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_dave_buys_ninety_percent_of_johns_gold_quote(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -9112,7 +9112,7 @@ mod tests {
     /// product pays 5g for $5, not 10g: 100_000 * 50_000 / 100_000. The
     /// weights are not a debt, so the 10g John already owes Dave does not
     /// fund the return. Dave still has to line John in gold.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_dave_buys_gold_on_johns_relay(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let john = account!("john");
@@ -9209,7 +9209,7 @@ mod tests {
     /// 10g returns $2.50: 50_000 * 100_000 / 200_000. Zac's gold forward and
     /// John's dollar forward carry the hops. Mitchell's AUD line is what lets
     /// the dollars land.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_dave_pays_mitchell_through_johns_aud_wow_relay(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -9296,7 +9296,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_fx_offer_convert(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -9344,7 +9344,7 @@ mod tests {
 
     /// No from-asset debt. A buy books both legs at the order rate.
     /// Lines are capacity. No forward offer.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_take_fx_books_both_legs_at_order_rate(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -9419,7 +9419,7 @@ mod tests {
     }
 
     /// Leftover debt is a rebook, not a second pair of claims.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_take_fx_rebooks_existing_debt(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -9476,7 +9476,7 @@ mod tests {
 
     /// A buy larger than the old bill rebooks that bill and opens the rest.
     /// The signed bound is the net of the two to-asset results.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_take_fx_buy_fills_past_existing_debt(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -9537,7 +9537,7 @@ mod tests {
 
     /// A signed receipt must not fill as a debt of the same size when the
     /// from-asset exposure crosses the preview. A signed wash is not unbounded.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_take_fx_bound_keeps_signed_side(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -9630,7 +9630,7 @@ mod tests {
     }
 
     /// Fee is charged on each slice. A debt cap still rejects a larger debt.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_take_fx_split_fee_keeps_debt_cap(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -9688,7 +9688,7 @@ mod tests {
 
     /// One unit the poster already owes must not turn a buy into a sell.
     /// No sell row exists. The buy still opens, and that unit nets on the from-leg.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_take_fx_buy_nets_reverse_claim(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -9735,7 +9735,7 @@ mod tests {
     /// new to-asset debt, so a worse rate still clears it. Alice signed for
     /// 50 USD (`test_fx_offer_convert`). Gary then posts 5.0. That
     /// take must not land: she would owe 500 USD for the same 100 AUD.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_convert_debtor_min_to_rejects_worse_rate(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -9806,7 +9806,7 @@ mod tests {
     /// Isabelle owes John 10 kWh. He posts the creditor side: 1 kWh → 0.30 AUD
     /// with a 1 kWh fee. The fee is his charge, so she owes 3.30 AUD
     /// (3.00 for the kWh plus 0.30 for the fee). The kWh debt is gone.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_posted_fee_favours_john_when_isabelle_converts_kwh(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -9864,7 +9864,7 @@ mod tests {
     /// John owes Isabelle 10 kWh. His creditor-side quote does not apply.
     /// He posts the debtor side at the same 1 kWh → 0.30 AUD with a 1 kWh
     /// fee. She takes it, and the fee comes off what he owes: 2.70 AUD.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_posted_fee_shrinks_debt_when_john_owes_isabelle_kwh(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -9962,7 +9962,7 @@ mod tests {
     /// Isabelle owes John 10 kWh. She converts 5, with a 1 kWh fee.
     /// Creditor side prices 6 kWh (1.80 AUD). Debtor side prices 4 kWh
     /// (1.20 AUD). The budget falls by the 5 kWh she converted.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_fx_quote_partial_take_prices_the_fee_and_spends_the_take(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -10060,7 +10060,7 @@ mod tests {
     /// A debtor-side fee that is the whole take, or more than the take, is
     /// rejected and changes nothing. The same take on the creditor side
     /// prices take + fee, so it goes through.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_fx_quote_debtor_fee_that_consumes_the_take_fails(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -10160,7 +10160,7 @@ mod tests {
     /// 1.20 with 5% off each way. Posts the four rows an exchange would:
     /// both directions, both debt sides, no fixed fee. A USD→AUD row does
     /// not quote AUD→USD.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_fx_quote_exchange_both_directions_and_both_debt_sides(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -10336,7 +10336,7 @@ mod tests {
 
     /// From-asset `remaining` caps convert and path FX. A take larger than
     /// what is left is rejected whole. Posting again replaces what is left.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_fx_offer_remaining_caps_convert_and_path(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -10573,7 +10573,7 @@ mod tests {
 
     /// Convert nets `from_asset` before the rebook. A reverse claim of 40 against
     /// a 100 claim leaves 60 to convert — no separate `net` first.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_convert_nets_from_asset_first(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -10624,7 +10624,7 @@ mod tests {
     }
 
     /// Reverse claim in the destination asset is cancelled by convert.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_convert_autonets_reverse_to_asset(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -10672,7 +10672,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_convert_uses_claim_debtor_when_both_quote(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -10731,7 +10731,7 @@ mod tests {
 
     /// Convert uses the counterparty's quote, not the sender's. Alice cannot
     /// rebook at her own 1:1; she can take Gary's 0.50.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_convert_uses_counterparty_offer(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -10907,7 +10907,7 @@ mod tests {
         assert!(row.low_line.is_some() && row.high_line.is_some());
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pair_net_when_first_account_is_low(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -10926,7 +10926,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pair_net_when_first_account_is_high(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -10948,7 +10948,7 @@ mod tests {
     /// The same script on three unrelated pairs. Going round the cycle
     /// p -> q -> r -> p, at least one pair has its first account on the low
     /// side of the row and at least one has it on the high side.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pair_net_other_names_both_orders(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let p = account!("carol");
@@ -10971,7 +10971,7 @@ mod tests {
 
     /// A deposit against a reverse claim: smaller cancels part, equal cancels
     /// it, larger flips the direction. Forgive only writes off what is owed.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pair_deposit_nets_flips_and_forgive(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -11031,7 +11031,7 @@ mod tests {
 
     /// `rm_crd_lne` erases the line and nothing else. The row goes only when
     /// both the balance and both lines are empty.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pair_rm_line_keeps_balance_and_row_lifecycle(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -11128,7 +11128,7 @@ mod tests {
 
     /// The balance is an `i64`. A claim above that is rejected and leaves
     /// the ledger as it was.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pair_deposit_rejects_balance_range(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -11192,7 +11192,7 @@ mod tests {
 
     /// Re-posting a line keeps `remaining` unless the new limit is lower. A
     /// revolving line's `remaining` follows its limit until it is spent.
-    #[psibase::test_case(packages("Banx"))]
+    #[psibase::test_case(packages("Favor"))]
     fn test_pair_line_repost_clamps_remaining(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let a = account!("alice");

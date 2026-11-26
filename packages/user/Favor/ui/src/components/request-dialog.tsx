@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { AssetField, ExpiresField } from "@/components/form-fields";
 import { InvoiceQrDialog } from "@/components/invoice-qr-dialog";
-import { useRequests } from "@/hooks/use-banx-data";
-import { useCreateRequest } from "@/hooks/use-banx-mutations";
+import { useRequests } from "@/hooks/use-favor-data";
+import { useCreateRequest } from "@/hooks/use-favor-mutations";
 import {
     amountFieldValidator,
     existingAccountValidators,

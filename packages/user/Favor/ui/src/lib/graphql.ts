@@ -4,7 +4,7 @@ import { graphql } from "@shared/lib/graphql";
 import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { AuthorizedGraphqlPlugin } from "@shared/lib/plugins/authorized-graphql-plugin";
 
-import { BANX_SERVICE } from "./constants";
+import { FAVOR_SERVICE } from "./constants";
 
 const zAsset = z.object({
     id: z.number(),
@@ -85,7 +85,7 @@ const zCashVault = z.object({
     balance: z.string(),
 });
 
-const zBanxRelay = z.object({
+const zFavorRelay = z.object({
     owner: z.string(),
     assetLo: z.number(),
     assetHi: z.number(),
@@ -97,7 +97,7 @@ const zTokenRelay = z.object({
     owner: z.string(),
     assetId: z.number(),
     tokenId: z.number(),
-    reserveBanx: z.string(),
+    reserveFavor: z.string(),
     tokenReserve: z.string(),
 });
 
@@ -141,7 +141,7 @@ const zPayAuth = z.object({
 export const REQUEST_INVOICE = 1;
 export const REQUEST_PLEASE_BOOK = 2;
 
-const zBanxInvite = z.object({
+const zFavorInvite = z.object({
     id: z.number(),
     inviter: z.string(),
     assetId: z.number(),
@@ -176,20 +176,20 @@ export type ClaimOffer = z.infer<typeof zClaimOffer>;
 export type BuyClaimOffer = ClaimOffer;
 export type CashQuote = z.infer<typeof zCashQuote>;
 export type CashVault = z.infer<typeof zCashVault>;
-export type BanxRelay = z.infer<typeof zBanxRelay>;
+export type FavorRelay = z.infer<typeof zFavorRelay>;
 export type TokenRelay = z.infer<typeof zTokenRelay>;
 export type FxOffer = z.infer<typeof zFxOffer>;
 export type PayRequest = z.infer<typeof zPayRequest>;
 export type PayAuth = z.infer<typeof zPayAuth>;
-export type BanxInvite = z.infer<typeof zBanxInvite>;
+export type FavorInvite = z.infer<typeof zFavorInvite>;
 export type ActivityEvent = z.infer<typeof zActivity>;
 
-/** Banx's `authorized.graphql`. The host adds the signed-in user's token. */
-export const banxAuthorized = new AuthorizedGraphqlPlugin(BANX_SERVICE);
+/** Favor's `authorized.graphql`. The host adds the signed-in user's token. */
+export const favorAuthorized = new AuthorizedGraphqlPlugin(FAVOR_SERVICE);
 
 /** Public marketplace data: assets, offers, pools, quotes. No sign-in needed. */
 const gql = <T>(query: string) =>
-    graphql<T>(query, { service: BANX_SERVICE });
+    graphql<T>(query, { service: FAVOR_SERVICE });
 
 /**
  * Private data: your lines, balances, routing fees, requests, repeating
@@ -197,7 +197,7 @@ const gql = <T>(query: string) =>
  * caller, and only with rows the caller is a party to.
  */
 const gqlAuth = <T>(query: string) =>
-    graphqlAuth<T>(banxAuthorized.authorized.graphql, query);
+    graphqlAuth<T>(favorAuthorized.authorized.graphql, query);
 
 export async function fetchAssets(): Promise<Asset[]> {
     const data = await gql<{ assets: Asset[] }>(`{ assets { id symbol precision description } }`);
@@ -266,20 +266,20 @@ export async function fetchBuyClaimOffers(
 
 const inviteFields = `id inviter assetId limit depleteOnDebit createdAt expiry claimedBy`;
 
-export async function fetchInvites(inviter: string): Promise<BanxInvite[]> {
-    const data = await gqlAuth<{ invites: BanxInvite[] }>(
+export async function fetchInvites(inviter: string): Promise<FavorInvite[]> {
+    const data = await gqlAuth<{ invites: FavorInvite[] }>(
         `{ invites(inviter: "${inviter}") { ${inviteFields} } }`,
     );
-    return zBanxInvite.array().parse(data.invites);
+    return zFavorInvite.array().parse(data.invites);
 }
 
-export async function fetchInvite(id: number): Promise<BanxInvite | null> {
-    const data = await gql<{ invite: BanxInvite | null }>(
+export async function fetchInvite(id: number): Promise<FavorInvite | null> {
+    const data = await gql<{ invite: FavorInvite | null }>(
         `{ invite(id: ${id}) { ${inviteFields} } }`,
     );
     return data.invite === null || data.invite === undefined
         ? null
-        : zBanxInvite.parse(data.invite);
+        : zFavorInvite.parse(data.invite);
 }
 
 export async function fetchRequests(account: string): Promise<PayRequest[]> {
@@ -311,17 +311,17 @@ export async function fetchCashQuotes(poster?: string): Promise<CashQuote[]> {
     return zCashQuote.array().parse(data.cashQuotes);
 }
 
-const banxRelayFields = `owner assetLo assetHi reserveLo reserveHi`;
+const favorRelayFields = `owner assetLo assetHi reserveLo reserveHi`;
 
-export async function fetchBanxRelays(owner?: string): Promise<BanxRelay[]> {
+export async function fetchFavorRelays(owner?: string): Promise<FavorRelay[]> {
     const arg = owner?.trim() ? `(owner: "${owner.trim()}")` : "";
-    const data = await gql<{ banxRelays: BanxRelay[] }>(
-        `{ banxRelays${arg} { ${banxRelayFields} } }`,
+    const data = await gql<{ favorRelays: FavorRelay[] }>(
+        `{ favorRelays${arg} { ${favorRelayFields} } }`,
     );
-    return zBanxRelay.array().parse(data.banxRelays);
+    return zFavorRelay.array().parse(data.favorRelays);
 }
 
-const tokenRelayFields = `owner assetId tokenId reserveBanx tokenReserve`;
+const tokenRelayFields = `owner assetId tokenId reserveFavor tokenReserve`;
 
 export async function fetchTokenRelays(owner?: string): Promise<TokenRelay[]> {
     const arg = owner?.trim() ? `(owner: "${owner.trim()}")` : "";

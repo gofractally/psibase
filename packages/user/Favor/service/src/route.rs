@@ -121,7 +121,7 @@ fn slot_key(
         return Err(INVALID);
     }
     let mut mac = <HmacSha as Mac>::new_from_slice(secret).map_err(|_| INVALID)?;
-    mac.update(b"psibase:banx:route:v1\0");
+    mac.update(b"psibase:favor:route:v1\0");
     mac.update(&context_mac_bytes(terms));
     mac.update(&current.value.to_le_bytes());
     mac.update(&[index as u8]);
@@ -141,7 +141,7 @@ fn outer_mac(
     layers: &[[u8; SEALED]],
 ) -> Result<[u8; 32], &'static str> {
     let mut mac = <HmacSha as Mac>::new_from_slice(secret).map_err(|_| INVALID)?;
-    mac.update(b"psibase:banx:envelope:v1\0");
+    mac.update(b"psibase:favor:envelope:v1\0");
     mac.update(&context_mac_bytes(terms));
     mac.update(nonce);
     for layer in layers {
@@ -185,7 +185,7 @@ pub fn seal(
                 XNonce::from_slice(&n),
                 Payload {
                     msg: &plain,
-                    aad: b"banx-route-hop-v1",
+                    aad: b"favor-route-hop-v1",
                 },
             )
             .map_err(|_| INVALID)?;
@@ -239,7 +239,7 @@ pub fn open(secret: &[u8], encoded: &str, now: i64) -> Result<OpenedRoute, &'sta
                 XNonce::from_slice(&n),
                 Payload {
                     msg: &layers[index],
-                    aad: b"banx-route-hop-v1",
+                    aad: b"favor-route-hop-v1",
                 },
             )
             .map_err(|_| INVALID)?;

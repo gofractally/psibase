@@ -1,7 +1,7 @@
 use psibase::{services::tokens::Quantity, AccountNumber, Table};
 
 use crate::math::{move_curve, try_swap_in};
-use crate::tables::tables::{Asset, BanxRelay, BanxRelayTable};
+use crate::tables::tables::{Asset, FavorRelay, FavorRelayTable};
 
 fn ordered(a: u16, b: u16) -> (u16, u16) {
     if a < b {
@@ -11,14 +11,14 @@ fn ordered(a: u16, b: u16) -> (u16, u16) {
     }
 }
 
-impl BanxRelay {
+impl FavorRelay {
     fn save(&self) {
-        BanxRelayTable::read_write().put(self).unwrap();
+        FavorRelayTable::read_write().put(self).unwrap();
     }
 
     pub fn get(owner: AccountNumber, asset_a: u16, asset_b: u16) -> Option<Self> {
         let (lo, hi) = ordered(asset_a, asset_b);
-        BanxRelayTable::read().get_index_pk().get(&(owner, lo, hi))
+        FavorRelayTable::read().get_index_pk().get(&(owner, lo, hi))
     }
 
     pub fn upsert(
@@ -49,7 +49,7 @@ impl BanxRelay {
     }
 
     pub fn remove(&self) {
-        BanxRelayTable::read_write().erase(&(self.owner, self.asset_lo, self.asset_hi));
+        FavorRelayTable::read_write().erase(&(self.owner, self.asset_lo, self.asset_hi));
     }
 
     fn reserves_for(&self, from_asset: u16) -> (u64, u64) {

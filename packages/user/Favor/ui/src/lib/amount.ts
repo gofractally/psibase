@@ -74,7 +74,7 @@ function withMinFraction(amount: string, minDigits: number): string {
  * Display a GraphQL `Decimal` string (already human).
  * A fraction keeps at least two digits (`1.20`) and any further non-zero
  * digits (`1.234`). Whole numbers stay whole. Prefer this over
- * {@link formatRawAmount} for Banx query fields.
+ * {@link formatRawAmount} for Favor query fields.
  */
 export function displayAmount(amount: string): string {
     const s = amount.trim();

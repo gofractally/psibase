@@ -18,11 +18,11 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
         return (
             <Card className="mx-auto max-w-md">
                 <CardHeader>
-                    <CardTitle>Sign in to use Banx</CardTitle>
+                    <CardTitle>Sign in to use Favor</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <p className="text-muted-foreground text-sm">
-                        Banx is a mutual-credit graph: credit lines, deposits,
+                        Favor is a mutual-credit graph: credit lines, deposits,
                         path payments, FX, and a Tokens cash window. Connect an
                         account to manage your positions.
                     </p>

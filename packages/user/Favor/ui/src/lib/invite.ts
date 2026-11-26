@@ -2,9 +2,9 @@ import { z } from "zod";
 
 import { supervisor } from "@shared/lib/supervisor";
 
-const TOKEN_KEY = (id: number) => `banx.invite.token.${id}`;
-const RECIPROCAL_KEY = "banx.invite.reciprocal";
-const NICK_DISMISS_KEY = (id: number) => `banx.invite.nick.dismiss.${id}`;
+const TOKEN_KEY = (id: number) => `favor.invite.token.${id}`;
+const RECIPROCAL_KEY = "favor.invite.reciprocal";
+const NICK_DISMISS_KEY = (id: number) => `favor.invite.nick.dismiss.${id}`;
 
 /** Terms of the line just received, used to prefill "line them back". */
 export type PendingReciprocal = {

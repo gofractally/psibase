@@ -1,9 +1,9 @@
-#[psibase::service(name = "banx-app+1")]
+#[psibase::service(name = "favor-app+1")]
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::*;
-    use banx::tables::{
-        relay_sub, Asset, AssetTable, BanxInvite, BanxInviteTable, BanxRelay, BanxRelayTable,
+    use favor::tables::{
+        relay_sub, Asset, AssetTable, FavorInvite, FavorInviteTable, FavorRelay, FavorRelayTable,
         BookAuth, BookAuthTab, CashQuote, CashQuoteTab, ClaimOffer, ClaimOfferTab, Connection,
         ForwardOffer, ForwardOfferTab, FxOffer, FxOfferTab, Line, Pair, PairTable, PayAuth,
         PayAuthTab, PayRequest, RequestTab, TokenRelayTable, PPM_SCALE, RATE_SCALE,
@@ -131,7 +131,7 @@ mod service {
     }
 
     fn all_pairs() -> Vec<Pair> {
-        PairTable::with_service(banx::SERVICE)
+        PairTable::with_service(favor::SERVICE)
             .get_index_pk()
             .iter()
             .collect()
@@ -141,7 +141,7 @@ mod service {
     fn pairs_involving(account: AccountNumber) -> Vec<Pair> {
         let lo = AccountNumber::new(0);
         let hi = AccountNumber::new(u64::MAX);
-        let table = PairTable::with_service(banx::SERVICE);
+        let table = PairTable::with_service(favor::SERVICE);
         let mut rows: Vec<Pair> = table
             .get_index_pk()
             .range((account, lo, 0)..=(account, hi, u16::MAX))
@@ -281,7 +281,7 @@ mod service {
         let Some(sa) = SubAccountTable::with_service(Tokens::SERVICE)
             .get_index_pk()
             .iter()
-            .find(|sa| sa.account == banx::SERVICE && sa.sub_account == name)
+            .find(|sa| sa.account == favor::SERVICE && sa.sub_account == name)
         else {
             return Quantity::new(0);
         };
@@ -293,7 +293,7 @@ mod service {
     }
 
     #[derive(SimpleObject)]
-    struct BanxRelayView {
+    struct FavorRelayView {
         owner: AccountNumber,
         assetLo: u16,
         assetHi: u16,
@@ -301,8 +301,8 @@ mod service {
         reserveHi: Decimal,
     }
 
-    impl BanxRelayView {
-        fn from_row(r: BanxRelay) -> Self {
+    impl FavorRelayView {
+        fn from_row(r: FavorRelay) -> Self {
             Self {
                 owner: r.owner,
                 assetLo: r.asset_lo,
@@ -318,7 +318,7 @@ mod service {
         owner: AccountNumber,
         assetId: u16,
         tokenId: u32,
-        reserveBanx: Decimal,
+        reserveFavor: Decimal,
         tokenReserve: Decimal,
     }
 
@@ -327,9 +327,9 @@ mod service {
         poster: AccountNumber,
         assetId: u16,
         tokenId: u32,
-        /// True: Banx → tokens (`cash_out`). False: tokens → Banx (`cash_in`).
+        /// True: Favor → tokens (`cash_out`). False: tokens → Favor (`cash_in`).
         isOut: bool,
-        /// Banx units for out, token units for in.
+        /// Favor units for out, token units for in.
         feeFixed: Decimal,
         fxRate: String,
         /// Taker input still available. Same units as `feeFixed`.
@@ -378,13 +378,13 @@ mod service {
         creditLines: Vec<CreditLineView>,
         forwardOffers: Vec<ForwardOfferView>,
         fxOffers: Vec<FxOfferView>,
-        /// Constant-product Banx relays owned by an account on the path.
-        relays: Vec<BanxRelayView>,
+        /// Constant-product Favor relays owned by an account on the path.
+        relays: Vec<FavorRelayView>,
         /// Chain unix seconds at query time (offer / FX expiry).
         now: i64,
     }
 
-    /// History row from `history.banx-app.activity` (amounts already human decimals).
+    /// History row from `history.favor-app.activity` (amounts already human decimals).
     #[derive(Deserialize, SimpleObject)]
     struct ActivityEvent {
         account: AccountNumber,
@@ -501,7 +501,7 @@ mod service {
     }
 
     impl InviteView {
-        fn from_row(row: BanxInvite) -> Self {
+        fn from_row(row: FavorInvite) -> Self {
             let p = asset_precision(row.asset_id);
             let expiry = psibase::services::invite::Wrapper::call().getExpDate(row.id);
             Self {
@@ -542,7 +542,7 @@ mod service {
 
     #[Object]
     impl Query {
-        /// Fixed scales used by Banx rate math.
+        /// Fixed scales used by Favor rate math.
         async fn constants(&self) -> ConstantsView {
             ConstantsView {
                 ppmScale: PPM_SCALE,
@@ -552,7 +552,7 @@ mod service {
 
         /// All registered assets.
         async fn assets(&self) -> Vec<AssetView> {
-            AssetTable::with_service(banx::SERVICE)
+            AssetTable::with_service(favor::SERVICE)
                 .get_index_pk()
                 .iter()
                 .map(AssetView::from)
@@ -569,7 +569,7 @@ mod service {
 
         /// Credit-line invite posted by `inviter`.
         async fn invite(&self, id: u32) -> Option<InviteView> {
-            BanxInviteTable::with_service(banx::SERVICE)
+            FavorInviteTable::with_service(favor::SERVICE)
                 .get_index_pk()
                 .get(&id)
                 .map(InviteView::from_row)
@@ -578,7 +578,7 @@ mod service {
         /// Invites created by `inviter`, newest id last. Only the inviter may list them.
         async fn invites(&self, inviter: AccountNumber) -> Result<Vec<InviteView>> {
             self.require(inviter, "invites")?;
-            Ok(BanxInviteTable::with_service(banx::SERVICE)
+            Ok(FavorInviteTable::with_service(favor::SERVICE)
                 .get_index_by_inviter()
                 .range((inviter, 0)..=(inviter, u32::MAX))
                 .map(InviteView::from_row)
@@ -596,7 +596,7 @@ mod service {
             let me = self.user()?;
             let want_debtor = asDebtor.unwrap_or(true);
             let want_creditor = asCreditor.unwrap_or(true);
-            Ok(BookAuthTab::with_service(banx::SERVICE)
+            Ok(BookAuthTab::with_service(favor::SERVICE)
                 .get_index_pk()
                 .iter()
                 .filter(|a| a.debtor == me || a.creditor == me)
@@ -680,7 +680,7 @@ mod service {
         /// hops). Routing fees are private: only the poster may read them.
         async fn forwardOffers(&self, poster: AccountNumber) -> Result<Vec<ForwardOfferView>> {
             self.require(poster, "forwarding offers")?;
-            Ok(ForwardOfferTab::with_service(banx::SERVICE)
+            Ok(ForwardOfferTab::with_service(favor::SERVICE)
                 .get_index_pk()
                 .iter()
                 .filter(|p| p.poster == poster)
@@ -690,7 +690,7 @@ mod service {
 
         /// Claim offers posted by `poster` (buy and sell, global + specific).
         async fn claimOffers(&self, poster: AccountNumber) -> Vec<ClaimOfferView> {
-            ClaimOfferTab::with_service(banx::SERVICE)
+            ClaimOfferTab::with_service(favor::SERVICE)
                 .get_index_pk()
                 .iter()
                 .filter(|p| p.poster == poster)
@@ -712,7 +712,7 @@ mod service {
             let want_poster = asPoster.unwrap_or(true);
             let want_counter = asCounterparty.unwrap_or(true);
             let open_only = openOnly.unwrap_or(false);
-            Ok(RequestTab::with_service(banx::SERVICE)
+            Ok(RequestTab::with_service(favor::SERVICE)
                 .get_index_pk()
                 .iter()
                 .filter(|r| r.poster == me || r.counterparty == me)
@@ -739,7 +739,7 @@ mod service {
         /// Only series the caller is a party to are returned.
         async fn payAuths(&self, account: AccountNumber) -> Result<Vec<PayAuthView>> {
             let me = self.user()?;
-            Ok(PayAuthTab::with_service(banx::SERVICE)
+            Ok(PayAuthTab::with_service(favor::SERVICE)
                 .get_index_pk()
                 .iter()
                 .filter(|row| row.payer == me || row.payee == me)
@@ -753,9 +753,9 @@ mod service {
             Tokens::call().getToken(tokenId).precision.value()
         }
 
-        /// Cash quotes (Banx asset ↔ token). Omit `poster` for every desk.
+        /// Cash quotes (Favor asset ↔ token). Omit `poster` for every desk.
         async fn cashQuotes(&self, poster: Option<AccountNumber>) -> Vec<CashQuoteView> {
-            CashQuoteTab::with_service(banx::SERVICE)
+            CashQuoteTab::with_service(favor::SERVICE)
                 .get_index_pk()
                 .iter()
                 .filter(|q| poster.map(|p| q.poster == p).unwrap_or(true))
@@ -763,13 +763,13 @@ mod service {
                 .collect()
         }
 
-        /// Tokens in Banx's `{poster}/{token_id}` sub-account (cash window).
+        /// Tokens in Favor's `{poster}/{token_id}` sub-account (cash window).
         async fn cashVault(&self, poster: AccountNumber) -> Vec<CashVaultView> {
             let prefix = format!("{poster}/");
             SubAccountTable::with_service(Tokens::SERVICE)
                 .get_index_pk()
                 .iter()
-                .filter(|sa| sa.account == banx::SERVICE && sa.sub_account.starts_with(&prefix))
+                .filter(|sa| sa.account == favor::SERVICE && sa.sub_account.starts_with(&prefix))
                 .filter_map(|sa| {
                     // `{poster}/{token}` is the cash vault. A pool is `{poster}/{asset}/{token}`.
                     let rest = sa.sub_account.strip_prefix(&prefix)?;
@@ -799,7 +799,7 @@ mod service {
             let Some(who) = poster.or(debtor) else {
                 return Vec::new();
             };
-            FxOfferTab::with_service(banx::SERVICE)
+            FxOfferTab::with_service(favor::SERVICE)
                 .get_index_pk()
                 .iter()
                 .filter(|p| p.poster == who)
@@ -809,7 +809,7 @@ mod service {
 
         /// Whether a routing key exists. Without one no route can be sealed or opened.
         async fn routingReady(&self) -> bool {
-            banx::tables::RouteKeyTable::with_service(banx::SERVICE)
+            favor::tables::RouteKeyTable::with_service(favor::SERVICE)
                 .get_index_pk()
                 .get(&0)
                 .is_some()
@@ -869,12 +869,12 @@ mod service {
                 limit_first_hops_to_payer_consent(&mut lines, from, to);
             }
             let found = if exact_out {
-                banx::path_find::find_banx_path_exact_out(
+                favor::path_find::find_favor_path_exact_out(
                     &lines, &routing, &fx, from, to, amount_raw, fromAsset, toAsset, max_hops,
                     graph.now,
                 )
             } else {
-                banx::path_find::find_banx_path(
+                favor::path_find::find_favor_path(
                     &lines, &routing, &fx, from, to, amount_raw, fromAsset, toAsset, max_hops,
                     graph.now,
                 )
@@ -886,7 +886,7 @@ mod service {
                     "no path"
                 }));
             };
-            let key = banx::tables::RouteKeyTable::with_service(banx::SERVICE)
+            let key = favor::tables::RouteKeyTable::with_service(favor::SERVICE)
                 .get_index_pk()
                 .get(&0)
                 .ok_or_else(|| {
@@ -898,10 +898,10 @@ mod service {
             unsafe {
                 psibase::native_raw::getRandom(random.as_mut_ptr(), random.len());
             }
-            let hops: Vec<banx::tables::PathHop> = quote
+            let hops: Vec<favor::tables::PathHop> = quote
                 .hops
                 .iter()
-                .map(|hop| banx::tables::PathHop {
+                .map(|hop| favor::tables::PathHop {
                     account: hop.account,
                     asset_id: hop.asset_id,
                 })
@@ -909,8 +909,8 @@ mod service {
             let last_asset = hops.last().map(|h| h.asset_id).unwrap_or(fromAsset);
             let amount_out = quote.amount_out;
             let min_return = if exact_out { amount_raw } else { amount_out };
-            let expires_at = graph.now + banx::route::QUOTE_TTL;
-            let terms = banx::route::RouteTerms {
+            let expires_at = graph.now + favor::route::QUOTE_TTL;
+            let terms = favor::route::RouteTerms {
                 epoch: key.epoch,
                 payer: from,
                 payee: to,
@@ -923,7 +923,7 @@ mod service {
             // What each hop draws, after fees. Execution prices every hop live
             // and rejects the payment if any draw differs from this.
             let amounts: Vec<u64> = quote.hops.iter().map(|hop| hop.amount).collect();
-            let route = banx::route::seal(&key.secret, terms, &hops, &amounts, &random)
+            let route = favor::route::seal(&key.secret, terms, &hops, &amounts, &random)
                 .map_err(async_graphql::Error::new)?;
             Ok(RouteQuote {
                 route,
@@ -934,20 +934,20 @@ mod service {
                 hopCount: hops.len() as u8,
             })
         }
-        /// Constant-product Banx relays. Omit `owner` for every relay.
-        async fn banxRelays(&self, owner: Option<AccountNumber>) -> Vec<BanxRelayView> {
-            BanxRelayTable::with_service(banx::SERVICE)
+        /// Constant-product Favor relays. Omit `owner` for every relay.
+        async fn favorRelays(&self, owner: Option<AccountNumber>) -> Vec<FavorRelayView> {
+            FavorRelayTable::with_service(favor::SERVICE)
                 .get_index_pk()
                 .iter()
                 .filter(|r| owner.map(|o| r.owner == o).unwrap_or(true))
-                .map(BanxRelayView::from_row)
+                .map(FavorRelayView::from_row)
                 .collect()
         }
 
-        /// Banx↔token relays. Omit `owner` for every relay.
+        /// Favor↔token relays. Omit `owner` for every relay.
         /// `tokenReserve` is the pair sub-account `{owner}/{asset}/{token}`.
         async fn tokenRelays(&self, owner: Option<AccountNumber>) -> Vec<TokenRelayView> {
-            TokenRelayTable::with_service(banx::SERVICE)
+            TokenRelayTable::with_service(favor::SERVICE)
                 .get_index_pk()
                 .iter()
                 .filter(|r| owner.map(|o| r.owner == o).unwrap_or(true))
@@ -958,7 +958,7 @@ mod service {
                         owner: r.owner,
                         assetId: r.asset_id,
                         tokenId: r.token_id,
-                        reserveBanx: Decimal::new(r.reserve_banx, asset_precision(r.asset_id)),
+                        reserveFavor: Decimal::new(r.reserve_favor, asset_precision(r.asset_id)),
                         tokenReserve: Decimal::new(tokens, token_precision(r.token_id)),
                     }
                 })
@@ -996,7 +996,7 @@ mod service {
             } else {
                 200
             };
-            EventQuery::new("history.banx-app.activity")
+            EventQuery::new("history.favor-app.activity")
                 .condition_with_params(cond, params)
                 .first(first)
                 .last(last.or(Some(default_last)))
@@ -1105,14 +1105,14 @@ mod service {
             .seconds();
         let now = time_sec(now_tp);
 
-        let forward_offers: Vec<ForwardOfferView> = ForwardOfferTab::with_service(banx::SERVICE)
+        let forward_offers: Vec<ForwardOfferView> = ForwardOfferTab::with_service(favor::SERVICE)
             .get_index_pk()
             .iter()
             .filter(|p| debtors.contains(&p.poster) && p.is_live())
             .map(ForwardOfferView::from)
             .collect();
 
-        let relay_rows: Vec<BanxRelay> = BanxRelayTable::with_service(banx::SERVICE)
+        let relay_rows: Vec<FavorRelay> = FavorRelayTable::with_service(favor::SERVICE)
             .get_index_pk()
             .iter()
             .filter(|r| debtors.contains(&r.owner))
@@ -1123,10 +1123,10 @@ mod service {
             .collect();
         let relays = relay_rows
             .into_iter()
-            .map(BanxRelayView::from_row)
+            .map(FavorRelayView::from_row)
             .collect();
 
-        let fx_offers: Vec<FxOfferView> = FxOfferTab::with_service(banx::SERVICE)
+        let fx_offers: Vec<FxOfferView> = FxOfferTab::with_service(favor::SERVICE)
             .get_index_pk()
             .iter()
             .filter(|p| {
@@ -1160,7 +1160,7 @@ mod service {
     /// owes the payer, where the draw only unwinds the claim. Any other first
     /// hop can still use what that account already owes the payer, and no more.
     fn limit_first_hops_to_payer_consent(
-        lines: &mut [banx::path_find::LineEdge],
+        lines: &mut [favor::path_find::LineEdge],
         payer: AccountNumber,
         payee: AccountNumber,
     ) {
@@ -1197,14 +1197,14 @@ mod service {
     fn graph_edges(
         graph: &PathGraphView,
     ) -> (
-        Vec<banx::path_find::LineEdge>,
-        Vec<banx::path_find::RoutingEdge>,
-        Vec<banx::path_find::FxEdge>,
+        Vec<favor::path_find::LineEdge>,
+        Vec<favor::path_find::RoutingEdge>,
+        Vec<favor::path_find::FxEdge>,
     ) {
         let lines = graph
             .creditLines
             .iter()
-            .map(|l| banx::path_find::LineEdge {
+            .map(|l| favor::path_find::LineEdge {
                 creditor: l.creditor,
                 debtor: l.debtor,
                 asset_id: l.assetId,
@@ -1217,7 +1217,7 @@ mod service {
         let routing = graph
             .forwardOffers
             .iter()
-            .map(|r| banx::path_find::RoutingEdge {
+            .map(|r| favor::path_find::RoutingEdge {
                 creditor: r.nextHop,
                 debtor: r.poster,
                 asset_id: r.assetId,
@@ -1227,9 +1227,9 @@ mod service {
                 allow_unknown: r.allowUnknown,
             })
             .collect();
-        let mut fx: Vec<banx::path_find::FxEdge> = Vec::new();
+        let mut fx: Vec<favor::path_find::FxEdge> = Vec::new();
         for r in &graph.relays {
-            fx.push(banx::path_find::FxEdge {
+            fx.push(favor::path_find::FxEdge {
                 poster: r.owner,
                 from_asset: r.assetLo,
                 to_asset: r.assetHi,
@@ -1240,7 +1240,7 @@ mod service {
                 reserve_in: raw_qty(&r.reserveLo),
                 reserve_out: raw_qty(&r.reserveHi),
             });
-            fx.push(banx::path_find::FxEdge {
+            fx.push(favor::path_find::FxEdge {
                 poster: r.owner,
                 from_asset: r.assetHi,
                 to_asset: r.assetLo,
@@ -1253,7 +1253,7 @@ mod service {
             });
         }
         for p in &graph.fxOffers {
-            fx.push(banx::path_find::FxEdge {
+            fx.push(favor::path_find::FxEdge {
                 poster: p.poster,
                 from_asset: p.fromAsset,
                 to_asset: p.toAsset,

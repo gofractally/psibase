@@ -10,7 +10,7 @@ import {
     usePathPay,
     usePayInvoice,
     useQuotePath,
-} from "@/hooks/use-banx-mutations";
+} from "@/hooks/use-favor-mutations";
 import {
     amountPlaceholder,
     displayAmount,

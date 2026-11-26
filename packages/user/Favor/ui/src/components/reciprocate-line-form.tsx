@@ -4,13 +4,13 @@ import { Handshake } from "lucide-react";
 
 import { NicknameContactField } from "@/components/nickname-contact-field";
 import { useAssetMap } from "@/hooks/use-assets";
-import { useBanxContacts } from "@/hooks/use-banx-contacts";
-import { useForwardOffers } from "@/hooks/use-banx-data";
+import { useFavorContacts } from "@/hooks/use-favor-contacts";
+import { useForwardOffers } from "@/hooks/use-favor-data";
 import {
     useSetBookAuth,
     useSetCreditLine,
     useSetGlobalForwardOffer,
-} from "@/hooks/use-banx-mutations";
+} from "@/hooks/use-favor-mutations";
 import { useSaveContact } from "@/hooks/use-save-contact";
 import { displayAmount } from "@/lib/amount";
 import { amountFieldValidator, useAppForm } from "@/lib/form";
@@ -44,7 +44,7 @@ export function ReciprocateLineForm({
         isContact,
         hasReadPermission,
         isLoading: contactsLoading,
-    } = useBanxContacts("/invite");
+    } = useFavorContacts("/invite");
     const alreadyContact =
         hasReadPermission && isContact(terms.inviter);
     const { data: forwardOffers = [] } = useForwardOffers();

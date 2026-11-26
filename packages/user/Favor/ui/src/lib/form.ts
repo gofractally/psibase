@@ -1,9 +1,9 @@
 /**
- * Banx forms use the monorepo shared TanStack Form hook
+ * Favor forms use the monorepo shared TanStack Form hook
  * (`@shared/components/form/app-form`).
  *
  * Prefer `form.AppField` + `TextField` / `NumberField` / `CheckboxField` /
- * `SwitchField` for standard inputs. Use `form.Field` for Banx-specific
+ * `SwitchField` for standard inputs. Use `form.Field` for Favor-specific
  * controls (`AssetField`, `ExpiresAtPicker`) that are not registered on the
  * shared form.
  */

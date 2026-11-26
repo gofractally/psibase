@@ -1,9 +1,9 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::banx::plugin::api::{CreatedInvite, Guest as Api};
-use bindings::exports::banx::plugin::authorized::Guest as Authorized;
-use bindings::exports::banx::plugin::helpers::Guest as Helpers;
+use bindings::exports::favor::plugin::api::{CreatedInvite, Guest as Api};
+use bindings::exports::favor::plugin::authorized::Guest as Authorized;
+use bindings::exports::favor::plugin::helpers::Guest as Helpers;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::api::add_action_to_transaction;
 
@@ -23,7 +23,7 @@ define_trust! {
     descriptions {
         Low => "
             - Convert amounts using asset precision
-            - Ask Banx for a private path quote as the signed-in user (hops are sealed, not shown)
+            - Ask Favor for a private path quote as the signed-in user (hops are sealed, not shown)
         ",
         Medium => "
             - Post or remove credit lines, book-auths, forward offers, claim offers, and currency policies
@@ -32,8 +32,8 @@ define_trust! {
             - Create or cancel a repeating payment
             - Buy or sell claims under a posted claim offer
             - Post cash quotes, fund/withdraw the cash vault, cash_in (from your vault)
-            - Post or remove a Banx relay or a token relay
-            - Create or revoke Banx invites (onboard + extend a credit line, one claimee)
+            - Post or remove a Favor relay or a token relay
+            - Create or revoke Favor invites (onboard + extend a credit line, one claimee)
             - Register a new asset
         ",
         High => "
@@ -41,7 +41,7 @@ define_trust! {
             - Take an FX order that can draw both lines
             - Pay an invoice along a path (max spend)
             - Run a repeating payment (draws the payer)
-            - cash_out (draw Banx, receive tokens)
+            - cash_out (draw Favor, receive tokens)
             - Swap through a token relay, or path-pay out to tokens
         ",
     }
@@ -105,7 +105,7 @@ define_trust! {
     }
 }
 
-struct BanxPlugin;
+struct FavorPlugin;
 
 fn parse_account(name: &str) -> Result<AccountNumber, Error> {
     name.parse::<AccountNumber>()
@@ -187,7 +187,7 @@ fn human_to_fx_rate_precs(
     let one_from = Quantity::from_str("1", from_prec)
         .map_err(|e| ErrorType::ConversionError(e.to_string()))?;
     let fx = (to_for_one.value as u128)
-        .checked_mul(banx::tables::RATE_SCALE as u128)
+        .checked_mul(favor::tables::RATE_SCALE as u128)
         .ok_or_else(|| ErrorType::ConversionError("fx_rate overflow".into()))?
         / (one_from.value as u128);
     let fx =
@@ -210,7 +210,7 @@ fn human_to_fx_rate(from_asset: u16, to_asset: u16, to_rate: &str) -> Result<u64
     let to_for_one_from = parse_amount_nonzero(to_asset, to_rate)?;
     let one_from = parse_amount_nonzero(from_asset, "1")?;
     let fx = (to_for_one_from.value as u128)
-        .checked_mul(banx::tables::RATE_SCALE as u128)
+        .checked_mul(favor::tables::RATE_SCALE as u128)
         .ok_or_else(|| ErrorType::ConversionError("fx_rate overflow".into()))?
         / (one_from.value as u128);
     let fx =
@@ -224,7 +224,7 @@ fn human_to_fx_rate(from_asset: u16, to_asset: u16, to_rate: &str) -> Result<u64
     Ok(fx)
 }
 
-impl Helpers for BanxPlugin {
+impl Helpers for FavorPlugin {
     fn decimal_to_quantity(asset_id: u16, amount: String) -> Result<u64, Error> {
         Ok(parse_amount(asset_id, &amount)?.value)
     }
@@ -241,7 +241,7 @@ impl Helpers for BanxPlugin {
         amount_in: String,
         fee_ppm: u32,
     ) -> Result<Option<String>, Error> {
-        let out = banx::math::try_swap_out(
+        let out = favor::math::try_swap_out(
             parse_raw(&reserve_in)?,
             parse_raw(&reserve_out)?,
             parse_raw(&amount_in)?,
@@ -256,7 +256,7 @@ impl Helpers for BanxPlugin {
         amount_out: String,
         fee_ppm: u32,
     ) -> Result<Option<String>, Error> {
-        let need = banx::math::try_swap_in(
+        let need = favor::math::try_swap_in(
             parse_raw(&reserve_in)?,
             parse_raw(&reserve_out)?,
             parse_raw(&amount_out)?,
@@ -266,7 +266,7 @@ impl Helpers for BanxPlugin {
     }
 }
 
-impl Api for BanxPlugin {
+impl Api for FavorPlugin {
     fn set_credit_line(
         debtor: String,
         asset_id: u16,
@@ -275,24 +275,24 @@ impl Api for BanxPlugin {
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_credit_line)?;
         let amount = parse_amount(asset_id, &limit)?;
-        let packed = banx::action_structs::st_crd_lne {
+        let packed = favor::action_structs::st_crd_lne {
             debitor: parse_account(&debtor)?,
             asset_id,
             amount,
             deplete_on_debit,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_crd_lne::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::st_crd_lne::ACTION_NAME, &packed)
     }
 
     fn remove_credit_line(debtor: String, asset_id: u16) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::remove_credit_line)?;
-        let packed = banx::action_structs::rm_crd_lne {
+        let packed = favor::action_structs::rm_crd_lne {
             debitor: parse_account(&debtor)?,
             asset_id,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::rm_crd_lne::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::rm_crd_lne::ACTION_NAME, &packed)
     }
 
     fn set_book_auth(
@@ -303,30 +303,30 @@ impl Api for BanxPlugin {
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_book_auth)?;
         let remaining = parse_amount_nonzero(asset_id, &remaining)?;
-        let packed = banx::action_structs::st_bk_ath {
+        let packed = favor::action_structs::st_bk_ath {
             creditor: parse_account(&creditor)?,
             asset_id,
             remaining,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_bk_ath::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::st_bk_ath::ACTION_NAME, &packed)
     }
 
     fn remove_book_auth(creditor: String, asset_id: u16) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::remove_book_auth)?;
-        let packed = banx::action_structs::rm_bk_ath {
+        let packed = favor::action_structs::rm_bk_ath {
             creditor: parse_account(&creditor)?,
             asset_id,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::rm_bk_ath::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::rm_bk_ath::ACTION_NAME, &packed)
     }
 
     fn book(debtor: String, asset_id: u16, amount: String, memo: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::book)?;
         let amount = parse_amount_nonzero(asset_id, &amount)?;
-        let packed = banx::action_structs::book {
+        let packed = favor::action_structs::book {
             debtor: parse_account(&debtor)?,
             asset_id,
             amount,
@@ -335,7 +335,7 @@ impl Api for BanxPlugin {
                 .map_err(|_| ErrorType::ConversionError("memo too long (max 80 bytes)".into()))?,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::book::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::book::ACTION_NAME, &packed)
     }
 
     fn set_forward_offer(
@@ -348,7 +348,7 @@ impl Api for BanxPlugin {
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_forward_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
-        let packed = banx::action_structs::st_fwd_ofr {
+        let packed = favor::action_structs::st_fwd_ofr {
             next_hop: parse_account(&next_hop)?,
             asset_id,
             fee_fixed,
@@ -357,7 +357,7 @@ impl Api for BanxPlugin {
             allow_unknown,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_fwd_ofr::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::st_fwd_ofr::ACTION_NAME, &packed)
     }
 
     fn set_global_forward_offer(
@@ -369,7 +369,7 @@ impl Api for BanxPlugin {
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_global_forward_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
-        let packed = banx::action_structs::st_glb_fwd {
+        let packed = favor::action_structs::st_glb_fwd {
             asset_id,
             fee_fixed,
             fee_percent: fee_percent_ppm,
@@ -377,23 +377,23 @@ impl Api for BanxPlugin {
             allow_unknown,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_glb_fwd::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::st_glb_fwd::ACTION_NAME, &packed)
     }
 
     fn remove_forward_offer(next_hop: String, asset_id: u16) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::remove_forward_offer)?;
-        let packed = banx::action_structs::rm_fwd_ofr {
+        let packed = favor::action_structs::rm_fwd_ofr {
             next_hop: parse_account(&next_hop)?,
             asset_id,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::rm_fwd_ofr::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::rm_fwd_ofr::ACTION_NAME, &packed)
     }
 
     fn remove_global_forward_offer(asset_id: u16) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::remove_global_forward_offer)?;
-        let packed = banx::action_structs::rm_glb_fwd { asset_id }.packed();
-        add_action_to_transaction(banx::action_structs::rm_glb_fwd::ACTION_NAME, &packed)
+        let packed = favor::action_structs::rm_glb_fwd { asset_id }.packed();
+        add_action_to_transaction(favor::action_structs::rm_glb_fwd::ACTION_NAME, &packed)
     }
 
     fn set_buy_claim_offer(
@@ -407,7 +407,7 @@ impl Api for BanxPlugin {
         trust::assert_authorized(trust::FunctionName::set_buy_claim_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
         let remaining = parse_amount(asset_id, &remaining)?;
-        let packed = banx::action_structs::st_buy_clm {
+        let packed = favor::action_structs::st_buy_clm {
             debtor: parse_account(&debtor)?,
             asset_id,
             fee_fixed,
@@ -416,7 +416,7 @@ impl Api for BanxPlugin {
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_buy_clm::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::st_buy_clm::ACTION_NAME, &packed)
     }
 
     fn set_global_buy_claim_offer(
@@ -429,7 +429,7 @@ impl Api for BanxPlugin {
         trust::assert_authorized(trust::FunctionName::set_global_buy_claim_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
         let remaining = parse_amount(asset_id, &remaining)?;
-        let packed = banx::action_structs::st_glb_buy {
+        let packed = favor::action_structs::st_glb_buy {
             asset_id,
             fee_fixed,
             fee_percent: fee_percent_ppm,
@@ -437,7 +437,7 @@ impl Api for BanxPlugin {
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_glb_buy::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::st_glb_buy::ACTION_NAME, &packed)
     }
 
     fn set_allow_unknown(
@@ -450,29 +450,29 @@ impl Api for BanxPlugin {
             "" | "0" => AccountNumber::new(0),
             name => parse_account(name)?,
         };
-        let packed = banx::action_structs::st_fwd_unk {
+        let packed = favor::action_structs::st_fwd_unk {
             next_hop,
             asset_id,
             allow_unknown,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_fwd_unk::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::st_fwd_unk::ACTION_NAME, &packed)
     }
 
     fn remove_buy_claim_offer(debtor: String, asset_id: u16) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::remove_buy_claim_offer)?;
-        let packed = banx::action_structs::rm_buy_clm {
+        let packed = favor::action_structs::rm_buy_clm {
             debtor: parse_account(&debtor)?,
             asset_id,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::rm_buy_clm::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::rm_buy_clm::ACTION_NAME, &packed)
     }
 
     fn remove_global_buy_claim_offer(asset_id: u16) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::remove_global_buy_claim_offer)?;
-        let packed = banx::action_structs::rm_glb_buy { asset_id }.packed();
-        add_action_to_transaction(banx::action_structs::rm_glb_buy::ACTION_NAME, &packed)
+        let packed = favor::action_structs::rm_glb_buy { asset_id }.packed();
+        add_action_to_transaction(favor::action_structs::rm_glb_buy::ACTION_NAME, &packed)
     }
 
     fn sell_claim(
@@ -485,7 +485,7 @@ impl Api for BanxPlugin {
         trust::assert_authorized(trust::FunctionName::sell_claim)?;
         let amount = parse_amount_nonzero(asset_id, &amount)?;
         let min_proceeds = parse_amount(asset_id, &min_proceeds)?;
-        let packed = banx::action_structs::sell_claim {
+        let packed = favor::action_structs::sell_claim {
             buyer: parse_account(&buyer)?,
             debtor: parse_account(&debtor)?,
             asset_id,
@@ -493,7 +493,7 @@ impl Api for BanxPlugin {
             min_proceeds,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::sell_claim::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::sell_claim::ACTION_NAME, &packed)
     }
 
     fn set_sell_claim_offer(
@@ -507,7 +507,7 @@ impl Api for BanxPlugin {
         trust::assert_authorized(trust::FunctionName::set_sell_claim_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
         let remaining = parse_amount(asset_id, &remaining)?;
-        let packed = banx::action_structs::st_sell_clm {
+        let packed = favor::action_structs::st_sell_clm {
             debtor: parse_account(&debtor)?,
             asset_id,
             fee_fixed,
@@ -516,7 +516,7 @@ impl Api for BanxPlugin {
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_sell_clm::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::st_sell_clm::ACTION_NAME, &packed)
     }
 
     fn set_global_sell_claim_offer(
@@ -529,7 +529,7 @@ impl Api for BanxPlugin {
         trust::assert_authorized(trust::FunctionName::set_global_sell_claim_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
         let remaining = parse_amount(asset_id, &remaining)?;
-        let packed = banx::action_structs::st_glb_sell {
+        let packed = favor::action_structs::st_glb_sell {
             asset_id,
             fee_fixed,
             fee_percent: fee_percent_ppm,
@@ -537,23 +537,23 @@ impl Api for BanxPlugin {
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_glb_sell::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::st_glb_sell::ACTION_NAME, &packed)
     }
 
     fn remove_sell_claim_offer(debtor: String, asset_id: u16) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::remove_sell_claim_offer)?;
-        let packed = banx::action_structs::rm_sell_clm {
+        let packed = favor::action_structs::rm_sell_clm {
             debtor: parse_account(&debtor)?,
             asset_id,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::rm_sell_clm::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::rm_sell_clm::ACTION_NAME, &packed)
     }
 
     fn remove_global_sell_claim_offer(asset_id: u16) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::remove_global_sell_claim_offer)?;
-        let packed = banx::action_structs::rm_glb_sell { asset_id }.packed();
-        add_action_to_transaction(banx::action_structs::rm_glb_sell::ACTION_NAME, &packed)
+        let packed = favor::action_structs::rm_glb_sell { asset_id }.packed();
+        add_action_to_transaction(favor::action_structs::rm_glb_sell::ACTION_NAME, &packed)
     }
 
     fn buy_claim(
@@ -566,7 +566,7 @@ impl Api for BanxPlugin {
         trust::assert_authorized(trust::FunctionName::buy_claim)?;
         let amount = parse_amount_nonzero(asset_id, &amount)?;
         let max_cost = parse_amount(asset_id, &max_cost)?;
-        let packed = banx::action_structs::buy_claim {
+        let packed = favor::action_structs::buy_claim {
             seller: parse_account(&seller)?,
             debtor: parse_account(&debtor)?,
             asset_id,
@@ -574,7 +574,7 @@ impl Api for BanxPlugin {
             max_cost,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::buy_claim::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::buy_claim::ACTION_NAME, &packed)
     }
 
     fn set_fx_offer(
@@ -590,7 +590,7 @@ impl Api for BanxPlugin {
         let fee_fixed = parse_amount(from_asset, &fee_fixed)?;
         let fx_rate = human_to_fx_rate(from_asset, to_asset, &to_rate)?;
         let remaining = parse_amount_nonzero(from_asset, &remaining)?;
-        let packed = banx::action_structs::st_fx_ofr {
+        let packed = favor::action_structs::st_fx_ofr {
             from_asset,
             to_asset,
             poster_is_creditor,
@@ -600,7 +600,7 @@ impl Api for BanxPlugin {
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_fx_ofr::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::st_fx_ofr::ACTION_NAME, &packed)
     }
 
     fn set_exchange_quotes(
@@ -620,7 +620,7 @@ impl Api for BanxPlugin {
             .into());
         }
         let market_fx = human_to_fx_rate(asset_a, asset_b, &market_rate)?;
-        let Some((forward, back)) = banx::math::try_exchange_rates(market_fx, spread_ppm) else {
+        let Some((forward, back)) = favor::math::try_exchange_rates(market_fx, spread_ppm) else {
             return Err(
                 ErrorType::ConversionError("spread consumes the market rate".into()).into(),
             );
@@ -635,7 +635,7 @@ impl Api for BanxPlugin {
             (asset_b, asset_a, back, remaining_b, true),
             (asset_b, asset_a, back, remaining_b, false),
         ] {
-            let packed = banx::action_structs::st_fx_ofr {
+            let packed = favor::action_structs::st_fx_ofr {
                 from_asset,
                 to_asset,
                 poster_is_creditor,
@@ -645,7 +645,7 @@ impl Api for BanxPlugin {
                 expires_at,
             }
             .packed();
-            add_action_to_transaction(banx::action_structs::st_fx_ofr::ACTION_NAME, &packed)?;
+            add_action_to_transaction(favor::action_structs::st_fx_ofr::ACTION_NAME, &packed)?;
         }
         Ok(())
     }
@@ -656,13 +656,13 @@ impl Api for BanxPlugin {
         poster_is_creditor: bool,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::remove_fx_offer)?;
-        let packed = banx::action_structs::rm_fx_ofr {
+        let packed = favor::action_structs::rm_fx_ofr {
             from_asset,
             to_asset,
             poster_is_creditor,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::rm_fx_ofr::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::rm_fx_ofr::ACTION_NAME, &packed)
     }
 
     fn create_request(
@@ -675,7 +675,7 @@ impl Api for BanxPlugin {
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::create_request)?;
         let amount = parse_amount_nonzero(asset_id, &amount)?;
-        let packed = banx::action_structs::st_req {
+        let packed = favor::action_structs::st_req {
             kind,
             counterparty: parse_account_or_zero(&counterparty)?,
             asset_id,
@@ -686,13 +686,13 @@ impl Api for BanxPlugin {
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_req::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::st_req::ACTION_NAME, &packed)
     }
 
     fn cancel_request(id: u32) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::cancel_request)?;
-        let packed = banx::action_structs::rm_req { id }.packed();
-        add_action_to_transaction(banx::action_structs::rm_req::ACTION_NAME, &packed)
+        let packed = favor::action_structs::rm_req { id }.packed();
+        add_action_to_transaction(favor::action_structs::rm_req::ACTION_NAME, &packed)
     }
 
     fn deposit(
@@ -703,26 +703,26 @@ impl Api for BanxPlugin {
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::deposit)?;
         let amount = parse_amount_nonzero(asset_id, &amount)?;
-        let packed = banx::action_structs::deposit {
+        let packed = favor::action_structs::deposit {
             depositor: parse_account(&depositor)?,
             asset_id,
             amount,
             request_id,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::deposit::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::deposit::ACTION_NAME, &packed)
     }
 
     fn forgive(debtor: String, asset_id: u16, amount: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::forgive)?;
         let amount = parse_amount_nonzero(asset_id, &amount)?;
-        let packed = banx::action_structs::forgive {
+        let packed = favor::action_structs::forgive {
             debtor: parse_account(&debtor)?,
             asset_id,
             amount,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::forgive::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::forgive::ACTION_NAME, &packed)
     }
 
     fn convert(
@@ -735,7 +735,7 @@ impl Api for BanxPlugin {
         trust::assert_authorized(trust::FunctionName::convert)?;
         let amount_from = parse_amount_nonzero(from_asset, &amount_from)?;
         let min_to = parse_amount(to_asset, &min_to)?;
-        let packed = banx::action_structs::convert {
+        let packed = favor::action_structs::convert {
             counterparty: parse_account(&counterparty)?,
             from_asset,
             to_asset,
@@ -743,7 +743,7 @@ impl Api for BanxPlugin {
             min_to,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::convert::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::convert::ACTION_NAME, &packed)
     }
 
     fn take_fx(
@@ -757,7 +757,7 @@ impl Api for BanxPlugin {
         trust::assert_authorized(trust::FunctionName::take_fx)?;
         let amount_from = parse_amount_nonzero(from_asset, &amount_from)?;
         let to_bound = parse_signed_amount(to_asset, &to_bound)?;
-        let packed = banx::action_structs::take_fx {
+        let packed = favor::action_structs::take_fx {
             poster: parse_account(&poster)?,
             from_asset,
             to_asset,
@@ -766,7 +766,7 @@ impl Api for BanxPlugin {
             to_bound,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::take_fx::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::take_fx::ACTION_NAME, &packed)
     }
 
     fn path_pay(
@@ -782,14 +782,14 @@ impl Api for BanxPlugin {
         // Amounts are raw integer strings from the sealed quote, not human decimals.
         let amount = Quantity::new(parse_raw(&amount)?);
         let min_return = Quantity::new(parse_raw(&min_return)?);
-        let packed = banx::action_structs::path_pay {
+        let packed = favor::action_structs::path_pay {
             route,
             amount,
             min_return,
             request_id,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::path_pay::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::path_pay::ACTION_NAME, &packed)
     }
 
     fn pay_inv(route: String, max_spend: String, request_id: u32) -> Result<(), Error> {
@@ -798,13 +798,13 @@ impl Api for BanxPlugin {
             return Err(ErrorType::ConversionError("pay_inv requires an invoice".into()).into());
         }
         let max_spend = Quantity::new(parse_raw(&max_spend)?);
-        let packed = banx::action_structs::pay_inv {
+        let packed = favor::action_structs::pay_inv {
             route,
             max_spend,
             request_id,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::pay_inv::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::pay_inv::ACTION_NAME, &packed)
     }
 
     fn set_pay_auth(
@@ -819,7 +819,7 @@ impl Api for BanxPlugin {
         trust::assert_authorized(trust::FunctionName::set_pay_auth)?;
         let amount = parse_amount_nonzero(asset_id, &amount)?;
         let max_spend = parse_amount_nonzero(asset_id, &max_spend)?;
-        let packed = banx::action_structs::st_pay_ath {
+        let packed = favor::action_structs::st_pay_ath {
             payee: parse_account(&payee)?,
             asset_id,
             amount,
@@ -829,19 +829,19 @@ impl Api for BanxPlugin {
             ends_at: time_point(ends_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_pay_ath::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::st_pay_ath::ACTION_NAME, &packed)
     }
 
     fn run_pay_auth(id: u32, route: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::run_pay_auth)?;
-        let packed = banx::action_structs::run_pay_ath { id, route }.packed();
-        add_action_to_transaction(banx::action_structs::run_pay_ath::ACTION_NAME, &packed)
+        let packed = favor::action_structs::run_pay_ath { id, route }.packed();
+        add_action_to_transaction(favor::action_structs::run_pay_ath::ACTION_NAME, &packed)
     }
 
     fn cancel_pay_auth(id: u32, force_cancel: bool) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::cancel_pay_auth)?;
-        let packed = banx::action_structs::rm_pay_ath { id, force_cancel }.packed();
-        add_action_to_transaction(banx::action_structs::rm_pay_ath::ACTION_NAME, &packed)
+        let packed = favor::action_structs::rm_pay_ath { id, force_cancel }.packed();
+        add_action_to_transaction(favor::action_structs::rm_pay_ath::ACTION_NAME, &packed)
     }
 
     fn set_cash_quote(
@@ -870,7 +870,7 @@ impl Api for BanxPlugin {
                 parse_token_amount(token_id, &remaining)?,
             )
         };
-        let packed = banx::action_structs::st_csh_qte {
+        let packed = favor::action_structs::st_csh_qte {
             asset_id,
             token_id,
             is_out,
@@ -880,51 +880,51 @@ impl Api for BanxPlugin {
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_csh_qte::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::st_csh_qte::ACTION_NAME, &packed)
     }
 
     fn remove_cash_quote(asset_id: u16, token_id: u32, is_out: bool) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::remove_cash_quote)?;
-        let packed = banx::action_structs::rm_csh_qte {
+        let packed = favor::action_structs::rm_csh_qte {
             asset_id,
             token_id,
             is_out,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::rm_csh_qte::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::rm_csh_qte::ACTION_NAME, &packed)
     }
 
     fn cash_fund(token_id: u32, amount: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::cash_fund)?;
         let amount = parse_token_amount_nonzero(token_id, &amount)?;
-        let packed = banx::action_structs::csh_fund { token_id, amount }.packed();
-        add_action_to_transaction(banx::action_structs::csh_fund::ACTION_NAME, &packed)
+        let packed = favor::action_structs::csh_fund { token_id, amount }.packed();
+        add_action_to_transaction(favor::action_structs::csh_fund::ACTION_NAME, &packed)
     }
 
     fn cash_withdraw(token_id: u32, amount: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::cash_withdraw)?;
         let amount = parse_token_amount_nonzero(token_id, &amount)?;
-        let packed = banx::action_structs::csh_wd { token_id, amount }.packed();
-        add_action_to_transaction(banx::action_structs::csh_wd::ACTION_NAME, &packed)
+        let packed = favor::action_structs::csh_wd { token_id, amount }.packed();
+        add_action_to_transaction(favor::action_structs::csh_wd::ACTION_NAME, &packed)
     }
 
     fn cash_out(
         cashier: String,
         asset_id: u16,
         token_id: u32,
-        amount_banx: String,
+        amount_favor: String,
         min_tokens: String,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::cash_out)?;
-        let packed = banx::action_structs::cash_out {
+        let packed = favor::action_structs::cash_out {
             cashier: parse_account(&cashier)?,
             asset_id,
             token_id,
-            amount_banx: parse_amount_nonzero(asset_id, &amount_banx)?,
+            amount_favor: parse_amount_nonzero(asset_id, &amount_favor)?,
             min_tokens: parse_token_amount(token_id, &min_tokens)?,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::cash_out::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::cash_out::ACTION_NAME, &packed)
     }
 
     fn cash_in(
@@ -932,18 +932,18 @@ impl Api for BanxPlugin {
         asset_id: u16,
         token_id: u32,
         amount_tokens: String,
-        min_banx: String,
+        min_favor: String,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::cash_in)?;
-        let packed = banx::action_structs::cash_in {
+        let packed = favor::action_structs::cash_in {
             cashier: parse_account(&cashier)?,
             asset_id,
             token_id,
             amount_tokens: parse_token_amount_nonzero(token_id, &amount_tokens)?,
-            min_banx: parse_amount(asset_id, &min_banx)?,
+            min_favor: parse_amount(asset_id, &min_favor)?,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::cash_in::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::cash_in::ACTION_NAME, &packed)
     }
 
     fn set_relay(
@@ -953,64 +953,64 @@ impl Api for BanxPlugin {
         reserve_b: String,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_relay)?;
-        let packed = banx::action_structs::st_relay {
+        let packed = favor::action_structs::st_relay {
             asset_a,
             reserve_a: parse_amount_nonzero(asset_a, &reserve_a)?,
             asset_b,
             reserve_b: parse_amount_nonzero(asset_b, &reserve_b)?,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_relay::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::st_relay::ACTION_NAME, &packed)
     }
 
     fn remove_relay(asset_a: u16, asset_b: u16) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::remove_relay)?;
-        let packed = banx::action_structs::rm_relay { asset_a, asset_b }.packed();
-        add_action_to_transaction(banx::action_structs::rm_relay::ACTION_NAME, &packed)
+        let packed = favor::action_structs::rm_relay { asset_a, asset_b }.packed();
+        add_action_to_transaction(favor::action_structs::rm_relay::ACTION_NAME, &packed)
     }
 
     fn set_token_relay(
         asset_id: u16,
         token_id: u32,
-        reserve_banx: String,
+        reserve_favor: String,
         reserve_tokens: String,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_token_relay)?;
-        let packed = banx::action_structs::st_tok_relay {
+        let packed = favor::action_structs::st_tok_relay {
             asset_id,
             token_id,
-            reserve_banx: parse_amount_nonzero(asset_id, &reserve_banx)?,
+            reserve_favor: parse_amount_nonzero(asset_id, &reserve_favor)?,
             reserve_tokens: parse_token_amount_nonzero(token_id, &reserve_tokens)?,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_tok_relay::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::st_tok_relay::ACTION_NAME, &packed)
     }
 
     fn remove_token_relay(asset_id: u16, token_id: u32) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::remove_token_relay)?;
-        let packed = banx::action_structs::rm_tok_relay { asset_id, token_id }.packed();
-        add_action_to_transaction(banx::action_structs::rm_tok_relay::ACTION_NAME, &packed)
+        let packed = favor::action_structs::rm_tok_relay { asset_id, token_id }.packed();
+        add_action_to_transaction(favor::action_structs::rm_tok_relay::ACTION_NAME, &packed)
     }
 
     fn token_relay_out(
         owner: String,
         asset_id: u16,
         token_id: u32,
-        amount_banx: String,
+        amount_favor: String,
         min_tokens: String,
         max_owed: String,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::token_relay_out)?;
-        let packed = banx::action_structs::tok_relay_out {
+        let packed = favor::action_structs::tok_relay_out {
             owner: parse_account(&owner)?,
             asset_id,
             token_id,
-            amount_banx: parse_amount_nonzero(asset_id, &amount_banx)?,
+            amount_favor: parse_amount_nonzero(asset_id, &amount_favor)?,
             min_tokens: parse_token_amount(token_id, &min_tokens)?,
             max_owed: parse_amount(asset_id, &max_owed)?,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::tok_relay_out::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::tok_relay_out::ACTION_NAME, &packed)
     }
 
     fn token_relay_in(
@@ -1018,18 +1018,18 @@ impl Api for BanxPlugin {
         asset_id: u16,
         token_id: u32,
         amount_tokens: String,
-        min_banx: String,
+        min_favor: String,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::token_relay_in)?;
-        let packed = banx::action_structs::tok_relay_in {
+        let packed = favor::action_structs::tok_relay_in {
             owner: parse_account(&owner)?,
             asset_id,
             token_id,
             amount_tokens: parse_token_amount_nonzero(token_id, &amount_tokens)?,
-            min_banx: parse_amount(asset_id, &min_banx)?,
+            min_favor: parse_amount(asset_id, &min_favor)?,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::tok_relay_in::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::tok_relay_in::ACTION_NAME, &packed)
     }
 
     fn path_cash(
@@ -1041,7 +1041,7 @@ impl Api for BanxPlugin {
         max_owed: String,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::path_cash)?;
-        let packed = banx::action_structs::path_cash {
+        let packed = favor::action_structs::path_cash {
             route,
             amount: Quantity::new(parse_raw(&amount)?),
             token_id,
@@ -1050,7 +1050,7 @@ impl Api for BanxPlugin {
             max_owed: Quantity::new(parse_raw(&max_owed)?),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::path_cash::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::path_cash::ACTION_NAME, &packed)
     }
 
     fn create_invite(
@@ -1063,9 +1063,9 @@ impl Api for BanxPlugin {
         let amount = parse_amount_nonzero(asset_id, &limit)?;
         let details = bindings::invite::plugin::inviter::prepare_new_invite(
             NUM_ACCOUNTS,
-            &banx::SERVICE.to_string(),
+            &favor::SERVICE.to_string(),
         )?;
-        let packed = banx::action_structs::cr_invite {
+        let packed = favor::action_structs::cr_invite {
             invite_id: details.invite_id,
             invite_payload: details.payload,
             num_accounts: NUM_ACCOUNTS,
@@ -1074,7 +1074,7 @@ impl Api for BanxPlugin {
             deplete_on_debit,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::cr_invite::ACTION_NAME, &packed)?;
+        add_action_to_transaction(favor::action_structs::cr_invite::ACTION_NAME, &packed)?;
         Ok(CreatedInvite {
             invite_token: details.invite_token,
             invite_id: details.invite_id,
@@ -1083,8 +1083,8 @@ impl Api for BanxPlugin {
 
     fn delete_invite(invite_id: u32) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::delete_invite)?;
-        let packed = banx::action_structs::rm_invite { invite_id }.packed();
-        add_action_to_transaction(banx::action_structs::rm_invite::ACTION_NAME, &packed)
+        let packed = favor::action_structs::rm_invite { invite_id }.packed();
+        add_action_to_transaction(favor::action_structs::rm_invite::ACTION_NAME, &packed)
     }
 
     fn add_asset(symbol: String, precision: u8, description: String) -> Result<(), Error> {
@@ -1098,21 +1098,21 @@ impl Api for BanxPlugin {
             Precision::new(precision).map_err(|e| ErrorType::ConversionError(e.to_string()))?;
         let description =
             Memo::new(description).map_err(|e| ErrorType::ConversionError(e.to_string()))?;
-        let packed = banx::action_structs::add_asset {
+        let packed = favor::action_structs::add_asset {
             symbol,
             precision,
             description,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::add_asset::ACTION_NAME, &packed)
+        add_action_to_transaction(favor::action_structs::add_asset::ACTION_NAME, &packed)
     }
 }
 
-impl Authorized for BanxPlugin {
+impl Authorized for FavorPlugin {
     fn graphql(query: String) -> Result<String, Error> {
         trust::assert_authorized(trust::FunctionName::graphql)?;
         bindings::host::http::api::post_graphql_get_json(&query)
     }
 }
 
-bindings::export!(BanxPlugin with_types_in bindings);
+bindings::export!(FavorPlugin with_types_in bindings);

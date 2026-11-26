@@ -70,10 +70,10 @@ members = [
     "NameMarket/service",
     "NameMarket/query-service",
     "NameMarket/plugin",
-    "Banx",
-    "Banx/service",
-    "Banx/query-service",
-    "Banx/plugin",
+    "Favor",
+    "Favor/service",
+    "Favor/query-service",
+    "Favor/plugin",
 ]
 
 exclude = [

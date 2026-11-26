@@ -12,12 +12,12 @@ import { useHasProfilesReadPermission } from "@shared/hooks/use-has-profiles-rea
 import { type PluginCall } from "@shared/lib/plugins/lib/call-plugin-function";
 import { profiles } from "@shared/lib/plugins";
 
-/** Profiles owns this. Banx has no contacts plugin, so the hosting-app default fails. */
+/** Profiles owns this. Favor has no contacts plugin, so the hosting-app default fails. */
 export const profilesReadPermission = profiles.api
     .hasReadPermission as PluginCall<[], boolean>;
 export const profilesContactsGet = profiles.contacts.get;
 
-export function useBanxContacts(returnPath: string) {
+export function useFavorContacts(returnPath: string) {
     const { data: user } = useCurrentUser();
     const { data: hasReadPermission, isPending: permissionPending } =
         useHasProfilesReadPermission({

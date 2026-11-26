@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { BANX_SERVICE } from "@/lib/constants";
-import { banxAuthorized } from "@/lib/graphql";
+import { FAVOR_SERVICE } from "@/lib/constants";
+import { favorAuthorized } from "@/lib/graphql";
 import { QueryKey } from "@/lib/query-keys";
 
 import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
@@ -28,7 +28,7 @@ export function useInvalidateLedger() {
             queryKey: QueryKey.claimOffers(user),
         });
         void qc.invalidateQueries({
-            queryKey: ["banx", "fxOffers"],
+            queryKey: ["favor", "fxOffers"],
         });
         void qc.invalidateQueries({
             queryKey: QueryKey.requests(user),
@@ -37,16 +37,16 @@ export function useInvalidateLedger() {
             queryKey: QueryKey.payAuths(user),
         });
         void qc.invalidateQueries({ queryKey: QueryKey.invites(user) });
-        void qc.invalidateQueries({ queryKey: ["banx", "cashQuotes"] });
-        void qc.invalidateQueries({ queryKey: ["banx", "banxRelays"] });
-        void qc.invalidateQueries({ queryKey: ["banx", "tokenRelays"] });
+        void qc.invalidateQueries({ queryKey: ["favor", "cashQuotes"] });
+        void qc.invalidateQueries({ queryKey: ["favor", "favorRelays"] });
+        void qc.invalidateQueries({ queryKey: ["favor", "tokenRelays"] });
         void qc.invalidateQueries({
             queryKey: QueryKey.cashVault(user),
         });
     }, [qc, user]);
 }
 
-function useInvalidateBanx() {
+function useInvalidateFavor() {
     const qc = useQueryClient();
     const { data: user } = useCurrentUser();
     const invalidateLedger = useInvalidateLedger();
@@ -56,14 +56,14 @@ function useInvalidateBanx() {
         void qc.invalidateQueries({
             queryKey: QueryKey.activityFeed(user),
         });
-        void qc.invalidateQueries({ queryKey: ["banx", "activityWith"] });
-        void qc.invalidateQueries({ queryKey: ["banx", "activity"] });
+        void qc.invalidateQueries({ queryKey: ["favor", "activityWith"] });
+        void qc.invalidateQueries({ queryKey: ["favor", "activity"] });
     };
 }
 
-async function banxCall(method: string, params: unknown[]) {
+async function favorCall(method: string, params: unknown[]) {
     await supervisor.functionCall({
-        service: BANX_SERVICE,
+        service: FAVOR_SERVICE,
         intf: "api",
         method,
         params,
@@ -71,7 +71,7 @@ async function banxCall(method: string, params: unknown[]) {
 }
 
 export function useSetCreditLine() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             debtor: string;
@@ -80,7 +80,7 @@ export function useSetCreditLine() {
             limit: string;
             depleteOnDebit: boolean;
         }) =>
-            banxCall("setCreditLine", [
+            favorCall("setCreditLine", [
                 p.debtor,
                 p.assetId,
                 p.limit,
@@ -95,10 +95,10 @@ export function useSetCreditLine() {
 }
 
 export function useRemoveCreditLine() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: { debtor: string; assetId: number }) =>
-            banxCall("removeCreditLine", [p.debtor, p.assetId]),
+            favorCall("removeCreditLine", [p.debtor, p.assetId]),
         onSuccess: () => {
             invalidate();
             toast.success("Credit line removed");
@@ -108,7 +108,7 @@ export function useRemoveCreditLine() {
 }
 
 export function useSetBookAuth() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             creditor: string;
@@ -116,7 +116,7 @@ export function useSetBookAuth() {
             remaining: string;
             expiresAtSeconds: number;
         }) =>
-            banxCall("setBookAuth", [
+            favorCall("setBookAuth", [
                 p.creditor,
                 p.assetId,
                 p.remaining,
@@ -131,10 +131,10 @@ export function useSetBookAuth() {
 }
 
 export function useRemoveBookAuth() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: { creditor: string; assetId: number }) =>
-            banxCall("removeBookAuth", [p.creditor, p.assetId]),
+            favorCall("removeBookAuth", [p.creditor, p.assetId]),
         onSuccess: () => {
             invalidate();
             toast.success("Book-auth removed");
@@ -144,7 +144,7 @@ export function useRemoveBookAuth() {
 }
 
 export function useBook() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             debtor: string;
@@ -152,7 +152,7 @@ export function useBook() {
             amount: string;
             memo: string;
         }) =>
-            banxCall("book", [
+            favorCall("book", [
                 p.debtor,
                 p.assetId,
                 p.amount,
@@ -167,7 +167,7 @@ export function useBook() {
 }
 
 export function useDeposit() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             depositor: string;
@@ -175,7 +175,7 @@ export function useDeposit() {
             amount: string;
             requestId?: number;
         }) =>
-            banxCall("deposit", [
+            favorCall("deposit", [
                 p.depositor,
                 p.assetId,
                 p.amount,
@@ -190,7 +190,7 @@ export function useDeposit() {
 }
 
 export function useCreateRequest() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             kind: number;
@@ -200,7 +200,7 @@ export function useCreateRequest() {
             memo: string;
             expiresAtSeconds: number;
         }) =>
-            banxCall("createRequest", [
+            favorCall("createRequest", [
                 p.kind,
                 p.counterparty,
                 p.assetId,
@@ -217,9 +217,9 @@ export function useCreateRequest() {
 }
 
 export function useCancelRequest() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
-        mutationFn: async (id: number) => banxCall("cancelRequest", [id]),
+        mutationFn: async (id: number) => favorCall("cancelRequest", [id]),
         onSuccess: () => {
             invalidate();
             toast.success("Request cancelled");
@@ -229,13 +229,13 @@ export function useCancelRequest() {
 }
 
 export function useForgive() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             debtor: string;
             assetId: number;
             amount: string;
-        }) => banxCall("forgive", [p.debtor, p.assetId, p.amount]),
+        }) => favorCall("forgive", [p.debtor, p.assetId, p.amount]),
         onSuccess: () => {
             invalidate();
             toast.success("Claim written off");
@@ -245,7 +245,7 @@ export function useForgive() {
 }
 
 export function usePathPay() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             route: string;
@@ -254,7 +254,7 @@ export function usePathPay() {
             minReturn: string;
             requestId?: number;
         }) =>
-            banxCall("pathPay", [
+            favorCall("pathPay", [
                 p.route,
                 p.amount,
                 p.minReturn,
@@ -269,7 +269,7 @@ export function usePathPay() {
 }
 
 export function useSetPayAuth() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             payee: string;
@@ -280,7 +280,7 @@ export function useSetPayAuth() {
             nextDueSeconds: number;
             endsAtSeconds: number;
         }) =>
-            banxCall("setPayAuth", [
+            favorCall("setPayAuth", [
                 p.payee,
                 p.assetId,
                 p.amount,
@@ -298,10 +298,10 @@ export function useSetPayAuth() {
 }
 
 export function useRunPayAuth() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: { id: number; route: string }) =>
-            banxCall("runPayAuth", [p.id, p.route]),
+            favorCall("runPayAuth", [p.id, p.route]),
         onSuccess: () => {
             invalidate();
             toast.success("Repeating payment collected");
@@ -311,10 +311,10 @@ export function useRunPayAuth() {
 }
 
 export function useCancelPayAuth() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: { id: number; forceCancel: boolean }) =>
-            banxCall("cancelPayAuth", [p.id, p.forceCancel]),
+            favorCall("cancelPayAuth", [p.id, p.forceCancel]),
         onSuccess: () => {
             invalidate();
             toast.success("Repeating payment deleted");
@@ -324,7 +324,7 @@ export function useCancelPayAuth() {
 }
 
 export function usePayInvoice() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             route: string;
@@ -332,7 +332,7 @@ export function usePayInvoice() {
             maxSpend: string;
             requestId: number;
         }) =>
-            banxCall("payInv", [p.route, p.maxSpend, p.requestId]),
+            favorCall("payInv", [p.route, p.maxSpend, p.requestId]),
         onSuccess: () => {
             invalidate();
             toast.success("Invoice paid");
@@ -369,7 +369,7 @@ export function useCurveQuote(
         feePpm < 1_000_000;
     return useQuery({
         queryKey: [
-            "banx",
+            "favor",
             "curveQuote",
             exactOut ? "in" : "out",
             reserveIn.toString(),
@@ -381,7 +381,7 @@ export function useCurveQuote(
         staleTime: Infinity,
         queryFn: async (): Promise<bigint | null> => {
             const res = await supervisor.functionCall({
-                service: BANX_SERVICE,
+                service: FAVOR_SERVICE,
                 intf: "helpers",
                 method: exactOut ? "quoteCurveIn" : "quoteCurveOut",
                 params: [
@@ -428,7 +428,7 @@ export function useQuotePath() {
                     hopCount: number;
                 };
             }>(
-                banxAuthorized.authorized.graphql,
+                favorAuthorized.authorized.graphql,
                 `{ quotePath(from: ${JSON.stringify(p.fromAccount)}, to: ${JSON.stringify(p.toAccount)}, amount: ${JSON.stringify(p.amount)}, fromAsset: ${p.fromAsset}, toAsset: ${p.toAsset}, maxHops: ${p.maxHops}, exactOut: ${exactOut}) {
                     route amountIn amountOut minReturn expiresAt hopCount
                 } }`,
@@ -447,7 +447,7 @@ export function useQuotePath() {
 }
 
 export function useSetForwardOffer() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             nextHop: string;
@@ -457,7 +457,7 @@ export function useSetForwardOffer() {
             expiresAtSeconds: number;
             allowUnknown: boolean;
         }) => {
-            await banxCall("setForwardOffer", [
+            await favorCall("setForwardOffer", [
                 p.nextHop,
                 p.assetId,
                 p.feeFixed,
@@ -475,7 +475,7 @@ export function useSetForwardOffer() {
 }
 
 export function useSetGlobalForwardOffer() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             assetId: number;
@@ -484,7 +484,7 @@ export function useSetGlobalForwardOffer() {
             expiresAtSeconds: number;
             allowUnknown: boolean;
         }) => {
-            await banxCall("setGlobalForwardOffer", [
+            await favorCall("setGlobalForwardOffer", [
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
@@ -501,10 +501,10 @@ export function useSetGlobalForwardOffer() {
 }
 
 export function useRemoveForwardOffer() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: { nextHop: string; assetId: number }) =>
-            banxCall("removeForwardOffer", [p.nextHop, p.assetId]),
+            favorCall("removeForwardOffer", [p.nextHop, p.assetId]),
         onSuccess: () => {
             invalidate();
             toast.success("Path-forward offer removed");
@@ -514,10 +514,10 @@ export function useRemoveForwardOffer() {
 }
 
 export function useRemoveGlobalForwardOffer() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: { assetId: number }) =>
-            banxCall("removeGlobalForwardOffer", [p.assetId]),
+            favorCall("removeGlobalForwardOffer", [p.assetId]),
         onSuccess: () => {
             invalidate();
             toast.success("Global path-forward offer removed");
@@ -527,7 +527,7 @@ export function useRemoveGlobalForwardOffer() {
 }
 
 export function useSetBuyClaimOffer() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             debtor: string;
@@ -537,7 +537,7 @@ export function useSetBuyClaimOffer() {
             remaining: string;
             expiresAtSeconds: number;
         }) =>
-            banxCall("setBuyClaimOffer", [
+            favorCall("setBuyClaimOffer", [
                 p.debtor,
                 p.assetId,
                 p.feeFixed,
@@ -554,7 +554,7 @@ export function useSetBuyClaimOffer() {
 }
 
 export function useSetGlobalBuyClaimOffer() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             assetId: number;
@@ -563,7 +563,7 @@ export function useSetGlobalBuyClaimOffer() {
             remaining: string;
             expiresAtSeconds: number;
         }) =>
-            banxCall("setGlobalBuyClaimOffer", [
+            favorCall("setGlobalBuyClaimOffer", [
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
@@ -579,10 +579,10 @@ export function useSetGlobalBuyClaimOffer() {
 }
 
 export function useRemoveBuyClaimOffer() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: { debtor: string; assetId: number }) =>
-            banxCall("removeBuyClaimOffer", [p.debtor, p.assetId]),
+            favorCall("removeBuyClaimOffer", [p.debtor, p.assetId]),
         onSuccess: () => {
             invalidate();
             toast.success("Buy-claim offer removed");
@@ -592,10 +592,10 @@ export function useRemoveBuyClaimOffer() {
 }
 
 export function useRemoveGlobalBuyClaimOffer() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: { assetId: number }) =>
-            banxCall("removeGlobalBuyClaimOffer", [p.assetId]),
+            favorCall("removeGlobalBuyClaimOffer", [p.assetId]),
         onSuccess: () => {
             invalidate();
             toast.success("Global buy-claim offer removed");
@@ -605,7 +605,7 @@ export function useRemoveGlobalBuyClaimOffer() {
 }
 
 export function useSetSellClaimOffer() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             debtor: string;
@@ -615,7 +615,7 @@ export function useSetSellClaimOffer() {
             remaining: string;
             expiresAtSeconds: number;
         }) =>
-            banxCall("setSellClaimOffer", [
+            favorCall("setSellClaimOffer", [
                 p.debtor,
                 p.assetId,
                 p.feeFixed,
@@ -632,7 +632,7 @@ export function useSetSellClaimOffer() {
 }
 
 export function useSetGlobalSellClaimOffer() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             assetId: number;
@@ -641,7 +641,7 @@ export function useSetGlobalSellClaimOffer() {
             remaining: string;
             expiresAtSeconds: number;
         }) =>
-            banxCall("setGlobalSellClaimOffer", [
+            favorCall("setGlobalSellClaimOffer", [
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
@@ -657,10 +657,10 @@ export function useSetGlobalSellClaimOffer() {
 }
 
 export function useRemoveSellClaimOffer() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: { debtor: string; assetId: number }) =>
-            banxCall("removeSellClaimOffer", [p.debtor, p.assetId]),
+            favorCall("removeSellClaimOffer", [p.debtor, p.assetId]),
         onSuccess: () => {
             invalidate();
             toast.success("Sell-claim offer removed");
@@ -670,10 +670,10 @@ export function useRemoveSellClaimOffer() {
 }
 
 export function useRemoveGlobalSellClaimOffer() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: { assetId: number }) =>
-            banxCall("removeGlobalSellClaimOffer", [p.assetId]),
+            favorCall("removeGlobalSellClaimOffer", [p.assetId]),
         onSuccess: () => {
             invalidate();
             toast.success("Global sell-claim offer removed");
@@ -683,7 +683,7 @@ export function useRemoveGlobalSellClaimOffer() {
 }
 
 export function useSellClaim() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             buyer: string;
@@ -692,7 +692,7 @@ export function useSellClaim() {
             amount: string;
             minProceeds: string;
         }) =>
-            banxCall("sellClaim", [
+            favorCall("sellClaim", [
                 p.buyer,
                 p.debtor,
                 p.assetId,
@@ -708,7 +708,7 @@ export function useSellClaim() {
 }
 
 export function useBuyClaim() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             seller: string;
@@ -717,7 +717,7 @@ export function useBuyClaim() {
             amount: string;
             maxCost: string;
         }) =>
-            banxCall("buyClaim", [
+            favorCall("buyClaim", [
                 p.seller,
                 p.debtor,
                 p.assetId,
@@ -733,7 +733,7 @@ export function useBuyClaim() {
 }
 
 export function useSetFxOffer() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             fromAsset: number;
@@ -747,7 +747,7 @@ export function useSetFxOffer() {
             remaining: string;
             expiresAtSeconds: number;
         }) =>
-            banxCall("setFxOffer", [
+            favorCall("setFxOffer", [
                 p.fromAsset,
                 p.toAsset,
                 p.posterIsCreditor,
@@ -765,7 +765,7 @@ export function useSetFxOffer() {
 }
 
 export function useSetExchangeQuotes() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             assetA: number;
@@ -778,7 +778,7 @@ export function useSetExchangeQuotes() {
             remainingB: string;
             expiresAtSeconds: number;
         }) =>
-            banxCall("setExchangeQuotes", [
+            favorCall("setExchangeQuotes", [
                 p.assetA,
                 p.assetB,
                 p.marketRate,
@@ -796,14 +796,14 @@ export function useSetExchangeQuotes() {
 }
 
 export function useRemoveFxOffer() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             fromAsset: number;
             toAsset: number;
             posterIsCreditor: boolean;
         }) =>
-            banxCall("removeFxOffer", [
+            favorCall("removeFxOffer", [
                 p.fromAsset,
                 p.toAsset,
                 p.posterIsCreditor,
@@ -817,7 +817,7 @@ export function useRemoveFxOffer() {
 }
 
 export function useSetCashQuote() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             assetId: number;
@@ -828,7 +828,7 @@ export function useSetCashQuote() {
             remaining: string;
             expiresAtSeconds: number;
         }) =>
-            banxCall("setCashQuote", [
+            favorCall("setCashQuote", [
                 p.assetId,
                 p.tokenId,
                 p.isOut,
@@ -846,13 +846,13 @@ export function useSetCashQuote() {
 }
 
 export function useRemoveCashQuote() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             assetId: number;
             tokenId: number;
             isOut: boolean;
-        }) => banxCall("removeCashQuote", [p.assetId, p.tokenId, p.isOut]),
+        }) => favorCall("removeCashQuote", [p.assetId, p.tokenId, p.isOut]),
         onSuccess: () => {
             invalidate();
             toast.success("Rate removed");
@@ -870,7 +870,7 @@ async function tokensCredit(
         service: "tokens",
         intf: "user",
         method: "credit",
-        params: [tokenId, BANX_SERVICE, amount, memo],
+        params: [tokenId, FAVOR_SERVICE, amount, memo],
     });
 }
 
@@ -883,23 +883,23 @@ async function tokensUncredit(
         service: "tokens",
         intf: "user",
         method: "uncredit",
-        params: [tokenId, BANX_SERVICE, amount, memo],
+        params: [tokenId, FAVOR_SERVICE, amount, memo],
     });
 }
 
 export function useCashFund() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: { tokenId: number; amount: string }) => {
             await tokensCredit(p.tokenId, p.amount);
             try {
-                await banxCall("cashFund", [p.tokenId, p.amount]);
+                await favorCall("cashFund", [p.tokenId, p.amount]);
             } catch (e) {
                 try {
                     await tokensUncredit(p.tokenId, p.amount);
                 } catch {
                     throw new Error(
-                        `The vault move did not finish. Tokens are still credited to ${BANX_SERVICE} and the rollback failed.`,
+                        `The vault move did not finish. Tokens are still credited to ${FAVOR_SERVICE} and the rollback failed.`,
                     );
                 }
                 throw e;
@@ -914,10 +914,10 @@ export function useCashFund() {
 }
 
 export function useCashWithdraw() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: { tokenId: number; amount: string }) =>
-            banxCall("cashWithdraw", [p.tokenId, p.amount]),
+            favorCall("cashWithdraw", [p.tokenId, p.amount]),
         onSuccess: () => {
             invalidate();
             toast.success("Tokens withdrawn");
@@ -927,20 +927,20 @@ export function useCashWithdraw() {
 }
 
 export function useCashOut() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             cashier: string;
             assetId: number;
             tokenId: number;
-            amountBanx: string;
+            amountFavor: string;
             minTokens: string;
         }) =>
-            banxCall("cashOut", [
+            favorCall("cashOut", [
                 p.cashier,
                 p.assetId,
                 p.tokenId,
-                p.amountBanx,
+                p.amountFavor,
                 p.minTokens,
             ]),
         onSuccess: () => {
@@ -952,21 +952,21 @@ export function useCashOut() {
 }
 
 export function useCashIn() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             cashier: string;
             assetId: number;
             tokenId: number;
             amountTokens: string;
-            minBanx: string;
+            minFavor: string;
         }) =>
-            banxCall("cashIn", [
+            favorCall("cashIn", [
                 p.cashier,
                 p.assetId,
                 p.tokenId,
                 p.amountTokens,
-                p.minBanx,
+                p.minFavor,
             ]),
         onSuccess: () => {
             invalidate();
@@ -977,7 +977,7 @@ export function useCashIn() {
 }
 
 export function useCreateInvite() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             assetId: number;
@@ -985,7 +985,7 @@ export function useCreateInvite() {
             depleteOnDebit: boolean;
         }): Promise<{ inviteId: number; inviteToken: string }> => {
             const res = (await supervisor.functionCall({
-                service: BANX_SERVICE,
+                service: FAVOR_SERVICE,
                 intf: "api",
                 method: "createInvite",
                 params: [
@@ -1012,13 +1012,13 @@ export function useCreateInvite() {
 }
 
 export function useAddAsset() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             symbol: string;
             precision: number;
             description: string;
-        }) => banxCall("addAsset", [p.symbol, p.precision, p.description]),
+        }) => favorCall("addAsset", [p.symbol, p.precision, p.description]),
         onSuccess: () => {
             invalidate();
             toast.success("Asset registered");
@@ -1028,10 +1028,10 @@ export function useAddAsset() {
 }
 
 export function useDeleteInvite() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: { inviteId: number }) =>
-            banxCall("deleteInvite", [p.inviteId]),
+            favorCall("deleteInvite", [p.inviteId]),
         onSuccess: () => {
             invalidate();
             toast.success("Invite revoked");
@@ -1041,7 +1041,7 @@ export function useDeleteInvite() {
 }
 
 export function useConvert() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             counterparty: string;
@@ -1050,7 +1050,7 @@ export function useConvert() {
             amountFrom: string;
             minTo: string;
         }) =>
-            banxCall("convert", [
+            favorCall("convert", [
                 p.counterparty,
                 p.fromAsset,
                 p.toAsset,
@@ -1066,7 +1066,7 @@ export function useConvert() {
 }
 
 export function useTakeFx() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             poster: string;
@@ -1077,7 +1077,7 @@ export function useTakeFx() {
             /** Signed human to-asset. Positive floors a receipt. Negative caps a debt. */
             toBound: string;
         }) =>
-            banxCall("takeFx", [
+            favorCall("takeFx", [
                 p.poster,
                 p.fromAsset,
                 p.toAsset,
@@ -1094,7 +1094,7 @@ export function useTakeFx() {
 }
 
 export function useSetRelay() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             assetA: number;
@@ -1102,7 +1102,7 @@ export function useSetRelay() {
             reserveA: string;
             reserveB: string;
         }) =>
-            banxCall("setRelay", [
+            favorCall("setRelay", [
                 p.assetA,
                 p.assetB,
                 p.reserveA,
@@ -1117,10 +1117,10 @@ export function useSetRelay() {
 }
 
 export function useRemoveRelay() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: { assetA: number; assetB: number }) =>
-            banxCall("removeRelay", [p.assetA, p.assetB]),
+            favorCall("removeRelay", [p.assetA, p.assetB]),
         onSuccess: () => {
             invalidate();
             toast.success("Pool removed");
@@ -1130,21 +1130,21 @@ export function useRemoveRelay() {
 }
 
 export function useSetTokenRelay() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             assetId: number;
             tokenId: number;
-            reserveBanx: string;
+            reserveFavor: string;
             reserveTokens: string;
         }) => {
             // The service debits this credit into `{sender}/{asset}/{token}`.
             await tokensCredit(p.tokenId, p.reserveTokens, "relay");
             try {
-                await banxCall("setTokenRelay", [
+                await favorCall("setTokenRelay", [
                     p.assetId,
                     p.tokenId,
-                    p.reserveBanx,
+                    p.reserveFavor,
                     p.reserveTokens,
                 ]);
             } catch (e) {
@@ -1152,7 +1152,7 @@ export function useSetTokenRelay() {
                     await tokensUncredit(p.tokenId, p.reserveTokens, "relay");
                 } catch {
                     throw new Error(
-                        `The pool was not posted. Tokens are still credited to ${BANX_SERVICE} and the rollback failed.`,
+                        `The pool was not posted. Tokens are still credited to ${FAVOR_SERVICE} and the rollback failed.`,
                     );
                 }
                 throw e;
@@ -1167,10 +1167,10 @@ export function useSetTokenRelay() {
 }
 
 export function useRemoveTokenRelay() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: { assetId: number; tokenId: number }) =>
-            banxCall("removeTokenRelay", [p.assetId, p.tokenId]),
+            favorCall("removeTokenRelay", [p.assetId, p.tokenId]),
         onSuccess: () => {
             invalidate();
             toast.success("Token pool removed");
@@ -1180,7 +1180,7 @@ export function useRemoveTokenRelay() {
 }
 
 export function usePathCash() {
-    const invalidate = useInvalidateBanx();
+    const invalidate = useInvalidateFavor();
     return useMutation({
         mutationFn: async (p: {
             route: string;
@@ -1191,7 +1191,7 @@ export function usePathCash() {
             minTokens: string;
             maxOwed: string;
         }) =>
-            banxCall("pathCash", [
+            favorCall("pathCash", [
                 p.route,
                 p.amount,
                 p.tokenId,

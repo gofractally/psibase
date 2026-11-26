@@ -7,13 +7,13 @@ import {
     amountUnit,
 } from "@/components/form-fields";
 import { PathForwardTrail } from "@/components/path-forward-trail";
-import { useForwardOffers } from "@/hooks/use-banx-data";
+import { useForwardOffers } from "@/hooks/use-favor-data";
 import {
     useRemoveForwardOffer,
     useRemoveGlobalForwardOffer,
     useSetForwardOffer,
     useSetGlobalForwardOffer,
-} from "@/hooks/use-banx-mutations";
+} from "@/hooks/use-favor-mutations";
 import { amountPlaceholder, displayAmount } from "@/lib/amount";
 import {
     MAX_HOP_FEE_PERCENT,

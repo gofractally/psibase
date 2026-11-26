@@ -7,13 +7,13 @@ import {
     useCashQuotes,
     useCashVault,
     useTokenPrecisionMap,
-} from "@/hooks/use-banx-data";
+} from "@/hooks/use-favor-data";
 import {
     useCashFund,
     useCashIn,
     useCashOut,
     useCashWithdraw,
-} from "@/hooks/use-banx-mutations";
+} from "@/hooks/use-favor-mutations";
 import {
     applyQuotedRate,
     displayAmount,
@@ -80,11 +80,11 @@ function tradeLine(
     if (assetPrecision === undefined || tokenPrecision === undefined) {
         return "Loading rate";
     }
-    const banx = symbolOf(q.assetId);
+    const favor = symbolOf(q.assetId);
     const token = tokenName(q.tokenId);
     return q.isOut
-        ? `1 ${banx} → ${formatFxToRate(q.fxRate, assetPrecision, tokenPrecision)} ${token}`
-        : `1 ${token} → ${formatFxToRate(q.fxRate, tokenPrecision, assetPrecision)} ${banx}`;
+        ? `1 ${favor} → ${formatFxToRate(q.fxRate, assetPrecision, tokenPrecision)} ${token}`
+        : `1 ${token} → ${formatFxToRate(q.fxRate, tokenPrecision, assetPrecision)} ${favor}`;
 }
 
 export function CashPage() {
@@ -210,7 +210,7 @@ export function CashPage() {
                             cashier: ctx.cashier,
                             assetId: value.assetId!,
                             tokenId,
-                            amountBanx: value.amount.trim(),
+                            amountFavor: value.amount.trim(),
                             minTokens: minOut,
                         },
                         opts,
@@ -222,7 +222,7 @@ export function CashPage() {
                             assetId: value.assetId!,
                             tokenId,
                             amountTokens: value.amount.trim(),
-                            minBanx: minOut,
+                            minFavor: minOut,
                         },
                         opts,
                     );

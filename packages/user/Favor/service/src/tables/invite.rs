@@ -6,26 +6,26 @@ use psibase::{
 
 use crate::tables::{
     emit_pair_activity,
-    tables::{Asset, BanxInvite, BanxInviteTable, Pair},
+    tables::{Asset, FavorInvite, FavorInviteTable, Pair},
 };
 
-impl BanxInvite {
+impl FavorInvite {
     fn save(&self) {
-        BanxInviteTable::read_write()
+        FavorInviteTable::read_write()
             .put(self)
             .expect("failed to save invite");
     }
 
     pub fn get(id: u32) -> Option<Self> {
-        BanxInviteTable::read().get_index_pk().get(&id)
+        FavorInviteTable::read().get_index_pk().get(&id)
     }
 
     pub fn get_assert(id: u32) -> Self {
-        Self::get(id).unwrap_or_else(|| panic!("banx invite {id} does not exist"))
+        Self::get(id).unwrap_or_else(|| panic!("favor invite {id} does not exist"))
     }
 
     pub fn list_by_inviter(inviter: AccountNumber) -> Vec<Self> {
-        BanxInviteTable::read()
+        FavorInviteTable::read()
             .get_index_by_inviter()
             .range((inviter, 0)..=(inviter, u32::MAX))
             .collect()
@@ -45,11 +45,11 @@ impl BanxInvite {
     ) {
         assert!(
             Self::get(invite_id).is_none(),
-            "banx invite {invite_id} already exists"
+            "favor invite {invite_id} already exists"
         );
         assert!(
             num_accounts == 1,
-            "banx invites are single-use (num_accounts must be 1)"
+            "favor invites are single-use (num_accounts must be 1)"
         );
         assert!(
             amount.value > 0,
@@ -149,7 +149,7 @@ impl BanxInvite {
             (self.inviter, "Invite refund".into()),
             refund,
         );
-        BanxInviteTable::read_write().erase(&self.id);
+        FavorInviteTable::read_write().erase(&self.id);
     }
 
     fn debit_then_credit(from: (AccountNumber, Memo), to: (AccountNumber, Memo), amount: Quantity) {

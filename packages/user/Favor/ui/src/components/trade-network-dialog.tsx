@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 
-import { useCreditLines } from "@/hooks/use-banx-data";
-import { useBanxContacts } from "@/hooks/use-banx-contacts";
+import { useCreditLines } from "@/hooks/use-favor-data";
+import { useFavorContacts } from "@/hooks/use-favor-contacts";
 import { accountHref } from "@/lib/account-groups";
 import type { CreditLine } from "@/lib/graphql";
 
@@ -14,7 +14,7 @@ import {
 } from "@shared/shadcn/ui/dialog";
 
 export type TradeLeg =
-    | { kind: "banx"; assetId: number; symbol: string }
+    | { kind: "favor"; assetId: number; symbol: string }
     | { kind: "token"; tokenId: number; symbol: string };
 
 export type TradePair = { left: TradeLeg; right: TradeLeg };
@@ -141,34 +141,34 @@ export function TradeNetworkDialog({
     pair: TradePair | null;
     onOpenChange: (open: boolean) => void;
 }) {
-    const { user, label } = useBanxContacts("/trade");
+    const { user, label } = useFavorContacts("/trade");
     const { data: lines = [], isLoading, isError } = useCreditLines();
     const left = pair?.left;
     const right = pair?.right;
     const token =
         left?.kind === "token" ? left : right?.kind === "token" ? right : null;
     const iou =
-        left?.kind === "banx" ? left : right?.kind === "banx" ? right : null;
-    const twoIou = left?.kind === "banx" && right?.kind === "banx";
+        left?.kind === "favor" ? left : right?.kind === "favor" ? right : null;
+    const twoIou = left?.kind === "favor" && right?.kind === "favor";
     const people =
         user && left && right
             ? peopleOn(
                   lines,
                   user,
                   label,
-                  left.kind === "banx" ? left.assetId : null,
-                  right.kind === "banx" ? right.assetId : null,
+                  left.kind === "favor" ? left.assetId : null,
+                  right.kind === "favor" ? right.assetId : null,
               )
             : [];
     const onBoth = twoIou
         ? people.filter((person) => person.left && person.right)
         : [];
     const leftOnly =
-        twoIou && left.kind === "banx"
+        twoIou && left.kind === "favor"
             ? people.filter((person) => person.left && !person.right)
             : [];
     const rightOnly =
-        twoIou && right.kind === "banx"
+        twoIou && right.kind === "favor"
             ? people.filter((person) => person.right && !person.left)
             : [];
     const leftCovered = onBoth.length + leftOnly.length > 0;

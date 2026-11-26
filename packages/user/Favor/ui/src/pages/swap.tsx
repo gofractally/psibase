@@ -13,7 +13,7 @@ import {
     usePathPay,
     useQuotePath,
     type PathQuote,
-} from "@/hooks/use-banx-mutations";
+} from "@/hooks/use-favor-mutations";
 import { amountPlaceholder, formatRawAmount } from "@/lib/amount";
 import { assetIdBySymbol } from "@/lib/transfer-url";
 import { amountFieldValidator } from "@/lib/form";
@@ -117,11 +117,11 @@ export function SwapPage() {
     const pathPay = usePathPay();
     const [searchParams, setSearchParams] = useSearchParams();
     const [payAsset, setPayAsset] = useLocalStorage<number | null>(
-        "banx.swap.fromAsset",
+        "favor.swap.fromAsset",
         null,
     );
     const [receiveAsset, setReceiveAsset] = useLocalStorage<number | null>(
-        "banx.swap.toAsset",
+        "favor.swap.toAsset",
         null,
     );
     const fromParam = searchParams.get("from");

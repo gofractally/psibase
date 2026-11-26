@@ -1,4 +1,4 @@
-import { useAddAsset } from "@/hooks/use-banx-mutations";
+import { useAddAsset } from "@/hooks/use-favor-mutations";
 import { symbolValidators, useAppForm } from "@/lib/form";
 
 import { Button } from "@shared/shadcn/ui/button";
@@ -60,7 +60,7 @@ export function AddAssetForm({
             <DialogHeader className="pr-8">
                 <DialogTitle>New asset</DialogTitle>
                 <DialogDescription>
-                    Register a currency on Banx. Symbol is a chain name (1–10
+                    Register a currency on Favor. Symbol is a chain name (1–10
                     characters). Precision is fixed at 0–8 decimal places.
                 </DialogDescription>
             </DialogHeader>

@@ -5,7 +5,7 @@ import { AddAssetForm } from "@/components/add-asset-dialog";
 import { defaultAssetId } from "@/components/asset-select";
 
 import { useAccountGroups } from "@/hooks/use-account-groups";
-import { useActivityFeed } from "@/hooks/use-banx-data";
+import { useActivityFeed } from "@/hooks/use-favor-data";
 import { currencyGlyph, formatRawAmount } from "@/lib/amount";
 import {
     currencyMatches,

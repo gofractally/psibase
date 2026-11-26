@@ -7,11 +7,11 @@ pub mod path_find;
 pub mod route;
 pub mod tables;
 
-#[psibase::service(name = "banx-app", tables = "tables::tables")]
+#[psibase::service(name = "favor-app", tables = "tables::tables")]
 pub mod service {
     use crate::tables::{
-        assert_account_exists, emit_pair_activity, path_required_send, run_path, Asset, BanxInvite,
-        BanxRelay, BookAuth, CashQuote, ClaimOffer, Connection, ForwardOffer, FxOffer, InitRow,
+        assert_account_exists, emit_pair_activity, path_required_send, run_path, Asset, FavorInvite,
+        FavorRelay, BookAuth, CashQuote, ClaimOffer, Connection, ForwardOffer, FxOffer, InitRow,
         InitTable, Pair, PayAuth, PayRequest, RouteKey, RouteKeyTable, TokenRelay,
     };
     use psibase::{
@@ -87,7 +87,7 @@ pub mod service {
         );
     }
 
-    /// Create a Banx invite. Caller is the inviter; `invite_id` / `invite_payload`
+    /// Create a Favor invite. Caller is the inviter; `invite_id` / `invite_payload`
     /// come from `invite:plugin` `prepare-new-invite`. `num_accounts` must be 1.
     /// The first [`onInvAccept`] extends a credit line to that claimee (no-op if
     /// a line already exists) and records `claimed_by`.
@@ -100,7 +100,7 @@ pub mod service {
         amount: Quantity,
         deplete_on_debit: bool,
     ) {
-        BanxInvite::add(
+        FavorInvite::add(
             invite_id,
             invite_payload,
             num_accounts,
@@ -110,14 +110,14 @@ pub mod service {
         );
     }
 
-    /// Delete a Banx invite. Inviter only. Refunds unused invite resources.
+    /// Delete a Favor invite. Inviter only. Refunds unused invite resources.
     #[action]
     fn rm_invite(invite_id: u32) {
-        BanxInvite::get_assert(invite_id).delete();
+        FavorInvite::get_assert(invite_id).delete();
     }
 
     /// Invite hook: apply the stored credit line to `accepter` if none exists
-    /// and record `claimed_by`. Missing or already-claimed Banx rows are ignored.
+    /// and record `claimed_by`. Missing or already-claimed Favor rows are ignored.
     #[action]
     #[allow(non_snake_case)]
     fn onInvAccept(invite_id: u32, accepter: AccountNumber) {
@@ -126,7 +126,7 @@ pub mod service {
             psibase::services::invite::Wrapper::SERVICE,
             "sender must be invite"
         );
-        if let Some(invite) = BanxInvite::get(invite_id) {
+        if let Some(invite) = FavorInvite::get(invite_id) {
             invite.accept(accepter);
         }
     }
@@ -516,7 +516,7 @@ pub mod service {
         FxOffer::get_assert(get_sender(), from_asset, to_asset, poster_is_creditor).remove();
     }
 
-    /// Post a constant-product relay between two Banx assets.
+    /// Post a constant-product relay between two Favor assets.
     ///
     /// Both reserves are virtual weights, not a debt. One row prices both
     /// directions. Posting again replaces them. A path that changes asset
@@ -524,19 +524,19 @@ pub mod service {
     /// The curve has no fee. A path that continues pays the forward fee.
     #[action]
     fn st_relay(asset_a: u16, reserve_a: Quantity, asset_b: u16, reserve_b: Quantity) {
-        BanxRelay::upsert(get_sender(), asset_a, reserve_a, asset_b, reserve_b);
+        FavorRelay::upsert(get_sender(), asset_a, reserve_a, asset_b, reserve_b);
     }
 
     /// Delete the sender's relay for this pair. Claims already drawn stay.
     #[action]
     fn rm_relay(asset_a: u16, asset_b: u16) {
-        BanxRelay::get(get_sender(), asset_a, asset_b)
+        FavorRelay::get(get_sender(), asset_a, asset_b)
             .expect("relay not found")
             .remove();
     }
 
-    /// Post a Banx↔token relay. `reserve_banx` is the virtual Banx weight.
-    /// `reserve_tokens` is pulled from shared(sender, Banx) into
+    /// Post a Favor↔token relay. `reserve_favor` is the virtual Favor weight.
+    /// `reserve_tokens` is pulled from shared(sender, Favor) into
     /// `{sender}/{asset_id}/{token_id}`. The same pair cannot be posted twice.
     /// The curve has no fee. A direct swap pays the owner's global forward
     /// on `asset_id`. A path that only delivers tokens does not.
@@ -544,14 +544,14 @@ pub mod service {
     fn st_tok_relay(
         asset_id: u16,
         token_id: u32,
-        reserve_banx: Quantity,
+        reserve_favor: Quantity,
         reserve_tokens: Quantity,
     ) {
         TokenRelay::upsert(
             get_sender(),
             asset_id,
             token_id,
-            reserve_banx,
+            reserve_favor,
             reserve_tokens,
         );
     }
@@ -562,9 +562,9 @@ pub mod service {
         TokenRelay::get_assert(get_sender(), asset_id, token_id).remove();
     }
 
-    /// Draw `amount_banx` on `owner` and receive tokens from their relay.
+    /// Draw `amount_favor` on `owner` and receive tokens from their relay.
     /// The curve prices that amount. A live global forward on `asset_id`
-    /// grosses it into the Banx the sender owes. `max_owed` is the most
+    /// grosses it into the Favor the sender owes. `max_owed` is the most
     /// this call may book, before netting. Unwinding a claim counts.
     /// A replaced forward above `max_owed` fails. Zero is a cap of zero.
     #[action]
@@ -572,7 +572,7 @@ pub mod service {
         owner: AccountNumber,
         asset_id: u16,
         token_id: u32,
-        amount_banx: Quantity,
+        amount_favor: Quantity,
         min_tokens: Quantity,
         max_owed: Quantity,
     ) {
@@ -581,7 +581,7 @@ pub mod service {
             get_sender(),
             asset_id,
             token_id,
-            amount_banx,
+            amount_favor,
             min_tokens,
             max_owed,
         );
@@ -589,14 +589,14 @@ pub mod service {
 
     /// Send tokens from the sender's vault into `owner`'s relay.
     /// The curve prices the full amount. A live global forward on `asset_id`
-    /// is taken off the Banx `owner` owes. Fund the vault first.
+    /// is taken off the Favor `owner` owes. Fund the vault first.
     #[action]
     fn tok_relay_in(
         owner: AccountNumber,
         asset_id: u16,
         token_id: u32,
         amount_tokens: Quantity,
-        min_banx: Quantity,
+        min_favor: Quantity,
     ) {
         TokenRelay::cash_in(
             owner,
@@ -604,15 +604,15 @@ pub mod service {
             asset_id,
             token_id,
             amount_tokens,
-            min_banx,
+            min_favor,
         );
     }
 
-    /// Post a cash quote: Banx `asset_id` ↔ Tokens `token_id`.
+    /// Post a cash quote: Favor `asset_id` ↔ Tokens `token_id`.
     ///
-    /// `is_out` true: taker draws Banx, receives tokens. False: taker sends
-    /// tokens, books a Banx deposit onto the poster.
-    /// `fee_fixed` is in Banx units for out, token units for in.
+    /// `is_out` true: taker draws Favor, receives tokens. False: taker sends
+    /// tokens, books a Favor deposit onto the poster.
+    /// `fee_fixed` is in Favor units for out, token units for in.
     /// `fx_rate`: `to = (from − fee) * fx_rate / RATE_SCALE`.
     #[action]
     fn st_csh_qte(
@@ -642,8 +642,8 @@ pub mod service {
         CashQuote::get_assert(get_sender(), asset_id, token_id, is_out).remove();
     }
 
-    /// Move tokens from shared(sender, Banx) into Banx's Tokens sub-account
-    /// `{sender}/{token_id}`. Sender must `tokens.credit` Banx first.
+    /// Move tokens from shared(sender, Favor) into Favor's Tokens sub-account
+    /// `{sender}/{token_id}`. Sender must `tokens.credit` Favor first.
     #[action]
     fn csh_fund(token_id: u32, amount: Quantity) {
         assert!(amount.value > 0, "csh_fund amount must be positive");
@@ -652,7 +652,7 @@ pub mod service {
         CashQuote::take_tokens(poster, token_id, amount, "csh_fund");
     }
 
-    /// Return tokens from Banx's `{sender}/{token_id}` sub-account.
+    /// Return tokens from Favor's `{sender}/{token_id}` sub-account.
     #[action]
     fn csh_wd(token_id: u32, amount: Quantity) {
         assert!(amount.value > 0, "csh_wd amount must be positive");
@@ -660,24 +660,24 @@ pub mod service {
         CashQuote::pay_tokens(poster, poster, token_id, amount, "csh_wd");
     }
 
-    /// Draw `amount_banx` on `cashier`'s line; receive tokens from their vault.
+    /// Draw `amount_favor` on `cashier`'s line; receive tokens from their vault.
     #[action]
     fn cash_out(
         cashier: AccountNumber,
         asset_id: u16,
         token_id: u32,
-        amount_banx: Quantity,
+        amount_favor: Quantity,
         min_tokens: Quantity,
     ) {
         CashQuote::get_live(cashier, asset_id, token_id, true).cash_out(
             get_sender(),
-            amount_banx,
+            amount_favor,
             min_tokens,
         );
     }
 
     /// Send tokens from the sender's `{sender}/{token_id}` vault at
-    /// `cashier`'s in quote; book Banx deposit onto the cashier. Tokens
+    /// `cashier`'s in quote; book Favor deposit onto the cashier. Tokens
     /// move into the cashier's vault. Sender fills their vault with `csh_fund`.
     #[action]
     fn cash_in(
@@ -685,12 +685,12 @@ pub mod service {
         asset_id: u16,
         token_id: u32,
         amount_tokens: Quantity,
-        min_banx: Quantity,
+        min_favor: Quantity,
     ) {
         CashQuote::get_live(cashier, asset_id, token_id, false).cash_in(
             get_sender(),
             amount_tokens,
-            min_banx,
+            min_favor,
         );
     }
 
@@ -870,7 +870,7 @@ pub mod service {
     /// `path_pay([(Gary, AUD), (Steve, USD)], amount_aud, min_return_usd)`:
     /// 1. **First hop** — sender draws `amount` on Gary in **AUD** (line and/or
     ///    reverse claim that auto-nets).
-    /// 2. **Currency change** — if the previous hop posted a [`BanxRelay`]
+    /// 2. **Currency change** — if the previous hop posted a [`FavorRelay`]
     ///    for the pair, the curve sizes the next hop. Otherwise apply their
     ///    creditor-side [`FxOffer`]. Does **not** rebook the previous
     ///    claim: the payer still owes the middle man the full from-asset.
@@ -912,14 +912,14 @@ pub mod service {
         );
     }
 
-    /// Path-pay that ends by selling the last hop's Banx for that account's tokens.
+    /// Path-pay that ends by selling the last hop's Favor for that account's tokens.
     ///
     /// The last hop must have posted a token relay for that asset and
-    /// `token_id`. The path draws the Banx amount on them, then their vault
-    /// pays `recipient`. They do not also owe `recipient` the Banx asset.
+    /// `token_id`. The path draws the Favor amount on them, then their vault
+    /// pays `recipient`. They do not also owe `recipient` the Favor asset.
     /// `min_tokens` floors the token output. The curve has no fee. A one-hop
     /// path books the owner's global forward on top of `amount`, same as
-    /// `tok_relay_out`. `max_owed` caps that Banx before netting, and zero
+    /// `tok_relay_out`. `max_owed` caps that Favor before netting, and zero
     /// is a cap of zero. A longer path draws exactly `amount` on the first
     /// hop and does not use `max_owed`.
     #[action]
@@ -942,7 +942,7 @@ pub mod service {
         let sender = get_sender();
         let hops = opened.hops;
         let last = hops[hops.len() - 1];
-        let banx_in = if hops.len() == 1 {
+        let favor_in = if hops.len() == 1 {
             assert!(last.account != sender, "path cannot draw on self");
             let owed = TokenRelay::neighbor_owes(last.account, last.asset_id, amount);
             TokenRelay::assert_max_owed(owed, max_owed);
@@ -959,11 +959,11 @@ pub mod service {
                 "",
             )
         };
-        TokenRelay::pay_tokens_for_banx(
+        TokenRelay::pay_tokens_for_favor(
             last.account,
             last.asset_id,
             token_id,
-            banx_in,
+            favor_in,
             recipient,
             min_tokens,
         );

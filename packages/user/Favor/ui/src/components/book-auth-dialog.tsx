@@ -4,7 +4,7 @@ import { AssetField, ExpiresField } from "@/components/form-fields";
 import {
     useRemoveBookAuth,
     useSetBookAuth,
-} from "@/hooks/use-banx-mutations";
+} from "@/hooks/use-favor-mutations";
 import { displayAmount } from "@/lib/amount";
 import {
     amountFieldValidator,

@@ -38,7 +38,7 @@ export const Layout = () => {
         : null;
     const page = accountName
         ? accountName
-        : (titles[pathname] ?? "Banx");
+        : (titles[pathname] ?? "Favor");
 
     return (
         <SidebarProvider>
@@ -55,7 +55,7 @@ export const Layout = () => {
                             <BreadcrumbList>
                                 <BreadcrumbItem className="hidden md:block">
                                     <BreadcrumbLink asChild>
-                                        <Link to="/accounts">Banx</Link>
+                                        <Link to="/accounts">Favor</Link>
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />

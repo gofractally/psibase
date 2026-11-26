@@ -1,5 +1,5 @@
 /**
- * Thin wrappers for Banx-specific controls inside TanStack `form.Field`.
+ * Thin wrappers for Favor-specific controls inside TanStack `form.Field`.
  * Shared form fields (TextField, etc.) come from useAppForm's AppField.
  */
 import type { ReactNode } from "react";

@@ -1,4 +1,4 @@
-//! Off-chain multi-hop path discovery for Banx `path_pay`.
+//! Off-chain multi-hop path discovery for Favor `path_pay`.
 //!
 //! Algorithm mirrors TokenSwap's layered max-output search (`find_path` over
 //! pools), but edges are **credit lines** (+ routing fees / FX policies), not
@@ -307,7 +307,7 @@ fn index_lines(lines: &[LineEdge]) -> LineIndex<'_> {
 /// `now` is unix seconds for policy expiry (use 0 to ignore wall-clock).
 ///
 /// Optional `to_asset`: require final hop in that asset.
-pub fn find_banx_path(
+pub fn find_favor_path(
     lines: &[LineEdge],
     routing: &[RoutingEdge],
     fx: &[FxEdge],
@@ -523,7 +523,7 @@ fn simulate_path_fees(
 /// Each hop sequence is monotone, so its fees are inverted on their own.
 /// Output across sequences is not: a larger send can miss a tight cheap hop
 /// and fall through to a worse route, or to no route.
-pub fn find_banx_path_exact_out(
+pub fn find_favor_path_exact_out(
     lines: &[LineEdge],
     routing: &[RoutingEdge],
     fx: &[FxEdge],
@@ -965,7 +965,7 @@ mod tests {
         max_hops: u8,
         now: i64,
     ) -> Option<PathQuote> {
-        find_banx_path(
+        find_favor_path(
             lines,
             routing,
             fx,
@@ -991,7 +991,7 @@ mod tests {
         max_hops: u8,
         now: i64,
     ) -> Option<PathQuote> {
-        find_banx_path_exact_out(
+        find_favor_path_exact_out(
             lines,
             routing,
             fx,

@@ -6,7 +6,7 @@ import {
     fetchActivityFeed,
     fetchActivityWith,
     fetchBookAuths,
-    fetchBanxRelays,
+    fetchFavorRelays,
     fetchCashQuotes,
     fetchCashVault,
     fetchTokenRelays,
@@ -20,8 +20,8 @@ import {
     fetchInvites,
     fetchTokenPrecision,
     type ActivityEvent,
-    type BanxInvite,
-    type BanxRelay,
+    type FavorInvite,
+    type FavorRelay,
     type BookAuth,
     type CashQuote,
     type CashVault,
@@ -122,7 +122,7 @@ export function useBuyClaimOffers() {
     return useClaimOffers();
 }
 
-export function useInvites(): UseQueryResult<BanxInvite[], Error> {
+export function useInvites(): UseQueryResult<FavorInvite[], Error> {
     const { data: user } = useCurrentUser();
     return useQuery({
         queryKey: QueryKey.invites(user),
@@ -161,20 +161,20 @@ export function useCashQuotes(
     });
 }
 
-/** Constant-product Banx relays. Omit `owner` for every relay. */
-export function useBanxRelays(
+/** Constant-product Favor relays. Omit `owner` for every relay. */
+export function useFavorRelays(
     owner?: string | null,
-): UseQueryResult<BanxRelay[], Error> {
+): UseQueryResult<FavorRelay[], Error> {
     const all = owner === undefined;
     const key = all ? "*" : (owner ?? "");
     return useQuery({
-        queryKey: QueryKey.banxRelays(key),
-        queryFn: () => fetchBanxRelays(all ? undefined : owner ?? undefined),
+        queryKey: QueryKey.favorRelays(key),
+        queryFn: () => fetchFavorRelays(all ? undefined : owner ?? undefined),
         enabled: all || !!owner?.trim(),
     });
 }
 
-/** Banx↔token relays. Omit `owner` for every relay. */
+/** Favor↔token relays. Omit `owner` for every relay. */
 export function useTokenRelays(
     owner?: string | null,
 ): UseQueryResult<TokenRelay[], Error> {

@@ -4,7 +4,7 @@ use psibase::{services::tokens::Quantity, AccountNumber};
 
 use super::{emit_pair_activity, invert_hop_fee, invert_rate, Connection};
 use crate::math::{smallest_input_for_output, try_apply_hop_fee, try_apply_rate};
-use crate::tables::tables::{BanxRelay, ForwardOffer, FxOffer, PathHop, PayRequest};
+use crate::tables::tables::{FavorRelay, ForwardOffer, FxOffer, PathHop, PayRequest};
 
 /// Exact-out send: walk hops backward from `target_out` at the last hop
 /// (undo hop fees, then FX). A relay used twice is priced forward, because
@@ -21,7 +21,7 @@ pub fn path_required_send(hops: &[PathHop], target_out: Quantity) -> Quantity {
         let offer = ForwardOffer::get_live(prev.account, hop.account, hop.asset_id);
         need = invert_hop_fee(need, offer.fee_fixed, offer.fee_percent);
         if hop.asset_id != prev.asset_id {
-            if let Some(relay) = BanxRelay::get(prev.account, prev.asset_id, hop.asset_id) {
+            if let Some(relay) = FavorRelay::get(prev.account, prev.asset_id, hop.asset_id) {
                 need = relay.swap_in(prev.asset_id, need);
             } else {
                 let pol = FxOffer::get_assert(prev.account, prev.asset_id, hop.asset_id, true);
@@ -45,7 +45,7 @@ fn relay_used_twice(hops: &[PathHop]) -> bool {
         if hop.asset_id == prev.asset_id {
             continue;
         }
-        let Some(relay) = BanxRelay::get(prev.account, prev.asset_id, hop.asset_id) else {
+        let Some(relay) = FavorRelay::get(prev.account, prev.asset_id, hop.asset_id) else {
             continue;
         };
         if !seen.insert((relay.owner, relay.asset_lo, relay.asset_hi)) {
@@ -65,14 +65,14 @@ fn sequential_required_send(hops: &[PathHop], target_out: Quantity) -> Quantity 
 
 /// Same pricing as [`execute_path`], on local relay copies. Does not draw or save.
 fn forward_amount(hops: &[PathHop], amount: u64) -> Option<u64> {
-    let mut pools: HashMap<(AccountNumber, u16, u16), BanxRelay> = HashMap::new();
+    let mut pools: HashMap<(AccountNumber, u16, u16), FavorRelay> = HashMap::new();
     let mut spent: HashMap<(AccountNumber, u16, u16), u64> = HashMap::new();
     let mut forward = amount;
     for i in 1..hops.len() {
         let prev = hops[i - 1];
         let hop = hops[i];
         if hop.asset_id != prev.asset_id {
-            if let Some(stored) = BanxRelay::get(prev.account, prev.asset_id, hop.asset_id) {
+            if let Some(stored) = FavorRelay::get(prev.account, prev.asset_id, hop.asset_id) {
                 let key = (stored.owner, stored.asset_lo, stored.asset_hi);
                 let relay = pools.entry(key).or_insert(stored);
                 forward = relay.apply_out(prev.asset_id, forward)?;
@@ -150,7 +150,7 @@ pub(crate) fn execute_path(
         }
 
         if asset_id != prev_asset {
-            if let Some(mut relay) = BanxRelay::get(path_debtor, prev_asset, asset_id) {
+            if let Some(mut relay) = FavorRelay::get(path_debtor, prev_asset, asset_id) {
                 forward = relay.swap_out(prev_asset, forward);
             } else {
                 let mut pol = FxOffer::get_assert(path_debtor, prev_asset, asset_id, true);
@@ -235,14 +235,14 @@ pub(crate) fn peek_hop_amounts(hops: &[PathHop], amount: u64, now: i64) -> (Vec<
         return (out, false);
     }
     out[0] = amount;
-    let mut pools: HashMap<(AccountNumber, u16, u16), BanxRelay> = HashMap::new();
+    let mut pools: HashMap<(AccountNumber, u16, u16), FavorRelay> = HashMap::new();
     let mut spent: HashMap<(AccountNumber, u16, u16), u64> = HashMap::new();
     let mut forward = amount;
     for i in 1..hops.len() {
         let prev = hops[i - 1];
         let hop = hops[i];
         if hop.asset_id != prev.asset_id {
-            if let Some(stored) = BanxRelay::get(prev.account, prev.asset_id, hop.asset_id) {
+            if let Some(stored) = FavorRelay::get(prev.account, prev.asset_id, hop.asset_id) {
                 let key = (stored.owner, stored.asset_lo, stored.asset_hi);
                 let relay = pools.entry(key).or_insert(stored);
                 let Some(next) = relay.apply_out(prev.asset_id, forward) else {
@@ -302,7 +302,7 @@ pub(crate) fn peek_required_send(hops: &[PathHop], target_out: u64, now: i64) ->
         let offer = ForwardOffer::find_live(prev.account, hop.account, hop.asset_id, now)?;
         need = invert_hop_fee(need, offer.fee_fixed, offer.fee_percent);
         if hop.asset_id != prev.asset_id {
-            if let Some(relay) = BanxRelay::get(prev.account, prev.asset_id, hop.asset_id) {
+            if let Some(relay) = FavorRelay::get(prev.account, prev.asset_id, hop.asset_id) {
                 need = relay.swap_in(prev.asset_id, need);
             } else {
                 let pol = FxOffer::get(prev.account, prev.asset_id, hop.asset_id, true)?;

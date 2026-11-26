@@ -6,8 +6,8 @@ import { ArrowLeftRight, Loader2 } from "lucide-react";
 import {
     profilesContactsGet,
     profilesReadPermission,
-} from "@/hooks/use-banx-contacts";
-import { useBuyClaim, useSellClaim } from "@/hooks/use-banx-mutations";
+} from "@/hooks/use-favor-contacts";
+import { useBuyClaim, useSellClaim } from "@/hooks/use-favor-mutations";
 import {
     amountPlaceholder,
     displayAmount,

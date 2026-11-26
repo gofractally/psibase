@@ -3,16 +3,16 @@ import { useLocalStorage } from "usehooks-ts";
 
 import { defaultAssetId } from "@/components/asset-select";
 import { useAssets } from "@/hooks/use-assets";
-import { useForwardOffers } from "@/hooks/use-banx-data";
-import { useSetGlobalForwardOffer } from "@/hooks/use-banx-mutations";
+import { useForwardOffers } from "@/hooks/use-favor-data";
+import { useSetGlobalForwardOffer } from "@/hooks/use-favor-mutations";
 import { liveGlobalForward } from "@/lib/account-groups";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-const DISMISS_KEY = "banx.forward-nudge.dismissed";
-const FOCUS_KEY = "banx.accounts.assetId";
-const TOAST_ID = "banx-forward-nudge";
+const DISMISS_KEY = "favor.forward-nudge.dismissed";
+const FOCUS_KEY = "favor.accounts.assetId";
+const TOAST_ID = "favor-forward-nudge";
 
 /**
  * Payments through you need a global path-forward. Nudge for the currency

@@ -118,15 +118,15 @@ pub(crate) fn invert_hop_fee(
         })
 }
 
-/// Tokens sub-account on Banx for one cashier + token.
+/// Tokens sub-account on Favor for one cashier + token.
 ///
 /// Tokens already keys balances by `token_id`; the string names the
-/// poster so cashiers do not share Banx's primary balance.
+/// poster so cashiers do not share Favor's primary balance.
 pub fn cash_sub(poster: AccountNumber, token_id: u32) -> String {
     format!("{poster}/{token_id}")
 }
 
-/// Tokens sub-account for one owner's pool. The pair is the Banx asset and the token,
+/// Tokens sub-account for one owner's pool. The pair is the Favor asset and the token,
 /// so two IOUs do not share a balance.
 pub fn relay_sub(owner: AccountNumber, asset_id: u16, token_id: u32) -> String {
     format!("{owner}/{asset_id}/{token_id}")

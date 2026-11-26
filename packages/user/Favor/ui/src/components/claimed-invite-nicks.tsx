@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { UserPlus } from "lucide-react";
 
 import { NicknameContactField } from "@/components/nickname-contact-field";
-import { useBanxContacts } from "@/hooks/use-banx-contacts";
-import { useInvites } from "@/hooks/use-banx-data";
+import { useFavorContacts } from "@/hooks/use-favor-contacts";
+import { useInvites } from "@/hooks/use-favor-data";
 import { useSaveContact } from "@/hooks/use-save-contact";
 import { inviteClaimedBy } from "@/lib/contacts";
 import {
@@ -29,7 +29,7 @@ export function ClaimedInviteNicks({
 }) {
     const { data: invites = [] } = useInvites();
     const { isContact, hasReadPermission, isLoading } =
-        useBanxContacts(returnPath);
+        useFavorContacts(returnPath);
     const saveContact = useSaveContact(returnPath);
     const [nicks, setNicks] = useState<Record<number, string>>({});
     const [hidden, setHidden] = useState<Record<number, boolean>>({});

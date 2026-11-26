@@ -12,7 +12,7 @@ import {
     useObligations,
     usePosterFxOffers,
     useTokenPrecisionMap,
-} from "@/hooks/use-banx-data";
+} from "@/hooks/use-favor-data";
 import { displayAmount, formatFxToRate } from "@/lib/amount";
 
 
@@ -172,20 +172,20 @@ export function AccountTrades({
                                 </TableRow>
                             ))}
                             {quotes.map((q) => {
-                                const banxPrec = byId.has(q.assetId)
+                                const favorPrec = byId.has(q.assetId)
                                     ? precisionOf(q.assetId)
                                     : undefined;
                                 const tokenPrec =
                                     tokenPrecisions.precision.get(q.tokenId);
                                 const tokenLabel = `#${q.tokenId}`;
-                                const banxLabel = symbolOf(q.assetId);
+                                const favorLabel = symbolOf(q.assetId);
                                 const price =
-                                    banxPrec === undefined ||
+                                    favorPrec === undefined ||
                                     tokenPrec === undefined
                                         ? "…"
                                         : q.isOut
-                                          ? `${formatFxToRate(q.fxRate, banxPrec, tokenPrec)} ${tokenLabel}`
-                                          : `${formatFxToRate(q.fxRate, tokenPrec, banxPrec)} ${banxLabel}`;
+                                          ? `${formatFxToRate(q.fxRate, favorPrec, tokenPrec)} ${tokenLabel}`
+                                          : `${formatFxToRate(q.fxRate, tokenPrec, favorPrec)} ${favorLabel}`;
                                 return (
                                     <TableRow
                                         key={`cash-${q.isOut ? 1 : 0}-${q.assetId}-${q.tokenId}`}
@@ -195,19 +195,19 @@ export function AccountTrades({
                                         </TableCell>
                                         <TableCell>
                                             {q.isOut
-                                                ? `${banxLabel} / ${tokenLabel}`
-                                                : `${tokenLabel} / ${banxLabel}`}
+                                                ? `${favorLabel} / ${tokenLabel}`
+                                                : `${tokenLabel} / ${favorLabel}`}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
                                             {price}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
                                             {displayAmount(q.remaining)}{" "}
-                                            {q.isOut ? banxLabel : tokenLabel}
+                                            {q.isOut ? favorLabel : tokenLabel}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
                                             {displayAmount(q.feeFixed)}{" "}
-                                            {q.isOut ? banxLabel : tokenLabel}
+                                            {q.isOut ? favorLabel : tokenLabel}
                                         </TableCell>
 
                                         <TableCell className="text-right text-sm">

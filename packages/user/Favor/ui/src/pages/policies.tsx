@@ -15,14 +15,14 @@ import {
     useCashQuotes,
     useFxOffers,
     useTokenPrecisionMap,
-} from "@/hooks/use-banx-data";
+} from "@/hooks/use-favor-data";
 import {
     useRemoveCashQuote,
     useRemoveFxOffer,
     useSetCashQuote,
     useSetFxOffer,
     useSetExchangeQuotes,
-} from "@/hooks/use-banx-mutations";
+} from "@/hooks/use-favor-mutations";
 import {
     amountPlaceholder,
     convertAtQuotedRate,
@@ -69,7 +69,7 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 
-type LegKind = "banx" | "token";
+type LegKind = "favor" | "token";
 
 type Leg = { kind: LegKind; id: number };
 
@@ -84,7 +84,7 @@ function legOf(
     assetId: number | undefined,
     tokenRaw: string,
 ): Leg | undefined {
-    if (kind === "banx") {
+    if (kind === "favor") {
         return assetId === undefined ? undefined : { kind, id: assetId };
     }
     const id = parseTokenId(tokenRaw);
@@ -119,16 +119,16 @@ function cashOrderArgs(args: {
           remaining: string;
       }
     | string {
-    const banx = args.from.kind === "banx" ? args.from : args.to;
+    const favor = args.from.kind === "favor" ? args.from : args.to;
     const token = args.from.kind === "token" ? args.from : args.to;
-    if (banx.kind !== "banx" || token.kind !== "token") {
+    if (favor.kind !== "favor" || token.kind !== "token") {
         return "A token trades against an IOU.";
     }
     if (args.buying) {
         return {
-            assetId: banx.id,
+            assetId: favor.id,
             tokenId: token.id,
-            isOut: args.from.kind === "banx",
+            isOut: args.from.kind === "favor",
             feeFixed: args.fee.trim() || "0",
             toRate: args.price.trim(),
             remaining: args.quantity.trim(),
@@ -151,7 +151,7 @@ function cashOrderArgs(args: {
         return "That amount is too small to convert at this rate.";
     }
     return {
-        assetId: banx.id,
+        assetId: favor.id,
         tokenId: token.id,
         isOut: args.from.kind === "token",
         feeFixed: fee,
@@ -172,7 +172,7 @@ function LegKindToggle({
 }) {
     return (
         <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-0.5">
-            {(["banx", "token"] as const).map((next) => {
+            {(["favor", "token"] as const).map((next) => {
                 const blocked =
                     next === "token" && !!tokenDisabled && kind !== "token";
                 return (
@@ -197,7 +197,7 @@ function LegKindToggle({
                             if (!blocked) onChange(next);
                         }}
                     >
-                        {next === "banx" ? "IOU" : "Token"}
+                        {next === "favor" ? "IOU" : "Token"}
                     </button>
                 );
             })}
@@ -222,8 +222,8 @@ export function PoliciesPage() {
 
     const currencyForm = useAppForm({
         defaultValues: {
-            fromKind: "banx" as LegKind,
-            toKind: "banx" as LegKind,
+            fromKind: "favor" as LegKind,
+            toKind: "favor" as LegKind,
             fromAsset: undefined as number | undefined,
             toAsset: undefined as number | undefined,
             fromToken: "",
@@ -359,7 +359,7 @@ export function PoliciesPage() {
     ]);
 
     const legPrecision = (leg: Leg): number | undefined => {
-        if (leg.kind === "banx") {
+        if (leg.kind === "favor") {
             return byId.has(leg.id) ? precisionOf(leg.id) : undefined;
         }
         return tokenPrecisions.precision.get(leg.id);
@@ -460,7 +460,7 @@ export function PoliciesPage() {
                                                     onClick={() =>
                                                         setNetwork({
                                                             left: {
-                                                                kind: "banx",
+                                                                kind: "favor",
                                                                 assetId:
                                                                     p.fromAsset,
                                                                 symbol: symbolOf(
@@ -468,7 +468,7 @@ export function PoliciesPage() {
                                                                 ),
                                                             },
                                                             right: {
-                                                                kind: "banx",
+                                                                kind: "favor",
                                                                 assetId:
                                                                     p.toAsset,
                                                                 symbol: symbolOf(
@@ -505,21 +505,21 @@ export function PoliciesPage() {
                                 ))
                             )}
                             {cashQuotes.map((q) => {
-                                const banxPrec = byId.has(q.assetId)
+                                const favorPrec = byId.has(q.assetId)
                                     ? precisionOf(q.assetId)
                                     : undefined;
                                 const tokenPrec = tokenPrecisions.precision.get(
                                     q.tokenId,
                                 );
                                 const tokenLabel = `#${q.tokenId}`;
-                                const banxLabel = symbolOf(q.assetId);
+                                const favorLabel = symbolOf(q.assetId);
                                 const price =
-                                    banxPrec === undefined ||
+                                    favorPrec === undefined ||
                                     tokenPrec === undefined
                                         ? "…"
                                         : q.isOut
-                                          ? `${formatFxToRate(q.fxRate, banxPrec, tokenPrec)} ${tokenLabel}`
-                                          : `${formatFxToRate(q.fxRate, tokenPrec, banxPrec)} ${banxLabel}`;
+                                          ? `${formatFxToRate(q.fxRate, favorPrec, tokenPrec)} ${tokenLabel}`
+                                          : `${formatFxToRate(q.fxRate, tokenPrec, favorPrec)} ${favorLabel}`;
                                 return (
                                     <TableRow
                                         key={`cash-${q.isOut ? 1 : 0}-${q.assetId}-${q.tokenId}`}
@@ -529,19 +529,19 @@ export function PoliciesPage() {
                                         </TableCell>
                                         <TableCell>
                                             {q.isOut
-                                                ? `${banxLabel} / ${tokenLabel}`
-                                                : `${tokenLabel} / ${banxLabel}`}
+                                                ? `${favorLabel} / ${tokenLabel}`
+                                                : `${tokenLabel} / ${favorLabel}`}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
                                             {price}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
                                             {displayAmount(q.remaining)}{" "}
-                                            {q.isOut ? banxLabel : tokenLabel}
+                                            {q.isOut ? favorLabel : tokenLabel}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
                                             {displayAmount(q.feeFixed)}{" "}
-                                            {q.isOut ? banxLabel : tokenLabel}
+                                            {q.isOut ? favorLabel : tokenLabel}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             —
@@ -555,12 +555,12 @@ export function PoliciesPage() {
                                                     type="button"
                                                     variant="outline"
                                                     size="sm"
-                                                    aria-label={`Network for ${q.isOut ? banxLabel : tokenLabel} and ${q.isOut ? tokenLabel : banxLabel}`}
+                                                    aria-label={`Network for ${q.isOut ? favorLabel : tokenLabel} and ${q.isOut ? tokenLabel : favorLabel}`}
                                                     onClick={() => {
                                                         const iou = {
-                                                            kind: "banx" as const,
+                                                            kind: "favor" as const,
                                                             assetId: q.assetId,
-                                                            symbol: banxLabel,
+                                                            symbol: favorLabel,
                                                         };
                                                         const token = {
                                                             kind: "token" as const,
@@ -671,15 +671,15 @@ export function PoliciesPage() {
                                 values.toKind === "token";
                             const samePair =
                                 !!fromLeg && !!toLeg && sameLegs(fromLeg, toLeg);
-                            const banxPair =
-                                values.fromKind === "banx" &&
-                                values.toKind === "banx";
+                            const favorPair =
+                                values.fromKind === "favor" &&
+                                values.toKind === "favor";
                             const feeText = values.feeFixed.trim();
                             const feeIsZero =
                                 feeText === "" || feeText === "0";
                             const theyOweMe = values.quoteMode === "they";
                             const bothWays =
-                                values.quoteMode === "both" && banxPair;
+                                values.quoteMode === "both" && favorPair;
                             const spreadText = values.spreadPct.trim();
                             const spreadNumber =
                                 spreadText === "" ? 0 : Number(spreadText);
@@ -728,7 +728,7 @@ export function PoliciesPage() {
                                 if (kind !== "token") return;
                                 // A token has no quote against another token.
                                 if (values[other] === "token") {
-                                    currencyForm.setFieldValue(other, "banx");
+                                    currencyForm.setFieldValue(other, "favor");
                                 }
                                 if (values.quoteMode === "both") {
                                     currencyForm.setFieldValue(
@@ -746,7 +746,7 @@ export function PoliciesPage() {
                                         <div
                                             className={cn(
                                                 "grid gap-2",
-                                                banxPair
+                                                favorPair
                                                     ? "grid-cols-3"
                                                     : "grid-cols-2",
                                             )}
@@ -787,7 +787,7 @@ export function PoliciesPage() {
                                             >
                                                 You sell
                                             </Button>
-                                            {banxPair ? (
+                                            {favorPair ? (
                                                 <Button
                                                     type="button"
                                                     variant={
@@ -819,7 +819,7 @@ export function PoliciesPage() {
                                                     chooseKind("fromKind", kind)
                                                 }
                                             />
-                                            {values.fromKind === "banx" ? (
+                                            {values.fromKind === "favor" ? (
                                                 <currencyForm.Field
                                                     name="fromAsset"
                                                     children={(field) => (
@@ -1055,7 +1055,7 @@ export function PoliciesPage() {
                                                     chooseKind("toKind", kind)
                                                 }
                                             />
-                                            {values.toKind === "banx" ? (
+                                            {values.toKind === "favor" ? (
                                                 <currencyForm.Field
                                                     name="toAsset"
                                                     children={(field) => (
@@ -1234,7 +1234,7 @@ export function PoliciesPage() {
                                             asset the order will take. Saving
                                             again replaces it.
                                         </p>
-                                    ) : banxPair ? (
+                                    ) : favorPair ? (
                                         <p className="text-muted-foreground text-sm">
                                             This remaining is a public path
                                             rate, not a private quote for one
@@ -1438,8 +1438,8 @@ export function PoliciesPage() {
                                 <currencyForm.SubmitButton
                                     labels={
                                         values.quoteMode === "both" &&
-                                        values.fromKind === "banx" &&
-                                        values.toKind === "banx"
+                                        values.fromKind === "favor" &&
+                                        values.toKind === "favor"
                                             ? ["Post orders", "Posting…"]
                                             : ["Post order", "Posting…"]
                                     }

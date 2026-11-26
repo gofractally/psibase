@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
 import { useAssetMap } from "@/hooks/use-assets";
-import { useCreditLines, useObligations } from "@/hooks/use-banx-data";
+import { useCreditLines, useObligations } from "@/hooks/use-favor-data";
 import {
     groupByCounterpartyAndAsset,
     mergeCreditLines,

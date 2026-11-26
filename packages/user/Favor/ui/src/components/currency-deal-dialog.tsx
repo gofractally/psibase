@@ -5,7 +5,7 @@ import {
     useConvert,
     useRemoveFxOffer,
     useSetFxOffer,
-} from "@/hooks/use-banx-mutations";
+} from "@/hooks/use-favor-mutations";
 import {
     amountPlaceholder,
     applyQuotedRate,

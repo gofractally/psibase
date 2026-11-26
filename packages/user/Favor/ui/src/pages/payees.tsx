@@ -6,11 +6,11 @@ import { BookExpenseDialog } from "@/components/book-expense-dialog";
 import { NewDepositLoanDialog } from "@/components/new-deposit-loan-dialog";
 import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
-import { useBookAuths } from "@/hooks/use-banx-data";
+import { useBookAuths } from "@/hooks/use-favor-data";
 import {
     profilesContactsGet,
     profilesReadPermission,
-} from "@/hooks/use-banx-contacts";
+} from "@/hooks/use-favor-contacts";
 import type { BookAuth } from "@/lib/graphql";
 
 import { siblingUrl } from "@psibase/common-lib";
@@ -199,7 +199,7 @@ export function PayeesPage() {
                     <div className="space-y-1">
                         <p className="font-medium">Connect Contacts</p>
                         <p className="text-muted-foreground max-w-md text-sm">
-                            Banx reads your payee list from the Contacts app
+                            Favor reads your payee list from the Contacts app
                             (via Profiles). Grant read access once, then your
                             nicknames and accounts appear here.
                         </p>

@@ -1,5 +1,5 @@
 mod asset;
-mod banx_relay;
+mod favor_relay;
 mod book_auth;
 mod cash_quote;
 mod claim_offer;
@@ -285,13 +285,13 @@ pub mod tables {
         }
     }
 
-    /// Maker quote: Banx asset ↔ Tokens `token_id`. Poster is the cashier.
+    /// Maker quote: Favor asset ↔ Tokens `token_id`. Poster is the cashier.
     ///
-    /// `is_out`: taker draws Banx on the poster and receives tokens.
+    /// `is_out`: taker draws Favor on the poster and receives tokens.
     /// Otherwise taker sends tokens; poster is deposited (repay or a new
     /// claim on the poster).
     ///
-    /// `to = (from − fee_fixed) * fx_rate / RATE_SCALE`. Out `from` is Banx;
+    /// `to = (from − fee_fixed) * fx_rate / RATE_SCALE`. Out `from` is Favor;
     /// in `from` is tokens.
     #[table(name = "CashQuoteTab", index = 7)]
     #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
@@ -299,11 +299,11 @@ pub mod tables {
         pub poster: AccountNumber,
         pub asset_id: u16,
         pub token_id: u32,
-        /// True: Banx → tokens (`cash_out`). False: tokens → Banx (`cash_in`).
+        /// True: Favor → tokens (`cash_out`). False: tokens → Favor (`cash_in`).
         pub is_out: bool,
         pub fee_fixed: Quantity,
         pub fx_rate: u64,
-        /// Taker input still available: Banx units when `is_out`, token units
+        /// Taker input still available: Favor units when `is_out`, token units
         /// otherwise. 0 means spent; the row stays so it can be topped up.
         pub remaining: Quantity,
         pub expires_at: TimePointSec,
@@ -316,11 +316,11 @@ pub mod tables {
         }
     }
 
-    /// Invite created through Banx: the first accept extends a credit line to
+    /// Invite created through Favor: the first accept extends a credit line to
     /// that claimee (skipped if a line already exists) and records `claimed_by`.
-    #[table(name = "BanxInviteTable", index = 8)]
+    #[table(name = "FavorInviteTable", index = 8)]
     #[derive(Default, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
-    pub struct BanxInvite {
+    pub struct FavorInvite {
         #[primary_key]
         pub id: u32,
         pub inviter: AccountNumber,
@@ -332,7 +332,7 @@ pub mod tables {
         pub claimed_by: Option<AccountNumber>,
     }
 
-    impl BanxInvite {
+    impl FavorInvite {
         #[secondary_key(1)]
         fn by_inviter(&self) -> (AccountNumber, u32) {
             (self.inviter, self.id)
@@ -390,16 +390,16 @@ pub mod tables {
         pub ends_at: TimePointSec,
     }
 
-    /// Constant-product curve between two Banx assets, posted by `owner`.
+    /// Constant-product curve between two Favor assets, posted by `owner`.
     ///
     /// Both reserves are virtual weights. A path that changes asset on
     /// `owner` uses this curve instead of a [`FxOffer`] for the pair.
     /// One row prices both directions. `asset_lo` is the lower asset id.
-    #[table(name = "BanxRelayTable", index = 11)]
+    #[table(name = "FavorRelayTable", index = 11)]
     #[derive(
         Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone,
     )]
-    pub struct BanxRelay {
+    pub struct FavorRelay {
         pub owner: AccountNumber,
         pub asset_lo: u16,
         pub asset_hi: u16,
@@ -407,16 +407,16 @@ pub mod tables {
         pub reserve_hi: Quantity,
     }
 
-    impl BanxRelay {
+    impl FavorRelay {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, u16, u16) {
             (self.owner, self.asset_lo, self.asset_hi)
         }
     }
 
-    /// Constant-product curve between one Banx asset and one token.
+    /// Constant-product curve between one Favor asset and one token.
     ///
-    /// `reserve_banx` is the virtual Banx weight. The token reserve is the
+    /// `reserve_favor` is the virtual Favor weight. The token reserve is the
     /// balance in `{owner}/{asset_id}/{token_id}`, filled when the pool is
     /// posted. One owner has one pool per pair.
     #[table(name = "TokenRelayTable", index = 12)]
@@ -427,7 +427,7 @@ pub mod tables {
         pub owner: AccountNumber,
         pub asset_id: u16,
         pub token_id: u32,
-        pub reserve_banx: Quantity,
+        pub reserve_favor: Quantity,
     }
 
     impl TokenRelay {

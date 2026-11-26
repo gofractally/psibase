@@ -23,7 +23,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-amber-800 text-white dark:bg-amber-600">
                             <Landmark className="size-4" />
                         </div>
-                        <span className="truncate font-semibold">Banx</span>
+                        <span className="truncate font-semibold">Favor</span>
                     </Link>
                 </SidebarMenuButton>
             </SidebarHeader>

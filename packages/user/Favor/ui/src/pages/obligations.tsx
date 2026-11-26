@@ -32,8 +32,8 @@ import {
 } from "@/components/buy-claim-offer-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useAccountGroups } from "@/hooks/use-account-groups";
-import { useBanxContacts } from "@/hooks/use-banx-contacts";
-import { useForwardOffers, useBuyClaimOffers } from "@/hooks/use-banx-data";
+import { useFavorContacts } from "@/hooks/use-favor-contacts";
+import { useForwardOffers, useBuyClaimOffers } from "@/hooks/use-favor-data";
 import {
     accountHref,
     creditExtendedRaw,
@@ -65,7 +65,7 @@ import {
 } from "@shared/shadcn/ui/tooltip";
 
 export function ObligationsPage() {
-    const { label } = useBanxContacts("/accounts");
+    const { label } = useFavorContacts("/accounts");
     const [searchParams, setSearchParams] = useSearchParams();
     const urlTransferPrefill = useMemo(
         () => transferPrefillFromSearch(searchParams),
@@ -97,15 +97,15 @@ export function ObligationsPage() {
     const [buyClaimPrefill, setBuyClaimPrefill] =
         useState<BuyClaimPrefill | null>(null);
     const [hideEmptySavings, setHideEmptySavings] = useLocalStorage(
-        "banx.accounts.hideEmptySavings",
+        "favor.accounts.hideEmptySavings",
         true,
     );
     const [hideEmptyLoans, setHideEmptyLoans] = useLocalStorage(
-        "banx.accounts.hideEmptyLoans",
+        "favor.accounts.hideEmptyLoans",
         true,
     );
     const [storedAssetId, setStoredAssetId] = useLocalStorage<number | null>(
-        "banx.accounts.assetId",
+        "favor.accounts.assetId",
         null,
     );
     const selectedAssetId = useMemo(() => {
