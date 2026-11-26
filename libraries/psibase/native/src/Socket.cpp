@@ -87,6 +87,8 @@ void AutoCloseSocket::replace(Writer& writer, std::shared_ptr<AutoCloseSocket>&&
    {
       SocketRow row{id, other->info()};
       other->id = id;
+      // What the replacement carries is charged to the same identity
+      other->setUsage(usage());
       {
          std::lock_guard l{sockets->mutex};
          other->weak_sockets  = std::move(weak_sockets);
@@ -99,6 +101,34 @@ void AutoCloseSocket::replace(Writer& writer, std::shared_ptr<AutoCloseSocket>&&
       sockets->sharedDb.kvPutSubjective(writer, SocketRow::db, psio::to_key(row.key()),
                                         psio::to_pssz(row));
    }
+}
+
+std::shared_ptr<UsageRecord> Socket::usage() const
+{
+   std::lock_guard l{usageMutex};
+   return usageRecord;
+}
+
+std::shared_ptr<UsageRecord> Socket::usageUnless(const UsageRecord* same) const
+{
+   std::lock_guard l{usageMutex};
+   if (usageRecord.get() == same)
+      return nullptr;
+   return usageRecord;
+}
+
+void Socket::setUsage(std::shared_ptr<UsageRecord> record)
+{
+   std::lock_guard l{usageMutex};
+   usageRecord = std::move(record);
+}
+
+std::shared_ptr<Socket> Sockets::get(std::int32_t fd)
+{
+   std::lock_guard l{mutex};
+   if (fd < 0 || static_cast<std::size_t>(fd) >= sockets.size())
+      return nullptr;
+   return sockets[static_cast<std::size_t>(fd)];
 }
 
 void Socket::remove(Writer& writer)

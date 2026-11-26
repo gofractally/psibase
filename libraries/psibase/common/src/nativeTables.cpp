@@ -193,4 +193,40 @@ namespace psibase
    {
       return timerKey();
    }
+
+   auto usagePrefix() -> KeyPrefixType
+   {
+      return std::tuple{usageTable, nativeTablePrimaryIndex};
+   }
+   auto usageKindPrefix(UsageKind kind) -> std::tuple<std::uint16_t, std::uint8_t, std::uint8_t>
+   {
+      return std::tuple{usageTable, nativeTablePrimaryIndex, static_cast<std::uint8_t>(kind)};
+   }
+   auto usageKey(const UsageIdentity& identity) -> UsageKeyType
+   {
+      return std::tuple{usageTable, nativeTablePrimaryIndex,
+                        static_cast<std::uint8_t>(identity.kind), identity.id};
+   }
+   auto UsageRow::key() const -> UsageKeyType
+   {
+      return usageKey(identity());
+   }
+
+   auto usageConfigKey() -> KeyPrefixType
+   {
+      return std::tuple{usageConfigTable, nativeTablePrimaryIndex};
+   }
+   auto UsageConfigRow::key() const -> KeyPrefixType
+   {
+      return usageConfigKey();
+   }
+
+   auto socketIdentityKey(std::int32_t fd) -> SocketIdentityKeyType
+   {
+      return std::tuple{socketIdentityTable, nativeTablePrimaryIndex, fd};
+   }
+   auto SocketIdentityRow::key() const -> SocketIdentityKeyType
+   {
+      return socketIdentityKey(fd);
+   }
 }  // namespace psibase

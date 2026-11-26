@@ -436,6 +436,49 @@ namespace psibase
       return reader.get(root, key);
    }
 
+   void SharedDatabase::kvWriteSubjective(Writer&                          writer,
+                                          DbId                             db,
+                                          std::span<const SubjectiveWrite> writes)
+   {
+      check(impl->trie->owns(writer), "writer belongs to another database view");
+      if (writes.empty())
+         return;
+      std::lock_guard l{impl->subjectiveMutex};
+      auto            proposedSubjective = impl->subjective;
+      auto&           root               = proposedSubjective[independentIndex(db)];
+      for (const auto& w : writes)
+      {
+         if (w.value)
+            writer.upsert(root, w.key, *w.value);
+         else
+            writer.remove(root, w.key);
+      }
+      accounting::Publication publication;
+      impl->publishSubjective(writer, proposedSubjective);
+      impl->setSubjective(std::move(proposedSubjective));
+      publication.finish();
+   }
+
+   void SharedDatabase::kvScanSubjective(
+       Writer&               reader,
+       DbId                  db,
+       std::span<const char> prefix,
+       const std::function<void(std::span<const char> key, std::span<const char> value)>& f)
+   {
+      check(impl->trie->owns(reader), "writer belongs to another database view");
+      auto              root = impl->getNativeSubjective(db);
+      std::vector<char> key(prefix.begin(), prefix.end());
+      std::vector<char> value;
+      while (reader.get_greater_equal(root, key, &key, &value))
+      {
+         if (key.size() < prefix.size() || !std::equal(prefix.begin(), prefix.end(), key.begin()))
+            break;
+         f(key, value);
+         // The next key in order
+         key.push_back(0);
+      }
+   }
+
    IndependentRevision SharedDatabase::getSubjective()
    {
       std::lock_guard l{impl->subjectiveSnapshotMutex};

@@ -7,6 +7,7 @@
 #include <psibase/RunQueue.hpp>
 #include <psibase/Secrets.hpp>
 #include <psibase/TransactionContext.hpp>
+#include <psibase/UsageMeter.hpp>
 #include <psibase/fileUtil.hpp>
 #include <psibase/finally.hpp>
 #include <psibase/http.hpp>
@@ -653,6 +654,148 @@ void to_openmetrics_text(const Perf& perf, S& stream)
    stream.write("# EOF\n", 6);
 }
 
+// Usage metering (gofractally/psibase#2270): totals per kind of identity.
+// No per-identity labels: their number is not bounded by anything the
+// operator controls, and client addresses would leave the node.
+void write_om_usage(const std::vector<psibase::UsageMeter::KindTotal>& totals, auto& stream)
+{
+   if (totals.empty())
+      return;
+   auto sample = [&](std::string_view name, psibase::UsageKind kind, const std::string& value)
+   {
+      std::string line{name};
+      line += "{kind=\"";
+      line += to_string(kind);
+      line += "\"} ";
+      line += value;
+      line += '\n';
+      stream.write(line.data(), line.size());
+   };
+   auto seconds = [](std::uint64_t ns) { return std::to_string(ns) + "e-9"; };
+   using C      = psibase::UsageCounters;
+   auto counter = [&](std::string_view name, std::string_view unit, std::string_view help,
+                      std::uint64_t C::* member, bool time)
+   {
+      write_om_descriptor(name, "counter", unit, help, stream);
+      for (const auto& item : totals)
+         sample(std::string(name) + "_total", item.kind,
+                time ? seconds(item.total.*member) : std::to_string(item.total.*member));
+   };
+   write_om_descriptor("psinode_usage_identities", "gauge", "", "Identities with a usage record",
+                       stream);
+   for (const auto& item : totals)
+      sample("psinode_usage_identities", item.kind, std::to_string(item.records));
+   counter("psinode_usage_requests", "", "HTTP requests", &C::requests, false);
+   counter("psinode_usage_received_bytes", "bytes", "Bytes received", &C::bytesIn, false);
+   counter("psinode_usage_sent_bytes", "bytes", "Bytes sent", &C::bytesOut, false);
+   counter("psinode_usage_received_messages", "", "Websocket messages received", &C::messagesIn,
+           false);
+   counter("psinode_usage_sent_messages", "", "Websocket messages sent", &C::messagesOut, false);
+   counter("psinode_usage_request_seconds", "seconds", "Wall clock of handling requests",
+           &C::requestNs, true);
+   counter("psinode_usage_pushed_transactions", "", "Trial runs started", &C::trxPushed, false);
+   counter("psinode_usage_trial_seconds", "seconds", "Wall clock of trial runs", &C::trialNs,
+           true);
+   counter("psinode_usage_compile_seconds", "seconds", "Compile time started by trial runs",
+           &C::compileNs, true);
+   counter("psinode_usage_verify_seconds", "seconds", "Wall clock of signature checks",
+           &C::verifyNs, true);
+}
+
+// Writes the usage counters to the node's storage every interval and once
+// more when the node stops.
+//
+// The writing is done on the chain thread, the thread that owns `ctx`,
+// which reads and writes the database already: the storage engine has a
+// limited number of session slots and metering must not bring a thread of
+// its own to the database (gofractally/psibase#2273). The chain thread also
+// produces blocks, so it is given as little as possible: the thread here
+// keeps time and prepares the rows (no storage), and the chain thread
+// writes them one batch of 128 per task, with whatever else it has to do in
+// between. Measured (UsageMeterTests "[.bench]"): a batch is well under a
+// millisecond; every record of a full table dirty is about 85 batches.
+struct UsageFlusher
+{
+   UsageFlusher(boost::asio::io_context&             ctx,
+                psibase::SharedDatabase              db,
+                std::shared_ptr<psibase::UsageMeter> meter)
+       : ctx(ctx), db(std::move(db)), meter(std::move(meter))
+   {
+      if (!this->meter->enabled())
+         return;
+      auto interval =
+          std::chrono::seconds(std::max<std::uint64_t>(this->meter->settings().flushSeconds, 1));
+      ticker = std::jthread{[this, interval]
+                            {
+                               std::unique_lock l{mutex};
+                               while (!cond.wait_for(l, interval, [this] { return done; }))
+                               {
+                                  // One flush at a time: a busy chain thread
+                                  // is not given a queue of them.
+                                  if (writing.exchange(true))
+                                     continue;
+                                  if (this->meter->prepareFlush())
+                                     boost::asio::post(this->ctx, [this] { writeBatch(); });
+                                  else
+                                     writing = false;
+                               }
+                            }};
+   }
+   // Runs on the thread that ran `ctx`, after it has stopped running it and
+   // before `ctx` is destroyed.
+   ~UsageFlusher()
+   {
+      {
+         std::lock_guard l{mutex};
+         done = true;
+      }
+      cond.notify_one();
+      if (ticker.joinable())
+         ticker.join();
+      if (!meter->enabled())
+         return;
+      try
+      {
+         auto writer = db.createWriter();
+         // What was prepared and not written, then what was counted since
+         meter->writeFlush(db, *writer);
+         meter->flush(db, *writer);
+      }
+      catch (std::exception& e)
+      {
+         PSIBASE_LOG(psibase::loggers::generic::get(), warning)
+             << "Usage counters not written: " << e.what();
+      }
+   }
+   // On the chain thread
+   void writeBatch()
+   {
+      try
+      {
+         auto writer = db.createWriter();
+         if (meter->writeFlush(db, *writer, psibase::UsageMeter::batchRows).remaining)
+         {
+            boost::asio::post(ctx, [this] { writeBatch(); });
+            return;
+         }
+      }
+      catch (std::exception& e)
+      {
+         PSIBASE_LOG(psibase::loggers::generic::get(), warning)
+             << "Usage counters not written: " << e.what();
+      }
+      writing = false;
+   }
+   boost::asio::io_context&             ctx;
+   psibase::SharedDatabase              db;
+   std::shared_ptr<psibase::UsageMeter> meter;
+   std::condition_variable              cond;
+   std::mutex                           mutex;
+   bool                                 done = false;
+   std::atomic<bool>                    writing{false};
+   std::jthread                         ticker;
+};
+
 std::int64_t read_as_microseconds(std::istream& is, long clk_tck)
 {
    std::int64_t value;
@@ -1285,6 +1428,7 @@ void run(const std::string&              db_path,
          std::string                     tls_cert,
          std::string                     tls_key,
          const PsinodeServiceConfig&     extra_options,
+         const psibase::UsageSettings&   usage_settings,
          RestartInfo&                    runResult)
 {
    ExecutionContext::registerHostFunctions();
@@ -1313,6 +1457,16 @@ void run(const std::string&              db_path,
    auto sharedState = std::make_shared<psibase::SharedState>(std::move(database), wasmCache);
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
+
+   // Usage metering: continue from the stored counters and tell the
+   // reporting service how the meter is configured.
+   auto usageMeter = sharedState->usage();
+   usageMeter->configure(usage_settings);
+   {
+      auto writer = system->sharedDatabase.createWriter();
+      usageMeter->load(system->sharedDatabase, *writer);
+      usageMeter->publishSettings(system->sharedDatabase, *writer);
+   }
 
    PSIBASE_LOG(psibase::loggers::generic::get(), info)
        << "Storage engine=psitri.big sync=" << db_conf.syncName
@@ -1532,6 +1686,11 @@ void run(const std::string&              db_path,
    RunQueue                runQueue{sharedState, std::chrono::milliseconds(proof_timeout_ms)};
    boost::asio::io_context chainContext;
 
+   // Usage metering: write the counters as the node runs, on this thread.
+   // Declared after chainContext so that it stops, and writes once more,
+   // before chainContext goes.
+   UsageFlusher usageFlusher{chainContext, system->sharedDatabase, usageMeter};
+
    auto shutdown_sockets = psibase::finally{[&system] { system->sockets->shutdown(); }};
 
    auto server_work = boost::asio::make_work_guard(chainContext);
@@ -1740,11 +1899,15 @@ void run(const std::string&              db_path,
       http_config->get_metrics = [sharedState](auto callback)
       {
          callback(
-             [result = get_perf(*sharedState)]() mutable
+             [result = get_perf(*sharedState),
+              usage  = sharedState->usage()->totals()]() mutable
              {
                 std::vector<char> data;
                 TextWriter        stream{data};
-                to_openmetrics_text(result, stream);
+                write_om_mem(result, stream);
+                write_om_tasks(result, stream);
+                write_om_usage(usage, stream);
+                stream.write("# EOF\n", 6);
                 return data;
              });
       };
@@ -2029,6 +2192,8 @@ int main(int argc, char* argv[])
    byte_size                db_size;
    Timeout                  http_timeout;
    std::size_t              service_threads;
+   psibase::UsageSettings   usage_settings;
+   std::vector<std::string> usage_trusted_proxies;
    std::uint64_t            proof_timeout_ms;
    PsinodeServiceConfig     extra_options;
 
@@ -2122,6 +2287,37 @@ int main(int argc, char* argv[])
        "The maximum time for HTTP clients to send or receive a message");
    opt("service-threads", po::value(&service_threads)->default_value(1, "")->value_name("num"),
        "The number of threads that run async actions posted by services");
+   // Usage metering (gofractally/psibase#2270). Read when the node starts.
+   opt("usage-metering", po::value(&usage_settings.enabled)->default_value(true, "on"),
+       "Record how much each connection identity (account, client address, peer) uses of this "
+       "node. Node-local; nothing is refused");
+   opt("usage-trusted-proxy",
+       po::value(&usage_trusted_proxies)->composing()->default_value({}, "")->value_name("prefix"),
+       "An address or prefix (10.0.0.0/8) of a reverse proxy whose Forwarded and "
+       "X-Forwarded-For headers name the client. Loopback and unix sockets are always trusted; "
+       "from anyone else the headers are ignored");
+   opt("usage-max-records",
+       po::value(&usage_settings.maxRecords)->default_value(4096, "4096")->value_name("num"),
+       "The most identities of one kind that have a usage record. When a kind is full the "
+       "records that would expire soonest are folded into its overflow record");
+   opt("usage-retention-base",
+       po::value(&usage_settings.retention.base)->default_value(3600, "3600")->value_name("seconds"),
+       "How long a usage record that used nothing is kept after it was last seen");
+   opt("usage-retention-per-unit",
+       po::value(&usage_settings.retention.perUnit)->default_value(60, "60")->value_name("seconds"),
+       "How much longer a usage record is kept for each unit it used (a request, a websocket "
+       "message, a pushed transaction, a millisecond of node time, 64 KiB transferred)");
+   opt("usage-retention-max",
+       po::value(&usage_settings.retention.max)
+           ->default_value(30 * 24 * 3600, "2592000")
+           ->value_name("seconds"),
+       "The longest a usage record is kept after it was last seen");
+   opt("usage-window",
+       po::value(&usage_settings.windowSeconds)->default_value(3600, "3600")->value_name("seconds"),
+       "The length of the window that recent use is reported for");
+   opt("usage-flush-interval",
+       po::value(&usage_settings.flushSeconds)->default_value(10, "10")->value_name("seconds"),
+       "How often the usage counters are written to the node's storage");
    desc.add(common_opts);
    opt = desc.add_options();
    // These should be usable on the command line and shown in help
@@ -2190,7 +2386,8 @@ int main(int argc, char* argv[])
       args = {argv + 1, argv + argc};
    }
 
-   auto parse_args = [&desc, &cfg_opts, &extra_options, &database](
+   auto parse_args = [&desc, &cfg_opts, &extra_options, &database, &usage_settings,
+                      &usage_trusted_proxies](
                          const std::vector<std::string>& args, po::variables_map& vm)
    {
       option_path        = std::filesystem::current_path();
@@ -2226,6 +2423,14 @@ int main(int argc, char* argv[])
          throw std::runtime_error("database is required");
       }
       po::notify(vm);
+      usage_settings.trustedProxies.clear();
+      for (const auto& text : usage_trusted_proxies)
+      {
+         if (auto prefix = psibase::parseIPAddressPrefix(text))
+            usage_settings.trustedProxies.push_back(std::move(*prefix));
+         else
+            throw std::runtime_error("usage-trusted-proxy: not an address prefix: " + text);
+      }
    };
 
    po::variables_map vm;
@@ -2269,7 +2474,8 @@ int main(int argc, char* argv[])
          restart.args.reset();
          run(db_path, db_template, DbConfig{db_cache_policy, db_sync}, AccountNumber{producer}, keys,
              passphrase, pkcs11_modules, listen, mountpoints, http_timeout, service_threads,
-             proof_timeout_ms, root_ca, tls_cert, tls_key, extra_options, restart);
+             proof_timeout_ms, root_ca, tls_cert, tls_key, extra_options, usage_settings,
+             restart);
          if (!restart.args || !restart.args->restart)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

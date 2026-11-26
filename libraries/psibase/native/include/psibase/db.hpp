@@ -118,6 +118,27 @@ namespace psibase
                                                        DbId                  db,
                                                        std::span<const char> key);
 
+      // Several puts and removes of native rows published together: the
+      // write lock of the node-local databases is taken once for the whole
+      // batch, as kvPutSubjective takes it for one row. For native code
+      // that writes many rows off the request path (the usage meter's
+      // flush); keep a batch small, since every section and every other
+      // direct write waits while it is applied. Like the other direct
+      // writes it must not be called on a thread that is inside a section.
+      struct SubjectiveWrite
+      {
+         std::vector<char>                key;
+         std::optional<std::vector<char>> value;  // empty: remove
+      };
+      void kvWriteSubjective(Writer& writer, DbId db, std::span<const SubjectiveWrite> writes);
+      // Every row whose key starts with `prefix`, in key order, from the
+      // current published state.
+      void kvScanSubjective(
+          Writer&               reader,
+          DbId                  db,
+          std::span<const char> prefix,
+          const std::function<void(std::span<const char> key, std::span<const char> value)>& f);
+
       IndependentRevision getSubjective();
       // The write lock of the node-local databases, for a section
       // (Database::checkoutSubjective ... commitSubjective), and, with the

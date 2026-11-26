@@ -12,6 +12,7 @@
 #include <psibase/BlockContext.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/SystemContext.hpp>
+#include <psibase/UsageMeter.hpp>
 #include <psibase/WebSocket.hpp>
 #include <psibase/db.hpp>
 #include <psibase/peer_manager.hpp>
@@ -164,8 +165,20 @@ namespace psibase::http
             p2pState = P2PState::reading;
          }
          channel.set("p2p");
+         // Usage metering: from here on this is a peer connection, and
+         // everything it carries is charged to the peer, by the address of
+         // the connection, for as long as the connection lives. That holds
+         // even if the peer logged in with an account: in this phase usage
+         // is tracked by peer and by account, and a peer is a peer. What the
+         // connection cost before this point (the HTTP request that asked
+         // for the upgrade) stays where it was charged: the account of the
+         // login token, or the address. Connections this node opened get
+         // their record here too; they have none until now.
+         if (auto meter = server.sharedState->usage(); meter->enabled())
+            setUsage(meter->find(UsageIdentity::peer(savedInfo.endpoint)));
          callback(shared_from_this());
       }
+      std::shared_ptr<UsageRecord> usageRecord() const override { return usage(); }
 
       void async_write(std::vector<char>&&                         data,
                        std::function<void(const std::error_code&)> callback) override
@@ -384,6 +397,12 @@ namespace psibase::http
                    }
                    else
                    {
+                      // Usage metering: payload bytes sent, per message
+                      if (auto usage = self->usage())
+                      {
+                         usage->add(UsageField::bytesOut, bytes_transferred);
+                         usage->add(UsageField::messagesOut, 1);
+                      }
                       callback = std::move(self->outbox.front().callback);
                       self->outbox.pop_front();
                    }
@@ -424,6 +443,12 @@ namespace psibase::http
                 }
                 else
                 {
+                   // Usage metering: payload bytes received, per message
+                   if (auto usage = self->usage())
+                   {
+                      usage->add(UsageField::bytesIn, bytes_read);
+                      usage->add(UsageField::messagesIn, 1);
+                   }
                    if (self->handleP2P())
                       return;
                    if (auto l = self->server.sharedState->sockets()->lockRecv(self))

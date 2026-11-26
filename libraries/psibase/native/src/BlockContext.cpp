@@ -1,4 +1,5 @@
 #include <psibase/TransactionContext.hpp>
+#include <psibase/UsageMeter.hpp>
 #include <psibase/saturating.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/finally.hpp>
@@ -457,19 +458,20 @@ namespace psibase
 
    // What a speculative run cost this node in compiles it started: the time
    // the project owner decided is to be charged, node-locally, to whoever
-   // submitted the transaction (gofractally/psibase#2256). No service keeps
-   // such a ledger yet, so this is where the charge would be made and all
-   // that is done is to record it. `run` is the id the transaction service
-   // posted the run under (RTransact's SpeculativeTransactionTable maps it to
-   // the transaction, and so to its sender).
+   // submitted the transaction (gofractally/psibase#2256). It is charged to
+   // the usage record of this context, which callRun set to the identity
+   // that posted the run (gofractally/psibase#2270).
    void BlockContext::reportSpeculativeCompile(std::uint64_t run, std::chrono::nanoseconds time)
    {
       if (time <= std::chrono::nanoseconds(0))
          return;
-      PSIBASE_LOG(trxLogger, info)
+      if (usage)
+         usage->add(UsageField::compileNs, time);
+      PSIBASE_LOG(trxLogger, debug)
           << "Speculative run " << run << " waited "
           << std::chrono::duration_cast<std::chrono::microseconds>(time).count()
-          << " us for service compiles: not charged to its submitter (no subjective ledger)";
+          << " us for service compiles, charged to "
+          << (usage ? to_string(usage->identity) : std::string("nobody (no usage meter)"));
       if (speculativeCompileHook)
          speculativeCompileHook(run, time);
    }
@@ -495,6 +497,19 @@ namespace psibase
             PSIBASE_LOG(trxLogger, warning) << "Wrong run mode should be caught earlier";
             break;
       }
+      // Usage metering: the run, and its continuation, are charged to the
+      // identity that posted the run; whatever they post in turn inherits it.
+      const auto runMode = row.mode().unpack();
+      if (auto meter = systemContext.usage.get(); meter && meter->enabled())
+      {
+         usage = meter->runOrigin(row.id());
+         meter->enforceQuota(usage);
+         if (runMode == RunMode::speculative)
+            usage->add(UsageField::trxPushed, 1);
+         else if (runMode == RunMode::verify)
+            usage->add(UsageField::verifyRuns, 1);
+      }
+
       SignedTransaction  trx;
       TransactionTrace   trace;
       TransactionContext tc{*this, trx, trace, mode};
@@ -537,6 +552,22 @@ namespace psibase
                                        << "::" << action.method.str() << " failed: " << e.what();
       }
 
+      if (usage)
+      {
+         // The time the action ran, compiles excluded (they are charged in
+         // reportSpeculativeCompile).
+         auto time = tc.getBillableTime();
+         if (runMode == RunMode::speculative)
+         {
+            usage->add(trace.error ? UsageField::trialFailed : UsageField::trialOk, 1);
+            usage->add(UsageField::trialNs, time);
+         }
+         else if (runMode == RunMode::verify)
+            usage->add(UsageField::verifyNs, time);
+         else
+            usage->add(UsageField::callbackNs, time);
+      }
+
       try
       {
          auto session = db.startWrite(writer);
@@ -553,6 +584,12 @@ namespace psibase
          TransactionTrace   trace;
          TransactionContext tc{*this, trx, trace, DbMode::rpc()};
          auto&              atrace = trace.actionTraces.emplace_back();
+         auto chargeContinuation = psibase::finally{
+             [&]
+             {
+                if (usage)
+                   usage->add(UsageField::callbackNs, tc.getBillableTime());
+             }};
          tc.execNonTrxAction(0, action, atrace);
          BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
          PSIBASE_LOG(trxLogger, debug) << "async continuation " << action.service.str()

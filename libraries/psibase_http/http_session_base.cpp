@@ -1,6 +1,7 @@
 #include "http_session_base.hpp"
 
 #include <cassert>
+#include <psibase/UsageMeter.hpp>
 
 namespace beast = boost::beast;
 namespace bhttp = beast::http;
@@ -157,10 +158,15 @@ namespace psibase::http
 
    void http_session_base::on_write(bool              close,
                                     beast::error_code ec,
-                                    std::size_t /*bytes_transferred*/)
+                                    std::size_t       bytes_transferred)
    {
       if (_closed)
          return;
+
+      // Usage metering: the bytes of the response that was just written
+      // (head and body), charged to whoever it answered.
+      if (!items.empty() && items.front()->usage)
+         items.front()->usage->add(UsageField::bytesOut, bytes_transferred);
 
       if (ec)
       {
@@ -209,6 +215,8 @@ namespace psibase::http
 
       // Allocate and store the work
       items.push_back(boost::make_unique<work_impl>(*this, std::move(msg)));
+      items.back()->usage = reply_usage ? std::move(reply_usage) : usage;
+      reply_usage.reset();
 
       // If there was no previous work, start this one
       if (items.size() == 1)

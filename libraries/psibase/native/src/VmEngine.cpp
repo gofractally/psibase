@@ -602,9 +602,9 @@ namespace psibase
          // that was given up and that a block has since come to need is a
          // block's compile: it is going to leave a module, and the run
          // waits for it as for any other compile in flight.
-         auto givenUp = [&] { return job->cancelRequested && !job->wanted; };
+         auto gaveUp = [&] { return job->cancelRequested && !job->wanted; };
          compileDone.wait_for(lock, limit,
-                              [&] { return job->done || job->released || givenUp(); });
+                              [&] { return job->done || job->released || gaveUp(); });
          // The run that started the compile stops waiting at the moment the
          // compile's bound passes, and may get here before the thread that
          // watches the bounds: the compile is given up either way.
@@ -612,7 +612,7 @@ namespace psibase
             giveUp(*job);
          if (job->done)
             return {started, job->abandoned ? Wait::abandoned : Wait::finished};
-         return {started, givenUp() ? Wait::abandoned : Wait::inFlight};
+         return {started, gaveUp() ? Wait::abandoned : Wait::inFlight};
       }
 
       bool await(const Key& key, std::optional<std::chrono::nanoseconds> limit)

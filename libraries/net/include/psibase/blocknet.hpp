@@ -20,6 +20,11 @@
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/post.hpp>
 
+namespace psibase
+{
+   struct UsageRecord;
+}
+
 namespace psibase::net
 {
    // round tp to the nearest multiple of d towards negative infinity
@@ -1382,7 +1387,15 @@ namespace psibase::net
 
       void recv(peer_id origin, const WasmProducerMessage& msg)
       {
-         chain().recvMessage(*prods_socket, msg.data);
+         // Usage metering (gofractally/psibase#2270): what this message
+         // costs the node (handling it, and the trial run and signature
+         // checks of a transaction it forwards) is charged to the owner
+         // of the connection it arrived on. msg.producer is what the
+         // message says about itself and is not used for this.
+         std::shared_ptr<UsageRecord> usage;
+         if constexpr (requires { network().connectionUsage(origin); })
+            usage = network().connectionUsage(origin);
+         chain().recvMessage(*prods_socket, msg.data, std::move(usage));
       }
 
       // Default implementations

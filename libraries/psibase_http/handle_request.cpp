@@ -8,6 +8,7 @@
 #include <boost/type_erasure/is_empty.hpp>
 #include <fstream>
 #include <psibase/BlockContext.hpp>
+#include <psibase/UsageMeter.hpp>
 #include <psibase/HttpHeaders.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
@@ -389,6 +390,9 @@ namespace psibase::http
             BOOST_LOG_SCOPED_LOGGER_TAG(logger, "ResponseTime",
                                         std::chrono::duration_cast<std::chrono::microseconds>(
                                             endTime - queryTimes.startTime));
+            // Usage metering: the reply belongs to this request's identity,
+            // whatever the connection is doing by now.
+            session->reply_usage = this->usage();
             (*session)(make_reply(this));
          }
          if (session->can_read())
@@ -757,6 +761,76 @@ namespace psibase::http
           std::move(req), send.shared_from_this(), std::forward<F>(f), std::forward<E>(e));
    }
 
+   namespace
+   {
+      // Usage metering (gofractally/psibase#2270).
+
+      // The size of a request as the client sent it, near enough: the
+      // request line, the header fields and the body. Taken from the parsed
+      // message, not from the read, which can run into the next request of
+      // a pipelining client.
+      std::uint64_t requestBytes(const http_session_base::request_type& req)
+      {
+         // "METHOD target HTTP/1.1\r\n" and the empty line
+         std::uint64_t result = req.method_string().size() + req.target().size() + 12 + 2;
+         for (const auto& field : req)
+            // "name: value\r\n"
+            result += field.name_string().size() + field.value().size() + 4;
+         return result + req.body().size();
+      }
+
+      // The record an unauthenticated request is charged to: the client's
+      // address, kept with the connection (UsageConnection). Forwarding
+      // headers are looked at only if the transport peer is a trusted
+      // proxy, and resolved again only when they differ from the last
+      // request's. Otherwise a request costs nothing here.
+      const std::shared_ptr<UsageRecord>& resolveUsage(UsageMeter&                            meter,
+                                                       const http_session_base::request_type& req,
+                                                       http_session_base&                     session)
+      {
+         static const std::shared_ptr<UsageRecord> none;
+         if (!meter.enabled())
+            return none;
+         auto& connection = session.usage_connection;
+         bool  trusted    = connection.trusted(meter,
+                                               [&]() -> std::optional<SocketEndpoint>
+                                               {
+                                                  try
+                                                  {
+                                                     return session.remote_endpoint();
+                                                  }
+                                                  catch (...)
+                                                  {
+                                                     // The peer is gone; its
+                                                     // requests are still counted
+                                                     return std::nullopt;
+                                                  }
+                                               });
+         // Proxies send one or two of these; more than fit are not believed
+         std::array<UsageConnection::ForwardedHeader, 8> forwarded;
+         std::size_t                                     count = 0;
+         if (trusted)
+         {
+            for (const auto& field : req)
+            {
+               auto name = field.name_string();
+               if (boost::beast::iequals(name, "forwarded") ||
+                   boost::beast::iequals(name, "x-forwarded-for"))
+               {
+                  if (count == forwarded.size())
+                  {
+                     count = 0;
+                     break;
+                  }
+                  auto value         = field.value();
+                  forwarded[count++] = {{name.data(), name.size()}, {value.data(), value.size()}};
+               }
+            }
+         }
+         return connection.record(meter, std::span{forwarded}.first(count));
+      }
+   }  // namespace
+
    // This function produces an HTTP response for the given
    // request. The type of the response object depends on the
    // contents of the request, so the interface requires the
@@ -767,6 +841,36 @@ namespace psibase::http
    {
       auto [req_host, req_target] = parse_request_target(req);
       HttpReplyBuilder builder{server, req};
+
+      // Usage metering: one request, its bytes, and the wall clock of this
+      // function, charged when it returns to whoever the request belongs
+      // to by then: the client's address, or the account if the request
+      // turned out to be authenticated while it was served.
+      auto usageStart = steady_clock::now();
+      if (!send.usage_meter)
+         send.usage_meter = server.sharedState->usage();
+      UsageMeter* const usageMeter = send.usage_meter.get();
+      // Refers to the connection's own copy: no reference count is touched
+      const std::shared_ptr<UsageRecord>& usageRecord = resolveUsage(*usageMeter, req, send);
+      if (send.usage != usageRecord)
+         send.usage = usageRecord;
+      std::shared_ptr<Socket> usageSocket;
+      send.reply_usage.reset();
+      psibase::finally chargeUsage{
+          [&, bytes = usageRecord ? requestBytes(req) : 0]
+          {
+             if (!usageRecord)
+                return;
+             // The socket's record if the request became an account's
+             // while it was served; otherwise the connection's, uncopied.
+             std::shared_ptr<UsageRecord> changed;
+             if (usageSocket)
+                changed = usageSocket->usageUnless(usageRecord.get());
+             UsageRecord* who = changed ? changed.get() : usageRecord.get();
+             who->add(UsageField::requests, 1);
+             who->add(UsageField::bytesIn, bytes);
+             who->add(UsageField::requestNs, steady_clock::now() - usageStart);
+          }};
 
       try
       {
@@ -779,7 +883,8 @@ namespace psibase::http
          {
             auto [host, port] = split_port(req_host);
 
-            auto        startTime = steady_clock::now();
+            // The one reading of the clock at the start of a request
+            auto        startTime = usageStart;
             HttpRequest data;
             for (auto iter = req.begin(); iter != req.end(); ++iter)
             {
@@ -836,6 +941,8 @@ namespace psibase::http
             BlockContext  bc{*system, system->sharedDatabase.getHead(),
                             system->sharedDatabase.createWriter(), true};
             bc.start();
+            // Runs posted while this request is served are charged to it
+            bc.usage = usageRecord;
 
             auto socket = makeHttpSocket(
                 std::move(req), send,
@@ -855,6 +962,9 @@ namespace psibase::http
                 },
                 [builder](const std::string& message)
                 { return builder.error(bhttp::status::internal_server_error, message); });
+            socket->setUsage(usageRecord);
+            usageSocket = socket;
+            usageMeter->enforceQuota(usageRecord);
 
             {
                SignedTransaction  trx;

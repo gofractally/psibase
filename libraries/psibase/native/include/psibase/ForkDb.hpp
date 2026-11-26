@@ -8,6 +8,7 @@
 #include <psibase/KvMerkle.hpp>
 #include <psibase/Prover.hpp>
 #include <psibase/Socket.hpp>
+#include <psibase/UsageMeter.hpp>
 #include <psibase/VerifyProver.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
@@ -2049,7 +2050,11 @@ namespace psibase
       void onSocketOpen(auto&& fn) { dbCallbacks.socketOpen = fn; }
       void onSocketP2P(auto&& fn) { dbCallbacks.socketP2P = fn; }
 
-      void recvMessage(const Socket& sock, const std::vector<char>& data)
+      // `usage`: who the message is charged to (the owner of the connection
+      // it arrived on); null if nobody is.
+      void recvMessage(const Socket&                sock,
+                       const std::vector<char>&     data,
+                       std::shared_ptr<UsageRecord> usage = nullptr)
       {
          Action action{.service = proxyServiceNum,
                        .rawData = psio::to_pssz(std::tuple(sock.id, data, std::uint32_t{0}))};
@@ -2057,6 +2062,17 @@ namespace psibase
          // TODO: This can run concurrently
          BlockContext     bc{*systemContext, systemContext->sharedDatabase.getHead(),
                              systemContext->sharedDatabase.createWriter(), true};
+         // Usage metering: the wall clock of handling the message; runs it
+         // posts are charged to the same record.
+         bc.usage          = usage;
+         auto usageStart   = std::chrono::steady_clock::now();
+         auto chargeUsage  = psibase::finally{
+             [&]
+             {
+                if (usage)
+                   usage->add(UsageField::requestNs,
+                              std::chrono::steady_clock::now() - usageStart);
+             }};
          TransactionTrace trace;
          try
          {

@@ -432,6 +432,7 @@ _default_config = '''# psinode config
 mount  = $PSIBASE_DATADIR/packages
 
 http-timeout = 4
+usage-flush-interval = 1
 %s
 [logger.stderr]
 type   = console

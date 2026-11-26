@@ -5,6 +5,7 @@
 #include <psibase/PsizamPolicy.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
+#include <psibase/UsageMeter.hpp>
 #include <psibase/saturating.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/finally.hpp>
@@ -270,6 +271,43 @@ namespace psibase
          }
       }
 
+      // Usage metering (gofractally/psibase#2270): the identity whose
+      // request, message or run is executing is remembered as the origin of
+      // a run it posts, in memory, keyed by the run's id, until the row is
+      // removed. Nothing is written for it. The write may belong to a
+      // subjective transaction that is retried or abandoned; remembering
+      // an origin for a run that never exists costs one map entry.
+      std::optional<std::uint64_t> runIdOfKey(std::span<const char> key)
+      {
+         static const auto prefix = psio::to_key(runPrefix());
+         if (key.size() != prefix.size() + 8 ||
+             std::memcmp(key.data(), prefix.data(), prefix.size()) != 0)
+            return {};
+         std::uint64_t id = 0;
+         for (std::size_t i = 0; i < 8; ++i)
+            id = (id << 8) | static_cast<unsigned char>(key[prefix.size() + i]);
+         return id;
+      }
+
+      void noteRunPosted(TransactionContext& tc, std::span<const char> key)
+      {
+         auto& bc    = tc.blockContext;
+         auto  meter = bc.systemContext.usage.get();
+         if (!meter || !meter->enabled())
+            return;
+         if (auto id = runIdOfKey(key))
+            meter->setRunOrigin(*id, bc.usage ? bc.usage : meter->node());
+      }
+
+      void noteRunRemoved(TransactionContext& tc, std::span<const char> key)
+      {
+         auto meter = tc.blockContext.systemContext.usage.get();
+         if (!meter || !meter->enabled())
+            return;
+         if (auto id = runIdOfKey(key))
+            meter->clearRunOrigin(*id);
+      }
+
       void verifyScheduledSnapshotRow(std::span<const char> key, std::span<const char> value)
       {
          check(psio::validate_strict<ScheduledSnapshotRow>(psio::pssz{}, value).ok(),
@@ -407,7 +445,46 @@ namespace psibase
             throw std::runtime_error("Unrecognized key in nativeSubjective");
       }
 
-      void verifyWriteSession(TransactionContext& context,
+      // Usage metering (gofractally/psibase#2270): SocketIdentityRow is a
+      // message, not a row. A local service (x-http) writes it once it has
+      // verified the login token of the request on socket `fd`; from then
+      // on that request is charged to the account instead of the client's
+      // address: its socket (the request's counts, the reply, a websocket
+      // it becomes) and, if this context is serving that request, the runs
+      // it posts. Nothing is stored.
+      void applySocketIdentity(TransactionContext& tc,
+                               std::span<const char> key,
+                               std::span<const char> value)
+      {
+         check(psio::validate_strict<SocketIdentityRow>(psio::pssz{}, value).ok(),
+               "SocketIdentityRow has invalid format");
+         auto row      = psio::from_pssz<SocketIdentityRow>(psio::trusted{value});
+         auto expected = psio::to_key(row.key());
+         check(key.size() == expected.size() &&
+                   !std::memcmp(key.data(), expected.data(), key.size()),
+               "SocketIdentityRow has incorrect key");
+         auto& bc    = tc.blockContext;
+         auto  meter = bc.systemContext.usage.get();
+         if (!meter || !meter->enabled())
+            return;
+         auto identity = UsageIdentity::account(row.account);
+         check(isValid(identity), "SocketIdentityRow does not name an account");
+         auto socket = bc.systemContext.sockets->get(row.fd);
+         if (!socket)
+            return;
+         auto previous = socket->usage();
+         // A peer connection stays a peer's, whoever the peer logged in as
+         if (previous && previous->identity.kind == UsageKind::peer)
+            return;
+         auto record   = meter->find(identity);
+         socket->setUsage(record);
+         // Only the context that serves this socket's request changes with it
+         if (bc.usage && bc.usage == previous)
+            bc.usage = record;
+      }
+
+      // Returns false if the write was consumed and must not be stored.
+      bool verifyWriteSession(TransactionContext& context,
                               std::span<const char>  key,
                               std::span<const char>  value)
       {
@@ -425,8 +502,14 @@ namespace psibase
             verifyPendingShutdownRow(context, key, value);
          else if (table == timerTable)
             verifyTimerRow(context.blockContext.db, key, value);
+         else if (table == socketIdentityTable)
+         {
+            applySocketIdentity(context, key, value);
+            return false;
+         }
          else
             throw std::runtime_error("Unrecognized key in nativeSession");
+         return true;
       }
 
       void verifyRemoveConstrained(TransactionContext& context,
@@ -815,10 +898,13 @@ namespace psibase
              {
                 verifyWriteSubjective(database, fullKey, {value.data(), value.size()});
                 admitStoredCode(transactionContext, fullKey, {value.data(), value.size()});
+                noteRunPosted(transactionContext, fullKey);
              }
              else if (bucketDb == DbId::nativeSession)
              {
-                verifyWriteSession(transactionContext, fullKey, {value.data(), value.size()});
+                if (!verifyWriteSession(transactionContext, fullKey,
+                                        {value.data(), value.size()}))
+                   return;
              }
              database.kvPutRaw(bucketDb, {fullKey.data(), fullKey.size()},
                                {value.data(), value.size()});
@@ -854,6 +940,8 @@ namespace psibase
                           notifyKvMut(*this, bucketDb, fullKey.size(), existing->size(), -1);
                        }
                     }
+                    if (bucketDb == DbId::nativeSubjective)
+                       noteRunRemoved(transactionContext, fullKey);
                     database.kvRemoveRaw(bucketDb, fullKey);
                  });
    }
