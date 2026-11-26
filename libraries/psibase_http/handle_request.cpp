@@ -780,52 +780,54 @@ namespace psibase::http
       }
 
       // The record an unauthenticated request is charged to: the client's
-      // address. Forwarding headers are read only if the transport peer is
-      // a trusted proxy (psibase::UsageIdentity::resolve). A connection whose peer
-      // is not one pays for this once.
-      std::shared_ptr<UsageRecord> resolveUsage(UsageMeter&                            meter,
-                                                const http_session_base::request_type& req,
-                                                http_session_base&                     session)
+      // address, kept with the connection (UsageConnection). Forwarding
+      // headers are looked at only if the transport peer is a trusted
+      // proxy, and resolved again only when they differ from the last
+      // request's. Otherwise a request costs nothing here.
+      const std::shared_ptr<UsageRecord>& resolveUsage(UsageMeter&                            meter,
+                                                       const http_session_base::request_type& req,
+                                                       http_session_base&                     session)
       {
+         static const std::shared_ptr<UsageRecord> none;
          if (!meter.enabled())
-            return nullptr;
-         const auto& proxies = meter.settings().trustedProxies;
-         bool        reuse   = session.usage_resolved && session.usage_direct && session.usage &&
-                               !session.usage->detached() &&
-                               !isAggregate(session.usage->identity.kind);
-         if (reuse && !session.usage_trusted)
-            return session.usage;
-         std::optional<SocketEndpoint> endpoint;
-         try
-         {
-            endpoint = session.remote_endpoint();
-         }
-         catch (...)
-         {
-            // The peer is gone; the request is still counted
-         }
-         bool trusted = endpoint && isTrustedUsageProxy(*endpoint, proxies);
-         std::vector<std::optional<IPAddress>> forwarded;
+            return none;
+         auto& connection = session.usage_connection;
+         bool  trusted    = connection.trusted(meter,
+                                               [&]() -> std::optional<SocketEndpoint>
+                                               {
+                                                  try
+                                                  {
+                                                     return session.remote_endpoint();
+                                                  }
+                                                  catch (...)
+                                                  {
+                                                     // The peer is gone; its
+                                                     // requests are still counted
+                                                     return std::nullopt;
+                                                  }
+                                               });
+         // Proxies send one or two of these; more than fit are not believed
+         std::array<UsageConnection::ForwardedHeader, 8> forwarded;
+         std::size_t                                     count = 0;
          if (trusted)
          {
-            HttpRequest headers;
             for (const auto& field : req)
             {
-               HttpHeader header{std::string(field.name_string()), std::string(field.value())};
-               if (header.matches("forwarded") || header.matches("x-forwarded-for"))
-                  headers.headers.push_back(std::move(header));
+               auto name = field.name_string();
+               if (boost::beast::iequals(name, "forwarded") ||
+                   boost::beast::iequals(name, "x-forwarded-for"))
+               {
+                  if (count == forwarded.size())
+                  {
+                     count = 0;
+                     break;
+                  }
+                  auto value         = field.value();
+                  forwarded[count++] = {{name.data(), name.size()}, {value.data(), value.size()}};
+               }
             }
-            if (!headers.headers.empty())
-               forwarded = forwardedFor(headers);
-            else if (reuse)
-               return session.usage;
          }
-         auto identity          = UsageIdentity::resolve(endpoint, forwarded, proxies);
-         session.usage          = meter.find(identity, session.usage);
-         session.usage_resolved = true;
-         session.usage_trusted  = trusted;
-         session.usage_direct   = forwarded.empty();
-         return session.usage;
+         return connection.record(meter, std::span{forwarded}.first(count));
       }
    }  // namespace
 
@@ -844,19 +846,27 @@ namespace psibase::http
       // function, charged when it returns to whoever the request belongs
       // to by then: the client's address, or the account if the request
       // turned out to be authenticated while it was served.
-      auto                         usageStart = steady_clock::now();
-      auto                         usageMeter = server.sharedState->usage();
-      std::shared_ptr<UsageRecord> usageRecord = resolveUsage(*usageMeter, req, send);
-      std::shared_ptr<Socket>      usageSocket;
+      auto usageStart = steady_clock::now();
+      if (!send.usage_meter)
+         send.usage_meter = server.sharedState->usage();
+      UsageMeter* const usageMeter = send.usage_meter.get();
+      // Refers to the connection's own copy: no reference count is touched
+      const std::shared_ptr<UsageRecord>& usageRecord = resolveUsage(*usageMeter, req, send);
+      if (send.usage != usageRecord)
+         send.usage = usageRecord;
+      std::shared_ptr<Socket> usageSocket;
       send.reply_usage.reset();
       psibase::finally chargeUsage{
           [&, bytes = usageRecord ? requestBytes(req) : 0]
           {
              if (!usageRecord)
                 return;
-             auto who = usageSocket ? usageSocket->usage() : nullptr;
-             if (!who)
-                who = usageRecord;
+             // The socket's record if the request became an account's
+             // while it was served; otherwise the connection's, uncopied.
+             std::shared_ptr<UsageRecord> changed;
+             if (usageSocket)
+                changed = usageSocket->usageUnless(usageRecord.get());
+             UsageRecord* who = changed ? changed.get() : usageRecord.get();
              who->add(UsageField::requests, 1);
              who->add(UsageField::bytesIn, bytes);
              who->add(UsageField::requestNs, steady_clock::now() - usageStart);
@@ -873,7 +883,8 @@ namespace psibase::http
          {
             auto [host, port] = split_port(req_host);
 
-            auto        startTime = steady_clock::now();
+            // The one reading of the clock at the start of a request
+            auto        startTime = usageStart;
             HttpRequest data;
             for (auto iter = req.begin(); iter != req.end(); ++iter)
             {

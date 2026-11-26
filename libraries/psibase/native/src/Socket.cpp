@@ -109,6 +109,14 @@ std::shared_ptr<UsageRecord> Socket::usage() const
    return usageRecord;
 }
 
+std::shared_ptr<UsageRecord> Socket::usageUnless(const UsageRecord* same) const
+{
+   std::lock_guard l{usageMutex};
+   if (usageRecord.get() == same)
+      return nullptr;
+   return usageRecord;
+}
+
 void Socket::setUsage(std::shared_ptr<UsageRecord> record)
 {
    std::lock_guard l{usageMutex};

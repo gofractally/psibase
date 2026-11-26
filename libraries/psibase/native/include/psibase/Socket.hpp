@@ -55,6 +55,8 @@ namespace psibase
       // another thread than the one that sends, hence the lock.
       std::shared_ptr<UsageRecord> usage() const;
       void                         setUsage(std::shared_ptr<UsageRecord> record);
+      // The record, unless it is `same` (then null, and nothing is copied)
+      std::shared_ptr<UsageRecord> usageUnless(const UsageRecord* same) const;
 
       std::int32_t           id;
       bool                   closed = false;

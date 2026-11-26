@@ -963,3 +963,137 @@ TEST_CASE("usage meter: flush cost", "[.bench]")
    other.join();
    CHECK(sumRequests(shared, *writer) == handles.size() * 7 + 200 * 6);
 }
+
+TEST_CASE("usage connection: the identity is resolved once and follows the forwarding headers")
+{
+   TestMeter t;
+   using H = UsageConnection::ForwardedHeader;
+   unsigned  lookups = 0;
+   auto      loopback = [&]() -> std::optional<SocketEndpoint>
+   {
+      ++lookups;
+      return tcp("127.0.0.1");
+   };
+   UsageConnection proxied;
+   REQUIRE(proxied.trusted(t.meter, loopback));
+   CHECK(proxied.record(t.meter, {})->identity == id("local:loopback"));
+   std::vector<H> one{{"X-Forwarded-For", "198.51.100.7"}};
+   auto           first = proxied.record(t.meter, one);
+   CHECK(first->identity == id("ip:198.51.100.7"));
+   // The same headers again: the same record, the peer is not asked again
+   for (int i = 0; i < 3; ++i)
+   {
+      REQUIRE(proxied.trusted(t.meter, loopback));
+      CHECK(proxied.record(t.meter, one) == first);
+   }
+   CHECK(lookups == 1);
+   // Another client through the same proxy connection
+   std::vector<H> other{{"X-Forwarded-For", "198.51.100.8"}};
+   CHECK(proxied.record(t.meter, other)->identity == id("ip:198.51.100.8"));
+   CHECK(proxied.record(t.meter, one) == first);
+   std::vector<H> two{{"Forwarded", "for=203.0.113.9"}, {"X-Forwarded-For", "198.51.100.7"}};
+   CHECK(proxied.record(t.meter, two)->identity == id("ip:198.51.100.7"));
+   // No headers: the proxy itself again
+   CHECK(proxied.record(t.meter, {})->identity == id("local:loopback"));
+
+   // A direct client: its headers are never asked for
+   UsageConnection direct;
+   CHECK(!direct.trusted(t.meter, [&]() -> std::optional<SocketEndpoint> { return tcp("203.0.113.7"); }));
+   auto mine = direct.record(t.meter, {});
+   CHECK(mine->identity == id("ip:203.0.113.7"));
+   CHECK(direct.record(t.meter, {}) == mine);
+
+   // A kept record that was dropped is looked up again
+   mine->add(UsageField::requests, 1);
+   t.meter.collect();
+   t.now += 100 * 24 * 3600;
+   t.meter.collect();
+   REQUIRE(mine->detached());
+   auto again = direct.record(t.meter, {});
+   CHECK(again != mine);
+   CHECK(again->identity == id("ip:203.0.113.7"));
+
+   // Off: nothing
+   UsageSettings off;
+   off.enabled = false;
+   UsageMeter      disabled{off};
+   UsageConnection none;
+   none.trusted(disabled, loopback);
+   CHECK(!none.record(disabled, one));
+}
+
+// Not part of the suite: UsageMeterTests "[.request]". What metering costs
+// one HTTP request, without the HTTP: the identity of the request from its
+// connection, the references the request takes on the record (the serving
+// context, the request's socket, the reply) and the counters it adds to.
+// "before" is what the request path did until the identity was kept with
+// the connection: the peer looked up, the headers copied and parsed, the
+// identity formatted and looked up, on every request.
+TEST_CASE("usage meter: cost per request", "[.request]")
+{
+   using H = UsageConnection::ForwardedHeader;
+   auto run = [](const char* label, unsigned threads, bool sameIdentity, bool proxied, bool before)
+   {
+      UsageMeter               meter;
+      constexpr unsigned       requests = 400000;
+      std::atomic<bool>        go{false};
+      std::vector<std::thread> pool;
+      std::vector<double>      ns(threads);
+      for (unsigned t = 0; t < threads; ++t)
+         pool.emplace_back(
+             [&, t]
+             {
+                auto address = sameIdentity ? std::string("198.51.100.7")
+                                            : "198.51.100." + std::to_string(10 + t);
+                auto peer    = proxied ? tcp("127.0.0.1")
+                                       : tcp(sameIdentity ? "203.0.113.7"
+                                                          : "203.0.113." + std::to_string(10 + t));
+                std::vector<H>  headers;
+                if (proxied)
+                   headers.push_back({"X-Forwarded-For", address});
+                UsageConnection connection;
+                while (!go)
+                   std::this_thread::yield();
+                auto start = std::chrono::steady_clock::now();
+                for (unsigned i = 0; i < requests; ++i)
+                {
+                   if (before)
+                      connection = {};
+                   auto begin = std::chrono::steady_clock::now();
+                   bool trusted = connection.trusted(
+                       meter, [&]() -> std::optional<SocketEndpoint> { return peer; });
+                   const auto& record = connection.record(
+                       meter, trusted ? std::span<const H>{headers} : std::span<const H>{});
+                   // the serving context, the request's socket, the reply
+                   UsageHandle context = record, socket = record, reply = socket;
+                   record->add(UsageField::requests, 1);
+                   record->add(UsageField::bytesIn, 300);
+                   record->add(UsageField::requestNs, std::chrono::steady_clock::now() - begin);
+                   reply->add(UsageField::bytesOut, 300);
+                }
+                ns[t] = std::chrono::duration<double, std::nano>(
+                            std::chrono::steady_clock::now() - start)
+                            .count() /
+                        requests;
+             });
+      go = true;
+      for (auto& thread : pool)
+         thread.join();
+      std::ranges::sort(ns);
+      std::printf("%-58s %2u threads: %7.1f ns per request (median thread), slowest %7.1f\n", label,
+                  threads, ns[ns.size() / 2], ns.back());
+      std::uint64_t total = 0;
+      for (const auto& row : meter.rows())
+         total += row.total.requests;
+      CHECK(total == std::uint64_t{requests} * threads);
+   };
+   for (unsigned threads : {1u, 16u})
+   {
+      run("direct client, one identity", threads, true, false, false);
+      run("direct client, an identity per thread", threads, false, false, false);
+      run("behind a proxy, one identity", threads, true, true, false);
+      run("behind a proxy, an identity per thread", threads, false, true, false);
+      run("before: behind a proxy, resolved per request, one id", threads, true, true, true);
+      run("before: direct client resolved per request, one id", threads, true, false, true);
+   }
+}

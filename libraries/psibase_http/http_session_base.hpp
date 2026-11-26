@@ -11,16 +11,13 @@
 #include <memory>
 #include <optional>
 #include <psibase/http.hpp>
+#include <psibase/UsageMeter.hpp>
 #include <psibase/log.hpp>
 #include <tuple>
 #include <vector>
 
 #include "server_state.hpp"
 
-namespace psibase
-{
-   struct UsageRecord;
-}
 
 namespace psibase::http
 {
@@ -90,17 +87,16 @@ namespace psibase::http
 
       // Usage metering (gofractally/psibase#2270).
       //
-      // The record of the request being handled: handle_request sets it,
-      // and the response is charged to it unless reply_usage names another
-      // (a request whose identity changed while it was served).
+      // The meter (kept so that a request does not copy a shared pointer
+      // every thread shares), the identity of this connection, resolved
+      // once (UsageConnection), the record of the request being handled,
+      // which handle_request sets, and the record a response is charged to
+      // if it is not that one (a request whose identity changed while it
+      // was served).
+      std::shared_ptr<UsageMeter>  usage_meter;
+      UsageConnection              usage_connection;
       std::shared_ptr<UsageRecord> usage;
       std::shared_ptr<UsageRecord> reply_usage;
-      // The transport peer is looked at once per connection: whether its
-      // forwarding headers are believed, and whether `usage` is the record
-      // of the peer itself (true) or of a forwarded address (false).
-      bool usage_resolved = false;
-      bool usage_trusted  = false;
-      bool usage_direct   = false;
 
       // Returns `true` if we have reached the queue limit
       bool is_full() const { return items.size() >= limit; }

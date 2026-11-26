@@ -1,5 +1,8 @@
 #include <psibase/UsageMeter.hpp>
 
+#include <psibase/HttpHeaders.hpp>
+#include <psibase/Rpc.hpp>
+
 #include <psio/key.hpp>
 #include <psio/pssz.hpp>
 
@@ -454,5 +457,37 @@ namespace psibase
       auto result        = writeFlush(db, writer);
       result.collectTime = collectTime;
       return result;
+   }
+
+   const UsageHandle& UsageConnection::record(UsageMeter&                      meter,
+                                              std::span<const ForwardedHeader> forwarded)
+   {
+      static const UsageHandle none;
+      if (!meter.enabled())
+         return none;
+      const auto& proxies = meter.settings().trustedProxies;
+      if (forwarded.empty())
+      {
+         if (!usable(direct_))
+            direct_ = meter.find(UsageIdentity::resolve(endpoint_, {}, proxies), direct_);
+         return direct_;
+      }
+      bool same = usable(forwarded_) && forwardedKey_.size() == forwarded.size();
+      for (std::size_t i = 0; same && i < forwarded.size(); ++i)
+         same = forwardedKey_[i].second == forwarded[i].value &&
+                forwardedKey_[i].first == forwarded[i].name;
+      if (!same)
+      {
+         HttpRequest headers;
+         forwardedKey_.clear();
+         for (const auto& h : forwarded)
+         {
+            headers.headers.push_back({std::string(h.name), std::string(h.value)});
+            forwardedKey_.emplace_back(h.name, h.value);
+         }
+         forwarded_ = meter.find(
+             UsageIdentity::resolve(endpoint_, forwardedFor(headers), proxies), forwarded_);
+      }
+      return forwarded_;
    }
 }  // namespace psibase

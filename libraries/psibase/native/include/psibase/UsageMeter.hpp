@@ -18,6 +18,8 @@
 #include <psibase/db.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/usage.hpp>
+#include <span>
+#include <string_view>
 
 #include <array>
 #include <atomic>
@@ -238,5 +240,61 @@ namespace psibase
       std::mutex                                     runMutex_;
       // Ordered: run ids grow, so the first entry is the oldest.
       std::map<std::uint64_t, UsageHandle> runOrigins_;
+   };
+
+   // The identity of one client connection, resolved once and kept with the
+   // connection (the HTTP session), so that a request costs no lookup, no
+   // lock, no allocation and no system call:
+   //
+   //  - The transport peer is looked at once: its address, whether its
+   //    forwarding headers are believed, and its own record.
+   //  - Behind a trusted proxy the client is named by the request's
+   //    forwarding headers. The record found for one set of header values
+   //    is kept, and the next request is compared with those values; only a
+   //    request whose headers differ is resolved again.
+   //  - A kept record is looked up again if it was dropped or evicted in
+   //    the meantime, or if it is an overflow record (the table was full).
+   //
+   // Not thread-safe: a connection handles one request at a time.
+   class UsageConnection
+   {
+     public:
+      struct ForwardedHeader
+      {
+         std::string_view name;   // "Forwarded" or "X-Forwarded-For"
+         std::string_view value;
+      };
+
+      // First: whether the request's forwarding headers are to be passed to
+      // record(). `endpoint()` is called once per connection and returns
+      // the transport peer (std::optional<SocketEndpoint>).
+      template <typename F>
+      bool trusted(UsageMeter& meter, F&& endpoint)
+      {
+         if (!resolved_)
+         {
+            endpoint_ = endpoint();
+            trusted_  = endpoint_ && isTrustedUsageProxy(*endpoint_, meter.settings().trustedProxies);
+            resolved_ = true;
+         }
+         return trusted_;
+      }
+      // Then: the record this request is charged to (null if metering is
+      // off). `forwarded` are the request's Forwarded and X-Forwarded-For
+      // headers in order, empty if the peer is not trusted or sent none.
+      const UsageHandle& record(UsageMeter& meter, std::span<const ForwardedHeader> forwarded);
+
+     private:
+      static bool usable(const UsageHandle& handle)
+      {
+         return handle && !handle->detached() && !isAggregate(handle->identity.kind);
+      }
+      bool                                             resolved_ = false;
+      bool                                             trusted_  = false;
+      std::optional<SocketEndpoint>                    endpoint_;
+      UsageHandle                                      direct_;
+      // What forwarded_ was resolved from
+      std::vector<std::pair<std::string, std::string>> forwardedKey_;
+      UsageHandle                                      forwarded_;
    };
 }  // namespace psibase
