@@ -59,6 +59,8 @@ namespace psibase
       std::mutex              mutex;
       std::condition_variable cond;
       std::vector<Watchdog*>  children;
+      // DIAGNOSTIC: every live watchdog, also one that has fired.
+      std::vector<Watchdog*>  diagLive;
       bool                    done = false;
       // When the worker will next look at the deadlines if nothing wakes it.
       // Guarded by mutex; the worker holds the mutex whenever it is awake.
@@ -103,6 +105,12 @@ namespace psibase
       RunClock::time_point  runningSince;
       RunClock::duration    limit = RunClock::duration::max();
       std::function<void()> handler;
+      // DIAGNOSTIC (gofractally/psibase#2263), guarded by the manager's mutex.
+      bool                 diagFired = false;
+      RunClock::time_point diagFiredAt{};
+      RunClock::time_point diagPausedAt{};
+      RunClock::time_point diagCreated{};
+      unsigned             diagSetLimits = 0, diagPauses = 0, diagResumes = 0;
    };
 
 }  // namespace psibase

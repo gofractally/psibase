@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdio>
+#include <cstdlib>
 
 namespace psibase
 {
@@ -34,6 +36,8 @@ namespace psibase
    {
       std::lock_guard l{mutex};
       children.push_back(wd);
+      diagLive.push_back(wd);
+      wd->diagCreated = RunClock::now();
       deadlineChanged(wd->deadline());
    }
    void WatchdogManager::remove(Watchdog* wd)
@@ -44,6 +48,7 @@ namespace psibase
       auto            pos = std::find(children.begin(), children.end(), wd);
       if (pos != children.end())
          children.erase(pos);
+      std::erase(diagLive, wd);
    }
    void WatchdogManager::run()
    {
@@ -61,6 +66,8 @@ namespace psibase
             const auto deadline = child->deadline();
             if (deadline && *deadline <= now)
             {
+               child->diagFired   = true;
+               child->diagFiredAt = now;
                child->interrupt();
             }
             else
@@ -71,6 +78,37 @@ namespace psibase
             }
          }
          children.erase(keep, children.end());
+         // DIAGNOSTIC: a run that is still alive long after it should have
+         // been stopped, or that has been paused for a long time.
+         for (Watchdog* w : diagLive)
+         {
+            using std::chrono::duration_cast;
+            using ms = std::chrono::milliseconds;
+            const bool lostInterrupt = w->diagFired && now - w->diagFiredAt > std::chrono::seconds(8);
+            const bool longPause     = w->paused && now - w->diagPausedAt > std::chrono::seconds(8);
+            const bool neverLimited  = !w->diagFired && !w->paused &&
+                                       now - w->diagCreated > std::chrono::seconds(20);
+            if (lostInterrupt || longPause || neverLimited)
+            {
+               std::fprintf(stderr,
+                            "WATCHDOG-DIAG %s: fired=%d firedAgo=%lldms paused=%d pausedAgo=%lldms "
+                            "age=%lldms limit=%lldms accumulated=%lldms runningFor=%lldms inChildren=%d "
+                            "setLimits=%u pauses=%u resumes=%u cancelled=%d\n",
+                            lostInterrupt ? "LOST-INTERRUPT" : longPause ? "LONG-PAUSE" : "NO-DEADLINE",
+                            w->diagFired, (long long)duration_cast<ms>(now - w->diagFiredAt).count(),
+                            w->paused, (long long)duration_cast<ms>(now - w->diagPausedAt).count(),
+                            (long long)duration_cast<ms>(now - w->diagCreated).count(),
+                            w->limit == RunClock::duration::max()
+                                ? -1ll
+                                : (long long)duration_cast<ms>(w->limit).count(),
+                            (long long)duration_cast<ms>(w->accumulated).count(),
+                            (long long)duration_cast<ms>(now - w->runningSince).count(),
+                            int(std::find(children.begin(), children.end(), w) != children.end()),
+                            w->diagSetLimits, w->diagPauses, w->diagResumes, 0);
+               std::fflush(stderr);
+               std::abort();
+            }
+         }
          nextLook = look;
          cond.wait_until(l, toSteady(look));
       }
@@ -94,6 +132,7 @@ namespace psibase
       assert(dur.count() >= 0);
       std::lock_guard l{manager->mutex};
       limit = dur;
+      ++diagSetLimits;
       manager->deadlineChanged(deadline());
    }
    void Watchdog::pause()
@@ -102,6 +141,8 @@ namespace psibase
       assert(!paused);
       accumulated = elapsedAt(RunClock::now());
       paused      = true;
+      diagPausedAt = RunClock::now();
+      ++diagPauses;
    }
    void Watchdog::resume()
    {
@@ -109,6 +150,7 @@ namespace psibase
       assert(paused);
       paused       = false;
       runningSince = RunClock::now();
+      ++diagResumes;
       manager->deadlineChanged(deadline());
    }
    RunClock::duration Watchdog::elapsed()
