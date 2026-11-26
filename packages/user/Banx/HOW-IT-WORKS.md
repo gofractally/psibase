@@ -285,7 +285,9 @@ Invoice `counterparty` may be 0. Please-book requires a named, existing account.
 
 ## Claim offers (buy / sell a claim)
 
-Not a path payment. You transfer a claim on a **debtor** to a **buyer**. The seller receives face after the **maker’s** spread as a claim on the buyer (0% APR). The moved claim **keeps its existing APR**.
+Not a path payment. You transfer a claim on a **debtor** to a **buyer**. The seller receives face after the **maker’s** spread as a 0% claim on the buyer. The moved claim **keeps its existing APR**.
+
+On `sell_claim` that claim is a deposit: the seller is signing and accepts the buyer’s IOU. On `buy_claim` it is a draw on the **seller’s credit line to the buyer** (reverse claim + headroom). A pure unwind of a debt the seller already owes the buyer needs no line. The ask alone does not take an unbacked IOU, even when the transfer itself only unwinds the debtor.
 
 One table, `side` in the primary key (`1` buy, `2` sell). `debtor = 0` is global. Spread ppm is signed (`10_000` = 1%):
 

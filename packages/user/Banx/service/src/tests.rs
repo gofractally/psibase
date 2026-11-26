@@ -603,6 +603,10 @@ mod tests {
         assert_eq!(exp(&chain, mitchell, cafe, aud), 0);
 
         // $90 face at a 5/90 (~5.555%) haircut → Pippa owes John $85.
+        // buy_claim draws that cost on John's line to Pippa.
+        Wrapper::push_from(&chain, john)
+            .st_crd_lne(pippa, aud, 85_0000.into(), false, 0, 0)
+            .get()?;
         Wrapper::push_from(&chain, john)
             .st_sell_clm(
                 cafe,
@@ -1726,6 +1730,166 @@ mod tests {
                 .is_err(),
             "dust deposit must not make bob know mallory as buyer"
         );
+        Ok(())
+    }
+
+    /// A full-size deposit makes the claim transfer a pure unwind, which
+    /// skips the buyer-line check. The proceeds still need Alice's line.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_buy_claim_full_deposit_needs_seller_line(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let mallory = account!("mallory");
+        for a in [alice, bob, mallory] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(100), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_glb_sell(usd, Quantity::new(0), 0, Quantity::new(u64::MAX), never())
+            .get()?;
+        Wrapper::push_from(&chain, mallory)
+            .deposit(bob, usd, Quantity::new(100), 0, 0)
+            .get()?;
+
+        assert!(
+            Wrapper::push_from(&chain, mallory)
+                .buy_claim(alice, bob, usd, Quantity::new(100), Quantity::new(0))
+                .get()
+                .is_err(),
+            "full unwind must not pay Alice with Mallory's unbacked IOU"
+        );
+        assert_eq!(exp(&chain, alice, bob, usd), 100);
+        assert_eq!(exp(&chain, mallory, bob, usd), 100);
+        assert_eq!(exp(&chain, alice, mallory, usd), 0);
+
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(mallory, usd, Quantity::new(100), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, mallory)
+            .buy_claim(alice, bob, usd, Quantity::new(100), Quantity::new(0))
+            .get()?;
+        assert_eq!(exp(&chain, alice, bob, usd), 0);
+        assert_eq!(exp(&chain, mallory, bob, usd), 0);
+        assert_eq!(exp(&chain, bob, mallory, usd), 0);
+        assert_eq!(exp(&chain, alice, mallory, usd), 100);
+        Ok(())
+    }
+
+    /// The cost is capped by Alice's line to Peter, and what Peter already
+    /// owes her counts against it. The debtor side is satisfied throughout,
+    /// so only the seller's line can reject.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_buy_claim_cost_capped_by_seller_line(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let peter = account!("peter");
+        for a in [alice, bob, peter] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(100), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_crd_lne(bob, usd, Quantity::new(100), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_glb_sell(usd, Quantity::new(0), 0, Quantity::new(u64::MAX), never())
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(peter, usd, Quantity::new(99), false, 0, 0)
+            .get()?;
+
+        assert!(
+            Wrapper::push_from(&chain, peter)
+                .buy_claim(alice, bob, usd, Quantity::new(100), Quantity::new(0))
+                .get()
+                .is_err(),
+            "a cost of 100 must not clear Alice's 99 line to Peter"
+        );
+        assert_eq!(exp(&chain, alice, bob, usd), 100);
+        assert_eq!(exp(&chain, peter, bob, usd), 0);
+        assert_eq!(exp(&chain, alice, peter, usd), 0);
+
+        Wrapper::push_from(&chain, peter)
+            .buy_claim(alice, bob, usd, Quantity::new(99), Quantity::new(0))
+            .get()?;
+        assert_eq!(exp(&chain, alice, bob, usd), 1);
+        assert_eq!(exp(&chain, peter, bob, usd), 99);
+        assert_eq!(exp(&chain, alice, peter, usd), 99);
+
+        assert!(
+            Wrapper::push_from(&chain, peter)
+                .buy_claim(alice, bob, usd, Quantity::new(1), Quantity::new(0))
+                .get()
+                .is_err(),
+            "Alice's line to Peter is full"
+        );
+        assert_eq!(exp(&chain, alice, bob, usd), 1);
+        assert_eq!(exp(&chain, alice, peter, usd), 99);
+        Ok(())
+    }
+
+    /// Alice already owes Peter 100. A cost that only unwinds that debt
+    /// needs no line from her. Anything past it does.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_buy_claim_unwind_needs_no_seller_line(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let peter = account!("peter");
+        for a in [alice, bob, peter] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(150), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .deposit(peter, usd, Quantity::new(100), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_crd_lne(bob, usd, Quantity::new(150), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_glb_sell(usd, Quantity::new(0), 0, Quantity::new(u64::MAX), never())
+            .get()?;
+
+        assert!(
+            Wrapper::push_from(&chain, peter)
+                .buy_claim(alice, bob, usd, Quantity::new(150), Quantity::new(0))
+                .get()
+                .is_err(),
+            "only 100 of the cost unwinds; the other 50 needs Alice's line"
+        );
+        assert_eq!(exp(&chain, alice, bob, usd), 150);
+        assert_eq!(exp(&chain, peter, bob, usd), 0);
+        assert_eq!(exp(&chain, peter, alice, usd), 100);
+
+        Wrapper::push_from(&chain, peter)
+            .buy_claim(alice, bob, usd, Quantity::new(100), Quantity::new(0))
+            .get()?;
+        assert_eq!(exp(&chain, alice, bob, usd), 50);
+        assert_eq!(exp(&chain, peter, bob, usd), 100);
+        assert_eq!(exp(&chain, peter, alice, usd), 0);
+        assert_eq!(exp(&chain, alice, peter, usd), 0);
         Ok(())
     }
 

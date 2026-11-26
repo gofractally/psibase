@@ -94,9 +94,9 @@ One table, `side` in the primary key (`1` buy, `2` sell). Spread ppm is signed (
 
 `sell_claim(buyer, debtor, asset, amount, min_proceeds)`: you hold a claim on `debtor` and hit the buyer’s **buy** offer. A positive `min_proceeds` is the floor you sign.
 
-`buy_claim(seller, debtor, asset, amount, max_cost)`: you buy the seller’s claim on `debtor` under their **sell** offer. A positive `max_cost` is the cap you sign.
+`buy_claim(seller, debtor, asset, amount, max_cost)`: you buy the seller’s claim on `debtor` under their **sell** offer. A positive `max_cost` is the cap you sign. The cost you owe the seller is a 0% draw on the **seller’s credit line to you** (reverse claim + headroom). Their ask alone does not take your IOU. Unwinding a debt they already owe you needs no line.
 
-Same books either way: face moves to the buyer; seller holds a claim on the buyer for face after the **maker’s** spread. Not a path payment and not “paid in full” for grace.
+`sell_claim` pays the seller with a 0% deposit, because the seller is signing and accepts the buyer’s IOU. Either way the face moves to the buyer. Not a path payment and not “paid in full” for grace.
 
 ## Interest
 

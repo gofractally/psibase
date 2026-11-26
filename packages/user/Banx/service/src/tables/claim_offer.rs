@@ -121,8 +121,6 @@ impl ClaimOffer {
         apply_spread(amount_in, self.fee_fixed, spread)
     }
 
-    /// Move `amount` of seller's claim on `debtor` to `buyer`; seller
-    /// receives face after this offer's spread as a claim on buyer.
     fn spend(&mut self, amount: Quantity) {
         self.remaining = super::helpers::spend_budget(
             self.remaining,
@@ -132,6 +130,14 @@ impl ClaimOffer {
         self.save();
     }
 
+    /// Move `amount` of the seller's claim on `debtor` to `buyer`.
+    ///
+    /// A buy offer (`sell_claim`) pays the seller with a 0% deposit: the
+    /// seller is signing and accepts the buyer's IOU. A sell offer
+    /// (`buy_claim`) pays with a 0% draw on the seller's line to the buyer.
+    /// Capacity is the reverse claim plus line headroom. The ask alone does
+    /// not take an unbacked IOU, including when the claim transfer itself
+    /// is only an unwind.
     pub fn execute(
         &mut self,
         actor: AccountNumber,
@@ -171,7 +177,12 @@ impl ClaimOffer {
             );
         }
         take.accept_claim(seller, amount);
-        Connection::get_live(seller, buyer, self.asset_id).deposit(proceeds, 0);
+        let pay = Connection::get_live(seller, buyer, self.asset_id);
+        if self.is_sell() {
+            pay.book_at_rate(proceeds, 0);
+        } else {
+            pay.deposit(proceeds, 0);
+        }
 
         // Memo is the debtor so the buyer's feed can name whose debt moved.
         // Actor is the taker: seller on sell_claim, buyer on buy_claim.

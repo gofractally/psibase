@@ -493,7 +493,11 @@ pub mod service {
     }
 
     /// Buyer (sender) buys claims on `debtor` from `seller` under the seller's
-    /// **sell** offer. Same books as `sell_claim`; the maker's ask applies.
+    /// **sell** offer. Face moves as in `sell_claim`. The cost the buyer owes
+    /// the seller is a 0% draw on the seller's credit line to the buyer,
+    /// capped like a path hop (reverse claim + headroom). A pure unwind of a
+    /// debt the seller already owes the buyer needs no line. The ask alone
+    /// does not accept an unbacked IOU.
     ///
     /// `max_cost` is the cap the buyer signs on the new claim they owe the
     /// seller. A positive bound rejects a replaced offer that costs more.
