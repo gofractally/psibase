@@ -36,6 +36,15 @@ namespace psibase
 
    // One thread that cancels whichever watchdog's deadline has passed. The
    // threads being watched never evaluate their own limits.
+   //
+   // A run whose deadline has passed is cancelled again every time the
+   // worker looks (every idlePeriod) for as long as its watchdog exists. One
+   // delivery is not enough: an engine may take a cancellation as a signal
+   // that can be lost in a narrow window (on wasmtime, an epoch tick that
+   // arrives while the store is deciding what to do about the previous one
+   // is absorbed, gofractally/psibase#2263), and a run that has outlived its
+   // limit must not depend on that. The handler therefore has to tolerate
+   // being called more than once.
    class WatchdogManager
    {
      public:
@@ -103,6 +112,9 @@ namespace psibase
       RunClock::time_point  runningSince;
       RunClock::duration    limit = RunClock::duration::max();
       std::function<void()> handler;
+      // Its deadline has passed and it has been cancelled; from then on it
+      // is cancelled again on every look.
+      bool cancelled = false;
    };
 
 }  // namespace psibase

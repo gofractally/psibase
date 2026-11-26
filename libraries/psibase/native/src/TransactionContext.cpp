@@ -648,10 +648,19 @@ namespace psibase
       std::lock_guard<std::mutex> guard{mutex};
       timedOut   = true;
       vmTimedOut = true;
-      for (auto& [_, ec] : executionContexts)
-         ec.asyncTimeout();
-      for (auto& [_, ec] : altExecContexts)
-         ec.asyncTimeout();
+      // Every context is told twice. Telling one may be what makes another
+      // look, before that other has been told (on wasmtime the contexts of a
+      // transaction share an engine, and telling one ticks the epoch every
+      // store of that engine checks); the second round arrives when all of
+      // them have been told. The watchdog also calls this again for as long
+      // as the transaction is still there.
+      for (int round = 0; round < 2; ++round)
+      {
+         for (auto& [_, ec] : executionContexts)
+            ec.asyncTimeout();
+         for (auto& [_, ec] : altExecContexts)
+            ec.asyncTimeout();
+      }
    }
 
    TransactionContext::BillingPause::BillingPause(TransactionContext& context) : context(context)

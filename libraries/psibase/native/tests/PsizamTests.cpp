@@ -971,36 +971,45 @@ namespace
       }
    };
 
-   // A service the chain admits and wasmtime refuses to compile. With every
-   // limit a chain value below the engines' own (gofractally/psibase#2262),
-   // the typed-reference forms refused by admission (gofractally/psizam#6)
-   // and the five disagreements of gofractally/psizam#7 closed, what is
-   // left is where psizam's validator and wasmtime's still disagree
-   // (gofractally/psibase#2266). This is one, found by the probe set of
-   // that issue: a function body with ref.func of a function that no
-   // element segment, export or global declares, which the specification
-   // refuses and psizam does not check. When psizam refuses it the tests
-   // that use this need another example, or a hook that makes the compile
-   // fail.
-   // start and called, both empty, and a third function: ref.func 2; drop.
-   constexpr std::string_view compilerRefusal = "undeclared function reference";
-   std::vector<std::uint8_t>  admittedButRefusedByWasmtime()
+   // A service the chain admits and the engine's compiler refuses. No
+   // module that occurs naturally is known as of psizam 2e3ef65: the last
+   // one used here, a function body with ref.func of a function nothing
+   // declares, is now refused by psizam's parser, and psizam's structured
+   // corpus of about 8,200 modules has none that admission accepts and
+   // wasmtime refuses (the test VmAdmissionCorpus is the evidence, and
+   // fails when one appears; gofractally/psibase#2262). The case still has
+   // to be handled, because another engine or a later wasmtime may refuse
+   // what this one compiles, so the tests make it: a valid service, and a
+   // compile hook that fails this engine's compile of it as its compiler
+   // would. The hook runs where the compile does, after the code is stored
+   // and before the engine's compiler is called.
+   constexpr std::string_view compilerRefusal = "refused by the compiler (test hook)";
+   std::vector<std::uint8_t>  admittedButRefusedByCompiler()
    {
       const EntryPoints         entry{0, 0};
-      std::vector<std::uint8_t> types{3}, declared{3}, exported{2}, bodies{3};
+      std::vector<std::uint8_t> types{2}, declared{2}, exported{2}, bodies{2};
       types.insert(types.end(), entry.types.begin(), entry.types.end());
-      types.insert(types.end(), {0x60, 0, 0});  // type 2: () -> ()
       declared.insert(declared.end(), entry.functions.begin(), entry.functions.end());
-      declared.push_back(2);
       exported.insert(exported.end(), entry.exports.begin(), entry.exports.end());
       bodies.insert(bodies.end(), entry.bodies.begin(), entry.bodies.end());
-      bodies.insert(bodies.end(), {5, 0, 0xd2, 2, 0x1a, 0x0b});
+      // What tells this module from the other tests' empty service.
       auto code = wasmModule({});
       section(code, 1, types);
       section(code, 3, declared);
       section(code, 7, exported);
       section(code, 10, bodies);
+      section(code, 0, {7, 'r', 'e', 'f', 'u', 's', 'e', 'd'});
       return code;
+   }
+   template <typename Cache>
+   void refuseCompileOf(Cache& cache, const psibase::Checksum256& refused)
+   {
+      cache.setCompileHook(
+          [refused](const psibase::Checksum256& hash)
+          {
+             if (hash == refused)
+                throw std::runtime_error(std::string(compilerRefusal));
+          });
    }
 
    // A valid module that takes far longer to compile than to admit:
@@ -1172,10 +1181,11 @@ TEST_CASE("Code the engine's compiler refuses after admission is stored, not a t
 {
    // Such a refusal must not decide the transaction: another engine
    // compiles the code.
-   const auto code = admittedButRefusedByWasmtime();
+   const auto code = admittedButRefusedByCompiler();
    CHECK_NOTHROW(psibase::admitNativeWasm(code, {}, 0));
    TempDirectory artifacts;
    NativeService fixture{artifacts.path / "modules"};
+   refuseCompileOf(fixture.cache, CodeWriter::row(code).codeHash);
    CodeWriter    writer{fixture};
    CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
    CHECK(writer.stored(psibase::DbId::native, code));
@@ -1715,55 +1725,76 @@ TEST_CASE("Storing code bills the same with and without a compiled module")
    if (!isWasmtime())
       SKIP("only wasmtime compiles where the code is stored");
    using namespace std::chrono;
-   TempDirectory artifacts;
-   NativeService fixture{artifacts.path / "modules"};
+   // The rule: admission is billed, and looking the module up, compiling it
+   // and storing it are not, so a write of code does not fail a CPU limit
+   // without a compiled module that it passes with one.
+   //
+   // The compile is given a known length, longer than the limit, instead
+   // of being measured: how long a real compile takes beside the rest of
+   // the write is the machine's and the scheduler's to say. The sleep is
+   // that length, on the thread that compiles; it orders nothing.
+   const auto compileTime = milliseconds(500);
+   const auto limit       = compileTime / 2;
+
+   TempDirectory     artifacts;
+   NativeService     fixture{artifacts.path / "modules"};
+   std::atomic<bool> slow{false};
+   fixture.cache.setCompileHook(
+       [&](const psibase::Checksum256&)
+       {
+          if (slow)
+             std::this_thread::sleep_for(compileTime);
+       });
    struct Cost
    {
       nanoseconds   wall, billed;
       std::uint64_t compiled;
    };
-   auto store = [&](const std::vector<std::uint8_t>& code, nanoseconds limit = hours(1))
+   auto store = [&](const std::vector<std::uint8_t>& code)
    {
       CodeWriter writer{fixture};
+      slow = true;
+      // The wall time is read outside the billed time on both sides, so it
+      // contains all of it: what it has more is what was not billed.
+      const auto start = steady_clock::now();
       writer.transaction.setWatchdog(writer.transaction.getBillableTime() + limit);
       const auto billedBefore = writer.transaction.getBillableTime();
-      const auto start        = steady_clock::now();
-      writer.put(psibase::DbId::native, code);
-      Cost cost{steady_clock::now() - start, writer.transaction.getBillableTime() - billedBefore,
-                writer.compiled()};
+      CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
+      const auto billed = writer.transaction.getBillableTime() - billedBefore;
+      Cost       cost{steady_clock::now() - start, billed, writer.compiled()};
+      slow = false;
+      CHECK(writer.stored(psibase::DbId::native, code));
       // A transaction over its limit can start no service.
       CHECK_NOTHROW(fixture.called(writer.transaction, fixture.peer));
       fixture.block.db.kvRemoveRaw(psibase::DbId::native,
                                    psio::encode(psio::key{}, CodeWriter::row(code).key()));
       return cost;
    };
-   const auto code = largeModule(6000, 40, 1);
+   // A small module: its admission, the one thing billed, is far below a
+   // millisecond of work, so the limit is hundreds of times what it needs.
+   const auto code = largeModule(40, 4, 1);
    const auto cold = store(code);
-   CHECK(cold.compiled == 1);
    const auto warm = store(code);
+   INFO("module " << code.size() << " bytes, compile lengthened by "
+                  << duration_cast<microseconds>(compileTime).count() << " us, limit "
+                  << duration_cast<microseconds>(limit).count() << " us; cold wall "
+                  << cold.wall.count() / 1000 << " us, billed " << cold.billed.count() / 1000
+                  << " us; warm wall " << warm.wall.count() / 1000 << " us, billed "
+                  << warm.billed.count() / 1000 << " us");
+   CHECK(cold.compiled == 1);
    CHECK(warm.compiled == 0);
-   INFO("module " << code.size() << " bytes; cold wall " << cold.wall.count() / 1000
-                  << " us, billed " << cold.billed.count() / 1000 << " us; warm wall "
-                  << warm.wall.count() / 1000 << " us, billed " << warm.billed.count() / 1000
-                  << " us");
-   // The compile is most of the cold run and none of its bill: what is
-   // billed is admission, which the warm run does too.
-   CHECK(cold.billed < cold.wall / 2);
-   CHECK(warm.billed <= warm.wall);
-
-   // A CPU limit the write passes with the module cached, it passes when it
-   // has to compile: several times the warm cost, and less than the compile.
-   const auto limit = std::max<nanoseconds>(4 * warm.wall, milliseconds(20));
-   const auto other = largeModule(6000, 40, 2);
-   const auto first = store(other, limit);
-   CHECK(first.compiled == 1);
-   CHECK(first.billed < limit);
-   if (first.wall <= limit)
-      WARN("the compile took " << first.wall.count() / 1000 << " us, within the limit of "
-                               << limit.count() / 1000 << " us: nothing was shown");
-   const auto again = store(other, limit);
-   CHECK(again.compiled == 0);
-   CHECK(again.billed < limit);
+   // None of the compile is in the bill. This is exact, whatever the
+   // scheduler does: the compile lasted at least `compileTime`, and the wall
+   // time is the billed time and what was not billed.
+   CHECK(cold.wall - cold.billed >= compileTime);
+   // The write that had to compile, for longer than the whole limit, passed
+   // the limit like the one that did not, and the transaction went on
+   // (above). These three read a clock against the limit, as the rule
+   // itself does: what is billed is admission, against a limit of a quarter
+   // of a second.
+   CHECK(cold.wall > limit);
+   CHECK(cold.billed < limit);
+   CHECK(warm.billed < limit);
 }
 
 namespace
@@ -1812,6 +1843,12 @@ namespace
       {
          std::unique_lock lock{mutex};
          changed.wait(lock, [&] { return threads.size() >= compiles; });
+      }
+      // The same, for no longer than `limit`: whether they have started.
+      bool awaitStarted(std::size_t compiles, std::chrono::nanoseconds limit)
+      {
+         std::unique_lock lock{mutex};
+         return changed.wait_for(lock, limit, [&] { return threads.size() >= compiles; });
       }
       // Whether any compile since `from` ran on the calling thread.
       bool compiledHere(std::size_t from = 0)
@@ -1912,12 +1949,13 @@ TEST_CASE("Code this node's compiler refuses does not keep a producer deferring"
 {
    if (!isWasmtime())
       SKIP("the refusal is wasmtime's");
-   // Admitted by the chain, refused by wasmtime's compiler.
-   const auto code = admittedButRefusedByWasmtime();
+   // Admitted by the chain, refused by the compiler (by the hook).
+   const auto code = admittedButRefusedByCompiler();
    const auto hash = CodeWriter::row(code).codeHash;
 
    TempDirectory artifacts;
    NativeService fixture{artifacts.path / "modules"};
+   refuseCompileOf(fixture.cache, hash);
    CodeWriter    writer{fixture};
    fixture.block.deferUncompiledCode = true;
    CHECK_NOTHROW(writer.put(psibase::DbId::native, code));
@@ -2281,17 +2319,33 @@ TEST_CASE("A node applying a block does not wait for a compile where the code is
    CHECK(writer.compiled() == 0);
 
    // The same block calls the new code: its first execution waits for that
-   // compile instead of starting another. The compile is let go from
-   // another thread, whenever that happens to be.
+   // compile instead of starting another.
+   //
+   // The compile is held while the execution shows which of the two it
+   // does, and is let go from another thread. An execution that starts a
+   // compile of its own enters the gate: that is an event, the gate opens
+   // at once and the count below is wrong. An execution that waits gives
+   // no sign a test can see (it is blocked inside WasmCache, which reports
+   // no waiter), so for it the gate opens when `held` has passed.
+   //
+   // `held` orders nothing that is asserted. Whenever the gate opens, the
+   // execution finds the one compile in flight or its module, and every
+   // check below holds. It only bounds how late the execution may arrive
+   // at the cache and still find the compile held, which is what makes a
+   // second compile visible: on a machine too loaded for that, the test
+   // shows less, and does not fail.
+   const auto       held = std::chrono::milliseconds(200);
    psibase::CodeRow row{.codeNum = account, .codeHash = hash};
    fixture.block.db.kvPut(row.db, row.key(), row);
+   bool        second = false;
    std::thread opener{[&]
                       {
-                         std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                         second = gate.awaitStarted(before + 2, held);
                          gate.release();
                       }};
    CHECK(NativeService::value(fixture.called(writer.transaction, account)) == 8);
    opener.join();
+   CHECK_FALSE(second);
    CHECK(gate.count() == before + 1);
    CHECK_FALSE(gate.compiledHere(before));
    CHECK(writer.compiled() == 1);
@@ -2310,11 +2364,17 @@ TEST_CASE("A speculative run gives up on a compile that takes too long, and the 
    auto          release = psibase::finally{[&] { gate.release(); }};
    gate.attach(fixture.cache);
    CHECK(fixture.cache.speculativeCompileWait() == std::chrono::seconds(5));
-   fixture.cache.setSpeculativeCompileWait(std::chrono::milliseconds(20));
    {
+      // The writer's own run is speculative too, and the first to execute
+      // the fixture's service: it waits for that compile, under the node's
+      // bound. The short bound is set once that is done and the gate is
+      // closed, so the only compile it is ever measured against is one that
+      // cannot finish: the run gives up because the bound passed, however
+      // fast or slow the machine is.
       CodeWriter writer{fixture, psibase::DbMode::speculative()};
       const auto before = gate.count();
       gate.close();
+      fixture.cache.setSpeculativeCompileWait(std::chrono::milliseconds(20));
       CHECK_THROWS_WITH(writer.put(psibase::DbId::native, code),
                         Catch::Matchers::ContainsSubstring("still being compiled on this node"));
       CHECK_FALSE(writer.stored(psibase::DbId::native, code));
@@ -2388,7 +2448,9 @@ TEST_CASE("A speculative run's limit measures its execution, not the compiles it
    TempDirectory artifacts;
    NativeService fixture{artifacts.path / "modules"};
    std::atomic<bool> slow{false};
-   // An injected compile time, several times the run's limit.
+   // An injected compile time, several times the run's limit. The sleep is
+   // that time, on the compile's own thread: nothing is ordered by it, and
+   // it lasts at least `compileTime` however loaded the machine is.
    fixture.cache.setCompileHook(
        [&](const psibase::Checksum256&)
        {

@@ -257,12 +257,18 @@ namespace psibase
                throw std::runtime_error(
                    "native WASM does not support typed function references");
          }
-         // A constant expression: one instruction and end. More than one is
-         // the extended constant expressions proposal (i32/i64 add, sub,
-         // mul), which is off: psizam's parser accepts it unconditionally
-         // and wasmtime refuses it (gofractally/psibase#2266).
+         // A constant expression. This pass only has to get past it: what
+         // may stand in one is the parser's to decide. More than one
+         // instruction is the extended constant expressions proposal
+         // (i32/i64 add, sub, mul over constants and globals), which is off
+         // by the parser's switch (enable_extended_const in
+         // NativeVMOptions), so the pass reads that form and leaves the
+         // refusal, in every place it can occur, to the parser. Anything
+         // else it cannot read.
          void constantExpression()
          {
+            const auto invalid = []
+            { throw std::runtime_error("invalid native WASM constant expression"); };
             switch (byte())
             {
                case 0x41:  // i32.const
@@ -282,15 +288,32 @@ namespace psibase
                   break;
                case 0xfd:  // v128.const
                   if (u32() != 12)
-                     throw std::runtime_error("invalid native WASM constant expression");
+                     invalid();
                   take(16);
                   break;
                default:
-                  throw std::runtime_error("invalid native WASM constant expression");
+                  invalid();
             }
-            if (byte() != 0x0b)
-               throw std::runtime_error(
-                   "native WASM does not support extended constant expressions");
+            for (;;)
+               switch (byte())
+               {
+                  case 0x0b:  // end
+                     return;
+                  case 0x41:  // i32.const
+                  case 0x42:  // i64.const
+                  case 0x23:  // global.get
+                     skipInteger();
+                     break;
+                  case 0x6a:  // i32.add, sub, mul
+                  case 0x6b:
+                  case 0x6c:
+                  case 0x7c:  // i64.add, sub, mul
+                  case 0x7d:
+                  case 0x7e:
+                     break;
+                  default:
+                     invalid();
+               }
          }
       };
 

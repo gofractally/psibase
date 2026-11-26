@@ -2,13 +2,16 @@
 // node's own database (NativeAotDatabase over storage::cache_root).
 
 #include <catch2/catch_all.hpp>
+#include <psibase/CpuAccounting.hpp>
 #include <psibase/NativeAotCache.hpp>
 #include <psibase/db.hpp>
 #include <psibase/nativeTables.hpp>
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstring>
+#include <functional>
 #include <mutex>
 #include <set>
 #include <thread>
@@ -317,6 +320,114 @@ TEST_CASE("The compiled-module store stays within its size and evicts the least 
    CHECK(node.cache.load(key(101)).has_value());
 }
 
+namespace
+{
+   // A place where a thread is stopped, and is known to be standing.
+   struct Hold
+   {
+      std::mutex              mutex;
+      std::condition_variable changed;
+      unsigned                arrived  = 0;      // times a thread has come here
+      unsigned                passed   = 0;      // of those, let go
+      bool                    open     = false;  // nobody is stopped any more
+      bool                    finished = false;  // nobody comes here any more
+
+      // The thread to be stopped calls this; it returns when it may go on.
+      void arrive()
+      {
+         std::unique_lock lock{mutex};
+         const auto       mine = ++arrived;
+         changed.notify_all();
+         changed.wait(lock, [&] { return open || passed >= mine; });
+      }
+      // Waits until a thread stands here for the `count`th time. False if
+      // none will, or none is stopped any more.
+      bool awaitArrival(unsigned count)
+      {
+         std::unique_lock lock{mutex};
+         changed.wait(lock, [&] { return open || arrived >= count || finished; });
+         return !open && arrived >= count;
+      }
+      // Whether a thread is standing here now.
+      bool holding()
+      {
+         std::lock_guard lock{mutex};
+         return !open && arrived > passed;
+      }
+      void pass()
+      {
+         {
+            std::lock_guard lock{mutex};
+            ++passed;
+         }
+         changed.notify_all();
+      }
+      void release()
+      {
+         {
+            std::lock_guard lock{mutex};
+            open = true;
+         }
+         changed.notify_all();
+      }
+      void finish()
+      {
+         {
+            std::lock_guard lock{mutex};
+            finished = true;
+         }
+         changed.notify_all();
+      }
+   };
+
+   // Turns a wait that would never end into a failure: if it is still there
+   // after `limit` it runs `rescue`, which lets the held thread go. The
+   // limit is no part of what is tested: what it guards takes milliseconds,
+   // and it is seconds so that no load on the machine reaches it.
+   class HangGuard
+   {
+      std::mutex              mutex;
+      std::condition_variable stop;
+      bool                    done = false;
+      std::atomic<bool>       fired{false};
+      std::thread             thread;
+
+     public:
+      HangGuard(std::chrono::seconds limit, std::function<void()> rescue)
+          : thread(
+                [this, limit, rescue = std::move(rescue)]
+                {
+                   std::unique_lock lock{mutex};
+                   if (!stop.wait_for(lock, limit, [&] { return done; }))
+                   {
+                      fired = true;
+                      rescue();
+                   }
+                })
+      {
+      }
+      ~HangGuard()
+      {
+         {
+            std::lock_guard lock{mutex};
+            done = true;
+         }
+         stop.notify_all();
+         thread.join();
+      }
+      bool expired() const { return fired; }
+   };
+   constexpr std::chrono::seconds hangLimit{20};
+
+   // The cache root's write hook is a plain function: what it holds is here.
+   std::atomic<Hold*> heldCacheWrite{nullptr};
+   void               holdCacheWrite()
+   {
+      if (auto* hold = heldCacheWrite.load())
+         hold->arrive();
+   }
+}  // namespace
+
 TEST_CASE("Modules are stored while the chain publishes, and neither waits for the other")
 {
    using namespace std::chrono;
@@ -404,8 +515,10 @@ TEST_CASE("Modules are stored while the chain publishes, and neither waits for t
       CHECK(content(node.shared, node.shared.getHead()) == "block");
       CHECK(node.cache.discarded() == 0);
       // Reported, not asserted: the two share a machine, a file and an
-      // allocator, so no time is a constant. What would show one waiting for
-      // the other is a publication that takes as long as the stores do.
+      // allocator, so no time is a constant, and on a loaded machine the
+      // scheduler alone makes one publication take longer than all the
+      // stores together. That neither waits for the other is shown below,
+      // without a clock.
       WARN((sync == storage::durability::none ? "sync none: " : "sync flush: ")
            << blocks << " chain publications alone " << publishAlone.total.count() << " us (longest "
            << publishAlone.longest.count() << " us); beside module stores, longest "
@@ -417,8 +530,94 @@ TEST_CASE("Modules are stored while the chain publishes, and neither waits for t
       // With flushing on, the chain's flush also writes out the module pages
       // stored since the last one (they are in the same file): that is a
       // cost of the flush, measured above, and not a wait for a writer.
-      if (sync == storage::durability::none)
-         CHECK(publishBeside.longest < storeBeside.total);
+
+      // Neither waits for the other, whatever the scheduler does: each side
+      // is stopped in the middle of its work, for as long as the other
+      // needs to do all of its own. A side that needed what the stopped one
+      // holds would never finish; HangGuard turns that into a failure.
+      const auto part = artifact(7, 64 << 10);
+
+      // The cache root's writer is stopped where it is about to write, with
+      // a store handed to it and its caller waiting. The chain publishes.
+      {
+         Hold cacheWrite;
+         heldCacheWrite = &cacheWrite;
+         storage::cache_root::set_write_hook(holdCacheWrite);
+         std::thread storer([&] { node.cache.store(key(900000), part); });
+         bool        held = false, still = false, hung = false;
+         {
+            HangGuard guard{hangLimit, [&] { cacheWrite.release(); }};
+            held = cacheWrite.awaitArrival(1);
+            std::thread chain([&] { publish(1000000); });
+            chain.join();
+            still = cacheWrite.holding();
+            hung  = guard.expired();
+         }
+         cacheWrite.release();
+         storer.join();
+         storage::cache_root::set_write_hook(nullptr);
+         heldCacheWrite = nullptr;
+         CHECK(held);
+         // The publications were all made while the store was in the
+         // writer's hands, and none of them had to be let through.
+         CHECK(still);
+         CHECK_FALSE(hung);
+         const bool kept = node.cache.load(key(900000)) == part;
+         CHECK(kept);
+      }
+
+      // The chain is stopped wherever a publication can be: storage asks
+      // the request's budget before it enters the writer's gate, again once
+      // it is inside, and when the work there is done, and a budget that is
+      // evaluated at every check is this test's to answer. At each of those
+      // places, the ones inside the gate among them, a module is stored and
+      // read back while the chain stands there.
+      {
+         Hold          chainStep;
+         unsigned      steps = 0;
+         std::uint32_t lost  = 0;
+         bool          hung  = false;
+         auto          budget = std::make_shared<accounting::Request>(
+             [&]
+             {
+                chainStep.arrive();
+                return true;
+             },
+             microseconds(0));
+         {
+            HangGuard   guard{hangLimit, [&] { chainStep.release(); }};
+            std::thread chain(
+                [&]
+                {
+                   auto writer = node.shared.createWriter();
+                   {
+                      accounting::Scope scope(budget);
+                      node.shared.setHead(*writer,
+                                          revision(node.shared, writer, blockId(2000000),
+                                                   blockId(1999999), "held"));
+                   }
+                   chainStep.finish();
+                });
+            while (chainStep.awaitArrival(steps + 1))
+            {
+               const auto id = 900001 + steps;
+               node.cache.store(key(id), part);
+               lost += node.cache.load(key(id)) != part;
+               ++steps;
+               chainStep.pass();
+            }
+            chain.join();
+            hung = guard.expired();
+         }
+         INFO("the chain was stopped at " << steps << " places of one publication");
+         CHECK_FALSE(hung);
+         // Some of them are inside the gate: one before it, one in it and
+         // one after its work, for each time the gate is entered.
+         CHECK(steps >= 3);
+         CHECK(lost == 0);
+         CHECK(content(node.shared, node.shared.getHead()) == "held");
+         CHECK(node.store->entries() == 2 * storers * stores + 1 + steps);
+      }
    }
 }
 
