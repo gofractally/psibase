@@ -49,6 +49,7 @@ custom_error! {
     #[allow(clippy::enum_variant_names)] pub Error
 
     InvalidKey          = "Invalid key",
+    VerifierNotAllowed  = "That service does not verify this kind of key",
     ExpectedPublicKey   = "Expected public key",
     ExpectedPrivateKey  = "Expected private key",
     InvalidPKCS11URI    = "Invalid PKCS #11 URI",
@@ -707,13 +708,79 @@ pub struct AnyPrivateKey {
     key: Arc<dyn Signer>,
 }
 
+/// A signer whose claims name a verifier other than the default for its key
+#[cfg(not(target_family = "wasm"))]
+#[derive(Debug)]
+struct WithVerifier {
+    key: Arc<dyn Signer>,
+    verifier: AccountNumber,
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl Signer for WithVerifier {
+    fn get_claim(&self) -> crate::Claim {
+        crate::Claim {
+            service: self.verifier,
+            rawData: self.key.get_claim().rawData,
+        }
+    }
+    fn sign(&self, data: &[u8]) -> Vec<u8> {
+        self.key.sign(data)
+    }
+}
+
+/// Splits `VERIFIER=KEY`, the form in which a key is given together with
+/// the service that verifies its signatures. Anything else is a key alone.
+fn split_verifier(s: &str) -> (Option<AccountNumber>, &str) {
+    if let Some((name, key)) = s.split_once('=') {
+        if let Ok(service) = AccountNumber::from_exact(name) {
+            if crate::verified_key_type(service).is_some() {
+                return (Some(service), key);
+            }
+        }
+    }
+    (None, s)
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl AnyPrivateKey {
+    /// The same key, signing for an account that chose `verifier` for it
+    /// (auth-sig's setKeyVerifier): its claims name `verifier` instead of
+    /// the default for the key's type. Fails unless `verifier` is one of the
+    /// verifiers allowed for the key.
+    pub fn with_verifier(&self, verifier: AccountNumber) -> Result<Self, Error> {
+        let claim = self.key.get_claim();
+        if !crate::is_allowed_verifier(verifier, &claim.rawData) {
+            return Err(Error::VerifierNotAllowed);
+        }
+        Ok(Self {
+            key: Arc::new(WithVerifier {
+                key: self.key.clone(),
+                verifier,
+            }),
+        })
+    }
+
+    pub fn claim(&self) -> crate::Claim {
+        self.key.get_claim()
+    }
+}
+
+/// `KEY` is a PKCS #11 URI or the path of a PEM or DER private key file.
+/// `VERIFIER=KEY` is the same key for an account that chose that verify
+/// service for it, e.g. `verify-br1=alice.pem`.
 #[cfg(not(target_family = "wasm"))]
 impl FromStr for AnyPrivateKey {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self {
+        let (verifier, s) = split_verifier(s);
+        let key = Self {
             key: load_private_key(s)?,
-        })
+        };
+        match verifier {
+            Some(verifier) => Ok(key.with_verifier(verifier)?),
+            None => Ok(key),
+        }
     }
 }
 
@@ -723,8 +790,9 @@ pub struct AnyPublicKey {
 }
 
 impl AnyPublicKey {
-    /// The claim for a key given as a DER SubjectPublicKeyInfo. Fails if no
-    /// verifier accepts the key.
+    /// The claim for a key given as a DER SubjectPublicKeyInfo, naming the
+    /// default verifier for the key's type. Fails if no verifier accepts
+    /// the key.
     pub fn from_spki(spki: Vec<u8>) -> Result<Self, Error> {
         let service = crate::verifier_for(&spki).ok_or(Error::KeyTypeNotSupported)?;
         Ok(Self {
@@ -733,6 +801,21 @@ impl AnyPublicKey {
                 rawData: spki.into(),
             },
         })
+    }
+
+    /// The same key with a claim that names `verifier`. Fails unless
+    /// `verifier` is one of the verifiers allowed for the key.
+    pub fn with_verifier(mut self, verifier: AccountNumber) -> Result<Self, Error> {
+        if !crate::is_allowed_verifier(verifier, &self.key.rawData) {
+            return Err(Error::VerifierNotAllowed);
+        }
+        self.key.service = verifier;
+        Ok(self)
+    }
+
+    /// Whether the claim names the default verifier for the key's type
+    pub fn has_default_verifier(&self) -> bool {
+        crate::verifier_for(&self.key.rawData) == Some(self.key.service)
     }
 
     pub fn auth_service(&self) -> AccountNumber {
@@ -744,18 +827,28 @@ impl AnyPublicKey {
     }
 }
 
+/// `KEY` is a PKCS #11 URI or the path of a PEM or DER public key file.
+/// `VERIFIER=KEY` is the same key with that verify service chosen for it
+/// in place of the default for its type, e.g. `verify-br1=alice.pub`.
 impl FromStr for AnyPublicKey {
     type Err = anyhow::Error;
     fn from_str(key: &str) -> Result<Self, Self::Err> {
+        let (verifier, key) = split_verifier(key);
+        let with = |result: Self| -> Result<Self, anyhow::Error> {
+            match verifier {
+                Some(verifier) => Ok(result.with_verifier(verifier)?),
+                None => Ok(result),
+            }
+        };
         #[cfg(not(target_family = "wasm"))]
         if key.starts_with("pkcs11:") {
-            return Ok(Self::from_spki(load_pkcs11_public_key(key)?)?);
+            return with(Self::from_spki(load_pkcs11_public_key(key)?)?);
         }
 
         let data = read_key_file(key, "PUBLIC KEY", Error::ExpectedPublicKey)?;
 
         data.decode_msg::<spki::SubjectPublicKeyInfo<AnyRef, BitStringRef>>()?;
-        Ok(Self::from_spki(data.into_vec())?)
+        with(Self::from_spki(data.into_vec())?)
     }
 }
 

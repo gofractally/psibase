@@ -97,6 +97,8 @@ struct TxArgs {
 struct SigArgs {
     /// Sign transactions with one or more keys.
     /// Each KEY may be a PKCS #11 URI or a path to a PEM/DER-encoded private key file.
+    /// For an account that chose a verify service other than the default
+    /// for its key, write VERIFIER=KEY (e.g. verify-br1=alice.pem).
     #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<AnyPrivateKey>,
 
@@ -116,7 +118,10 @@ struct AccountArgs {
     #[arg(value_parser = AccountNumber::from_exact)]
     owner: Option<AccountNumber>,
 
-    /// Set the account to authenticate using this key
+    /// Set the account to authenticate using this key.
+    /// When modifying an account, VERIFIER=KEY chooses a verify service
+    /// other than the default for the key (e.g. verify-br1=alice.pub);
+    /// the account then signs with -s VERIFIER=KEY.
     #[clap(short = 'k', long, value_name = "KEY")]
     key: Option<AnyPublicKey>,
 

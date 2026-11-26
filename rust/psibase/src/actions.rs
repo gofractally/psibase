@@ -35,11 +35,18 @@ pub fn new_account_key_action(
     account: AccountNumber,
     key: &AnyPublicKey,
 ) -> Action {
-    if crate::verified_key_type(key.key.service).is_some() {
-        auth_sig::Wrapper::pack_from(sender).newAccount(account, key.key.rawData.clone().into())
-    } else {
+    if crate::verified_key_type(key.key.service).is_none() {
         panic!("unknown verify service {}", key.key.service)
     }
+    // A new account gets the default verifier for its key. Another one is
+    // chosen by the account itself, once it exists (set_key_action).
+    if !key.has_default_verifier() {
+        panic!(
+            "a new account uses the default verify service for its key; choose {} afterwards by setting the key again",
+            key.key.service
+        )
+    }
+    auth_sig::Wrapper::pack_from(sender).newAccount(account, key.key.rawData.clone().into())
 }
 
 pub fn new_account_owned_action(
@@ -55,10 +62,15 @@ pub fn new_account_owned_action(
 }
 
 pub fn set_key_action(account: AccountNumber, key: &AnyPublicKey) -> Action {
-    if crate::verified_key_type(key.key.service).is_some() {
+    if crate::verified_key_type(key.key.service).is_none() {
+        panic!("unknown account service");
+    }
+    if key.has_default_verifier() {
         auth_sig::Wrapper::pack_from(account).setKey(key.key.rawData.to_vec().into())
     } else {
-        panic!("unknown account service");
+        // The account chooses another verifier allowed for its key.
+        auth_sig::Wrapper::pack_from(account)
+            .setKeyVerifier(key.key.service, key.key.rawData.to_vec().into())
     }
 }
 
