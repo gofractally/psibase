@@ -618,6 +618,9 @@ namespace psibase::vm_wasmtime
          {
             std::lock_guard lock{interruptMutex};
             interrupter.emplace(instance->make_interrupter());
+            if (std::getenv("PSIBASE_WATCHDOG_TRACE"))
+               std::fprintf(stderr, "WATCHDOG-DIAG init ctx=%p service=%s timedOut=%d\n", (void*)this,
+                            code.codeNum.str().c_str(), int(timedOut.load()));
             if (timedOut)
                interrupter->fire();
          }
@@ -862,6 +865,10 @@ namespace psibase::vm_wasmtime
    {
       timedOut = true;
       std::lock_guard lock{interruptMutex};
+      // DIAGNOSTIC (gofractally/psibase#2263)
+      std::fprintf(stderr, "WATCHDOG-DIAG asyncTimeout ctx=%p service=%s interrupter=%d initialized=%d\n",
+                   (void*)this, code.codeNum.str().c_str(), int(interrupter.has_value()),
+                   int(initialized));
       if (interrupter)
          interrupter->fire();
    }

@@ -648,6 +648,8 @@ namespace psibase
       std::lock_guard<std::mutex> guard{mutex};
       timedOut   = true;
       vmTimedOut = true;
+      std::fprintf(stderr, "WATCHDOG-DIAG tx asyncTimeout contexts=%zu alt=%zu\n",
+                   executionContexts.size(), altExecContexts.size());
       for (auto& [_, ec] : executionContexts)
          ec.asyncTimeout();
       for (auto& [_, ec] : altExecContexts)

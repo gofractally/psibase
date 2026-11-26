@@ -88,6 +88,10 @@ namespace psibase
             const bool longPause     = w->paused && now - w->diagPausedAt > std::chrono::seconds(8);
             const bool neverLimited  = !w->diagFired && !w->paused &&
                                        now - w->diagCreated > std::chrono::seconds(20);
+            // Experiment: deliver the interrupt again on every look.
+            static const bool refire = std::getenv("PSIBASE_WATCHDOG_REFIRE") != nullptr;
+            if (refire && w->diagFired)
+               w->handler();
             if (lostInterrupt || longPause || neverLimited)
             {
                std::fprintf(stderr,
