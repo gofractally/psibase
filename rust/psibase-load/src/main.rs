@@ -75,6 +75,15 @@ struct Args {
     #[clap(short = 'H', long = "header", value_name = "HEADER")]
     headers: Vec<String>,
 
+    /// Give every connection a forwarded address of its own: connection i
+    /// sends `X-Forwarded-For: <BASE + i + 1>` (BASE is an IPv4 address whose
+    /// last number is ignored, e.g. 198.51.100.0; after 254 connections the
+    /// next /24 is used). To a node that trusts this client as a proxy each
+    /// connection is then a different anonymous client. Each connection
+    /// sends its share of the requests one after the other.
+    #[clap(long, value_name = "BASE")]
+    forwarded_per_connection: Option<std::net::Ipv4Addr>,
+
     /// push: when the node answers
     #[clap(long, value_enum, default_value = "applied")]
     wait_for: WaitFor,
@@ -149,8 +158,21 @@ fn service_url(api: &url::Url, service: &str, path: &str) -> Result<url::Url, an
     Ok(url.join(path)?)
 }
 
-fn make_client(args: &Args) -> Result<reqwest::Client, anyhow::Error> {
+// The forwarded address of connection `index`
+fn forwarded_address(base: std::net::Ipv4Addr, index: usize) -> std::net::Ipv4Addr {
+    let network = u32::from(base) & 0xffff_ff00;
+    std::net::Ipv4Addr::from(
+        network
+            .wrapping_add(((index / 254) as u32) << 8)
+            .wrapping_add((index % 254) as u32 + 1),
+    )
+}
+
+fn make_client(args: &Args, forwarded: Option<String>) -> Result<reqwest::Client, anyhow::Error> {
     let mut headers = reqwest::header::HeaderMap::new();
+    if let Some(address) = forwarded {
+        headers.insert("X-Forwarded-For", address.parse()?);
+    }
     if let Some(token) = &args.token {
         headers.insert(
             reqwest::header::AUTHORIZATION,
@@ -166,9 +188,10 @@ fn make_client(args: &Args) -> Result<reqwest::Client, anyhow::Error> {
             value.trim().parse()?,
         );
     }
+    let per_connection = args.forwarded_per_connection.is_some();
     let mut builder = reqwest::Client::builder()
         .default_headers(headers)
-        .pool_max_idle_per_host(args.connections)
+        .pool_max_idle_per_host(if per_connection { 1 } else { args.connections })
         .pool_idle_timeout(None)
         .tcp_nodelay(true);
     if let Some(addr) = args.connect {
@@ -265,6 +288,55 @@ async fn run_batch(
     stats
 }
 
+// The same when every connection is a client of its own: request i belongs
+// to connection i % connections, and a connection sends its requests one
+// after the other (at their scheduled times if a rate is given).
+async fn run_batch_per_connection(
+    requests: Vec<reqwest::RequestBuilder>,
+    connections: usize,
+    rate: f64,
+    push: bool,
+) -> Stats {
+    let start = Instant::now();
+    let mut queues: Vec<Vec<(usize, reqwest::RequestBuilder)>> =
+        (0..connections).map(|_| Vec::new()).collect();
+    for (i, request) in requests.into_iter().enumerate() {
+        queues[i % connections].push((i, request));
+    }
+    let mut tasks = Vec::with_capacity(connections);
+    for queue in queues {
+        tasks.push(tokio::spawn(async move {
+            let mut stats = Stats::default();
+            for (i, request) in queue {
+                if rate > 0.0 {
+                    tokio::time::sleep_until(
+                        (start + Duration::from_secs_f64(i as f64 / rate)).into(),
+                    )
+                    .await;
+                }
+                let sent = Instant::now();
+                match one_request(request, push).await {
+                    Ok(()) => {
+                        stats.accepted += 1;
+                        stats.latencies.push(sent.elapsed());
+                    }
+                    Err(kind) => *stats.failures.entry(kind).or_default() += 1,
+                }
+            }
+            stats
+        }));
+    }
+    let mut stats = Stats::default();
+    for task in tasks {
+        match task.await {
+            Ok(part) => stats.merge(part),
+            Err(_) => *stats.failures.entry("task failed".to_string()).or_default() += 1,
+        }
+    }
+    stats.busy = start.elapsed();
+    stats
+}
+
 fn percentile(sorted: &[Duration], p: f64) -> f64 {
     if sorted.is_empty() {
         return 0.0;
@@ -279,7 +351,22 @@ async fn main() -> Result<(), anyhow::Error> {
     if args.connections == 0 || args.count == 0 {
         return Err(anyhow!("--connections and --count must be at least 1"));
     }
-    let client = make_client(&args)?;
+    let client = make_client(&args, None)?;
+    // One client, and so one connection, per forwarded address
+    let mut clients = Vec::new();
+    if let Some(base) = args.forwarded_per_connection {
+        for i in 0..args.connections {
+            clients.push(make_client(&args, Some(forwarded_address(base, i).to_string()))?);
+        }
+    }
+    let per_connection = !clients.is_empty();
+    let client_for = |i: usize| -> &reqwest::Client {
+        if per_connection {
+            &clients[i % clients.len()]
+        } else {
+            &client
+        }
+    };
     let run_id: u32 = std::process::id() ^ (chrono::Utc::now().timestamp_subsec_nanos());
     let mut total = Stats::default();
     let mut prepare = Duration::ZERO;
@@ -288,8 +375,14 @@ async fn main() -> Result<(), anyhow::Error> {
     match args.mode {
         Mode::Get => {
             let url = service_url(&args.api, &args.service, &args.path)?;
-            let requests = (0..args.count).map(|_| client.get(url.clone())).collect();
-            let stats = run_batch(requests, args.connections, args.rate, false).await;
+            let requests = (0..args.count)
+                .map(|i| client_for(i).get(url.clone()))
+                .collect();
+            let stats = if per_connection {
+                run_batch_per_connection(requests, args.connections, args.rate, false).await
+            } else {
+                run_batch(requests, args.connections, args.rate, false).await
+            };
             pushing = stats.busy;
             total.merge(stats);
         }
@@ -326,7 +419,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 .ok_or_else(|| anyhow!("bad expiration"))?;
                 let n = std::cmp::min(args.batch.max(1), args.count - sequence);
                 let mut requests = Vec::with_capacity(n);
-                for _ in 0..n {
+                for k in 0..n {
                     let from = args.from[sequence % args.from.len()];
                     let memo = format!("load {:08x} {}", run_id, sequence);
                     sequence += 1;
@@ -348,7 +441,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     };
                     let packed = psio::to_pssz(&psibase::sign_transaction(trx, &args.sign)?);
                     requests.push(
-                        client
+                        client_for(k)
                             .post(push_url.clone())
                             .header("Content-Type", "application/octet-stream")
                             .header("Accept", "application/json")
@@ -356,7 +449,11 @@ async fn main() -> Result<(), anyhow::Error> {
                     );
                 }
                 prepare += started.elapsed();
-                let stats = run_batch(requests, args.connections, args.rate, true).await;
+                let stats = if per_connection {
+                    run_batch_per_connection(requests, args.connections, args.rate, true).await
+                } else {
+                    run_batch(requests, args.connections, args.rate, true).await
+                };
                 pushing += stats.busy;
                 total.merge(stats);
             }
@@ -371,6 +468,7 @@ async fn main() -> Result<(), anyhow::Error> {
         "mode": match args.mode { Mode::Push => "push", Mode::Get => "get" },
         "requests": args.count,
         "connections": args.connections,
+        "identities": if per_connection { "per-connection" } else { "one" },
         "offered_rate": args.rate,
         "wait_for": if args.mode == Mode::Push { format!("{:?}", args.wait_for).to_lowercase() } else { String::new() },
         "signed": !args.sign.is_empty(),

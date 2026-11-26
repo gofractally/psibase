@@ -19,7 +19,8 @@ of the machine affects both alike:
      key and tokens, and logs her in;
   3. runs psibase-load against it: signed transfers alice -> bob pushed
      anonymously, the same pushed with alice's login token, and a GET-only
-     run of /common/tapos/head;
+     run of /common/tapos/head (--get-identities one: all connections are
+     one anonymous address; per-connection: each has its own);
   4. stops the node.
 
 A fresh node per run, not one node restarted: every run then starts from
@@ -72,6 +73,10 @@ def parse_args():
     parser.add_argument('--connections', type=int, default=256, help='Keep-alive connections for pushes (default 256)')
     parser.add_argument('--get-connections', type=int, default=16, help='Keep-alive connections for GETs (default 16)')
     parser.add_argument('--rate', type=float, default=0, help='Offered pushes per second; 0 = as fast as accepted')
+    parser.add_argument('--get-identities', choices=['one', 'per-connection'], default='one',
+                        help='GET run: every connection the same anonymous address (default), or an '
+                             'address of its own per connection, which separates the cost of many '
+                             'connections charging one usage record from the rest')
     parser.add_argument('--keep', action='store_true', help='Keep the node directories')
     return parser.parse_args()
 
@@ -152,8 +157,25 @@ def main():
                     '--rate', str(args.rate), '--from', 'alice', '--to', 'bob', '--sign', keyfile]
             results.append(load(port, 'push-anonymous', push + ['-H', 'X-Forwarded-For: 198.51.100.7']))
             results.append(load(port, 'push-account', push + ['--token', token]))
-            results.append(load(port, 'get', ['--mode', 'get', '-n', str(args.gets), '-c', str(args.get_connections),
-                                              '-H', 'X-Forwarded-For: 198.51.100.7']))
+            # Loopback is a trusted proxy for the meter whatever is configured,
+            # so any forwarded address is taken as the client's.
+            identities = (['-H', 'X-Forwarded-For: 198.51.100.7'] if args.get_identities == 'one'
+                          else ['--forwarded-per-connection', '198.51.100.0'])
+            results.append(load(port, get_label, ['--mode', 'get', '-n', str(args.gets),
+                                                  '-c', str(args.get_connections)] + identities))
+            if mode == 'on' and index == 0:
+                # What the node recorded for the GET run: one anonymous
+                # identity, or one per connection. Rows are written every
+                # usage-flush-interval (10 s).
+                time.sleep(12)
+                with node.get('/report', service='x-usage', params={'kind': 'ip', 'limit': '1000'}) as reply:
+                    reply.raise_for_status()
+                    clients = [r['identity'] for r in reply.json()['top']
+                               if r['identity'].startswith('ip:198.51.100.')]
+                # The anonymous pushes above came from 198.51.100.7, which is
+                # also the one GET client, or one of the per-connection ones.
+                print('usage report after the GET run (%s): %d anonymous client identities'
+                      % (args.get_identities, len(clients)), flush=True)
         finally:
             node.shutdown()
             if not args.keep:
@@ -165,6 +187,7 @@ def main():
             print(json.dumps(result), flush=True)
         return results
 
+    get_label = 'get-one-identity' if args.get_identities == 'one' else 'get-per-connection'
     all_results = {'on': [], 'off': []}
     for index in range(args.rounds):
         for mode in ['on', 'off'] if index % 2 == 0 else ['off', 'on']:
@@ -180,15 +203,15 @@ def main():
 
     print()
     print('medians of %d runs per mode; load average now %.1f' % (args.rounds, os.getloadavg()[0]))
-    print('%-16s %-4s %12s %10s %10s %8s' % ('load', 'mode', 'accepted/s', 'p50 ms', 'p99 ms', 'failed'))
-    for label in ['push-anonymous', 'push-account', 'get']:
+    print('%-18s %-4s %12s %10s %10s %8s' % ('load', 'mode', 'accepted/s', 'p50 ms', 'p99 ms', 'failed'))
+    for label in ['push-anonymous', 'push-account', get_label]:
         for mode in ['on', 'off']:
             failed = sum(r['failed'] for r in all_results[mode] if r['label'] == label)
-            print('%-16s %-4s %12.1f %10.2f %10.2f %8d' % (label, mode, median(mode, label, 'accepted_per_second'),
+            print('%-18s %-4s %12.1f %10.2f %10.2f %8d' % (label, mode, median(mode, label, 'accepted_per_second'),
                                                          median(mode, label, 'p50'), median(mode, label, 'p99'), failed))
         off = median('off', label, 'accepted_per_second')
         if off:
-            print('%-16s on/off throughput ratio %.3f' % (label, median('on', label, 'accepted_per_second') / off))
+            print('%-18s on/off throughput ratio %.3f' % (label, median('on', label, 'accepted_per_second') / off))
 
 
 if __name__ == '__main__':
