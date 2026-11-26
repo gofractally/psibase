@@ -149,7 +149,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | **service** | Tables and actions |
 | **r-favor** | GraphQL: caller-scoped lines, obligations, requests and history; public offers, FX, relays; `quotePath` returns a sealed route |
 | **plugin** | WIT `api` for the Supervisor (`setCreditLine`, `pathPay`, `quotePath`, …) |
-| **ui** | React app on the `favor-app` subdomain |
+| **ui** | React app on the `favor` subdomain |
 
 ### Actions (service)
 
@@ -211,7 +211,7 @@ cd packages/user/Favor/ui && yarn && yarn build
 cargo-psibase package
 ```
 
-Install with `cargo-psibase install` against a local psinode. Open `https://favor-app.<root>/`. GraphiQL: `/graphiql`.
+Install with `cargo-psibase install` against a local psinode. Open `https://favor.<root>/`. GraphiQL: `/graphiql`.
 
 ## Test
 

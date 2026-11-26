@@ -1,4 +1,4 @@
-export const FAVOR_SERVICE = "favor-app" as const;
+export const FAVOR_SERVICE = "favor" as const;
 
 /**
  * Chain rate scale: `PPM_SCALE` = 100%.

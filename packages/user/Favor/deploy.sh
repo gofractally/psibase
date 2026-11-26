@@ -3,13 +3,13 @@
 #
 #   ./packages/user/Favor/deploy.sh
 #
-# Routing key: path payments fail until `favor-app` has one. A deploy sets it
+# Routing key: path payments fail until `favor` has one. A deploy sets it
 # only when `routingReady` is false, so redeploying does not invalidate open
 # quotes. `ROTATE_KEY=1` forces a new one, which does.
 set -euo pipefail
 
 API="${API:-https://pinkduck.lol}"
-SENDER=favor-app
+SENDER=favor
 QUERY="${SENDER}+1"
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -19,7 +19,7 @@ USER_WS="$PACKAGES/user"
 SCHEMA="$USER_WS/target/wasm32-wasip1/release"
 PSI="$SCHEMA/packages/Favor.psi"
 WORKDIR=$(mktemp -d)
-KEY="$WORKDIR/favor-app.pem"
+KEY="$WORKDIR/favor.pem"
 EXTRACT="$WORKDIR/psi"
 trap 'rm -rf "$WORKDIR"' EXIT
 
@@ -59,7 +59,7 @@ push_json() {
     psibase push -a "$API" -s "$KEY" "$file"
 }
 
-# Whether `favor-app` has a routing key. Public query, no sign-in.
+# Whether `favor` has a routing key. Public query, no sign-in.
 routing_ready() {
     local json
     json=$(curl -sS --max-time 20 \

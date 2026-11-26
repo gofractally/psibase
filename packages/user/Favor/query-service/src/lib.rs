@@ -1,4 +1,4 @@
-#[psibase::service(name = "favor-app+1")]
+#[psibase::service(name = "favor+1")]
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::*;
@@ -384,7 +384,7 @@ mod service {
         now: i64,
     }
 
-    /// History row from `history.favor-app.activity` (amounts already human decimals).
+    /// History row from `history.favor.activity` (amounts already human decimals).
     #[derive(Deserialize, SimpleObject)]
     struct ActivityEvent {
         account: AccountNumber,
@@ -996,7 +996,7 @@ mod service {
             } else {
                 200
             };
-            EventQuery::new("history.favor-app.activity")
+            EventQuery::new("history.favor.activity")
                 .condition_with_params(cond, params)
                 .first(first)
                 .last(last.or(Some(default_last)))

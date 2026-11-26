@@ -7,11 +7,11 @@ pub mod path_find;
 pub mod route;
 pub mod tables;
 
-#[psibase::service(name = "favor-app", tables = "tables::tables")]
+#[psibase::service(name = "favor", tables = "tables::tables")]
 pub mod service {
     use crate::tables::{
-        assert_account_exists, emit_pair_activity, path_required_send, run_path, Asset, FavorInvite,
-        FavorRelay, BookAuth, CashQuote, ClaimOffer, Connection, ForwardOffer, FxOffer, InitRow,
+        assert_account_exists, emit_pair_activity, path_required_send, run_path, Asset, BookAuth,
+        CashQuote, ClaimOffer, Connection, FavorInvite, FavorRelay, ForwardOffer, FxOffer, InitRow,
         InitTable, Pair, PayAuth, PayRequest, RouteKey, RouteKeyTable, TokenRelay,
     };
     use psibase::{

@@ -343,7 +343,7 @@ Multiple tokens per Favor asset: one quote row per `(poster, asset, token, is_ou
 
 ## History
 
-Each writer emits a bilateral `history.favor-app.activity` event: one row per party as `account`, the other as `counterparty`. Amounts are **human decimals** at emit (asset precision; convert’s `netted` uses the destination asset).
+Each writer emits a bilateral `history.favor.activity` event: one row per party as `account`, the other as `counterparty`. Amounts are **human decimals** at emit (asset precision; convert’s `netted` uses the destination asset).
 
 Kinds include `path_draw`, `path_pay`, `deposit`, `book`, `forgive`, `convert`, `take`, `relay`, `cash_out`, `cash_in`, `credit_line`, `rm_credit_line`, `book_auth`, `rm_book_auth`, `sell_claim` / `buy_claim`, `invoice`, `please_book`, `fulfill`, `req_cancel`.
 
