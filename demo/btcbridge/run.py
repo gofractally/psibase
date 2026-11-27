@@ -193,6 +193,8 @@ def start():
  if NETWORK=='regtest' and 'faucet' not in rpc('listwallets'):rpc('loadwallet','faucet')
  start_signers()
  if os.environ.get('BTCBRIDGE_AUTO_RELAY','1')=='1':proc('relayer',[sys.executable,Path(__file__).parent/'relayer.py','--state',STATE])
+ # The gateway serves a regtest node's data to the page; on signet the page asks a public API.
+ if NETWORK!='regtest':return print(f'http://btcbridge.psibase.localhost:{NODE_PORT}/')
  proc('gateway',[sys.executable,Path(__file__).parent/'server.py','--state',STATE])
  wait(lambda:urllib.request.urlopen(f'http://127.0.0.1:{WEB_PORT}/api/health',timeout=2))
  print(ORIGIN+'/')
