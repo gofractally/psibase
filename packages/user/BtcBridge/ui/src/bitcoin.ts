@@ -2,7 +2,7 @@
 // relay needs with every header. Nothing here is trusted by the chain; the services verify it all.
 // These checks only keep the browser from submitting what a wrong or lying Bitcoin source returned.
 import {HDKey} from '@scure/bip32';
-import {sortedMultisig,TEST_NETWORK,NETWORK} from '@scure/btc-signer';
+import {Address,OutScript,sortedMultisig,TEST_NETWORK,NETWORK} from '@scure/btc-signer';
 
 export type Fetch=(path:string)=>Promise<unknown>;
 export type SignetBlock={header:string,coinbase:string,branch:string[]};
@@ -23,6 +23,43 @@ export function custodyAddress(network:string,xpubs:string[],branch:number,index
  const {versions,net}=networkParams(network);
  const keys=xpubs.map(key=>HDKey.fromExtendedKey(key,versions).deriveChild(branch).deriveChild(index).publicKey!);
  return sortedMultisig(2,keys,true,net).address!;
+}
+
+// What a withdrawal costs and what the bridge can pay, by the rules of the core library
+// (`build_plan`, `budgeted_weight`, `least_fee_share`). Estimates for the form; the service decides.
+export type WithdrawalPolicy={network:string,fee_rate:number,service_fee:number,min_withdrawal:number,dust:number,batch_size:number,max_inputs:number};
+export type CustodyOutput={txid:string,vout:number,value:number,height:number,status:number};
+/// Weight units budgeted for one custody input: 41 bytes and a 2-of-3 witness (105 vB).
+const INPUT_WEIGHT=41*4+256;
+/// Length of the output script an address pays to; 34 (the longest standard one) if it does not parse yet.
+export function scriptLength(network:string,address:string):number{
+ try{return OutScript.encode(Address(networkParams(network).net).decode(address.trim())).length;}catch{return 34;}
+}
+/// Virtual size of a batch as the bridge budgets it: custody inputs, the payments, and change.
+export function budgetedVsize(inputs:number,paymentScripts:number[]):number{
+ const outputs=paymentScripts.reduce((n,len)=>n+9+len,0)+43;
+ return Math.ceil((4*(10+outputs)+2+INPUT_WEIGHT*inputs)/4);
+}
+/// The least network fee a request can ever be charged: a full batch, one input, shared equally.
+export function leastFeeShare(policy:WithdrawalPolicy,script:number):number{
+ const requests=Math.max(1,policy.batch_size),scripts=Array(requests).fill(22);scripts[0]=script;
+ return Math.floor(budgetedVsize(1,scripts)*policy.fee_rate/requests);
+}
+/// A request paid alone: the inputs the bridge would spend (oldest first, as it selects them), the
+/// fee, and the change. `null` when the available outputs cannot pay it: the bridge always keeps
+/// at least `dust` as change. `most` is the largest amount those outputs could pay alone.
+export function quoteAlone(policy:WithdrawalPolicy,outputs:CustodyOutput[],script:number,amount:number):{inputs:number,fee:number,change:number}|null{
+ let value=0,n=0;
+ for(const o of available(policy,outputs)){value+=o.value;n++;const fee=budgetedVsize(n,[script])*policy.fee_rate;if(value>=amount+fee+policy.dust)return{inputs:n,fee,change:value-amount-fee};}
+ return null;
+}
+export function mostPayableAlone(policy:WithdrawalPolicy,outputs:CustodyOutput[],script:number):number{
+ let value=0,n=0,most=0;
+ for(const o of available(policy,outputs)){value+=o.value;n++;most=Math.max(most,value-budgetedVsize(n,[script])*policy.fee_rate-policy.dust);}
+ return most;
+}
+function available(policy:WithdrawalPolicy,outputs:CustodyOutput[]):CustodyOutput[]{
+ return outputs.filter(o=>o.status===0).sort((a,b)=>a.height-b.height||(a.txid<b.txid?-1:a.txid>b.txid?1:0)||a.vout-b.vout).slice(0,policy.max_inputs);
 }
 
 const HEX=/^(?:[0-9a-f]{2})*$/;

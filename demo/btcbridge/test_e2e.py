@@ -25,12 +25,12 @@ class BridgeTests(unittest.TestCase):
   before=snapshot()['config']
   with self.assertRaises(ValueError):fn()
   self.assertEqual(before,snapshot()['config'])
- def withdraw(self,owner='alice',amount=100000,max_fee=10000):
+ def withdraw(self,owner='alice',amount=100000,max_fee=10000,kind=None):
   state=snapshot(owner);locked=amount+max_fee+state['policy']['service_fee'];actions=[]
   claim=max(0,min(state['wallet']['incoming'],locked-state['wallet']['balance']))
   if claim:actions.append(action(owner,'tokens','debit',dict(token_id=state['config']['token'],creditor='btcbridge',amount={'value':claim},memo='Test claim')))
   actions.append(action(owner,'tokens','credit',dict(token_id=state['config']['token'],debitor='btcbridge',amount={'value':locked},memo='Test authorization')))
-  destination=rpc('getnewaddress',wallet='faucet')
+  destination=rpc('getnewaddress','',kind,wallet='faucet') if kind else rpc('getnewaddress',wallet='faucet')
   actions.append(action(owner,'btcbridge','withdraw',dict(address=destination,amount=amount,max_fee=max_fee)))
   return push(actions)[-1],destination
  def test_00_native_accounts_require_real_signatures(self):
@@ -119,7 +119,11 @@ class BridgeTests(unittest.TestCase):
    if original:
     self.unchanged_failure(lambda:call('alice','btcbridge','deposit',**proof(original['txid']),vout=i['vout']))
  def test_04b_impossible_fee_cap_cannot_block_queue(self):
-  low,_=self.withdraw('alice',max_fee=1);other,_=self.withdraw('bob')
+  # An allowance below the least share a request could ever be charged is refused outright.
+  self.unchanged_failure(lambda:self.withdraw('alice',max_fee=1))
+  # 221 sat is that least share (two P2WPKH requests, one input, 2 sat/vB). Batched with a
+  # taproot payment the share is 233: admitted, then set aside when the batch is made.
+  low,_=self.withdraw('alice',max_fee=221);other,_=self.withdraw('bob',kind='bech32m')
   self.assertEqual(call('alice','btcbridge','makeBatch'),0)
   rows={r['id']:r for r in snapshot()['requests']}
   self.assertEqual(rows[low]['status'],4);self.assertEqual(rows[other]['status'],0)
