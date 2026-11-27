@@ -27,6 +27,7 @@ import {
     fetchRecord,
     keysFor,
     callPlugin,
+    heldAccounts,
     loadDevice,
     loginFor,
     recordAccount,
@@ -132,33 +133,61 @@ export const runAccountStep = async (ctx: PageContext) => {
 
     // -------------------------------------------------------- chooser
 
+    // Which account to use on this app. Each app is told of one account
+    // only, so the first choice offered beside the visitor's accounts is a
+    // new one made for this app.
     const showChooser = () => {
         const device = loadDevice();
         const single = device.accounts.length === 1;
         frame(
-            single ? `Welcome back, ${device.accounts[0].name}` : "Choose an account",
-            `Use it on ${ctx.app}.${ctx.rootName}.`,
+            single ? `Continue to ${ctx.app}` : "Choose an account",
+            `${ctx.app}.${ctx.rootName} will see the account you choose here, and no other.`,
         );
         const list = $("acct-list");
         list.textContent = "";
         const ordered = [...device.accounts].sort(
             (a, b) => Number(b.name === device.current) - Number(a.name === device.current),
         );
-        for (const account of ordered) {
+        ordered.forEach((account, i) => {
             const button = document.createElement("button");
             button.type = "button";
-            button.className =
-                account.name === device.current ? "si-btn si-primary" : "si-btn si-provider";
+            button.className = i === 0 ? "si-btn si-primary" : "si-btn si-provider";
             button.textContent = `Continue as ${account.name}`;
             button.addEventListener("click", () => void enter(account.name));
             list.append(button);
-        }
+        });
+        const fresh = document.createElement("button");
+        fresh.type = "button";
+        fresh.className = "si-btn si-provider";
+        fresh.textContent = "Create a new account for this app";
+        fresh.addEventListener("click", () => ctx.go("account", { intent: "new" }));
+        list.append(fresh);
         list.hidden = false;
         links(guestLink, { label: "Manage accounts", run: () => ctx.go("manage") });
         setLinks($("acct-more"), [
-            { label: "Create another account", run: () => ctx.go("account", { intent: "new" }) },
             { label: "Recover an account", run: () => ctx.go("account", { intent: "recover" }) },
         ]);
+    };
+
+    // A new account is created, and paid for, by one the visitor already
+    // has. With more than one, they say which.
+    const showCreators = (accounts: string[]) => {
+        frame(
+            "Which account creates it?",
+            "It pays for the new account and becomes its recovery partner, which you can change afterwards. That connects the two on the network, so pick one you don't mind being linked to the new account.",
+        );
+        const list = $("acct-list");
+        list.textContent = "";
+        for (const account of accounts) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "si-btn si-provider";
+            button.textContent = `Create with ${account}`;
+            button.addEventListener("click", () => showName(undefined, account));
+            list.append(button);
+        }
+        list.hidden = false;
+        links(backLink);
     };
 
     const enter = async (name: string) => {
@@ -310,7 +339,7 @@ export const runAccountStep = async (ctx: PageContext) => {
         if (by) {
             frame(
                 "Name your new account",
-                `${by} creates it and becomes its recovery partner, which you can change afterwards. The name can't be changed later.`,
+                `${by} creates it and becomes its recovery partner. You'll be signed in to ${ctx.app} as the new account. The name can't be changed later.`,
             );
         } else {
             frame(
@@ -633,7 +662,10 @@ export const runAccountStep = async (ctx: PageContext) => {
         if (intent !== "new" && loadDevice().accounts.length) return showChooser();
         const status = await api<Status>("/status");
         const device = loadDevice();
-        const own = device.accounts.find((a) => a.name === device.current && a.held !== false);
+        const held = heldAccounts();
+        // One account creates the next; with several, the visitor says which.
+        const ownAccount = () =>
+            held.length > 1 ? showCreators(held) : showName(undefined, held[0]);
         if (status.link?.account) {
             // The provider sign-in already has its account. If this browser
             // does not hold it yet, bring it here first.
@@ -641,10 +673,10 @@ export const runAccountStep = async (ctx: PageContext) => {
                 return recover(status.link.account, false);
             }
             // A further account is created by one the visitor already has.
-            if (own) return showName(undefined, own.name);
+            if (held.length) return ownAccount();
             return showChooser();
         }
-        if (intent === "new" && own && !status.link) return showName(undefined, own.name);
+        if (intent === "new" && held.length && !status.link) return ownAccount();
         if (!status.open) return showClosed();
         if (status.link) return showName(status.link);
         if (status.providers.length === 0) return showClosed();

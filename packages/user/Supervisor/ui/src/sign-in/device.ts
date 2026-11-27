@@ -47,6 +47,12 @@ export interface DeviceAccounts {
     pendingName?: string;
     /** Base64url user id of the passkey, for telling the password manager. */
     userId?: string;
+    /**
+     * Which account each app was entered as: an account name, or "" for a
+     * guest. An app sees only the account chosen for it, so a visitor can
+     * keep the accounts they use elsewhere to themselves.
+     */
+    apps?: Record<string, string>;
 }
 
 export const loadDevice = (): DeviceAccounts => {
@@ -95,6 +101,29 @@ export const dropFromDevice = (name: string) => {
 };
 
 export const clearDevice = () => window.localStorage.removeItem(DEVICE_KEY);
+
+/**
+ * The choice made for `app`: an account this browser can sign in as, "" for
+ * a guest, or undefined when the visitor has not chosen yet.
+ */
+export const choiceFor = (app: string): string | undefined => {
+    const device = loadDevice();
+    const choice = device.apps?.[app];
+    if (choice === undefined || choice === "") return choice;
+    const entry = device.accounts.find((a) => a.name === choice);
+    return entry && entry.held !== false ? choice : undefined;
+};
+
+export const rememberChoice = (app: string, account: string | undefined) => {
+    const device = loadDevice();
+    saveDevice({ ...device, apps: { ...device.apps, [app]: account ?? "" } });
+};
+
+/** The accounts this browser holds a signing key for. */
+export const heldAccounts = (): string[] =>
+    loadDevice()
+        .accounts.filter((a) => a.held !== false)
+        .map((a) => a.name);
 
 /** Keeps what a passkey prompt told us about the passkey and its holder. */
 export const notePasskey = (details: {
@@ -358,7 +387,6 @@ export const recordAccount = async (
 export const syncAccounts = async (
     net: Network,
     unlocked: Unlocked,
-    app: string,
 ): Promise<string[]> => {
     // The passkey's own notes first; the node's list for a passkey that
     // carries none. Sequence values always come from the chain.
@@ -389,7 +417,9 @@ export const syncAccounts = async (
                 );
                 continue;
             }
-            await adoptFor(app, entry.name, found.keys.activePem);
+            // Signed in to the supervisor only: no app learns of an account
+            // until the visitor chooses it for that app.
+            await adoptFor("supervisor", entry.name, found.keys.activePem);
             rememberOnDevice(
                 { name: entry.name, ownerSeq: found.keys.owner.seq, activeSeq: found.keys.active.seq },
                 false,

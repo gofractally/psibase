@@ -131,7 +131,7 @@ export const runManageStep = async (ctx: PageContext) => {
                 });
                 await new Promise((r) => setTimeout(r, 1200));
                 const entry = { name, ownerSeq: keys.owner.seq, activeSeq: seq.toString() };
-                await adoptFor(ctx.app, name, privateKeyPem(next));
+                await adoptFor("supervisor", name, privateKeyPem(next));
                 rememberOnDevice(entry, false);
                 await recordAccount(net, unlocked, entry).catch((e) => console.warn(e));
             } finally {

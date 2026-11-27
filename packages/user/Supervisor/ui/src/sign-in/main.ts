@@ -18,8 +18,12 @@ import { signText } from "./account-keys";
 import { NAME_RULE, type PageContext, type View } from "./context";
 import {
     type Network,
+    choiceFor,
     clearDevice,
     forgetAccount,
+    heldAccounts,
+    logoutFor,
+    rememberChoice,
     loadDevice,
     loginFor,
     notePasskey,
@@ -143,15 +147,25 @@ const HAS_PASSKEY_KEY = "psibase.has-passkey.v1";
 const WHO_KEY = "psibase.passkey-holder.v1";
 
 interface Holder {
-    /** The account (or the name picked for one) the passkey is known by. */
+    /** The account (or the name picked for one) this app would be entered as. */
     name?: string;
     displayName?: string;
+    /** How many accounts the passkey holds. */
+    accounts?: number;
 }
 
 const currentHolder = (): Holder => {
     const device = loadDevice();
-    const name = device.current ?? device.accounts[0]?.name ?? device.pendingName;
-    if (name || device.displayName) return { name, displayName: device.displayName };
+    // The account this app knows, or the only account there is. With
+    // several and no choice yet, no one account stands for the holder.
+    const held = heldAccounts();
+    const name =
+        choiceFor(destination.app) ||
+        (held.length === 1 ? held[0] : undefined) ||
+        (held.length === 0 ? device.pendingName : undefined);
+    if (name || device.displayName || held.length) {
+        return { name, displayName: device.displayName, accounts: held.length };
+    }
     try {
         return JSON.parse(window.localStorage.getItem(WHO_KEY) ?? "{}") as Holder;
     } catch {
@@ -187,7 +201,9 @@ const renderWelcome = () => {
         ? "One passkey gets you in. New here? It takes a few seconds, and you can explore before you decide on anything else."
         : holder.name
           ? `Use your passkey to continue as ${holder.name}.`
-          : "Use your passkey to pick up where you left off.";
+          : (holder.accounts ?? 0) > 1
+            ? "Use your passkey, then choose which account to use here or create a new one."
+            : "Use your passkey to pick up where you left off.";
     setButton(
         !knownPasskey
             ? "Sign up or sign in"
@@ -407,14 +423,24 @@ const enterApp = async (
     signedIn = false,
 ) => {
     window.sessionStorage.setItem(BOUNCE_KEY, String(Date.now()));
+    const before = choiceFor(destination.app);
     if (account && !signedIn) await loginFor(destination.app, account);
+    // Entering as a guest an app that knew an account: the account leaves.
+    if (!account && before) await logoutFor(destination.app).catch((e) => console.warn(e));
+    rememberChoice(destination.app, account);
     await submitSession(session, !!account);
 };
 
 const goToDestination = async (session: GuestSession, celebrate: boolean) => {
-    const device = loadDevice();
-    const entry = device.accounts.find((a) => a.name === device.current);
-    const account = entry && entry.held !== false ? entry.name : undefined;
+    // An app is entered as the account chosen for it. A visitor with
+    // accounts who has not chosen for this app is asked, so an app never
+    // learns of an account the visitor uses elsewhere.
+    const choice = choiceFor(destination.app);
+    if (choice === undefined && heldAccounts().length) {
+        go("account");
+        return;
+    }
+    const account = choice || undefined;
     if (celebrate) {
         $("done-detail").textContent = account
             ? `Welcome back, ${account}`
@@ -612,7 +638,7 @@ const signIn = async (mode: Mode) => {
         // The passkey says which accounts are this visitor's; bring their
         // signing keys to this browser while the root is at hand.
         try {
-            await syncAccounts(network(session), unlocked, destination.app);
+            await syncAccounts(network(session), unlocked);
         } catch (e) {
             console.warn("Could not bring accounts to this browser", e);
         }

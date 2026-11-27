@@ -10,6 +10,7 @@ const port = process.argv[2] ?? "8443";
 const A = process.argv[3] ?? "alicetest1";
 const B = process.argv[4] ?? "bobtester1";
 const A2 = process.argv[5] ?? A.slice(0, -1) + "z";
+const A3 = A.slice(0, -1) + "y";
 const app = "exchange";
 const root = `psibase.localhost:${port}`;
 const shots = process.env.SHOTS ?? "/tmp/pw-signin/shots";
@@ -61,8 +62,8 @@ const record = async (p, name) => {
     return (await r.json()).data?.account;
 };
 
-const sessionSub = async (p) => {
-    const c = (await p.context.cookies(`${S}://${app}.${root}/`)).find((c) => c.name === "__Host-SESSION");
+const sessionSub = async (p, host = app) => {
+    const c = (await p.context.cookies(`${S}://${host}.${root}/`)).find((c) => c.name === "__Host-SESSION");
     if (!c) return undefined;
     return JSON.parse(Buffer.from(c.value.split(".")[1], "base64url").toString()).sub;
 };
@@ -123,8 +124,15 @@ await step(a, "new device: passkey alone finds the account and signs in as it", 
     await page.goto(`${S}://${app}.${root}/`);
     await page.waitForSelector("#view-welcome:not([hidden])", { timeout: 30000 });
     await page.click("#btn-create");
-    await onApp(page); await page.waitForLoadState("networkidle");
-    return expectSub(a, A);
+    // The passkey found the account; the visitor says whether this app may see it.
+    await page.waitForSelector(`text=Continue as ${A}`, { timeout: 60000 });
+    const before = await sessionSub(a);
+    if (before === A) throw new Error("the app was given the account before it was chosen");
+    await snap(a, "chooser");
+    const offered = (await page.locator("#acct-list button").allTextContents()).join(" / ");
+    await page.click(`text=Continue as ${A}`);
+    await onApp(page);
+    return `${await expectSub(a, A)}; offered: ${offered}`;
 });
 
 await step(a, "manage view shows the account, its partner and usage", async (page) => {
@@ -211,12 +219,33 @@ await step(a, "new device again: both accounts come back from the passkey", asyn
     await page.goto(`${S}://${app}.${root}/`);
     await page.waitForSelector("#view-welcome:not([hidden])", { timeout: 30000 });
     await page.click("#btn-create");
+    await page.waitForSelector(`text=Continue as ${A2}`, { timeout: 60000 });
+    const offered = (await page.locator("#acct-list button").allTextContents()).join(" / ");
+    await page.click(`text=Continue as ${A}`);
     await onApp(page);
-    await manage(page, A);
-    const names = (await page.locator(".si-acct .si-dest-host").allTextContents()).sort();
-    if (names.join() !== [A, A2].sort().join()) throw new Error("accounts here: " + names.join(", "));
     const listReads = a.log.filter((l) => l.includes("/list/")).length;
-    return `${names.join(", ")}; requests to the node's list: ${listReads}`;
+    return `${await expectSub(a, A)}; offered: ${offered}; requests to the node's list: ${listReads}`;
+});
+
+await step(a, "another app: a new account is created for it by a chosen account, and the app sees only that one", async (page) => {
+    await page.goto(`${S}://supervisor.${root}/sign-in.html?app=homepage&path=/`);
+    await page.waitForSelector("text=Create a new account for this app", { timeout: 60000 });
+    await page.click("text=Create a new account for this app");
+    await page.waitForSelector(`text=Create with ${A2}`, { timeout: 30000 });
+    await snap(a, "which-creates");
+    const asked = await page.textContent("#acct-title");
+    await page.click(`text=Create with ${A2}`);
+    await page.waitForSelector("#acct-name-form:not([hidden])", { timeout: 30000 });
+    await page.fill("#acct-name", A3);
+    await page.waitForSelector("#acct-create:not([disabled])");
+    await page.click("#acct-create");
+    await page.waitForURL((u) => u.host.startsWith("network."), { timeout: 60000 });
+    await page.waitForLoadState("networkidle"); await page.waitForTimeout(1500);
+    const home = await sessionSub(a, "network");
+    const r = await record(a, A3);
+    if (home !== A3) throw new Error("home page session is " + home);
+    if (r.partner !== A2) throw new Error("partner is " + r.partner);
+    return `"${asked}"; home page sub=${home}, created by ${r.partner}; ${await expectSub(a, A)} on the exchange`;
 });
 
 const b = await person("B");
@@ -253,6 +282,7 @@ await step(a, `asks to change the partner again, which now waits for ${B}`, asyn
 
 await step(b, "recovery page lists the account and the request; approve it by hand", async (page) => {
     await page.goto(`${S}://supervisor.${root}/sign-in.html?app=homepage&path=/recovery`);
+    await page.click(`text=Continue as ${B}`);
     await page.waitForURL((u) => u.pathname === "/recovery", { timeout: 60000 });
     await page.waitForSelector(`text=${A}`, { timeout: 60000 });
     await page.waitForSelector("text=Approve", { timeout: 30000 });
