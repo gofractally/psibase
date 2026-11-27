@@ -284,6 +284,65 @@ namespace SystemService
          return ifNoneMatch && *ifNoneMatch == etag;
       }
 
+      struct VersionQuery
+      {
+         std::string v;
+         PSIO_REFLECT(VersionQuery, v)
+      };
+
+      // A bundler's content hash in a file name: "/assets/index-DiwrgTda.js".
+      // The last '-' or '.' separated part of the name before the extension,
+      // eight or more characters of the base64url alphabet with a digit or an
+      // upper case letter among them, under an "assets" directory.
+      bool hasHashedName(std::string_view path)
+      {
+         if (path.find("/assets/") == std::string_view::npos)
+            return false;
+         auto name = path.substr(path.rfind('/') + 1);
+         auto dot  = name.rfind('.');
+         if (dot == std::string_view::npos || dot == 0)
+            return false;
+         auto stem  = name.substr(0, dot);
+         auto start = stem.find_last_of("-.");
+         if (start == std::string_view::npos)
+            return false;
+         auto hash = stem.substr(start + 1);
+         if (hash.size() < 8)
+            return false;
+         bool mixed = false;
+         for (char c : hash)
+         {
+            bool digit = c >= '0' && c <= '9';
+            bool upper = c >= 'A' && c <= 'Z';
+            bool lower = c >= 'a' && c <= 'z';
+            if (!digit && !upper && !lower && c != '_')
+               return false;
+            mixed = mixed || digit || upper;
+         }
+         return mixed;
+      }
+
+      // Whether the URL of a request names the content it is answered with,
+      // so that the answer can be kept and used again without asking: either
+      // `?v=<ETag>` with the ETag of the content, or a hashed file name.
+      // (gofractally/psibase#2291)
+      // A hashed name counts only for the file stored under that name, not
+      // for a page served in its place.
+      bool namesContent(const HttpRequest&     request,
+                        std::string_view       path,
+                        const SitesContentRow& content,
+                        const std::string&     etag)
+      {
+         if (request.target.find('?') != std::string::npos &&
+             request.query<VersionQuery>().v == etag)
+            return true;
+         return content.path == path && hasHashedName(path);
+      }
+
+      constexpr const char* revalidate = "no-cache";
+      // Not "public": a site may be behind the sign-in gate.
+      constexpr const char* keepForever = "max-age=31536000, immutable";
+
       void decRef(Sites::Tables& tables, SitesDataRefTable& refsTable, const Checksum256& hash)
       {
          auto prevRefs = refsTable.get(hash);
@@ -506,7 +565,11 @@ namespace SystemService
                 getCspHeader(content, content->account, cspRootDomain(rootHost, request));
             auto etag = psio::to_hex(content->contentHash.data(), content->contentHash.data() + 8);
 
-            if (!notFound && useCache(content->account) && shouldCache(request, etag))
+            bool        caching = !notFound && useCache(content->account);
+            const char* cacheControl =
+                caching && namesContent(request, target, *content, etag) ? keepForever : revalidate;
+
+            if (caching && shouldCache(request, etag))
             {
                // https://issues.chromium.org/issues/40132719
                // Chrome bug - Devtools still shows 200 status code sometimes
@@ -514,7 +577,7 @@ namespace SystemService
                    .status  = HttpStatus::notModified,
                    .headers = {{"ETag", etag},
                                {"Content-Security-Policy", cspHeader},
-                               {"Cache-Control", "no-cache"},
+                               {"Cache-Control", cacheControl},
                                {"Access-Control-Allow-Origin", "*"},
                                {"Access-Control-Allow-Methods", "GET, OPTIONS, HEAD"},
                                {"Access-Control-Allow-Headers", "*"}},
@@ -525,7 +588,7 @@ namespace SystemService
                 .status      = notFound ? HttpStatus::notFound : HttpStatus::ok,
                 .contentType = content->contentType,
                 .headers     = {{"Content-Security-Policy", cspHeader},
-                                {"Cache-Control", "no-cache"},
+                                {"Cache-Control", cacheControl},
                                 {"Access-Control-Allow-Origin", "*"},
                                 {"Access-Control-Allow-Methods", "GET, OPTIONS, HEAD"},
                                 {"Access-Control-Allow-Headers", "*"}},
