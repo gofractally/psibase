@@ -215,15 +215,23 @@ The plugins build against the tree's own wallet interfaces (`host:accounts`,
 `Transact`, `Tokens`, and `Permissions` must be direct package dependencies so
 DynLd can resolve their namespaces.
 
-The account panel reads the on-chain Profiles service for names, biographies and
-avatars, and uses its native plugin for signed profile/avatar edits. It reads,
-creates, updates and removes contacts through the canonical, permissioned
-`profiles:plugin/contacts` API. Contacts belong to Psibase's persistent client
-store rather than the objective chain; the bridge does not maintain a duplicate
-address book. Selecting a contact fetches that exact account's registered deposit
-address and independently derives it from all three custody roots. Display names
-are presentation only; the exact account name remains visible. A contact without
-a registered deposit address must create one while connected to their own account.
+The page has no account controls of its own. Its header mounts the account menu
+every app shows (`packages/shared-ui/components/account-menu`): who is signed
+in, profile, accounts and keys, switch account, log out, or sign in. Those lead
+to the network's sign-in app and return to the page, which then asks the wallet
+who is signed in and shows only that account's address, balance and requests.
+The deposit panel can read the signed-in account's contacts, with permission,
+through the permissioned `profiles:plugin/contacts` API to deposit for a
+contact: selecting one fetches that account's registered deposit address and
+independently derives it from all three custody roots. Contacts and profiles
+are edited in the home app. A contact without a registered deposit address must
+create one while signed in to their own account.
+
+The menu is a React component styled with shared-ui's Tailwind stylesheet; the
+rest of the page is plain TypeScript with its own CSS. `ui/build.mjs` bundles
+the menu from the tree (nothing is copied), compiles the shared stylesheet,
+leaves out its page-wide base layer and keeps the page's rules in a CSS layer
+beneath it, so the menu looks as it does elsewhere and the page is unchanged.
 
 Local operator credentials are mode-0600 P-256 PEM files under the mode-0700
 `state/account-keys` directory. Every user, provider and administrator has a

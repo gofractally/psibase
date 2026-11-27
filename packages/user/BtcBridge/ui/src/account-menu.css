@@ -1,0 +1,6 @@
+/* The shared-ui stylesheet, for the account menu only. build.mjs compiles this with Tailwind, drops
+   the page-wide base layer (this page keeps its own element styles; account-menu-reset.css stands
+   in for the menu's elements) and puts style.css in a layer below, so the menu's utilities apply
+   to the menu and nothing of the page changes. */
+@import "@shared/styles/globals.css";
+@source "./account-menu.tsx";

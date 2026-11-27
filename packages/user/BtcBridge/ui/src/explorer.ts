@@ -64,7 +64,7 @@ export function createExplorer(c:ExplorerContext){
  async function fetchHistory(force=false){
   if(historyLoading||!c.state())return;const account=c.account();
   if(account!==historyOwner){historyOwner=account;historyCursor=null;historyStack=[];historyFetched=0;}
-  if(!account){el('history-results').innerHTML='<p class="empty">Connect your Psibase account to see your deposits and withdrawals.</p>';return;}
+  if(!account){el('history-results').innerHTML='<p class="empty">Sign in from the account menu to see your deposits and withdrawals.</p>';return;}
   if(!force&&Date.now()-historyFetched<10000)return;
   historyLoading=true;const seq=++historyGeneration;
   try{const q=new URLSearchParams({owner:account,limit:'10'});if(historyCursor)q.set('cursor',historyCursor);

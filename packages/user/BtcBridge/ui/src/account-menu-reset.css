@@ -1,0 +1,21 @@
+/* In place of shared-ui's page-wide base layer: the element defaults its components expect, for the
+   account menu's elements only (the trigger in the header; its popup and toasts, which are
+   attached to <body>). Appended by build.mjs. */
+@layer base {
+    #account-menu, #account-menu *,
+    [data-radix-popper-content-wrapper], [data-radix-popper-content-wrapper] *,
+    [data-sonner-toaster], [data-sonner-toaster] * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        border: 0 solid var(--border);
+    }
+    #account-menu button {
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+    }
+    [data-radix-popper-content-wrapper] svg { display: block; }
+    [data-radix-popper-content-wrapper] img, #account-menu img { display: block; max-width: 100%; }
+}
