@@ -572,7 +572,101 @@ fn build_plan_inner(
             unsigned: hex::encode(serialize(&tx)),
         });
     }
-    Err("Insufficient confirmed UTXOs (including economical change and fees)".into())
+    Err(INSUFFICIENT.into())
+}
+/// The planner's answer when the offered custody outputs cannot pay the payments, their fee and
+/// the change the bridge keeps.
+pub const INSUFFICIENT: &str = "Insufficient confirmed UTXOs (including economical change and fees)";
+
+/// Which of the requests offered for one batch are paid by it, and which are set aside.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BatchChoice {
+    /// The batch, if any request is paid. Its payments are the paid requests.
+    pub plan: Option<Plan>,
+    /// Requests the available outputs cannot pay even alone: they wait for the reserve.
+    pub unfunded: Vec<u64>,
+    /// Requests whose share of the fee exceeds their allowance.
+    pub over_fee_cap: Vec<u64>,
+}
+fn funded(policy: &Policy, batch: u32, candidates: &[Input], requests: &[Payment]) -> Result<bool> {
+    match quote_plan(policy, batch, candidates, requests) {
+        Ok(_) => Ok(true),
+        Err(e) if e == INSUFFICIENT => Ok(false),
+        Err(e) => Err(e),
+    }
+}
+/// Whether the available custody outputs can pay this request by itself, whatever its fee allowance.
+pub fn fundable_alone(policy: &Policy, batch: u32, candidates: &[Input], request: &Payment) -> Result<bool> {
+    funded(policy, batch, candidates, std::slice::from_ref(request))
+}
+/// Choose a batch from the oldest queued requests so that no request can hold up the others.
+///
+/// 1. A request the available outputs cannot pay even alone is set aside (`unfunded`); it did
+///    nothing wrong and is offered again when the reserve has grown.
+/// 2. Of the rest, in request order, the longest run from the oldest that can be paid together
+///    is taken; later ones simply stay queued for the next batch.
+/// 3. A request whose share of the fee exceeds its allowance is set aside (`over_fee_cap`) and
+///    the others are planned again without it.
+///
+/// "Can be paid" is the planner's own rule: selected inputs cover the payments, the fee and at
+/// least `dust` of change. There is no changeless batch: a remainder below `dust` is neither
+/// given to miners nor paid out, so that last part of the reserve stays in custody.
+///
+/// An error is a defect in the stored data (a malformed request or output), never a property
+/// of one request's amount.
+pub fn choose_batch(
+    policy: &Policy,
+    batch: u32,
+    candidates: &[Input],
+    requests: &[Payment],
+) -> Result<BatchChoice> {
+    let mut queue = requests.to_vec();
+    queue.sort_by_key(|r| r.id);
+    let mut choice = BatchChoice {
+        plan: None,
+        unfunded: vec![],
+        over_fee_cap: vec![],
+    };
+    if !funded(policy, batch, candidates, &queue)? {
+        // Smaller sets need less, so only now can a single request be unpayable.
+        let mut payable = vec![];
+        for r in queue {
+            if fundable_alone(policy, batch, candidates, &r)? {
+                payable.push(r);
+            } else {
+                choice.unfunded.push(r.id);
+            }
+        }
+        // The longest payable run from the oldest: every one-request run is payable.
+        let (mut low, mut high) = (1.min(payable.len()), payable.len());
+        while low < high {
+            let middle = (low + high + 1) / 2;
+            if funded(policy, batch, candidates, &payable[..middle])? {
+                low = middle;
+            } else {
+                high = middle - 1;
+            }
+        }
+        payable.truncate(low);
+        queue = payable;
+    }
+    while !queue.is_empty() {
+        let quote = quote_plan(policy, batch, candidates, &queue)?;
+        let over: Vec<u64> = quote
+            .payments
+            .iter()
+            .zip(&quote.fees)
+            .filter(|(r, fee)| **fee > r.max_fee)
+            .map(|(r, _)| r.id)
+            .collect();
+        if over.is_empty() {
+            choice.plan = Some(build_plan(policy, batch, candidates, &queue)?);
+            break;
+        }
+        queue.retain(|r| !over.contains(&r.id));
+        choice.over_fee_cap.extend(over);
+    }
+    Ok(choice)
 }
 pub fn check_plan(policy: &Policy, plan: &Plan) -> Result<()> {
     let rebuilt = build_plan(policy, plan.batch, &plan.inputs, &plan.payments)?;

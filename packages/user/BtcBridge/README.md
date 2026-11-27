@@ -135,11 +135,44 @@ adds 31 or 43 vB and the fee is shared; each further input adds 105 vB.
 charged (a full batch with one input: 221 sat to P2WPKH at 2 sat/vB with
 batches of two). A larger allowance that still proves too small when the batch
 is made sets the request aside for its owner to cancel; it does not hold up the
-queue. The bridge always keeps at least `dust` as change, so from a reserve of
-one 10,000 sat output at most 10,000 - 380 - 1,000 = 8,620 sat can be paid out.
-A request the reserve cannot pay that way is not set aside: `makeBatch` fails
-while it is at the head of the queue, until deposits arrive or its owner
-cancels it.
+queue.
+
+### No request can hold up the queue
+
+`makeBatch` takes the oldest queued requests and chooses the batch with the
+core library's `choose_batch`. It fails for no property of a single request:
+
+- A request the available confirmed custody outputs cannot pay even alone
+  **waits for the reserve** (status 5). Its owner did nothing wrong, so it is
+  not left for them to cancel and resubmit: each later `makeBatch` looks at the
+  oldest waiting requests (up to 32) and puts back in the queue, in their old
+  place, those the outputs can now pay. The owner sees the state and may cancel
+  at any time.
+- Of the rest, the longest run from the oldest that can be paid together is
+  taken; later requests stay queued for the next batch. Nothing jumps the queue.
+- A request whose share of the fee exceeds its allowance is set aside (status
+  4) for its owner to cancel, as before; the fee rate does not fall by itself.
+
+"Can pay" is the planner's rule: the selected outputs (oldest first, at most
+`max_inputs`) cover the payments, the fee and at least `dust` of change. There
+is no changeless batch: a remainder below `dust` is neither added to the fee
+nor paid out; a further output is drawn if there is one, otherwise the request
+waits. From a reserve of one 10,000 sat output at most 10,000 - 380 - 1,000 =
+8,620 sat can be paid; a request for 9,510 waits until another deposit arrives.
+The last `dust` plus fee of a reserve therefore cannot leave through a
+withdrawal.
+
+`withdraw` does not refuse an amount for exceeding the present reserve: a later
+deposit may make it payable, and the request waits meanwhile.
+
+Request states: 0 queued, 1 in a batch, 2 complete, 3 cancelled, 4 fee
+allowance too low, 5 waiting for the reserve. The owner can cancel in states 0,
+4 and 5.
+
+What can still stop `makeBatch` for everyone is not a request: sixteen open
+batches (`Open batch limit`), a paused bridge, or a stale or paused relay.
+`requestSigs`, `gather` and `complete` act on one batch and one signer; a
+failure there concerns that batch only.
 Accepted transfers protect their Bitcoin history. A higher-work reorg removing
 that history, or exceeding the bounded update window, persistently freezes the
 relay. A stale tip stops new credit and withdrawal authorization. A pause cannot
@@ -280,8 +313,13 @@ isolated exchange adapter writes. The separate original exchange is unchanged.
 ## Verification and deployment limits
 
 ```sh
+# The core tests run on the build machine, not as wasm. This workspace's default target is
+# wasm32-wasip1, so a plain `cargo test -p btcbridge-core` tries to build for wasm and cannot
+# run: name the host target.
 cargo test --manifest-path packages/user/Cargo.toml \
-  --target aarch64-apple-darwin -p btcbridge-core -p signing-core
+  --target "$(rustc -vV | sed -n 's/^host: //p')" -p btcbridge-core -p signing-core
+# (x86_64-unknown-linux-gnu on the Linux server, aarch64-apple-darwin on an Apple silicon Mac.)
+(cd packages/user/BtcBridge/ui && npm ci && npm test)
 python3 demo/btcbridge/test_e2e.py
 ```
 
@@ -361,7 +399,8 @@ Public JSON endpoints (GET, no authentication):
   deposit history. `/explorer/deposit?outpoint=TXID-VOUT_HEX` reads one receipt;
   VOUT_HEX is eight hexadecimal digits.
 - `/explorer/withdrawals?limit=25&cursor=...&owner=alice`: descending requests
-  including queued, committed, complete, cancelled, and fee-deferred states.
+  including queued, committed, complete, cancelled, fee-deferred and
+  waiting-for-reserve states.
 - `/explorer/batches?limit=5&cursor=...&status=0`: pending by default, 1 complete,
   or `all`. Maximum ten batches per page.
 - `/explorer/batch?id=2`: full public transaction and per-input signing detail.

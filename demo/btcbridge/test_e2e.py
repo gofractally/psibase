@@ -193,6 +193,31 @@ class BridgeTests(unittest.TestCase):
   self.assertEqual(after['deposit_fee_terms']['fee_bps'],10)
   self.assertEqual(after['deposit_fee_policy']['pending']['fee_bps'],20)
   self.assertGreaterEqual(after['deposit_fee_policy']['activates_at'],before['now']+86400)
+ def test_10_request_the_reserve_cannot_pay_waits_and_blocks_nobody(self):
+  available=lambda:sum(u['value'] for u in snapshot()['utxos'] if u['status']==0)
+  status=lambda owner,request:next(r['status'] for r in snapshot(owner)['requests'] if r['id']==request)
+  wallet=snapshot('liquidity')['wallet'];large=wallet['balance']+wallet['incoming']-20000
+  # Open batches reserve whole custody outputs, oldest first, until what is left cannot pay one large request.
+  for _ in range(12):
+   if available()<large:break
+   self.withdraw('alice',10000);self.withdraw('bob',10000);self.assertGreater(call('carol','btcbridge','makeBatch'),0)
+  self.assertLess(available(),large)
+  big,_=self.withdraw('liquidity',amount=large);small,_=self.withdraw('carol',10000)
+  # It heads the queue. makeBatch does not fail: the request waits for the reserve (5), in view of its owner.
+  call('alice','btcbridge','makeBatch')
+  self.assertEqual(status('liquidity',big),5);self.assertIn(status('carol',small),(0,1,5))
+  self.unchanged_failure(lambda:call('bob','btcbridge','cancel',request=big))
+  # The reserve grows: the next makeBatch puts the request back in its place and pays it.
+  address=call('liquidity','btcbridge','newAddress');txid=rpc('sendtoaddress',address['address'],11,wallet='faucet');mine(7);relay_headers();prove_deposit(txid)
+  self.withdraw('carol',10000)
+  self.assertGreater(call('alice','btcbridge','makeBatch'),0)
+  self.assertEqual(status('liquidity',big),1)
+  # A waiting request can be cancelled by its owner like a queued one.
+  wallet=snapshot('liquidity')['wallet'];huge,_=self.withdraw('liquidity',amount=wallet['balance']+wallet['incoming']-20000);self.withdraw('carol',10000)
+  call('alice','btcbridge','makeBatch')
+  if status('liquidity',huge)==5:
+   escrow=snapshot()['config']['escrow'];call('liquidity','btcbridge','cancel',request=huge)
+   self.assertEqual(status('liquidity',huge),3);self.assertLess(snapshot()['config']['escrow'],escrow)
  def test_99_deep_reorg_freezes_accepted_state(self):
   protected=snapshot()['relay']['protected_height'];old_height=rpc('getblockcount');rpc('invalidateblock',rpc('getblockhash',protected));mine(old_height-protected+2)
   relay_headers();self.assertTrue(snapshot()['relay']['paused'])

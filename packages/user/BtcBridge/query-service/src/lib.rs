@@ -203,6 +203,14 @@ pub mod service {
                 {
                     requests.insert(r.id, r);
                 }
+                // Requests waiting for the reserve: whoever relays must see them to offer them again.
+                for r in RequestTable::read()
+                    .get_index_by_status()
+                    .range((5, 0)..=(5, u64::MAX))
+                    .take(32)
+                {
+                    requests.insert(r.id, r);
+                }
                 if let Some(owner) = owner {
                     for r in RequestTable::read()
                         .get_index_by_owner()

@@ -136,8 +136,16 @@ def drive():
  """Public coordinator. All signatures come from the separate generic signing daemons."""
  relay_headers();scan_deposits();state=snapshot()
  queued=[r for r in state['requests'] if r['status']==0]
- if queued and (len(queued)>=state['policy']['batch_size'] or state['now']>=min(r['created'] for r in queued)+state['policy']['batch_seconds']):
-  call(RELAYER,'btcbridge','makeBatch');state=snapshot()
+ due=queued and (len(queued)>=state['policy']['batch_size'] or state['now']>=min(r['created'] for r in queued)+state['policy']['batch_seconds'])
+ # A request waiting for the reserve (status 5) rejoins the queue inside makeBatch, so someone has
+ # to call it once the available custody outputs could pay such a request.
+ free=sum(u['value'] for u in state['utxos'] if u['status']==0)
+ retry=any(r['status']==5 and r['amount']+state['policy']['dust']<free for r in state['requests'])
+ if due or retry:
+  try:call(RELAYER,'btcbridge','makeBatch')
+  except ValueError as error:
+   if due or not any(s in str(error) for s in ('No pending withdrawals','not due')):raise
+  state=snapshot()
  for b in state['batches']:
   if b['status']!=0:continue
   rev=next(r for r in state['revisions'] if r['batch']==b['id'] and r['revision']==b['current_revision'])

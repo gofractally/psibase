@@ -525,7 +525,7 @@ pub mod service {
             .expect("Unknown request");
         assert_eq!(r.owner, get_sender(), "Withdrawal owner authority");
         assert!(
-            r.status == 0 || r.status == 4,
+            r.status == 0 || r.status == 4 || r.status == 5,
             "Committed withdrawals cannot be cancelled"
         );
         let locked = plus(plus(r.amount, r.max_fee), r.service_fee);
@@ -549,6 +549,26 @@ pub mod service {
                 < 16,
             "Open batch limit"
         );
+        let candidates: Vec<_> = UtxoTable::read()
+            .get_index_by_status()
+            .range((0, 0, String::new())..=(0, u32::MAX, "z".into()))
+            .take(256)
+            .map(|u| u.input())
+            .collect();
+        let id = c.next_batch;
+        // Requests waiting for the reserve (status 5) rejoin the queue, in their old place, once
+        // the available outputs can pay them. A bounded number is looked at per call.
+        let waiting: Vec<_> = RequestTable::read()
+            .get_index_by_status()
+            .range((5, 0)..=(5, u64::MAX))
+            .take(32)
+            .collect();
+        for mut r in waiting {
+            if must(btc::fundable_alone(&p, id, &candidates, &r.payment())) {
+                r.status = 0;
+                RequestTable::read_write().put(&r).unwrap();
+            }
+        }
         let mut requests: Vec<_> = RequestTable::read()
             .get_index_by_status()
             .range((0, 0)..=(0, u64::MAX))
@@ -560,38 +580,36 @@ pub mod service {
                 || now() >= requests[0].created + p.batch_seconds as u64,
             "Withdrawal batch is not due"
         );
-        let candidates: Vec<_> = UtxoTable::read()
-            .get_index_by_status()
-            .range((0, 0, String::new())..=(0, u32::MAX, "z".into()))
-            .take(256)
-            .map(|u| u.input())
+        // No single request can make this call fail: one the reserve cannot pay waits for the
+        // reserve (5), one whose fee allowance is too small is set aside (4), and the batch is
+        // made from the others. Both are persisted even when no batch results.
+        let payments: Vec<_> = requests.iter().map(|r| r.payment()).collect();
+        let choice = must(btc::choose_batch(&p, id, &candidates, &payments));
+        for r in &mut requests {
+            if choice.unfunded.contains(&r.id) {
+                r.status = 5;
+            } else if choice.over_fee_cap.contains(&r.id) {
+                r.status = 4;
+            } else {
+                continue;
+            }
+            RequestTable::read_write().put(r).unwrap();
+        }
+        let paid: Vec<u64> = choice
+            .plan
+            .iter()
+            .flat_map(|plan| plan.payments.iter().map(|r| r.id))
             .collect();
-        let id = c.next_batch;
-        let plan = loop {
-            let payments: Vec<_> = requests.iter().map(|r| r.payment()).collect();
-            let quote = must(btc::quote_plan(&p, id, &candidates, &payments));
-            let blocked: Vec<_> = quote
-                .payments
-                .iter()
-                .zip(&quote.fees)
-                .filter(|(r, fee)| **fee > r.max_fee)
-                .map(|(r, _)| r.id)
-                .collect();
-            if blocked.is_empty() {
-                break must(btc::build_plan(&p, id, &candidates, &payments));
-            }
-            for r in &mut requests {
-                if blocked.contains(&r.id) {
-                    r.status = 4;
-                    RequestTable::read_write().put(r).unwrap();
-                }
-            }
-            requests.retain(|r| r.status == 0);
-            // Persist deferrals, rather than reverting and leaving an impossible fee cap at the head forever.
-            if requests.is_empty()
-                || (requests.len() < p.batch_size as usize
-                    && now() < requests[0].created + p.batch_seconds as u64)
+        // Requests neither set aside nor paid stay queued for the next batch.
+        requests.retain(|r| paid.contains(&r.id));
+        let plan = match choice.plan {
+            Some(plan)
+                if requests.len() >= p.batch_size as usize
+                    || now() >= requests[0].created + p.batch_seconds as u64 =>
             {
+                plan
+            }
+            _ => {
                 save(&c);
                 return 0;
             }
