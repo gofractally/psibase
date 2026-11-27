@@ -26,8 +26,11 @@ import {
     adoptFor,
     fetchRecord,
     keysFor,
+    callPlugin,
     loadDevice,
-    recordInList,
+    loginFor,
+    recordAccount,
+    refreshPasskeyLabel,
     rememberOnDevice,
     sameKey,
     setCurrent,
@@ -301,27 +304,41 @@ export const runAccountStep = async (ctx: PageContext) => {
     const availability = (name: string) =>
         api<{ ok: boolean; problem: string }>(`/check_name?name=${encodeURIComponent(name)}`);
 
-    const showName = (link: LinkInfo) => {
-        frame(
-            "Choose your name",
-            link.provider === "dev"
-                ? "This is how others will see you. It can't be changed later."
-                : `Verified as ${link.handle}. Now pick how others will see you here. It can't be changed later.`,
-            3,
-        );
+    /** `link`: the provider sign-in behind a sponsored account. `by`: the visitor's own account that creates it. */
+    const showName = (link: LinkInfo | undefined, by?: string) => {
+        creator = by;
+        if (by) {
+            frame(
+                "Name your new account",
+                `${by} creates it and becomes its recovery partner, which you can change afterwards. The name can't be changed later.`,
+            );
+        } else {
+            frame(
+                "Choose your name",
+                !link || link.provider === "dev"
+                    ? "This is how others will see you. It can't be changed later."
+                    : `Verified as ${link.handle}. Now pick how others will see you here. It can't be changed later.`,
+                3,
+            );
+        }
         nameForm({
             label: "Your name on this network",
             button: "Create account",
             rule: NAME_RULE,
             check: availability,
-            suggestion: link.handle
-                .toLowerCase()
-                .replace(/[^a-z0-9-]/g, "")
-                .replace(/^[^a-z]+/, "")
-                .slice(0, 10),
+            // The name picked when the passkey was made, if it is still
+            // wanted; otherwise something like the provider's handle.
+            suggestion: by
+                ? undefined
+                : (loadDevice().pendingName ??
+                  link?.handle
+                      .toLowerCase()
+                      .replace(/[^a-z0-9-]/g, "")
+                      .replace(/^[^a-z]+/, "")
+                      .slice(0, 10)),
             submit: (name) => void create(name),
         });
-        links(guestLink);
+        links(by ? backLink : guestLink);
     };
 
     // -------------------------------------------------------- provider
@@ -411,12 +428,18 @@ export const runAccountStep = async (ctx: PageContext) => {
         rememberOnDevice(entry, true);
         // Without this a new device would not find the account by itself;
         // it can still be found by name from "Recover an account".
-        await recordInList(net, unlocked, entry).catch((e) => console.warn(e));
+        await recordAccount(net, unlocked, entry).catch((e) => console.warn(e));
+        // The password manager now shows the passkey under the account's name.
+        await refreshPasskeyLabel();
         $("done-detail").textContent = `You're ${name} now`;
         ctx.show("done");
         await new Promise((r) => setTimeout(r, 900));
         await ctx.enterApp(name, true);
     };
+
+    // Who creates the account: the network's sponsor, for a visitor a
+    // sign-in provider vouched for, or one of the visitor's own accounts.
+    let creator: string | undefined;
 
     const create = async (name: string) => {
         notice();
@@ -426,19 +449,33 @@ export const runAccountStep = async (ctx: PageContext) => {
             unlocked = await ctx.unlock(
                 "Confirm with your passkey",
                 `Your passkey makes the keys for ${name}.`,
+                name,
             );
             keys = accountKeys(unlocked.chainId, unlocked.root, name, 0n, 0n);
             ctx.working("Creating your account", `Reserving ${name}`);
-            const reply = await api<{ transaction: string }>("/create", {
-                name,
-                owner: keys.owner,
-                active: keys.active,
-            });
             try {
-                await pushPrepared(transact, reply.transaction);
+                if (creator) {
+                    // The page acts as the creating account for this one call.
+                    await loginFor("supervisor", creator);
+                    await callPlugin({
+                        service: "auth-sig",
+                        plugin: "plugin",
+                        intf: "actions",
+                        method: "createAccountWith",
+                        params: [name, keys.owner.key, 0, keys.active.key, 0],
+                    });
+                } else {
+                    const reply = await api<{ transaction: string }>("/create", {
+                        name,
+                        owner: keys.owner,
+                        active: keys.active,
+                    });
+                    await pushPrepared(transact, reply.transaction);
+                }
             } catch (e) {
                 throw new Error(
-                    "The network did not create the account: " + (e as Error).message,
+                    "The network did not create the account: " +
+                        ((e as Error)?.message ?? String(e)),
                 );
             }
             await untilVisible(name, keys.owner.key);
@@ -503,6 +540,7 @@ export const runAccountStep = async (ctx: PageContext) => {
                 unlocked = await ctx.unlock(
                     "Confirm with your passkey",
                     `Checking whether it controls ${name}.`,
+                    name,
                 );
                 const found = await keysFor(net, unlocked, name);
                 if (found) {
@@ -543,6 +581,7 @@ export const runAccountStep = async (ctx: PageContext) => {
                 unlocked = await ctx.unlock(
                     "Confirm with your passkey",
                     `It makes new keys for ${name}.`,
+                    name,
                 );
                 // A sequence value the account has not used, so the keys are
                 // new even under the passkey it had before.
@@ -593,19 +632,19 @@ export const runAccountStep = async (ctx: PageContext) => {
         if (intent === "recover") return showRecoverName();
         if (intent !== "new" && loadDevice().accounts.length) return showChooser();
         const status = await api<Status>("/status");
+        const device = loadDevice();
+        const own = device.accounts.find((a) => a.name === device.current && a.held !== false);
         if (status.link?.account) {
-            // The provider identity already has its account.
-            if (loadDevice().accounts.some((a) => a.name === status.link!.account)) {
-                showChooser();
-                if (intent === "new") {
-                    notice(
-                        `This network gives each person one account through sign-up, and yours is ${status.link.account}.`,
-                    );
-                }
-                return;
+            // The provider sign-in already has its account. If this browser
+            // does not hold it yet, bring it here first.
+            if (!device.accounts.some((a) => a.name === status.link!.account)) {
+                return recover(status.link.account, false);
             }
-            return recover(status.link.account, false);
+            // A further account is created by one the visitor already has.
+            if (own) return showName(undefined, own.name);
+            return showChooser();
         }
+        if (intent === "new" && own && !status.link) return showName(undefined, own.name);
         if (!status.open) return showClosed();
         if (status.link) return showName(status.link);
         if (status.providers.length === 0) return showClosed();

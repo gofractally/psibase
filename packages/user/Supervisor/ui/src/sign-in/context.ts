@@ -3,7 +3,7 @@ import { type GuestSession } from "../guest-session";
 import { type Network } from "./device";
 import { type Unlocked } from "./passkey";
 
-export type View = "welcome" | "account" | "manage" | "working" | "done" | "unsupported";
+export type View = "welcome" | "pick" | "account" | "manage" | "working" | "done" | "unsupported";
 
 export interface PageContext {
     session: GuestSession;
@@ -16,10 +16,12 @@ export interface PageContext {
     show: (view: View) => void;
     working: (title: string, detail?: string) => void;
     /**
-     * Asks for the passkey this browser signed in with. The caller wipes
-     * the result when its action is finished.
+     * Asks for the passkey this browser signed in with. `adding` names an
+     * account the action is about to create or bring back: it is written
+     * into the passkey in the same prompt. The caller wipes the result when
+     * its action is finished.
      */
-    unlock: (why: string, detail?: string) => Promise<Unlocked>;
+    unlock: (why: string, detail?: string, adding?: string) => Promise<Unlocked>;
     /**
      * Leaves for the app: as `account`, or as a guest. `signedIn` says the
      * account was just signed in to the app and need not be again.

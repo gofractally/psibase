@@ -21,7 +21,12 @@ import {
     updateList,
     withAccount,
 } from "./account-list";
-import { type Unlocked } from "./passkey";
+import {
+    type PasskeyLabel,
+    type PasskeyNotes,
+    type Unlocked,
+    relabelPasskey,
+} from "./passkey";
 
 // ------------------------------------------------------- this browser
 
@@ -36,6 +41,12 @@ export interface DeviceAccounts {
     accounts: DeviceEntry[];
     /** The account this browser acts as, if any. */
     current?: string;
+    /** The name the visitor chose to be shown by; optional. */
+    displayName?: string;
+    /** The account name chosen when the passkey was made, not yet created. */
+    pendingName?: string;
+    /** Base64url user id of the passkey, for telling the password manager. */
+    userId?: string;
 }
 
 export const loadDevice = (): DeviceAccounts => {
@@ -47,7 +58,7 @@ export const loadDevice = (): DeviceAccounts => {
         const current = accounts.some((a) => a.name === parsed.current)
             ? parsed.current
             : accounts[0]?.name;
-        return { accounts, current };
+        return { ...parsed, accounts, current };
     } catch {
         return { accounts: [] };
     }
@@ -63,8 +74,11 @@ export const rememberOnDevice = (
 ) => {
     const device = loadDevice();
     saveDevice({
+        ...device,
         accounts: withAccount(device.accounts, { ...entry, held } as DeviceEntry),
         current: makeCurrent ? entry.name : (device.current ?? entry.name),
+        // The name chosen with the passkey is spoken for once it is an account.
+        pendingName: device.pendingName === entry.name ? undefined : device.pendingName,
     });
 };
 
@@ -74,6 +88,7 @@ export const setCurrent = (name: string | undefined) =>
 export const dropFromDevice = (name: string) => {
     const device = loadDevice();
     saveDevice({
+        ...device,
         accounts: device.accounts.filter((a) => a.name !== name),
         current: device.current === name ? undefined : device.current,
     });
@@ -81,11 +96,55 @@ export const dropFromDevice = (name: string) => {
 
 export const clearDevice = () => window.localStorage.removeItem(DEVICE_KEY);
 
+/** Keeps what a passkey prompt told us about the passkey and its holder. */
+export const notePasskey = (details: {
+    userId?: string;
+    displayName?: string;
+    pendingName?: string;
+}) => {
+    const device = loadDevice();
+    saveDevice({
+        ...device,
+        userId: details.userId ?? device.userId,
+        displayName: details.displayName ?? device.displayName,
+        pendingName: details.pendingName ?? device.pendingName,
+    });
+};
+
+/**
+ * What the passkey should carry: the accounts this browser knows of, plus
+ * `adding` when an account is about to be created or brought back.
+ */
+export const notesToWrite = (adding?: string): PasskeyNotes => {
+    const device = loadDevice();
+    return {
+        displayName: device.displayName,
+        accounts: [...device.accounts.map((a) => a.name), ...(adding ? [adding] : [])],
+    };
+};
+
+/** How the passkey should read in the password manager. */
+export const passkeyLabel = (): PasskeyLabel | undefined => {
+    const device = loadDevice();
+    const first = device.current ?? device.accounts[0]?.name ?? device.pendingName;
+    if (!first) return undefined;
+    const more = device.accounts.filter((a) => a.name !== first).length;
+    const name = more ? `${first} +${more}` : first;
+    return { name, displayName: device.displayName || name };
+};
+
+/** Brings the password manager's label up to date, where the browser can. */
+export const refreshPasskeyLabel = async () => {
+    const device = loadDevice();
+    const label = passkeyLabel();
+    if (device.userId && label) await relabelPasskey(device.userId, label);
+};
+
 // ------------------------------------------------------------ plugins
 
 type Call = { service: string; plugin: string; intf: string; method: string; params: unknown[] };
 
-const callPlugin = async (call: Call, returnPath = "/"): Promise<unknown> => {
+export const callPlugin = async (call: Call, returnPath = "/"): Promise<unknown> => {
     const { getSupervisor } = await import("@psibase/common-lib");
     return getSupervisor().functionCall(call, { enabled: false, returnPath });
 };
@@ -273,11 +332,22 @@ export const keysFor = async (
     return { keys, record };
 };
 
-/** Adds or replaces an account in the passkey's list on the node. */
-export const recordInList = (net: Network, unlocked: Unlocked, entry: ListedAccount) =>
-    updateList(listStore(net, unlocked), unlocked.guest, (accounts) =>
+/**
+ * Makes sure the account will be found from the passkey alone. The passkey
+ * itself is the first place (it was written in the prompt that `unlocked`
+ * came from, if the passkey can carry notes); the node's encrypted list is
+ * used when it is not.
+ */
+export const recordAccount = async (
+    net: Network,
+    unlocked: Unlocked,
+    entry: ListedAccount,
+) => {
+    if (unlocked.notesWritten) return;
+    await updateList(listStore(net, unlocked), unlocked.guest, (accounts) =>
         withAccount(accounts, entry),
     );
+};
 
 /**
  * Brings this browser up to date with the passkey's account list: every
@@ -290,9 +360,15 @@ export const syncAccounts = async (
     unlocked: Unlocked,
     app: string,
 ): Promise<string[]> => {
-    const listed = (await fetchList(listStore(net, unlocked))).accounts;
+    // The passkey's own notes first; the node's list for a passkey that
+    // carries none. Sequence values always come from the chain.
+    const carried = unlocked.notes?.accounts ?? [];
+    const names = carried.length
+        ? carried
+        : (await fetchList(listStore(net, unlocked))).accounts.map((a) => a.name);
+    notePasskey({ userId: unlocked.userId, displayName: unlocked.notes?.displayName });
     const device = loadDevice();
-    for (const entry of listed) {
+    for (const entry of names.map((name) => ({ name }))) {
         const found = await keysFor(net, unlocked, entry.name).catch(() => undefined);
         if (!found) continue; // No longer this passkey's account.
         found.keys.ownerSecret.fill(0);

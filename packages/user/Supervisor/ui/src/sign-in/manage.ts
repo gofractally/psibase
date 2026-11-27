@@ -22,7 +22,7 @@ import {
     forgetAccount,
     keysFor,
     loadDevice,
-    recordInList,
+    recordAccount,
     rememberOnDevice,
 } from "./device";
 import { pushAsOwner } from "./owner-tx";
@@ -133,7 +133,7 @@ export const runManageStep = async (ctx: PageContext) => {
                 const entry = { name, ownerSeq: keys.owner.seq, activeSeq: seq.toString() };
                 await adoptFor(ctx.app, name, privateKeyPem(next));
                 rememberOnDevice(entry, false);
-                await recordInList(net, unlocked, entry).catch((e) => console.warn(e));
+                await recordAccount(net, unlocked, entry).catch((e) => console.warn(e));
             } finally {
                 next.fill(0);
             }
@@ -224,15 +224,78 @@ export const runManageStep = async (ctx: PageContext) => {
         return `Pause ${duration(p.pauseSeconds ?? record.pauseSeconds)}, freeze window ${duration(p.freezeSeconds ?? record.freezeSeconds)}`;
     };
 
+    // The account's everyday controls are on the first tab; pausing,
+    // freezing and the recovery partner are kept apart on the second, so
+    // nobody meets them by accident.
+    let tab: "account" | "security" | undefined;
+
     const detail = (name: string, record: ChainRecord) => {
+        const troubled = record.state !== "normal";
+        // An account that is paused or frozen opens on what can be done about it.
+        const shown = tab ?? (troubled ? "security" : "account");
         const panel = el("div", { class: "si-panel" });
+        const tabs = el("div", { class: "si-tabs" });
+        for (const [id, label] of [
+            ["account", "Account"],
+            ["security", "Security"],
+        ] as const) {
+            const button = el("button", {
+                class: "si-tab" + (shown === id ? " si-current" : ""),
+                text: label,
+                type: "button",
+            });
+            if (id === "security" && troubled) {
+                button.append(el("span", { class: "si-flag", text: "●" }));
+            }
+            button.addEventListener("click", () => {
+                tab = id;
+                notice();
+                void render();
+            });
+            tabs.append(button);
+        }
         const facts = el("div", { class: "si-facts" });
         // The actions sit side by side where there is room for them.
         const box = el("div", { class: "si-actions" });
-        panel.append(el("h2", { class: "si-panel-title", text: name }), facts, box);
+        panel.append(el("h2", { class: "si-panel-title", text: name }), tabs, facts, box);
+
+        const sponsored = !!sponsor && record.partner === sponsor;
+        const release = () => ctx.go("account", { intent: "recover", account: name });
+
+        if (shown === "account") {
+            facts.append(
+                row("State", stateText(record)),
+                row("Signing key", `number ${record.active.seq}`),
+            );
+            if (!troubled) {
+                box.append(
+                    action(
+                        "Sign out other devices",
+                        "Replaces the key devices sign with. Use it if a device was lost.",
+                        () => void rotateActive(name),
+                    ),
+                );
+            } else {
+                facts.append(
+                    el("p", {
+                        class: "si-hint",
+                        text: `Nothing can be done as ${name} for now. See Security.`,
+                    }),
+                );
+            }
+            panel.append(
+                el(
+                    "p",
+                    { class: "si-below" },
+                    linkButton("Remove from this browser", () => void remove(name)),
+                ),
+            );
+            return panel;
+        }
+
         facts.append(
-            row("State", stateText(record)),
             row("Recovery partner", partnerName(record.partner)),
+            row("State", stateText(record)),
             row("Pause length", duration(record.pauseSeconds)),
             row("Freeze window", duration(record.freezeSeconds)),
         );
@@ -246,16 +309,9 @@ export const runManageStep = async (ctx: PageContext) => {
                 }),
             );
         }
-        const sponsored = !!sponsor && record.partner === sponsor;
-        const release = () => ctx.go("account", { intent: "recover", account: name });
 
         if (record.state === "normal") {
             box.append(
-                action(
-                    "Sign out other devices",
-                    "Replaces the key devices sign with. Use it if a device was lost.",
-                    () => void rotateActive(name),
-                ),
                 action(
                     "Pause this account",
                     `Stops everything for ${duration(record.pauseSeconds)}. Use it when you are not sure what happened.`,
@@ -277,7 +333,11 @@ export const runManageStep = async (ctx: PageContext) => {
             input.maxLength = 10;
             input.autocapitalize = "none";
             input.spellcheck = false;
-            const submit = el("button", { class: "si-btn si-ghost", text: "Change recovery partner", type: "submit" });
+            const submit = el("button", {
+                class: "si-btn si-ghost",
+                text: "Change recovery partner",
+                type: "submit",
+            });
             form.append(input, submit);
             form.addEventListener("submit", (e) => {
                 e.preventDefault();
@@ -324,35 +384,30 @@ export const runManageStep = async (ctx: PageContext) => {
                     }),
                 );
             }
+        } else if (sponsored) {
+            box.append(
+                action(
+                    "Recover this account",
+                    "Sign in the way you did when you created the account; your passkey then makes new keys.",
+                    release,
+                ),
+            );
+        } else if (record.partner) {
+            box.append(
+                action(
+                    "Send new keys to the recovery partner",
+                    `${record.partner} approves them from their recovery page.` +
+                        (record.recoveryRequests.length
+                            ? ` ${record.recoveryRequests.length} request${record.recoveryRequests.length === 1 ? " is" : "s are"} waiting.`
+                            : ""),
+                    () => void proposeKeys(name),
+                ),
+            );
         } else {
-            if (sponsored) {
-                box.append(
-                    action(
-                        "Recover this account",
-                        "Sign in the way you did when you created the account; your passkey then makes new keys.",
-                        release,
-                    ),
-                );
-            } else if (record.partner) {
-                box.append(
-                    action(
-                        "Send new keys to the recovery partner",
-                        `${record.partner} approves them from their recovery page.` +
-                            (record.recoveryRequests.length
-                                ? ` ${record.recoveryRequests.length} request${record.recoveryRequests.length === 1 ? " is" : "s are"} waiting.`
-                                : ""),
-                        () => void proposeKeys(name),
-                    ),
-                );
-            } else {
-                box.append(
-                    el("p", { class: "si-hint", text: "No recovery partner: this freeze is permanent." }),
-                );
-            }
+            box.append(
+                el("p", { class: "si-hint", text: "No recovery partner: this freeze is permanent." }),
+            );
         }
-        panel.append(
-            el("p", { class: "si-below" }, linkButton("Remove from this browser", () => void remove(name))),
-        );
         return panel;
     };
 
@@ -415,6 +470,7 @@ export const runManageStep = async (ctx: PageContext) => {
             head.addEventListener("click", () => {
                 if (open) return;
                 selected = account.name;
+                tab = undefined;
                 notice();
                 void render();
             });

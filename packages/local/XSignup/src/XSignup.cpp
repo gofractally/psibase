@@ -1253,8 +1253,8 @@ auto XSignup::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
    {
       if (request.method != "GET")
          return HttpReply::methodNotAllowed(request);
-      if (session.guest.empty())
-         return fail(request, HttpStatus::unauthorized, "Sign in with your passkey first.");
+      // No session needed: whether a name exists is public chain state, and
+      // a visitor picks a name before they have a passkey to sign in with.
       return serveCheckName(request);
    }
 

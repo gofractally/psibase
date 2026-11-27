@@ -9,6 +9,7 @@ const S = "https";
 const port = process.argv[2] ?? "8443";
 const A = process.argv[3] ?? "alicetest1";
 const B = process.argv[4] ?? "bobtester1";
+const A2 = process.argv[5] ?? A.slice(0, -1) + "z";
 const app = "exchange";
 const root = `psibase.localhost:${port}`;
 const shots = process.env.SHOTS ?? "/tmp/pw-signin/shots";
@@ -29,12 +30,13 @@ const person = async (label) => {
     const log = [];
     page.on("console", (m) => log.push(`[${label} console.${m.type()}] ${m.text().slice(0, 400)}`));
     page.on("pageerror", (e) => log.push(`[${label} pageerror] ${e.message.slice(0, 300)}`));
+    page.on("request", (r) => { if (r.method() === "PUT" && r.url().includes("/list/")) log.push(`[${label} LIST_PUT]`); });
     page.on("response", (r) => { if (r.status() >= 400) log.push(`[${label} http ${r.status()}] ${r.request().method()} ${r.url().slice(0, 150)}`); });
     const cdp = await context.newCDPSession(page);
     await cdp.send("WebAuthn.enable");
-    await cdp.send("WebAuthn.addVirtualAuthenticator", { options: { protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal",
-        hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: true, automaticPresenceSimulation: true } });
-    return { context, page, log, cdp, label };
+    const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", { options: { protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal",
+        hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: true, hasLargeBlob: true, automaticPresenceSimulation: true } });
+    return { context, page, log, cdp, label, authenticatorId };
 };
 
 let n = 0, current;
@@ -71,11 +73,21 @@ const provider = async (page, handle) => { await page.waitForSelector("#login", 
 const until = async (what, fn, ms = 30000) => { const end = Date.now() + ms; let last; while (Date.now() < end) { last = await fn(); if (last) return last; await new Promise((r) => setTimeout(r, 700)); } throw new Error("timed out: " + what); };
 
 const signUp = async (p, name) => {
-    await step(p, `${name}: guest signs in`, async (page) => {
+    await step(p, `${name}: picks a name, makes a passkey and enters as a guest`, async (page) => {
         await page.goto(`${S}://${app}.${root}/`);
         await page.waitForSelector("#view-welcome:not([hidden])");
         await page.click("#btn-create");
-        await onApp(page); await page.waitForLoadState("networkidle");
+        await page.waitForSelector("#view-pick:not([hidden])", { timeout: 30000 });
+        await page.fill("#pick-name", "abc");
+        const hint = await page.textContent("#pick-hint");
+        await page.fill("#pick-name", name);
+        await page.fill("#pick-display", "Test " + name);
+        await page.waitForSelector("#pick-create:not([disabled])");
+        await snap(p, "pick");
+        await page.click("#pick-create");
+        await onApp(page);
+        const creds = (await p.cdp.send("WebAuthn.getCredentials", { authenticatorId: p.authenticatorId })).credentials;
+        return `short-name hint: ${hint}; passkeys on the device: ${creds.length}`;
     });
     await step(p, `${name}: verifies with the provider and picks a name`, async (page) => {
         await page.goto(`${S}://supervisor.${root}/sign-in.html?step=account&app=${app}&path=/`);
@@ -83,12 +95,11 @@ const signUp = async (p, name) => {
         await page.click("#acct-providers button >> nth=0");
         await provider(page, name);
         await page.waitForSelector("#acct-name-form:not([hidden])", { timeout: 30000 });
-        await page.fill("#acct-name", "abc");
-        const hint = await page.textContent("#acct-name-hint");
-        await page.fill("#acct-name", name);
+        const prefilled = await page.inputValue("#acct-name");
+        if (prefilled !== name) throw new Error(`name form holds "${prefilled}", expected the picked name`);
         await page.waitForSelector("#acct-create:not([disabled])");
         await snap(p, "name");
-        return "short-name hint: " + hint;
+        return "prefilled with the picked name";
     });
     await step(p, `${name}: account is created with owner and active keys`, async (page) => {
         p.log.length = 0;
@@ -96,7 +107,8 @@ const signUp = async (p, name) => {
         await onApp(page); await page.waitForLoadState("networkidle");
         const r = await record(p, name);
         const prompts = p.log.filter((l) => l.includes("PASSKEY_PROMPT")).length;
-        return `${await expectSub(p, name)}; state ${r.state}, partner ${r.partner}, seqs ${r.owner.seq}/${r.active.seq}; passkey prompts ${prompts}`;
+        const puts = p.log.filter((l) => l.includes("LIST_PUT")).length;
+        return `${await expectSub(p, name)}; state ${r.state}, partner ${r.partner}, seqs ${r.owner.seq}/${r.active.seq}; passkey prompts ${prompts}; writes to the node's list ${puts}`;
     });
 };
 
@@ -119,8 +131,16 @@ await step(a, "manage view shows the account, its partner and usage", async (pag
     await manage(page, A);
     await snap(a, "manage");
     const text = (await page.innerText("#mg-body")).replace(/\s+/g, " ");
-    for (const want of ["In use", "Recovery partner", "Requests"]) if (!text.includes(want)) throw new Error(`missing "${want}" in: ${text.slice(0, 300)}`);
-    return text.slice(0, 160);
+    for (const want of ["In use", "Sign out other devices", "Requests"]) if (!text.includes(want)) throw new Error(`missing "${want}" in: ${text.slice(0, 300)}`);
+    if (text.includes("Freeze this account")) throw new Error("freeze is shown outside the Security tab");
+    await page.click(".si-tab >> text=Security");
+    await page.waitForSelector("text=Freeze this account");
+    await snap(a, "security");
+    const sec = (await page.innerText("#mg-body")).replace(/\s+/g, " ");
+    if (!sec.includes("Recovery partner")) throw new Error("no recovery partner on the Security tab");
+    await page.click(".si-tab >> text=Account");
+    await page.waitForSelector("text=Sign out other devices");
+    return text.slice(0, 120);
 });
 
 await step(a, "sign out other devices: the active key is replaced and this browser still signs", async (page) => {
@@ -135,7 +155,7 @@ await step(a, "sign out other devices: the active key is replaced and this brows
 });
 
 await step(a, "pause, then the sign-up service ends it after a provider sign-in", async (page) => {
-    await manage(page, A);
+    await manage(page, A); await page.click(".si-tab >> text=Security");
     await page.click("text=Pause this account"); await page.click("text=click again to confirm");
     await until("paused", async () => (await record(a, A)).state.toLowerCase() === "paused");
     await page.waitForSelector("text=End the pause now", { timeout: 30000 });
@@ -150,7 +170,7 @@ await step(a, "pause, then the sign-up service ends it after a provider sign-in"
 });
 
 await step(a, "freeze, then recover with new keys through the sign-up service", async (page) => {
-    await manage(page, A);
+    await manage(page, A); await page.click(".si-tab >> text=Security");
     await page.click("text=Freeze this account"); await page.click("text=click again to confirm");
     await until("frozen", async () => (await record(a, A)).state.toLowerCase() === "frozen");
     await page.waitForSelector("text=Recover this account", { timeout: 30000 });
@@ -165,11 +185,45 @@ await step(a, "freeze, then recover with new keys through the sign-up service", 
     return `${await expectSub(a, A)}; owner seq ${r.owner.seq}`;
 });
 
+await step(a, "Create another account from the manage view makes a second account under the same passkey", async (page) => {
+    await manage(page, A);
+    await page.click("text=Create another account");
+    await page.waitForSelector("#acct-name-form:not([hidden])", { timeout: 30000 });
+    const title = await page.textContent("#acct-title");
+    await page.fill("#acct-name", A2);
+    await page.waitForSelector("#acct-create:not([disabled])");
+    await snap(a, "second-account");
+    await page.click("#acct-create");
+    await onApp(page);
+    const r = await record(a, A2);
+    if (r.partner !== A) throw new Error("partner of the second account is " + r.partner);
+    await manage(page, A2);
+    const names = await page.locator(".si-acct .si-dest-host").allTextContents();
+    return `${title}; ${await expectSub(a, A2)}; partner ${r.partner}; on this browser: ${names.join(", ")}`;
+});
+
+await step(a, "new device again: both accounts come back from the passkey", async (page) => {
+    a.log.length = 0;
+    await a.context.clearCookies();
+    for (const host of ["supervisor", app, "homepage", "x-signup"]) {
+        await a.cdp.send("Storage.clearDataForOrigin", { origin: `${S}://${host}.${root}`, storageTypes: "all" });
+    }
+    await page.goto(`${S}://${app}.${root}/`);
+    await page.waitForSelector("#view-welcome:not([hidden])", { timeout: 30000 });
+    await page.click("#btn-create");
+    await onApp(page);
+    await manage(page, A);
+    const names = (await page.locator(".si-acct .si-dest-host").allTextContents()).sort();
+    if (names.join() !== [A, A2].sort().join()) throw new Error("accounts here: " + names.join(", "));
+    const listReads = a.log.filter((l) => l.includes("/list/")).length;
+    return `${names.join(", ")}; requests to the node's list: ${listReads}`;
+});
+
 const b = await person("B");
 await signUp(b, B);
 
 await step(a, `asks to make ${B} the recovery partner`, async (page) => {
-    await manage(page, A);
+    await manage(page, A); await page.click(".si-tab >> text=Security");
     await page.fill(".si-input", B);
     await page.click("text=Change recovery partner");
     await until("pending partner change", async () => { const r = await record(a, A); return r.pending && r.pending.partner === B; });
@@ -191,7 +245,7 @@ await step(b, "the current partner is the sign-up service; it approves after a p
 
 await step(a, `asks to change the partner again, which now waits for ${B}`, async (page) => {
     await onApp(page).catch(() => {});
-    await manage(page, A);
+    await manage(page, A); await page.click(".si-tab >> text=Security");
     await page.fill(".si-input", "signupsvc");
     await page.click("text=Change recovery partner");
     await until("pending partner change", async () => { const r = await record(a, A); return r.pending && r.pending.partner === "signupsvc"; });

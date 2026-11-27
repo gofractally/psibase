@@ -415,6 +415,50 @@
                 letter-spacing: 0.01em;
             }
 
+            #signin .si-form-hint {
+                margin: 8px 2px 16px;
+                min-height: 20px;
+            }
+
+            #signin .si-optional {
+                font-weight: 500;
+                color: var(--si-muted);
+            }
+
+            #signin .si-field input::placeholder {
+                font-weight: 500;
+                font-size: 15px;
+                color: var(--si-muted);
+            }
+
+            #signin .si-tabs {
+                display: flex;
+                gap: 6px;
+                border-bottom: 1px solid var(--si-card-border);
+            }
+
+            #signin .si-tab {
+                padding: 8px 14px;
+                border: 0;
+                border-bottom: 2px solid transparent;
+                background: none;
+                font: inherit;
+                font-size: 14px;
+                font-weight: 600;
+                color: var(--si-muted);
+                cursor: pointer;
+            }
+
+            #signin .si-tab.si-current {
+                color: var(--si-text);
+                border-bottom-color: var(--si-accent);
+            }
+
+            #signin .si-tab .si-flag {
+                margin-left: 6px;
+                color: var(--si-danger);
+            }
+
             #signin #acct-name-form .si-hint {
                 margin: 8px 2px 16px;
                 min-height: 20px;
@@ -809,6 +853,54 @@
                             <span><strong>Your keys stay with you.</strong> They are made on this device by your passkey and never sent to a server.</span>
                         </li>
                     </ul>
+                </div>
+
+                <!-- Pick view: a new visitor chooses a name before the passkey is made -->
+                <div id="view-pick" class="si-view" hidden>
+                    <h1>Pick your name</h1>
+                    <p class="si-lede">
+                        Your passkey is saved under this name, so you can tell it apart later.
+                        It becomes your account name if you create an account.
+                    </p>
+                    <form id="pick-form" novalidate>
+                        <label class="si-label" for="pick-name">Name</label>
+                        <div class="si-field">
+                            <span class="si-at" aria-hidden="true">@</span>
+                            <input
+                                id="pick-name"
+                                type="text"
+                                autocomplete="off"
+                                autocapitalize="none"
+                                autocorrect="off"
+                                spellcheck="false"
+                                maxlength="10"
+                            />
+                        </div>
+                        <p class="si-hint si-form-hint" id="pick-hint"></p>
+                        <label class="si-label" for="pick-display">
+                            Display name <span class="si-optional">optional</span>
+                        </label>
+                        <div class="si-field">
+                            <input
+                                id="pick-display"
+                                type="text"
+                                autocomplete="off"
+                                maxlength="40"
+                                placeholder="How you'd like to be shown"
+                            />
+                        </div>
+                        <p class="si-hint si-form-hint"></p>
+                        <button class="si-btn si-primary" id="pick-create" type="submit" disabled>
+                            Create my passkey
+                        </button>
+                    </form>
+                    <p class="si-below">
+                        <button class="si-link" id="pick-existing" type="button">
+                            I already have a passkey
+                        </button>
+                        ·
+                        <button class="si-link" id="pick-back" type="button">Back</button>
+                    </p>
                 </div>
 
                 <!-- Account view: a guest becomes a named account -->

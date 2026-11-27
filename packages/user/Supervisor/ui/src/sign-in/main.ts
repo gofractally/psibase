@@ -15,22 +15,27 @@ import {
     saveGuestSession,
 } from "../guest-session";
 import { signText } from "./account-keys";
-import { type PageContext, type View } from "./context";
+import { NAME_RULE, type PageContext, type View } from "./context";
 import {
     type Network,
     clearDevice,
     forgetAccount,
     loadDevice,
     loginFor,
+    notePasskey,
+    notesToWrite,
     syncAccounts,
 } from "./device";
 import {
     Cancelled,
+    type PasskeyLabel,
     type PrfResult,
     Unsupported,
     type Unlocked,
+    canDiscardPasskey,
     canLookUpSilently,
     createPasskey,
+    discardPasskey,
     fromB64Url,
     unlockWith,
     readPasskey,
@@ -91,7 +96,7 @@ const go: PageContext["go"] = (next, extra = {}) => {
 
 // ------------------------------------------------------------------ views
 
-const views: View[] = ["welcome", "account", "manage", "working", "done", "unsupported"];
+const views: View[] = ["welcome", "pick", "account", "manage", "working", "done", "unsupported"];
 
 const show = (view: View) => {
     for (const v of views) $(`view-${v}`).hidden = v !== view;
@@ -395,10 +400,20 @@ const loadRememberedCredential = (): Uint8Array | undefined => {
     }
 };
 
-const newPasskey = () =>
-    createPasskey(rootName, () =>
+// A new passkey is made under the name its holder picked, so the password
+// manager shows something they recognise. Until they have picked, making one
+// stops here and the name is asked for.
+let chosenLabel: (PasskeyLabel & { account: string; display?: string }) | undefined;
+
+class NeedsName extends Error {}
+
+const newPasskey = () => {
+    if (!chosenLabel) throw new NeedsName();
+    working("Creating your passkey", "Follow the prompt from your device.");
+    return createPasskey(rootName, chosenLabel, () =>
         working("One more touch", "Confirm once more to finish setting up."),
     );
+};
 
 class NoPasskeyChosen extends Error {}
 
@@ -413,10 +428,7 @@ class NoPasskeyChosen extends Error {}
  *   chosen, the button becomes "Create a passkey".
  */
 const obtainPasskey = async (mode: Mode): Promise<PrfResult> => {
-    if (mode === "create") {
-        working("Creating your passkey", "Follow the prompt from your device.");
-        return newPasskey();
-    }
+    if (mode === "create") return newPasskey();
     const remembered = loadRememberedCredential();
     if (remembered || mode === "existing") {
         working("Checking your passkey", "Follow the prompt from your device.");
@@ -429,7 +441,6 @@ const obtainPasskey = async (mode: Mode): Promise<PrfResult> => {
         } catch (e) {
             if (!(e instanceof Cancelled)) throw e;
         }
-        working("Creating your passkey", "Follow the prompt from your device.");
         return newPasskey();
     }
     working("Checking for a passkey", "Follow the prompt from your device.");
@@ -439,6 +450,88 @@ const obtainPasskey = async (mode: Mode): Promise<PrfResult> => {
         if (e instanceof Cancelled) throw new NoPasskeyChosen();
         throw e;
     }
+};
+
+// ------------------------------------------------------- picking a name
+
+let pickTimer: number | undefined;
+let pickSeq = 0;
+
+const pickHint = (text: string, bad = false) => {
+    const hint = $("pick-hint");
+    hint.textContent = text;
+    hint.classList.toggle("si-bad", bad);
+};
+
+/** Checks the name as it is typed: its shape here, whether it is free on the node. */
+const validatePick = () => {
+    const input = $<HTMLInputElement>("pick-name");
+    const cleaned = input.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    if (cleaned !== input.value) input.value = cleaned;
+    const value = input.value;
+    const button = $<HTMLButtonElement>("pick-create");
+    button.disabled = true;
+    window.clearTimeout(pickTimer);
+    const seq = ++pickSeq;
+    if (!value) {
+        pickHint("8 to 10 lowercase letters, digits or hyphens, starting with a letter.");
+        return;
+    }
+    if (!NAME_RULE.test(value) || value.endsWith("-")) {
+        const short = value.length < 8;
+        pickHint(
+            short
+                ? `${8 - value.length} more character${value.length === 7 ? "" : "s"} needed.`
+                : "Use lowercase letters, digits and hyphens, starting with a letter.",
+            !short,
+        );
+        return;
+    }
+    pickHint("Checking…");
+    pickTimer = window.setTimeout(async () => {
+        try {
+            const res = await fetch(
+                `${siblingOrigin("x-signup")}/check_name?name=${encodeURIComponent(value)}`,
+            );
+            const reply = (await res.json()) as { ok?: boolean; problem?: string };
+            if (seq !== pickSeq) return;
+            pickHint(
+                reply.ok ? `${value} is available.` : (reply.problem ?? "That name can't be used."),
+                !reply.ok,
+            );
+            button.disabled = !reply.ok;
+        } catch {
+            if (seq !== pickSeq) return;
+            // The name is confirmed again when the account is created.
+            pickHint("Could not check that name just now; you can still continue.");
+            button.disabled = false;
+        }
+    }, 250);
+};
+
+const showPick = () => {
+    show("pick");
+    validatePick();
+    $<HTMLInputElement>("pick-name").focus();
+};
+
+const wirePick = () => {
+    $("pick-name").addEventListener("input", validatePick);
+    $("pick-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const account = $<HTMLInputElement>("pick-name").value;
+        const display = $<HTMLInputElement>("pick-display").value.trim().slice(0, 40);
+        if ($<HTMLButtonElement>("pick-create").disabled) return;
+        chosenLabel = {
+            account,
+            display: display || undefined,
+            name: account,
+            displayName: display || account,
+        };
+        void signIn("create");
+    });
+    $("pick-existing").addEventListener("click", () => void signIn("existing"));
+    $("pick-back").addEventListener("click", () => renderWelcome());
 };
 
 const network = (session: GuestSession): Network => ({
@@ -458,6 +551,11 @@ const signIn = async (mode: Mode) => {
         const session = await guestLogin(unlocked);
         saveGuestSession(session);
         window.localStorage.setItem(HAS_PASSKEY_KEY, session.credentialId);
+        notePasskey({
+            userId: unlocked.userId,
+            displayName: chosenLabel?.display,
+            pendingName: chosenLabel?.account,
+        });
         // The passkey says which accounts are this visitor's; bring their
         // signing keys to this browser while the root is at hand.
         try {
@@ -474,6 +572,10 @@ const signIn = async (mode: Mode) => {
         await goToDestination(session, true);
     } catch (e) {
         unlocked?.wipe();
+        if (e instanceof NeedsName) {
+            showPick();
+            return;
+        }
         if (e instanceof Unsupported) {
             $("unsupported-detail").textContent = e.message;
             show("unsupported");
@@ -515,9 +617,15 @@ const pageContext = (session: GuestSession): PageContext => ({
     $,
     show,
     working,
-    unlock: async (why, detail) => {
+    unlock: async (why, detail, adding) => {
         working(why, detail);
-        const unlocked = await unlockWith(await readPasskey(loadRememberedCredential()));
+        const unlocked = await unlockWith(
+            await readPasskey(
+                loadRememberedCredential(),
+                false,
+                adding ? notesToWrite(adding) : undefined,
+            ),
+        );
         if (unlocked.guest.publicKey !== session.publicKey) {
             unlocked.wipe();
             throw new Error(
@@ -543,6 +651,7 @@ const start = async () => {
         return;
     }
 
+    wirePick();
     $("btn-create").addEventListener("click", () => {
         const mode = nextMode;
         nextMode = "auto";
@@ -562,15 +671,31 @@ const start = async () => {
     const forget = $("btn-forget");
     forget.addEventListener("click", async () => {
         working("Signing out");
+        const unused = loadDevice().accounts.length === 0;
+        const credentialId = window.localStorage.getItem(HAS_PASSKEY_KEY);
         await signOutEverywhere();
         forget.hidden = true;
         $("foot-id").textContent = "";
         renderWelcome();
+        // A passkey that never became an account is only clutter in the
+        // password manager; offer to take it out.
+        if (unused && credentialId && canDiscardPasskey()) {
+            setBelow("Signed out. This passkey has no accounts.", {
+                label: "Remove it from your password manager",
+                run: async () => {
+                    await discardPasskey(credentialId);
+                    window.localStorage.removeItem(HAS_PASSKEY_KEY);
+                    renderWelcome();
+                    setBelow("Removed.");
+                },
+            });
+        }
     });
 
     if (session) {
-        const current = loadDevice().current;
-        $("foot-id").textContent = current ?? `Guest ${shortId(session.guest)}`;
+        const device = loadDevice();
+        const who = device.current ?? `Guest ${shortId(session.guest)}`;
+        $("foot-id").textContent = device.displayName ? `${device.displayName} · ${who}` : who;
         forget.hidden = false;
         if (step === "manage") {
             const { runManageStep } = await import("./manage");
