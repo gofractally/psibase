@@ -187,6 +187,8 @@ fn signet_custody_addresses_and_destinations() {
     assert!(p.xpubs.iter().all(|k| k.starts_with("tpub")));
     let address = custody_address(&p, 0, 7).unwrap();
     assert!(address.starts_with("tb1q") && address.len() == 62, "{address}");
+    // Asserted with the same literal in ui/test/bitcoin.test.mjs: the browser derives it independently.
+    assert_eq!(address, "tb1qwcmue3lw5fxdgkhtmq3erqycpcn4slt4apd9fjry9ly3scjcha8q5nlgxe");
     // Same keys, same script: only the address encoding differs from regtest.
     let regtest = policy("regtest", Network::Regtest);
     assert_eq!(

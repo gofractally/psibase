@@ -1,0 +1,19 @@
+{
+ "source": "Transaction IDs of default-signet block 332639 from the mempool.space and blockstream.info signet Esplora APIs (/block/:hash/txids), identical answers, fetched 2026-11-27. The header, coinbase and branch of this block are in core/tests/fixtures/signet-blocks-bip325.json.",
+ "height": 332639,
+ "txids": [
+  "656cb8c038e52ba0b0da5a38fd89e0024eeeca3a208f0feb0484e243263d1837",
+  "61162d85dffa7605177f505d4ef5eea6c4a7df822cf4ca47f049a0c14c303f4c",
+  "7d5f38a33abac54044f9b9fb15d731cd1ee60e3f21438013e10c9bb4a063ce08",
+  "b4bb357594a4a543485ea8375d51f31553543909146c0716bc26b2835aff297b",
+  "8529c11e59c45c17bf7774a6a4cd0090f58c1ddbe6324aa74d556c667fe1e305",
+  "acc0c07444754ffef28671afbf9694aec9ceda02e183a0ba38d663da60c31114",
+  "e3148ff4a8cd32bfdff858a0ace7375f74e9af809a61c347e18859431d7fcb2b",
+  "9aab16b52d6b13050722a5aca543aa3279f7d6748be6739729e5f32b1d8fd039",
+  "e68d4ada7cef835201f5caef78fb20ad3bee7efb016f2077d69b5a9b6d00eb6e",
+  "4843e49e8980de8c6467b0ca17cc342e9cd8ffbcafe153c243180d305e7bfc85",
+  "f09dcee5becbfc85925b9dc96cffd66b3d28c5027be1990695332531b57272f7",
+  "88705addd36bd9c78cbb743ca954a5442ab9c630975161209adce5a34733616f",
+  "db4f08c2ba7b43a46959158c78f57f0df1dca55ee0c0925c36714395b609ac7d"
+ ]
+}

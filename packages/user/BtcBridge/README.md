@@ -80,6 +80,19 @@ supported. The proof is checked and discarded; only the header is stored. Up
 to 16 signet headers per action; in every block observed the coinbase is 261
 bytes and the branch at most nine hashes.
 
+In the browser, header sync on a signet relay makes four requests per block to
+the configured Esplora-compatible source: `/block-height/:h`,
+`/block/:hash/header`, `/block/:hash/txids` and `/tx/:coinbase/hex`. The
+coinbase's Merkle branch is computed from the transaction IDs and checked
+against the header before anything is submitted (`ui/src/bitcoin.ts`), so a
+wrong answer from the source costs a message, not a failed transaction. Headers
+go through the wallet as `btcrelay.signetHeaders`, 16 per action and at most 64
+blocks per sync. The source is `bitcoin_api` in the deployment's `config.json`;
+without one the UI falls back to `https://mempool.space/signet/api` on signet
+and `https://blockstream.info/api` on mainnet, and a user can set another.
+`npm test` in `ui` checks the proof assembly against the fixtures of the core
+tests.
+
 What remains trusted on signet is its two signers, as for every signet node.
 A header with valid proof of work and no valid signature is refused, so header
 submission is permissionless on signet as on mainnet. The signature does not

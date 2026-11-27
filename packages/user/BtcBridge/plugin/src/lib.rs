@@ -59,6 +59,21 @@ impl Guest for Plugin {
                 bindings::btcrelay::plugin::api::headers(&args.headers)?;
                 continue;
             }
+            if a.service == "btcrelay" && a.method == "signetHeaders" {
+                let args: btcrelay::action_structs::signetHeaders =
+                    serde_json::from_value(a.data).map_err(error)?;
+                let blocks: Vec<_> = args
+                    .blocks
+                    .into_iter()
+                    .map(|b| bindings::btcrelay::plugin::api::SignetBlock {
+                        header: b.header,
+                        coinbase: b.coinbase,
+                        branch: b.branch,
+                    })
+                    .collect();
+                bindings::btcrelay::plugin::api::signet_headers(&blocks)?;
+                continue;
+            }
             if a.service == "tokens" {
                 let token = a.data["token_id"]
                     .as_u64()

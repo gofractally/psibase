@@ -2,5 +2,15 @@ package btcrelay:plugin;
 interface api {
     use host:types/types.{error};
     headers: func(headers: list<string>) -> result<_, error>;
+    /// A signet header with the proof of its block signature (BIP 325): the raw coinbase
+    /// transaction, with witness data, and the coinbase's Merkle branch (transaction-ID hex, leaf
+    /// to root).
+    record signet-block {
+        header: string,
+        coinbase: string,
+        branch: list<string>,
+    }
+    /// Signet relays take headers only with their proof; at most 16 per call.
+    signet-headers: func(blocks: list<signet-block>) -> result<_, error>;
 }
 world imports { import api; }

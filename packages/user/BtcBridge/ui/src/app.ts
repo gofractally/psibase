@@ -1,5 +1,5 @@
-import {HDKey} from '@scure/bip32';
-import {sortedMultisig,TEST_NETWORK,NETWORK,Transaction} from '@scure/btc-signer';
+import {Transaction} from '@scure/btc-signer';
+import {custodyAddress,fetchSignetBlock,SIGNET_BATCH} from './bitcoin';
 import QRCode from 'qrcode';
 import {createExplorer} from './explorer';
 import {getSupervisor,siblingUrl,isRedirectErrorObject,handlePluginUserPrompt} from 'psibase-common';
@@ -10,6 +10,10 @@ const callPlugin=(service:string,intf:string,method:string,params:unknown[]=[],p
 };
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 let deployment:{bitcoin_api?:string}={};
+// Used only when the deployment's config.json names no `bitcoin_api` and the user has set none.
+const DEFAULT_SOURCES:Record<string,string>={bitcoin:'https://blockstream.info/api',signet:'https://mempool.space/signet/api'};
+// Signet headers travel with their coinbase proof: four requests per block. One sync call relays at most this many.
+const SIGNET_SYNC_LIMIT=4*SIGNET_BATCH;
 let state:any,account='',recipient='',recipientState:any,contacts:any[]=[],profile:any=null,busy=false,syncing=false,endpoint='',loadSequence=0;
 let contactsLoaded=false,recipientProfile:any=null;
 function rememberDraft(){
@@ -74,12 +78,13 @@ function renderContacts(){
 async function loadRecipient(){const target=recipient;recipientProfile=null;el('recipient-avatar').hidden=true;el('address-ready').hidden=true;el('address-empty').hidden=true;el('recipient-identity').textContent=`Loading verified deposit address for @${target}…`;recipientState=target&&target!==account?await request(`/snapshot?owner=${encodeURIComponent(target)}`):null;if(target!==recipient)return;if(target&&target!==account){const response=await request(siblingUrl(null,'profiles','/graphql'),{method:'POST',headers:{'Content-Type':'application/graphql'},body:`{profile(account:${JSON.stringify(target)}){displayName bio}}`});if(target!==recipient)return;recipientProfile=response.data?.profile;}render();}
 
 async function run(label:string,fn:()=>Promise<void>){if(busy)return;busy=true;document.querySelectorAll<HTMLButtonElement>('button').forEach(b=>b.disabled=true);try{await fn();message(label);await load();}catch(e){message((e as Error).message,true);}finally{busy=false;document.querySelectorAll<HTMLButtonElement>('button').forEach(b=>b.disabled=false);controls();}}
-function derivedAddress(index:number):string{const p=state.policy,versions=p.network==='regtest'?{private:0x04358394,public:0x043587cf}:undefined;const keys=p.xpubs.map((key:string)=>HDKey.fromExtendedKey(key,versions).deriveChild(0).deriveChild(index).publicKey!);const net=p.network==='regtest'?{...TEST_NETWORK,bech32:'bcrt'}:NETWORK;return sortedMultisig(2,keys,true,net).address!;}
+function derivedAddress(index:number):string{return custodyAddress(state.policy.network,state.policy.xpubs,0,index);}
 async function load(){const owner=account,sequence=++loadSequence,next=await request(`/snapshot${owner?'?owner='+encodeURIComponent(owner):''}`);if(owner!==account||sequence!==loadSequence)return;if(!next.config)throw Error('BTC Bridge has not been initialized.');state={...next,owner};render();if(depositCandidate&&!checkingDeposit&&Date.now()-depositCheckAt>10000){depositCheckAt=Date.now();const txid=depositCandidate.txid;void findDeposit(txid).then(d=>{if(depositCandidate?.txid===txid){depositCandidate=d;renderDepositReview();}}).catch(()=>{});}}
 function render(){controls();const{config:c,policy:p,relay:r}=state;
- if(!endpoint){endpoint=localStorage.getItem(`btcbridge-endpoint-${p.network}`)||(deployment.bitcoin_api||(p.network==='bitcoin'?'https://blockstream.info/api':''));el<HTMLInputElement>('endpoint').value=endpoint;}
- el('network').textContent=p.network==='regtest'?'REGTEST · TEST BTC':'BITCOIN';el<HTMLAnchorElement>('exchange-link').href=`${location.protocol}//exchange.${location.host.split('.').slice(1).join('.')}/`;
- el('network-notice').hidden=p.network!=='regtest';el('network-notice').textContent='Isolated test network. These BTC have no real-world value. Use your Psibase account and signing key. Funding and mining are managed outside this app.';
+ if(!endpoint){endpoint=localStorage.getItem(`btcbridge-endpoint-${p.network}`)||(deployment.bitcoin_api||DEFAULT_SOURCES[p.network]||'');el<HTMLInputElement>('endpoint').value=endpoint;}
+ el('network').textContent=p.network==='regtest'?'REGTEST · TEST BTC':p.network==='signet'?'Bitcoin signet — test coins, no value':'BITCOIN';el<HTMLAnchorElement>('exchange-link').href=`${location.protocol}//exchange.${location.host.split('.').slice(1).join('.')}/`;
+ el('network-notice').hidden=p.network==='bitcoin';el('network-notice').textContent=p.network==='signet'?'Bitcoin signet: a public test network. These coins have no value. Send signet coins from your own wallet; never send real bitcoin to these addresses.':'Isolated test network. These BTC have no real-world value. Use your Psibase account and signing key. Funding and mining are managed outside this app.';
+ el('relay-trust').hidden=p.network!=='signet';el('relay-trust').textContent='On signet the relay verifies each block\'s proof of work and the signet signers\' block signature. The signet signers are trusted, as they are by every signet node.';
  el('balance').innerHTML=account?`${fmt((state.wallet?.balance||0)+(state.wallet?.incoming||0))} <small>BTC</small>`:'Connect account';el('balance-detail').textContent=`Native token #${c.token} · ${r.required} Bitcoin confirmations required`;
  el('reserve').textContent=`${fmt(c.reserve)} BTC`;
  const supply=Number(state.token.issued_supply.value??state.token.issued_supply)-Number(state.token.burned_supply.value??state.token.burned_supply);el('supply').textContent=`${fmt(supply)} BTC`;
@@ -99,6 +104,12 @@ function render(){controls();const{config:c,policy:p,relay:r}=state;
 }
 async function bitcoin(path:string,options?:RequestInit){if(!endpoint)throw Error('Set a Bitcoin API endpoint for this network.');return request(`${endpoint.replace(/\/$/,'')}${path}`,options);}
 async function syncHeaders(){const remote=Number(await bitcoin('/blocks/tip/height'));let common=Math.min(remote,state.relay.height);for(let tries=0;;tries++){const theirs=String(await bitcoin(`/block-height/${common}`)),ours=await request(`/header?height=${common}`);if(theirs===ours?.id)break;if(common<=state.relay.checkpoint_height||tries>=128)throw Error('Bitcoin source disagrees beyond the supported fork window.');common--;}
+ if(state.relay.network==='signet'){
+  // The relay takes a signet header only with its coinbase transaction and Merkle branch (BIP 325 block signature).
+  const last=Math.min(remote,common+SIGNET_SYNC_LIMIT);
+  for(let h=common+1;h<=last;){const blocks=[];for(;h<=last&&blocks.length<SIGNET_BATCH;h++)blocks.push(await fetchSignetBlock(bitcoin,h));el('sync-status').textContent=`Relaying signet headers through ${h-1}${last<remote?` of ${remote}`:''}`;await transact([action(account,'btcrelay','signetHeaders',{blocks})]);}
+  await load();return;
+ }
  for(let h=common+1;h<=remote;){const headers:string[]=[];for(;h<=remote&&headers.length<32;h++){const hash=await bitcoin(`/block-height/${h}`);headers.push(String(await bitcoin(`/block/${hash}/header`)));}el('sync-status').textContent=`Relaying Bitcoin headers through ${h-1}`;await transact([action(account,'btcrelay','headers',{headers})]);}await load();}
 async function transactionProof(txid:string,deposit=false){const info=await bitcoin(`/tx/${txid}`);if(!info.status.confirmed)return null;const proof=await bitcoin(`/tx/${txid}/merkle-proof`),block=info.status.block_hash||await bitcoin(`/block-height/${proof.block_height}`),count=state.relay.height-proof.block_height+1;if(deposit)pending.set(txid,count);if(count<state.relay.required)return null;return{info,args:{raw:String(await bitcoin(`/tx/${txid}/hex`)),block:String(block),siblings:proof.merkle,position:proof.pos}};}
 type DepositCandidate={txid:string,raw:string,info:any,proof:any,block:string,height:number,reported:number,outputs:any[],fees:any};
