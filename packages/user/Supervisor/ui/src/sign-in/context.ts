@@ -21,7 +21,12 @@ export interface PageContext {
      * into the passkey in the same prompt. The caller wipes the result when
      * its action is finished.
      */
-    unlock: (why: string, detail?: string, adding?: string) => Promise<Unlocked>;
+    /**
+     * `creating`: this is the creation of the account the visitor asked for
+     * on the first screen, which may use what their passkey unlocked there
+     * instead of asking again.
+     */
+    unlock: (why: string, detail?: string, adding?: string, creating?: boolean) => Promise<Unlocked>;
     /**
      * Leaves for the app: as `account`, or as a guest. `signedIn` says the
      * account was just signed in to the app and need not be again.

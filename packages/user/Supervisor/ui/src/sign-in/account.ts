@@ -501,6 +501,7 @@ export const runAccountStep = async (ctx: PageContext) => {
                 "Confirm with your passkey",
                 `Your passkey makes the keys for ${name}.`,
                 name,
+                true,
             );
             keys = accountKeys(unlocked.chainId, unlocked.root, name, 0n, 0n);
             ctx.working("Creating your account", `Reserving ${name}`);
