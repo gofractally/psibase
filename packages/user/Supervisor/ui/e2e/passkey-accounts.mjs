@@ -93,6 +93,14 @@ const signUp = async (p, name) => {
         const landed = new URL(tab.url());
         await tab.close();
         if (!landed.host.startsWith("supervisor.") || !landed.pathname.endsWith("/sign-in.html")) throw new Error("without an account the app's page was served: " + landed.href);
+        // Nor does the node answer an app's API for the passkey-only session's token, beyond what signing up needs.
+        const token = await page.evaluate(() => JSON.parse(window.localStorage.getItem("psibase.guest-session.v1") ?? "{}").token);
+        if (!token) throw new Error("no passkey session token on the sign-in page");
+        const ask = async (svc, path, method = "POST") => (await p.context.request.fetch(`${S}://${svc}.${root}${path}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/graphql" }, data: method === "POST" ? "{ __typename }" : undefined })).status();
+        const refused = [await ask("tokens", "/graphql"), await ask(app, "/markets", "GET"), await ask("explorer", "/graphql")];
+        const allowed = [await ask("auth-sig", "/graphql"), await ask("dyn-ld", "/graphql"), await ask("tokens", "/plugin.wasm", "GET")];
+        if (refused.some((c) => c !== 401)) throw new Error("a passkey-only token was answered by an app's API: " + refused.join(","));
+        if (allowed.some((c) => c === 401)) throw new Error("what signing up needs was refused: " + allowed.join(","));
         const creds = (await p.cdp.send("WebAuthn.getCredentials", { authenticatorId: p.authenticatorId })).credentials;
         return `short name: ${hint}; passkeys on the device: ${creds.length}`;
     });

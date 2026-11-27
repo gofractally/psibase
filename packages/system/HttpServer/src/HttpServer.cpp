@@ -296,16 +296,47 @@ namespace SystemService
          return false;
       }
 
+      // What someone signed in with a passkey but no account (a guest) may
+      // ask an app's host for. A guest is on the way to an account and
+      // nowhere else, so this is exactly what the sign-in page and the
+      // supervisor behind it request while signing up, recovering or
+      // importing an account (taken from a recorded sign-up; extend it only
+      // with a reason):
+      bool guestMayRequest(AccountNumber app, const HttpRequest& req)
+      {
+         auto path = req.path();
+         // Plugin files: the supervisor loads the plugins the sign-in flow
+         // calls (accounts, auth-sig, transact, host and what they import).
+         // They are code, the same for everyone.
+         if (req.method == "GET" && path.ends_with(".wasm"))
+            return true;
+         if (req.method != "POST")
+            return false;
+         // Which service provides each plugin import.
+         if (app == AccountNumber{"dyn-ld"})
+            return path == "/graphql";
+         // The network's name, which the supervisor needs to start.
+         if (app == AccountNumber{"branding"})
+            return path == "/graphql";
+         // Whether an account exists and which service authorizes it.
+         if (app == AccountNumber{"accounts"})
+            return path == "/graphql";
+         // An account's keys and state, and the packing of the owner actions
+         // the sign-in page signs with keys from the passkey.
+         if (app == AccountNumber{"auth-sig"})
+            return path == "/graphql" || path.starts_with("/pack_action/");
+         return false;
+      }
+
       // Whether this node serves `app`'s pages to someone who is not signed
       // in to an account. The one place that decides it.
       //
-      // The rule (gofractally/psibase#2285): an app's developer has to opt in
-      // to serving signed-out visitors, and then pays for those requests;
-      // otherwise the visitor is told to sign in and pays for their own.
-      // Neither the opt-in nor the developer's credit with a node exists
-      // yet, so today no app is served signed out. When they do, this reads
-      // them, and the request's usage is recorded against the app's account
-      // instead of the visitor's address.
+      // The rule (gofractally/psibase#2285): this is each node operator's
+      // decision, not chain state. An operator may list apps it serves to
+      // signed-out visitors, whose requests are then charged to the app;
+      // for every other app the visitor is told to sign in and pays for
+      // their own use. The operator's list does not exist yet, so today no
+      // app is served signed out.
       bool servedSignedOut(AccountNumber /*app*/)
       {
          return false;
@@ -436,13 +467,15 @@ namespace SystemService
       // No app code runs for a request that nobody can be billed for. And an
       // app's page is for an account: someone who has only a passkey (a
       // guest) or only a visitor identity is sent to the sign-in page, where
-      // the next step is to make or choose an account. Their other requests
-      // (the supervisor's plugin files and look-ups while they sign up) are
-      // still answered.
+      // the next step is to make or choose an account. Of a guest's other
+      // requests only those that signing up needs are answered
+      // (guestMayRequest).
       bool navigation = isNavigation(req);
+      bool guestOnly  = !session.user && !session.guest.empty();
       if (requireIdentity && !gateExempt(service, req) &&
           (!session.billable() ||
-           (navigation && !session.user && !servedSignedOut(*service_opt))))
+           (navigation && !session.user && !servedSignedOut(*service_opt)) ||
+           (!navigation && guestOnly && !guestMayRequest(*service_opt, req))))
       {
          if (navigation)
          {
