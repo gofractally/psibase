@@ -96,14 +96,20 @@ const passwordApi = (): PasswordCredentialCtor | undefined =>
 
 // A signature gives two candidate keys, in an order that changes from one
 // signature to the next, so "the first" or "the second" means nothing. The
-// real key is remembered by a short fingerprint instead (16 bits of its
-// hash: enough to tell two candidates apart, far too little to learn the
-// key from). It rides in the password entry's user name ("+k3fa9"), so a
-// new device needs no second passkey prompt to find out.
-const fingerprint = (key: Uint8Array) => bytesToHex(sha256(key)).slice(0, 4);
+// recovery key itself says which is real: it is chosen so that a keyed hash of
+// the real key starts with 16 zero bits (see newRecoveryKey). Nothing has to
+// be written beside it, so the password entry's user name is just the name.
+const WHICH_TAG = utf8ToBytes("psibase/passkey-fallback/which/v1");
 
-const entryName = (account: string, mark?: string) =>
-    mark === undefined ? account : `${account}+k${mark}`;
+const marksAsReal = (recoveryKey: Uint8Array, key: Uint8Array) => {
+    const h = hmac(sha256, recoveryKey, concatBytes(WHICH_TAG, key));
+    return h[0] === 0 && h[1] === 0;
+};
+
+// Before that, the real key was remembered by 16 bits of its hash, written
+// after the name in the password entry ("name+k3fa9") and in this device's
+// hint. Entries saved that way are still read; none are written.
+const fingerprint = (key: Uint8Array) => bytesToHex(sha256(key)).slice(0, 4);
 
 const markFrom = (id: string): string | undefined => /\+k([0-9a-f]{4})$/.exec(id)?.[1];
 
@@ -135,13 +141,13 @@ const saveHint = (credentialId: Uint8Array, hint: Hint) => {
 };
 
 /** Offers the recovery key to the browser's password manager, where it has one. */
-const offerToPasswordManager = async (account: string, wif: string, mark?: string) => {
+const offerToPasswordManager = async (account: string, wif: string) => {
     const Ctor = passwordApi();
     if (!Ctor) return;
     try {
         await navigator.credentials.store(
             new Ctor({
-                id: entryName(account, mark),
+                id: account,
                 password: wif,
                 name: "Recovery secret (not a signing key)",
             }),
@@ -174,17 +180,24 @@ const combine = (kind: FallbackKind, value: Uint8Array, recoveryKey: Uint8Array)
     hmac(sha256, recoveryKey, concatBytes(TAG[kind], value));
 
 /**
- * A fresh recovery key: hash( the passkey's first signature || random bytes ).
- * The random bytes are what make it unguessable; they are used here and kept
- * nowhere.
+ * A fresh recovery key: hash( the passkey's first signature || random bytes ||
+ * counter ). The random bytes are what make it unguessable; they are used
+ * here and kept nowhere. The counter runs until the key is a valid key of the
+ * curve the saved format is for and, for a passkey whose key is recovered
+ * from signatures, until it marks that key as the real one (about 65,000
+ * tries, once).
  */
-const newRecoveryKey = (mixIn: Uint8Array): Uint8Array => {
-    for (;;) {
-        const candidate = sha256(
-            concatBytes(mixIn, crypto.getRandomValues(new Uint8Array(32))),
-        );
-        // The saved string must be a valid key of the curve the format is for.
-        if (secp256k1.utils.isValidPrivateKey(candidate)) return candidate;
+const newRecoveryKey = (mixIn: Uint8Array, realKey?: Uint8Array): Uint8Array => {
+    const seed = crypto.getRandomValues(new Uint8Array(32));
+    const counter = new Uint8Array(4);
+    const view = new DataView(counter.buffer);
+    for (let n = 0; ; n = (n + 1) >>> 0) {
+        view.setUint32(0, n, true);
+        const candidate = sha256(concatBytes(mixIn, seed, counter));
+        if (!secp256k1.utils.isValidPrivateKey(candidate)) continue;
+        if (realKey && !marksAsReal(candidate, realKey)) continue;
+        seed.fill(0);
+        return candidate;
     }
 };
 
@@ -204,7 +217,6 @@ export const secretWithoutPrf = async (ev: NoPrfEvidence, ui: FallbackUi): Promi
         // sign-in would then derive something else.
         const first = await ev.again();
         let value = ev.credentialId;
-        let mark: string | undefined;
         if (es256) {
             const found = candidates(first);
             const real = found && pickP256PublicKey(found, ev.registration.publicKey!);
@@ -213,14 +225,13 @@ export const secretWithoutPrf = async (ev: NoPrfEvidence, ui: FallbackUi): Promi
                     "This passkey signs in a form this page cannot read its key back from, so it cannot be used here without the secret-deriving (PRF) feature.",
                 );
             }
-            mark = fingerprint(real);
             value = real;
         }
-        const recoveryKey = newRecoveryKey(first.signature);
+        const recoveryKey = newRecoveryKey(first.signature, es256 ? value : undefined);
         const wif = wifEncode(recoveryKey);
-        await offerToPasswordManager(ev.registration.label, wif, mark);
+        await offerToPasswordManager(ev.registration.label, wif);
         await ui.keep({ wif, account: ev.registration.label });
-        saveHint(ev.credentialId, { kind, mark });
+        saveHint(ev.credentialId, { kind, mark: es256 ? fingerprint(value) : undefined });
         const secret = combine(kind, value, recoveryKey);
         recoveryKey.fill(0);
         return secret;
@@ -236,12 +247,16 @@ export const secretWithoutPrf = async (ev: NoPrfEvidence, ui: FallbackUi): Promi
 
     let value = ev.credentialId;
     if (first) {
+        // An earlier record of the real key, where there is one, then the
+        // recovery key's own mark.
         const mark = stored?.mark ?? loadHint(ev.credentialId)?.mark;
         let real = mark ? first.filter((k) => fingerprint(k) === mark) : [];
+        if (real.length !== 1) real = first.filter((k) => marksAsReal(recoveryKey, k));
         if (real.length !== 1) {
-            // No record of which candidate is the passkey's key (or one that
-            // does not settle it): a second signature does, since only the
-            // real key is a candidate of both.
+            // Neither settles it (a recovery key made before keys carried the
+            // mark, or the rare case where both candidates carry it): a
+            // second signature does, since only the real key is a candidate
+            // of both.
             const second = candidates(await ev.again()) ?? [];
             real = first.filter((k) => second.some((s) => equal(s, k)));
             if (real.length !== 1) {
