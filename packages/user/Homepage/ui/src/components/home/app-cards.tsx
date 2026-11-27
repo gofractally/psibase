@@ -1,12 +1,20 @@
 import type { LucideIcon } from "lucide-react";
 
 import {
+    ArrowLeftRight,
     ArrowUpRight,
+    Bitcoin,
     Blocks,
     Book,
+    CandlestickChart,
+    Coins,
     Hammer,
+    HandCoins,
+    Mail,
     Settings,
+    Store,
     Terminal,
+    Users,
 } from "lucide-react";
 
 import { siblingUrl } from "@psibase/common-lib";
@@ -28,6 +36,8 @@ interface AppLink {
     packageName?: string;
     newTab?: boolean;
     producerOnly?: boolean;
+    /** A page of this app rather than another app's site. */
+    path?: string;
 }
 
 const EXPLORER: AppLink = {
@@ -47,6 +57,81 @@ const DOCS: AppLink = {
     color: "hsl(38 92% 55%)",
     packageName: "Docs",
 };
+
+// The parts of this app a signed-in account uses, listed with the apps so
+// that they can be found from the landing page as well as from the top bar and
+// the account menu.
+const BUILT_IN: AppLink[] = [
+    {
+        service: "homepage",
+        path: "/tokens",
+        name: "Wallet",
+        description: "Hold, send and receive tokens; accept or cancel pending transfers.",
+        icon: Coins,
+        color: "hsl(226 80% 66%)",
+    },
+    {
+        service: "homepage",
+        path: "/chainmail",
+        name: "Mail",
+        description: "Messages between accounts on this network.",
+        icon: Mail,
+        color: "hsl(190 80% 55%)",
+    },
+    {
+        service: "homepage",
+        path: "/contacts",
+        name: "Contacts",
+        description: "People you know here, their profiles, and invitations.",
+        icon: Users,
+        color: "hsl(142 60% 50%)",
+    },
+    {
+        service: "homepage",
+        path: "/tokens/swap",
+        name: "Swap",
+        description: "Trade one token for another through liquidity pools.",
+        icon: ArrowLeftRight,
+        color: "hsl(28 90% 58%)",
+    },
+    {
+        service: "homepage",
+        path: "/account-marketplace",
+        name: "Name market",
+        description: "Buy premium account names.",
+        icon: Store,
+        color: "hsl(320 70% 62%)",
+        packageName: "NameMarket",
+    },
+];
+
+// Apps with their own site, shown when their package is installed.
+const INSTALLED_APPS: AppLink[] = [
+    {
+        service: "exchange",
+        name: "Exchange",
+        description: "Order books, lending and relays for any pair of tokens.",
+        icon: CandlestickChart,
+        color: "hsl(160 70% 48%)",
+        packageName: "Exchange",
+    },
+    {
+        service: "btcbridge",
+        name: "Bitcoin bridge",
+        description: "Deposit and withdraw bitcoin as a token on this network.",
+        icon: Bitcoin,
+        color: "hsl(33 95% 55%)",
+        packageName: "BtcBridge",
+    },
+    {
+        service: "favor",
+        name: "Favor",
+        description: "Credit between people you trust, settled by netting.",
+        icon: HandCoins,
+        color: "hsl(265 75% 68%)",
+        packageName: "Favor",
+    },
+];
 
 const SIGNED_IN_APPS: AppLink[] = [
     {
@@ -86,7 +171,7 @@ const AppCard = ({ app }: { app: AppLink }) => {
 
     return (
         <a
-            href={siblingUrl(null, app.service, null)}
+            href={app.path ?? siblingUrl(null, app.service, null)}
             {...(app.newTab && {
                 target: "_blank",
                 rel: "noopener noreferrer",
@@ -151,6 +236,8 @@ export const AppCards = ({ signedIn }: { signedIn: boolean }) => {
     const isProducer = useIsCurrentUserProducer();
 
     const apps = [
+        ...(signedIn ? BUILT_IN : []),
+        ...(signedIn ? INSTALLED_APPS : []),
         EXPLORER,
         DOCS,
         ...(signedIn ? SIGNED_IN_APPS : []),
@@ -161,7 +248,7 @@ export const AppCards = ({ signedIn }: { signedIn: boolean }) => {
         <DashboardSection title="Apps">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {apps.map((app) => (
-                    <InstalledAppCard key={app.service} app={app} />
+                    <InstalledAppCard key={app.path ?? app.service} app={app} />
                 ))}
             </div>
         </DashboardSection>
