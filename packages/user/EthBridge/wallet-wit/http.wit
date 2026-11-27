@@ -1,3 +1,0 @@
-package host:http;
-interface api { use host:types/types.{error}; get-json: func(endpoint: string) -> result<string,error>; }
-world imports { import api; }

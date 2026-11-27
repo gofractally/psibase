@@ -1,3 +1,0 @@
-package host:client;
-interface api { get-sender: func() -> string; get-active-app: func() -> string; }
-world imports { import api; }
