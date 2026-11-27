@@ -553,11 +553,13 @@ namespace
                                                      : status->consensus.current;
             for (auto service : consensus.services)
             {
-               if (chain
-                       .kvGet<CodeByHashRow>(
-                           CodeByHashRow::db,
-                           codeByHashKey(service.codeHash, service.vmType, service.vmVersion))
-                       .has_value())
+               // Only whether the row exists matters. Reading it through kvGet
+               // would copy the verifier's whole wasm into this module.
+               auto key = psio::encode(
+                   psio::key{},
+                   codeByHashKey(service.codeHash, service.vmType, service.vmVersion));
+               if (tester::raw::kvGet(chain.nativeHandle(), CodeByHashRow::db, key.data(),
+                                      key.size()) != -1)
                {
                   result.push_back(service);
                }
@@ -643,7 +645,15 @@ namespace
          return TransactionTrace{.error = "proofs and claims must have same size"};
       }
       auto tokens        = getRunTokens(chain, trx);
-      auto verifyContext = makeRunContext(chain, RunMode::verify, status);
+      // Computed on first use: it looks up every verify service's code, and a
+      // transaction without a matching token (or without claims) never needs it.
+      std::optional<Checksum256> verifyContext;
+      auto                       matchesContext = [&](const Checksum256& context)
+      {
+         if (!verifyContext)
+            verifyContext = makeRunContext(chain, RunMode::verify, status);
+         return context == *verifyContext;
+      };
       for (auto&& [claim, proof, token] : std::views::zip(claims, trx.proofs, tokens))
       {
          VerifyArgs args{trxId, claim.unpack(), proof};
@@ -652,7 +662,7 @@ namespace
                         .method  = MethodNumber("verifySys"),
                         .rawData = psio::to_pssz(args)};
          if (token && token->success && token->mode == RunMode::verify && token->action == act &&
-             token->context == verifyContext)
+             matchesContext(token->context))
          {
             // skip execution
          }
