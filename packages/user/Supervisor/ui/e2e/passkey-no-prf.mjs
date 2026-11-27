@@ -85,7 +85,7 @@ await step(a, "a passkey with no PRF: the visitor is given a recovery key and ge
     await page.fill("#pick-name", A); await page.waitForSelector("#pick-create:not([disabled])"); await page.click("#pick-create");
     await page.waitForSelector("#fb-keep:not([hidden])", { timeout: 30000 });
     await snap(a, "recovery-key");
-    wif = (await page.textContent("#fb-key")).trim();
+    wif = (await page.inputValue("#fb-key")).trim();
     if (!/^[KL][1-9A-HJ-NP-Za-km-z]{51}$/.test(wif)) throw new Error("not a base58 key: " + wif.slice(0, 8));
     await page.click("#fb-kept");
     await onApp(page);

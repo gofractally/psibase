@@ -558,22 +558,46 @@ const fallbackShow = (mode: "keep" | "ask") => {
     show("fallback");
 };
 
+// Password managers decide a form was submitted successfully when, after its
+// submit event, the page moves on (a navigation within the document) and the
+// fields are gone from view. The page does move on, so it says so; the field
+// keeps its value a little longer for managers that read it late.
+const submittedToPasswordManager = (field: HTMLInputElement) => {
+    window.history.replaceState(window.history.state, "", window.location.href);
+    window.setTimeout(() => (field.value = ""), 5000);
+};
+
 onPasskeyWithoutSecret(async (evidence) => {
     const { secretWithoutPrf } = await import("./fallback");
     return secretWithoutPrf(evidence, {
-        keep: ({ wif }) =>
+        keep: ({ wif, account }) =>
             new Promise<void>((resolve) => {
-                $("fb-key").textContent = wif;
-                const kept = $<HTMLButtonElement>("fb-kept");
+                const form = $<HTMLFormElement>("fb-keep");
+                const key = $<HTMLInputElement>("fb-key");
+                const show = $<HTMLButtonElement>("fb-show");
                 const copy = $<HTMLButtonElement>("fb-copy");
-                copy.textContent = "Copy the recovery key";
+                $<HTMLInputElement>("fb-keep-name").value = account;
+                key.type = "password";
+                key.value = wif;
+                // Not read-only (some password managers skip read-only
+                // fields), but not editable either.
+                key.oninput = () => (key.value = wif);
+                show.textContent = "Show";
+                show.onclick = () => {
+                    const hidden = key.type === "password";
+                    key.type = hidden ? "text" : "password";
+                    show.textContent = hidden ? "Hide" : "Show";
+                };
+                copy.textContent = "Copy";
                 copy.onclick = () =>
                     void navigator.clipboard.writeText(wif).then(
                         () => (copy.textContent = "Copied"),
                         () => (copy.textContent = "Could not copy"),
                     );
-                kept.onclick = () => {
-                    $("fb-key").textContent = "";
+                form.onsubmit = (e) => {
+                    e.preventDefault();
+                    key.type = "password";
+                    submittedToPasswordManager(key);
                     working("Signing you in", "Deriving your keys on this device.");
                     resolve();
                 };
@@ -583,17 +607,22 @@ onPasskeyWithoutSecret(async (evidence) => {
             new Promise<string>((resolve, reject) => {
                 const form = $<HTMLFormElement>("fb-form");
                 const input = $<HTMLInputElement>("fb-input");
+                const name = $<HTMLInputElement>("fb-name");
+                const device = loadDevice();
+                // Filled in when this device knows it, so a password manager
+                // matches its entry and never saves one without a name.
+                name.value = device.current ?? device.accounts[0]?.name ?? device.pendingName ?? "";
                 input.value = "";
                 form.onsubmit = (e) => {
                     e.preventDefault();
                     const text = input.value;
-                    input.value = "";
+                    submittedToPasswordManager(input);
                     working("Signing you in", "Deriving your keys on this device.");
                     resolve(text);
                 };
                 $("fb-cancel").onclick = () => reject(new Cancelled());
                 fallbackShow("ask");
-                input.focus();
+                (name.value ? input : name).focus();
             }),
     });
 });

@@ -944,19 +944,49 @@
                 <div id="view-fallback" class="si-view" hidden>
                     <h1 id="fb-title">Save your recovery key</h1>
                     <p class="si-lede" id="fb-lede"></p>
-                    <div id="fb-keep" class="si-stack" hidden>
-                        <pre class="si-code si-key" id="fb-key"></pre>
-                        <button class="si-btn si-ghost" id="fb-copy" type="button">Copy the recovery key</button>
+                    <!-- A real form with a name and a password field, really submitted:
+                         that is what every password manager (not only the browser's own)
+                         recognises and offers to save. -->
+                    <form id="fb-keep" class="si-stack" autocomplete="on" hidden>
+                        <label class="si-hint" for="fb-keep-name">Saved under this name</label>
+                        <div class="si-field">
+                            <input id="fb-keep-name" name="username" type="text" autocomplete="username" readonly />
+                        </div>
+                        <label class="si-hint" for="fb-key">Recovery key</label>
+                        <div class="si-field">
+                            <input
+                                id="fb-key"
+                                class="si-key"
+                                name="password"
+                                type="password"
+                                autocomplete="new-password"
+                                spellcheck="false"
+                            />
+                        </div>
+                        <p class="si-below">
+                            <button class="si-link" id="fb-show" type="button">Show</button>
+                            ·
+                            <button class="si-link" id="fb-copy" type="button">Copy</button>
+                        </p>
                         <p class="si-hint">
                             This is a recovery secret, not an account's signing key. It is weaker than a
                             passkey that derives its own secret: use a device or passkey provider that
                             supports that if you can.
                         </p>
-                        <button class="si-btn si-primary" id="fb-kept" type="button">I've saved it</button>
-                    </div>
+                        <button class="si-btn si-primary" id="fb-kept" type="submit">I've saved it</button>
+                    </form>
                     <div id="fb-ask" hidden>
                         <form id="fb-form" autocomplete="on">
-                            <input type="text" name="username" autocomplete="username" value="recovery key" hidden />
+                            <div class="si-field">
+                                <input
+                                    id="fb-name"
+                                    name="username"
+                                    type="text"
+                                    autocomplete="username"
+                                    spellcheck="false"
+                                    placeholder="The name it was saved under"
+                                />
+                            </div>
                             <div class="si-field">
                                 <input
                                     id="fb-input"
