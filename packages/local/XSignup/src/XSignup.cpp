@@ -906,13 +906,21 @@ namespace
    {
       bool        ok = false;
       std::string problem;
-      PSIO_REFLECT(NameReply, ok, attr(problem, utf8))
+      // Whether an account of this name exists, whatever its length: the
+      // sign-in page asks for a name first and has to tell "sign in as it"
+      // from "create it".
+      bool taken = false;
+      PSIO_REFLECT(NameReply, ok, attr(problem, utf8), taken)
    };
 
    HttpReply serveCheckName(const HttpRequest& req)
    {
-      auto problem = nameProblem(req.query<NameQuery>().name);
-      return json(req, NameReply{!problem, problem.value_or("")});
+      auto text    = req.query<NameQuery>().name;
+      auto problem = nameProblem(text);
+      AccountNumber name{text};
+      bool taken = name != AccountNumber{} && name.str() == text &&
+                   to<Accounts>().getAccount(name).has_value();
+      return json(req, NameReply{!problem, problem.value_or(""), taken});
    }
 
    HttpReply serveCreate(const HttpRequest& req, const SessionInfo& session)
