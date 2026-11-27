@@ -9,6 +9,35 @@ using std::chrono::steady_clock;
 
 namespace psibase::http
 {
+   // A request target as it is written to the log: the path, and the names
+   // of the query parameters without their values. Query values carry
+   // one-time secrets (an OAuth callback's `code` and `state`, tokens in
+   // links), and a log is read by more people than a request is.
+   static std::string loggable_target(std::string_view target)
+   {
+      auto        query = target.find('?');
+      std::string result{target.substr(0, query)};
+      if (query == std::string_view::npos)
+         return result;
+      result += '?';
+      auto rest  = target.substr(query + 1);
+      bool first = true;
+      while (!rest.empty())
+      {
+         auto end  = rest.find('&');
+         auto pair = rest.substr(0, end);
+         auto eq   = pair.find('=');
+         if (!first)
+            result += '&';
+         first = false;
+         result += pair.substr(0, eq);
+         if (eq != std::string_view::npos)
+            result += "=*";
+         rest = end == std::string_view::npos ? std::string_view{} : rest.substr(end + 1);
+      }
+      return result;
+   }
+
    std::pair<beast::string_view, beast::string_view> parse_request_target(
        const http_session_base::request_type& request);
 
@@ -91,7 +120,7 @@ namespace psibase::http
                  boost::log::attributes::constant{std::string(req.method_string())}),
              boost::log::add_scoped_logger_attribute(
                  logger, "RequestTarget",
-                 boost::log::attributes::constant{std::string(req_target)}),
+                 boost::log::attributes::constant{loggable_target(req_target)}),
              boost::log::add_scoped_logger_attribute(
                  logger, "RequestHost", boost::log::attributes::constant{std::string(req_host)})});
          PSIBASE_LOG(logger, debug) << "Received HTTP request";

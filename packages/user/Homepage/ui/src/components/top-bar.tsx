@@ -178,7 +178,7 @@ const LoginButton = () => {
             }
         >
             <LogIn className="size-3.5" />
-            Log in
+            Guest · Sign in
         </Button>
     );
 };

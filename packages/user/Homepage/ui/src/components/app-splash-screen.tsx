@@ -37,7 +37,8 @@ export const AppSplashScreen = () => {
                 </p>
             </div>
             <div className="text-muted-foreground text-xs">
-                Sign in to use {currentApp?.name ?? "this app"}.
+                You're browsing as a guest. Sign in or create an account
+                to use {currentApp?.name ?? "this app"}.
             </div>
             <Button
                 size="sm"
@@ -45,7 +46,7 @@ export const AppSplashScreen = () => {
                 disabled={isPending}
                 onClick={onLogin}
             >
-                <LogIn className="size-3.5" /> Log in
+                <LogIn className="size-3.5" /> Sign in
             </Button>
         </div>
     );

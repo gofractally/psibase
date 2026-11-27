@@ -89,10 +89,10 @@ export const AccountMenuItems = ({ onProfile, children }: Props) => {
                     )}
                     <div className="grid min-w-0 leading-tight">
                         <span className="truncate text-sm font-semibold">
-                            {user ? displayName || user : "Not signed in"}
+                            {user ? displayName || user : "Guest"}
                         </span>
                         <span className="text-muted-foreground truncate font-mono text-[11px]">
-                            {user ? `@${user}` : "Browsing as a guest"}
+                            {user ? `@${user}` : "No account chosen for this app"}
                         </span>
                     </div>
                 </div>
@@ -160,7 +160,7 @@ export const AccountMenuItems = ({ onProfile, children }: Props) => {
                     }
                 >
                     <LogIn />
-                    Sign in
+                    Sign in or create an account
                 </DropdownMenuItem>
             )}
         </>

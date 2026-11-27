@@ -453,10 +453,17 @@ const goToDestination = async (session: GuestSession, celebrate: boolean) => {
     try {
         await enterApp(session, account);
     } catch (e) {
-        // The account could not be signed in (paused, frozen, or its key was
-        // replaced elsewhere). The visitor still gets in, as a guest.
+        // The account could not be signed in (paused, frozen, its key was
+        // replaced elsewhere, or the network refused). Say so and let the
+        // visitor choose. Entering as a guest here would also record "guest"
+        // as their choice for this app, and the account would then seem to
+        // be ignored on every later visit.
         console.warn(e);
-        await enterApp(session, undefined);
+        if (account) {
+            go("account", { failed: account });
+            return;
+        }
+        throw e;
     }
 };
 

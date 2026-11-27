@@ -62,7 +62,7 @@ export function UserSidebarNavFooter({ onProfile, children }: Props = {}) {
                                         <span className="truncate font-medium">
                                             {user
                                                 ? displayName || user
-                                                : "Not signed in"}
+                                                : "Guest"}
                                         </span>
                                         {user && displayName && (
                                             <span className="text-muted-foreground truncate font-mono text-[11px]">

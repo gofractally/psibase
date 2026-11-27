@@ -704,6 +704,12 @@ export const runAccountStep = async (ctx: PageContext) => {
         } else {
             await refresh();
         }
+        const failed = params.get("failed");
+        if (failed) {
+            notice(
+                `${failed} could not be signed in to ${ctx.app} just now. Try again, or open Manage accounts if it is paused or frozen.`,
+            );
+        }
         if (providerError) {
             notice(
                 providerError === "cancelled"

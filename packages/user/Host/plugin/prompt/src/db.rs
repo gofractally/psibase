@@ -11,7 +11,13 @@ mod tables {
         Bucket::new(
             Database {
                 mode: NonTransactional,
-                duration: Session,
+                // Persistent, not Session: the prompt is recorded by the
+                // supervisor embedded in the app's page and read by the
+                // supervisor's own top-level prompt page. Session storage is
+                // not shared between a frame and a top-level page in WebKit,
+                // so Safari reported "No prompt is active". The prompt page
+                // refuses a prompt older than a few minutes (`created`).
+                duration: Persistent,
             },
             "active-prompt",
         )

@@ -672,7 +672,12 @@ auto XHttp::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
 {
    check(getSender() == XHttp::service, "Wrong sender");
 
-   if (auto reply = to<XAdmin>().checkAuth(request, socket))
+   // Deciding that a caller is not a local administrator asks the chain who
+   // they are, and the chain's services ask this one for the root host: the
+   // check comes back into x-http, so it is made as a recursive call. Without
+   // that a refused request ended in "Cannot reenter service" (a 500, with
+   // nothing done) instead of the 401.
+   if (auto reply = recurse().to<XAdmin>().checkAuth(request, socket))
       return reply;
 
    if (request.method == "OPTIONS")
