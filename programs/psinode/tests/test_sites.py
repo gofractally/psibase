@@ -60,6 +60,71 @@ class TestSites(unittest.TestCase):
         self.assertPlainNotFound(a.get('/', 'qux', headers=NAVIGATE), '/')
         self.assertResponse(a.get('/about.html', 'qux', headers=NAVIGATE), 'bar about')
 
+    @testutil.psinode_test
+    def test_content_named_urls(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer', 'Sites'])
+
+        apps = TestPackage('Apps', '1.0.0').depends('Sites')
+        apps.service('foo', data={
+            'index.html': 'foo home',
+            'plugin.wasm': 'foo plugin',
+            'assets/index-DiwrgTda.js': 'foo script',
+            'assets/style-AgyV-iFx.css': 'foo hashed style',
+            'assets/index-D_ZJrvOo.js': 'foo other script',
+            'assets/logo.svg': 'foo logo',
+            'assets/long-filename.css': 'foo style',
+            'other/index-DiwrgTda.js': 'foo other',
+        })
+
+        with tempfile.TemporaryDirectory() as dir:
+            make_package_repository(dir, [apps])
+            a.install(['Apps'], sources=[dir])
+        a.wait(new_block())
+
+        FOREVER = 'max-age=31536000, immutable'
+
+        # A plain URL is checked with the server every time
+        with a.get('/plugin.wasm', 'foo') as reply:
+            reply.raise_for_status()
+            self.assertEqual(reply.headers['Cache-Control'], 'no-cache')
+            etag = reply.headers['ETag']
+        with a.get('/plugin.wasm', 'foo', headers={'If-None-Match': etag}) as reply:
+            self.assertEqual(reply.status_code, 304)
+            self.assertEqual(reply.headers['Cache-Control'], 'no-cache')
+
+        # The same file asked for by its hash can be kept
+        with a.get('/plugin.wasm?v=' + etag, 'foo') as reply:
+            reply.raise_for_status()
+            self.assertEqual(reply.text, 'foo plugin')
+            self.assertEqual(reply.headers['Cache-Control'], FOREVER)
+            self.assertEqual(reply.headers['ETag'], etag)
+        with a.get('/plugin.wasm?v=' + etag, 'foo', headers={'If-None-Match': etag}) as reply:
+            self.assertEqual(reply.status_code, 304)
+            self.assertEqual(reply.headers['Cache-Control'], FOREVER)
+
+        # A hash that is not the content's is answered with the content, to be checked again
+        for v in ['0' * 16, etag[:-1], etag + '0', '']:
+            with a.get('/plugin.wasm?v=' + v, 'foo') as reply:
+                reply.raise_for_status()
+                self.assertEqual(reply.text, 'foo plugin')
+                self.assertEqual(reply.headers['Cache-Control'], 'no-cache')
+
+        # A bundler's hashed file name under assets/ can be kept; other names can not
+        for path in ['/assets/index-DiwrgTda.js', '/assets/style-AgyV-iFx.css', '/assets/index-D_ZJrvOo.js']:
+            with a.get(path, 'foo') as reply:
+                reply.raise_for_status()
+                self.assertEqual(reply.headers['Cache-Control'], FOREVER, path)
+        for path in ['/assets/logo.svg', '/assets/long-filename.css', '/other/index-DiwrgTda.js', '/']:
+            with a.get(path, 'foo') as reply:
+                reply.raise_for_status()
+                self.assertEqual(reply.headers['Cache-Control'], 'no-cache', path)
+
+        # A missing hashed name is not found, and nothing about it is kept
+        with a.get('/assets/index-Zzzzzzz9.js', 'foo') as reply:
+            self.assertEqual(reply.status_code, 404)
+            self.assertNotEqual(reply.headers.get('Cache-Control'), FOREVER)
+
     def assertResponse(self, response, expected):
         response.raise_for_status()
         self.assertEqual(response.text, expected)

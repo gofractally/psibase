@@ -33,8 +33,13 @@ export function createSharedViteConfig(
         cache: true,
         ...(uiFramework === "svelte" ? outDirParams : {}),
         output: {
-            entryFileNames: "index.js",
-            assetFileNames: "[name][extname]",
+            // Every file but index.html is named by its content, under
+            // assets/, where Sites answers it to be kept without asking
+            // again (gofractally/psibase#2291). index.html names them, and
+            // is itself checked with the server on every load.
+            entryFileNames: "assets/[name]-[hash].js",
+            chunkFileNames: "assets/[name]-[hash].js",
+            assetFileNames: "assets/[name]-[hash][extname]",
             dir: "dist",
             ...(Object.keys(manualChunks).length > 0
                 ? {
