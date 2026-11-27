@@ -550,11 +550,13 @@ const fallbackShow = (mode: "keep" | "ask") => {
     $("fb-keep").hidden = mode !== "keep";
     $("fb-ask").hidden = mode !== "ask";
     $("fb-title").textContent =
-        mode === "keep" ? "Save your recovery key" : "Enter your recovery key";
+        mode === "keep"
+            ? "Please confirm that your passkey's password is saved"
+            : "Enter your passkey's password";
     $("fb-lede").textContent =
         mode === "keep"
-            ? "Your passkey provider can't derive a secret for this network, so your keys are made from the passkey together with this recovery key. Keep it in your password manager: you need both to sign in. Anyone who has it and can use your passkey controls your accounts."
-            : `This passkey can't derive a secret by itself, so it works together with a recovery key. This site made that key when the passkey was created and offered it to your password manager: look there for the entry for ${window.location.hostname} under your name. It is 52 characters and starts with K or L.`;
+            ? "Your passkey works together with this password: you need both to sign in. Make sure your password manager saves it."
+            : `This passkey works together with a password that this site made when the passkey was created. Look in your password manager for the entry for ${window.location.hostname} under your name. It is 52 characters and starts with K or L.`;
     show("fallback");
 };
 

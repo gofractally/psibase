@@ -10,8 +10,12 @@
 //                  credential-id:  the credential id, for a passkey whose
 //                                  key cannot be recovered from a signature
 //                                  (RSA)
-//   recovery key   32 random bytes, saved as a base58 (WIF) string in the
-//                  password manager
+//   password       32 random bytes as a base58 (WIF) string, which the
+//                  visitor's password manager saves and fills through an
+//                  ordinary user-name-and-password form. The page calls it a
+//                  password; this file calls it the recovery key. The
+//                  browser's own credential interfaces are not used: they
+//                  reach only the browser's manager and collide with others
 //
 //   secret = HMAC-SHA-256( key = recovery key, message = tag(kind) || passkey value )
 //
@@ -32,14 +36,11 @@ import { bytesToHex, concatBytes, utf8ToBytes } from "@noble/hashes/utils";
 
 import {
     WebauthnSignatureError,
-    looksLikeWif,
     pickP256PublicKey,
     recoverP256PublicKeys,
     wifDecode,
     wifEncode,
 } from "@psibase/common-lib";
-
-import { credentialRequest } from "./passkey";
 
 export type FallbackKind = "es256" | "credential-id";
 
@@ -86,16 +87,6 @@ const candidates = (a: Assertion): Uint8Array[] | undefined => {
 
 // ------------------------------------------------- where the key is kept
 
-type PasswordCredentialLike = { type: string; id: string; password?: string };
-type PasswordCredentialCtor = new (data: {
-    id: string;
-    password: string;
-    name?: string;
-}) => Credential;
-
-const passwordApi = (): PasswordCredentialCtor | undefined =>
-    (window as unknown as { PasswordCredential?: PasswordCredentialCtor }).PasswordCredential;
-
 // A signature gives two candidate keys, in an order that changes from one
 // signature to the next, so "the first" or "the second" means nothing. The
 // recovery key itself says which is real: it is chosen so that a keyed hash of
@@ -108,12 +99,9 @@ const marksAsReal = (recoveryKey: Uint8Array, key: Uint8Array) => {
     return h[0] === 0 && h[1] === 0;
 };
 
-// Before that, the real key was remembered by 16 bits of its hash, written
-// after the name in the password entry ("name+k3fa9") and in this device's
-// hint. Entries saved that way are still read; none are written.
+// This device also remembers the real key by 16 bits of its hash, which
+// saves the tie-break prompt for a key made before keys carried the mark.
 const fingerprint = (key: Uint8Array) => bytesToHex(sha256(key)).slice(0, 4);
-
-const markFrom = (id: string): string | undefined => /\+k([0-9a-f]{4})$/.exec(id)?.[1];
 
 const HINT_KEY = "psibase.passkey-fallback.v1";
 
@@ -140,44 +128,6 @@ const saveHint = (credentialId: Uint8Array, hint: Hint) => {
     } catch {
         // Only a convenience.
     }
-};
-
-/** Offers the recovery key to the browser's password manager, where it has one. */
-const offerToPasswordManager = async (account: string, wif: string) => {
-    const Ctor = passwordApi();
-    if (!Ctor) return;
-    try {
-        await credentialRequest(() =>
-            navigator.credentials.store(
-                new Ctor({
-                    id: account,
-                    password: wif,
-                    name: "Recovery secret (not a signing key)",
-                }),
-            ),
-        );
-    } catch (e) {
-        console.warn("The password manager did not take the recovery key", e);
-    }
-};
-
-/** The recovery key from the password manager, if it will give one. */
-const fromPasswordManager = async (): Promise<{ wif: string; mark?: string } | undefined> => {
-    if (!passwordApi()) return undefined;
-    try {
-        const found = (await credentialRequest(() =>
-            navigator.credentials.get({
-                password: true,
-                mediation: "optional",
-            } as CredentialRequestOptions),
-        )) as PasswordCredentialLike | null;
-        if (found?.type === "password" && found.password && looksLikeWif(found.password)) {
-            return { wif: found.password, mark: markFrom(found.id) };
-        }
-    } catch (e) {
-        console.warn("The password manager gave no recovery key", e);
-    }
-    return undefined;
 };
 
 // --------------------------------------------------------------- the secret
@@ -235,7 +185,6 @@ export const secretWithoutPrf = async (ev: NoPrfEvidence, ui: FallbackUi): Promi
         }
         const recoveryKey = newRecoveryKey(first.signature, es256 ? value : undefined);
         const wif = wifEncode(recoveryKey);
-        await offerToPasswordManager(ev.registration.label, wif);
         await ui.keep({ wif, account: ev.registration.label });
         saveHint(ev.credentialId, { kind, mark: es256 ? fingerprint(value) : undefined });
         const secret = combine(kind, value, recoveryKey);
@@ -247,15 +196,14 @@ export const secretWithoutPrf = async (ev: NoPrfEvidence, ui: FallbackUi): Promi
     const first = candidates(assertion);
     const kind: FallbackKind = first ? "es256" : "credential-id";
 
-    const stored = await fromPasswordManager();
-    const text = stored?.wif ?? (await ui.ask());
+    const text = await ui.ask();
     const { secret: recoveryKey } = wifDecode(text.trim());
 
     let value = ev.credentialId;
     if (first) {
         // An earlier record of the real key, where there is one, then the
         // recovery key's own mark.
-        const mark = stored?.mark ?? loadHint(ev.credentialId)?.mark;
+        const mark = loadHint(ev.credentialId)?.mark;
         let real = mark ? first.filter((k) => fingerprint(k) === mark) : [];
         if (real.length !== 1) real = first.filter((k) => marksAsReal(recoveryKey, k));
         if (real.length !== 1) {

@@ -940,19 +940,19 @@
                     </p>
                 </div>
 
-                <!-- Fallback view: a passkey that gives no secret, and its recovery key -->
+                <!-- Fallback view: a passkey that gives no secret, and its password -->
                 <div id="view-fallback" class="si-view" hidden>
-                    <h1 id="fb-title">Save your recovery key</h1>
+                    <h1 id="fb-title"></h1>
                     <p class="si-lede" id="fb-lede"></p>
                     <!-- A real form with a name and a password field, really submitted:
                          that is what every password manager (not only the browser's own)
                          recognises and offers to save. -->
                     <form id="fb-keep" class="si-stack" autocomplete="on" hidden>
-                        <label class="si-hint" for="fb-keep-name">Saved under this name</label>
+                        <label class="si-hint" for="fb-keep-name">Username</label>
                         <div class="si-field">
                             <input id="fb-keep-name" name="username" type="text" autocomplete="username" readonly />
                         </div>
-                        <label class="si-hint" for="fb-key">Recovery key</label>
+                        <label class="si-hint" for="fb-key">Password</label>
                         <div class="si-field">
                             <input
                                 id="fb-key"
@@ -969,11 +969,10 @@
                             <button class="si-link" id="fb-copy" type="button">Copy</button>
                         </p>
                         <p class="si-hint">
-                            This is a recovery secret, not an account's signing key. It is weaker than a
-                            passkey that derives its own secret: use a device or passkey provider that
-                            supports that if you can.
+                            Make sure your password manager saves this password. It is not an
+                            account's signing key, and it only works together with your passkey.
                         </p>
-                        <button class="si-btn si-primary" id="fb-kept" type="submit">I've saved it</button>
+                        <button class="si-btn si-primary" id="fb-kept" type="submit">Log in or sign up</button>
                     </form>
                     <div id="fb-ask" hidden>
                         <form id="fb-form" autocomplete="on">
@@ -984,7 +983,7 @@
                                     type="text"
                                     autocomplete="username"
                                     spellcheck="false"
-                                    placeholder="The name it was saved under"
+                                    placeholder="Username"
                                 />
                             </div>
                             <div class="si-field">
@@ -1001,11 +1000,11 @@
                             <button class="si-btn si-primary" type="submit">Continue</button>
                         </form>
                         <details class="si-hint">
-                            <summary>I never saved a recovery key</summary>
+                            <summary>I never saved a password</summary>
                             <p>
                                 Then nothing was ever stored under this passkey that it could open, and
                                 it cannot be used here. Cancel, delete this passkey in your password
-                                manager, and create a new one: you will be shown its recovery key to
+                                manager, and create a new one: you will be shown its password to
                                 save.
                             </p>
                         </details>
