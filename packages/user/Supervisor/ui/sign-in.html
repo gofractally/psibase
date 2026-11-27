@@ -348,7 +348,14 @@
 
             #signin .si-stack {
                 display: grid;
+                grid-template-columns: minmax(0, 1fr);
                 gap: 10px;
+            }
+
+            #signin .si-stack > *,
+            #signin .si-panel > * {
+                min-width: 0;
+                box-sizing: border-box;
             }
 
             #signin .si-btn.si-provider {
@@ -427,6 +434,102 @@
             #signin .si-link:focus-visible {
                 outline: 2px solid var(--si-accent);
                 outline-offset: 3px;
+            }
+
+            #signin .si-acct {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                width: 100%;
+                padding: 11px 13px;
+                border-radius: 15px;
+                border: 1px solid var(--si-card-border);
+                background: color-mix(in srgb, var(--si-accent) 6%, transparent);
+                color: var(--si-text);
+                font: inherit;
+                text-align: left;
+                cursor: pointer;
+            }
+
+            #signin .si-acct:hover,
+            #signin .si-acct.si-open {
+                background: color-mix(in srgb, var(--si-accent) 13%, transparent);
+            }
+
+            #signin .si-panel {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr);
+                gap: 10px;
+                padding: 14px;
+                border-radius: 15px;
+                border: 1px solid var(--si-card-border);
+            }
+
+            #signin .si-panel .si-label,
+            #signin .si-panel .si-hint,
+            #signin .si-panel .si-below {
+                margin: 0;
+            }
+
+            #signin .si-row {
+                display: flex;
+                justify-content: space-between;
+                gap: 14px;
+                font-size: 13.5px;
+                color: var(--si-muted);
+            }
+
+            #signin .si-row strong {
+                color: var(--si-text);
+                font-weight: 600;
+                text-align: right;
+            }
+
+            #signin .si-action {
+                display: grid;
+                gap: 5px;
+            }
+
+            #signin .si-action .si-btn.si-ghost {
+                margin-top: 4px;
+            }
+
+            #signin .si-btn.si-danger {
+                color: var(--si-danger);
+                border-color: color-mix(in srgb, var(--si-danger) 40%, transparent);
+            }
+
+            #signin .si-inline {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                align-items: stretch;
+            }
+
+            #signin .si-inline .si-btn.si-ghost {
+                margin-top: 0;
+                width: auto;
+                white-space: nowrap;
+            }
+
+            #signin .si-input,
+            #signin .si-input:focus {
+                flex: 1 1 170px;
+                min-height: 44px;
+                min-width: 0;
+                padding: 0 12px;
+                border-radius: 12px;
+                border: 1px solid var(--si-card-border);
+                outline: 0;
+                box-shadow: none;
+                background: color-mix(in srgb, var(--si-accent) 6%, transparent);
+                color: var(--si-text);
+                font: inherit;
+                font-size: 14.5px;
+            }
+
+            #signin .si-input:focus {
+                border-color: var(--si-accent);
             }
 
             #signin .si-points {
@@ -642,7 +745,7 @@
                         </li>
                         <li>
                             <span class="si-dot"></span>
-                            <span><strong>Your key stays with you.</strong> It is made on this device and never sent to a server.</span>
+                            <span><strong>Your keys stay with you.</strong> They are made on this device by your passkey and never sent to a server.</span>
                         </li>
                     </ul>
                 </div>
@@ -661,7 +764,7 @@
                     <div id="acct-providers" class="si-stack" hidden></div>
 
                     <form id="acct-name-form" hidden novalidate>
-                        <label class="si-label" for="acct-name">Your name on this network</label>
+                        <label class="si-label" id="acct-name-label" for="acct-name">Your name on this network</label>
                         <div class="si-field">
                             <span class="si-at" aria-hidden="true">@</span>
                             <input
@@ -673,7 +776,7 @@
                                 autocapitalize="none"
                                 autocorrect="off"
                                 spellcheck="false"
-                                maxlength="18"
+                                maxlength="10"
                             />
                         </div>
                         <p class="si-hint" id="acct-name-hint"></p>
@@ -682,15 +785,19 @@
                         </button>
                     </form>
 
-                    <button class="si-btn si-primary" id="acct-continue" type="button" hidden></button>
+                    <div id="acct-list" class="si-stack" hidden></div>
 
-                    <p class="si-below" id="acct-below">
-                        <button class="si-link" id="acct-later" type="button">Not now</button>
-                        <span id="acct-classic-sep"> · </span>
-                        <button class="si-link" id="acct-classic" type="button">
-                            Use an existing account instead
-                        </button>
-                    </p>
+                    <p class="si-below" id="acct-below"></p>
+                    <p class="si-below" id="acct-more" hidden></p>
+                </div>
+
+                <!-- Manage view: this browser's accounts and their owner-key actions -->
+                <div id="view-manage" class="si-view" hidden>
+                    <h1 id="mg-title">Your accounts</h1>
+                    <p class="si-lede" id="mg-lede"></p>
+                    <p class="si-notice" id="mg-notice" hidden></p>
+                    <div id="mg-body" class="si-stack"></div>
+                    <p class="si-below" id="mg-below"></p>
                 </div>
 
                 <!-- Working view -->

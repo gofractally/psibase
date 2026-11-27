@@ -350,15 +350,20 @@ namespace SystemService
                                "__Secure-VISITOR=" + *token + "; Domain=" + root +
                                    "; Path=/; SameSite=Lax; Secure; HttpOnly; Max-Age=" +
                                    std::to_string(age)};
-            return HttpReply{
+            HttpReply reply{
                 .status      = HttpStatus::ok,
                 .contentType = "text/html",
                 .body        = std::vector(page.begin(), page.end()),
-                .headers     = {setCookieHeader("SESSION", *token, age, true),
-                                std::move(visitor),
+                .headers     = {std::move(visitor),
                                 {"Cache-Control", "no-store"},
                                 {"Content-Security-Policy",
                                  "default-src 'none'; base-uri 'none'; form-action 'none'"}}};
+            // "visitorOnly": this host already holds an account's session,
+            // set by the supervisor when it signed the account in. Only the
+            // billing identity is refreshed; the session is left alone.
+            if (formField(body, "visitorOnly").value_or("") != "1")
+               reply.headers.push_back(setCookieHeader("SESSION", *token, age, true));
+            return reply;
          }
          if (request.target == "/common/set-host-cookie")
          {

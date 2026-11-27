@@ -1,42 +1,38 @@
-// A guest becomes a named account.
+// Accounts: choosing one, creating one, getting one back.
 //
+// Creating (gofractally/psibase#2275):
 //   1. Passkey   — already done: the visitor is a guest.
 //   2. Verify    — a sign-in provider vouches for the visitor, which makes
-//                  them eligible for one account. The node keeps the
+//                  them eligible for an account. The node keeps the
 //                  provider's stable user id and handle, never its tokens.
-//   3. Name      — the visitor picks a name. The node's sponsor signs a
-//                  transaction creating the account with the visitor's own
-//                  passkey-derived key; this page submits it.
+//   3. Name      — the visitor picks a name and confirms with the passkey,
+//                  which derives the account's owner and active keys. Only
+//                  the two public keys leave this page; the node's sponsor
+//                  signs the transaction that creates the account and
+//                  becomes its recovery partner.
 //
-// Then the key goes into the supervisor's key store and the account becomes
-// the signed-in user for the app the visitor came from.
-import { type GuestSession } from "../guest-session";
+// The active key then goes into the supervisor's key store, the account is
+// added to the passkey's encrypted account list, and the owner key is wiped.
+import { accountKeys, sha256Hex } from "./account-keys";
 import {
-    guestKeyFrom,
-    hexToBytes,
-    privateKeyPem,
-    sha256Hex,
-} from "./guest-key";
-
-export interface AccountContext {
-    session: GuestSession;
-    app: string;
-    path: string;
-    rootName: string;
-    siblingOrigin: (service: string) => string;
-    $: <T extends HTMLElement>(id: string) => T;
-    show: (view: "account" | "working" | "done") => void;
-    working: (title: string, detail?: string) => void;
-    /** Asks for the passkey and returns its secret. */
-    unlock: () => Promise<Uint8Array>;
-    fetchChainId: () => Promise<string>;
-    /** The private key remembered from sign-in, if this browser has it. */
-    storedKey: () => Promise<string | undefined>;
-    forgetStoredKey: () => Promise<void>;
-    /** Sends the visitor back to the app as a guest. */
-    leaveAsGuest: () => void;
-    isCancelled: (e: unknown) => boolean;
-}
+    ANY_NAME_RULE,
+    NAME_RULE,
+    type PageContext,
+    pushPrepared,
+    setLinks,
+} from "./context";
+import {
+    type ChainRecord,
+    adoptFor,
+    fetchRecord,
+    keysFor,
+    loadDevice,
+    recordInList,
+    rememberOnDevice,
+    sameKey,
+    setCurrent,
+} from "./device";
+import { type Unlocked } from "./passkey";
 
 interface LinkInfo {
     provider: string;
@@ -50,27 +46,29 @@ interface Status {
     providers: { name: string; label: string }[];
     guest: string;
     link?: LinkInfo | null;
+    accounts?: string[];
+    sponsor?: string | null;
+    recovery?: { account: string; valid_seconds: number } | null;
 }
 
 const SECRET_KEY = "psibase.sign-in.provider-secret";
-const NAME_RULE = /^[a-z][a-z0-9-]{7,17}$/;
 
-export const runAccountStep = async (ctx: AccountContext) => {
-    const { $, session } = ctx;
-    const signup = ctx.siblingOrigin("x-signup");
+type Intent = "" | "new" | "recover";
+
+export const runAccountStep = async (ctx: PageContext) => {
+    const { $, session, net } = ctx;
+    const signup = net.siblingOrigin("x-signup");
+    const transact = net.siblingOrigin("transact");
     const params = new URLSearchParams(window.location.search);
+    const intent = (params.get("intent") ?? "") as Intent;
+    const subject = params.get("account") ?? "";
 
-    const api = async <T>(
-        path: string,
-        body?: unknown,
-    ): Promise<T> => {
+    const api = async <T>(path: string, body?: unknown): Promise<T> => {
         const res = await fetch(signup + path, {
             method: body === undefined ? "GET" : "POST",
             headers: {
                 Authorization: `Bearer ${session.token}`,
-                ...(body === undefined
-                    ? {}
-                    : { "Content-Type": "application/json" }),
+                ...(body === undefined ? {} : { "Content-Type": "application/json" }),
             },
             body: body === undefined ? undefined : JSON.stringify(body),
         }).catch(() => {
@@ -85,17 +83,19 @@ export const runAccountStep = async (ctx: AccountContext) => {
         }
         if (!res.ok) {
             throw new Error(
-                (parsed as { error?: string }).error ??
-                    "Something went wrong. Try again.",
+                (parsed as { error?: string }).error ?? "Something went wrong. Try again.",
             );
         }
         return parsed as T;
     };
 
     const notice = (message?: string) => {
-        const el = $("acct-notice");
-        el.hidden = !message;
-        el.textContent = message ?? "";
+        const node = $("acct-notice");
+        node.hidden = !message;
+        node.textContent = message ?? "";
+    };
+    const report = (e: unknown) => {
+        if (!ctx.isCancelled(e)) notice(e instanceof Error ? e.message : undefined);
     };
 
     // The progress strip belongs to creating an account; someone who
@@ -105,34 +105,91 @@ export const runAccountStep = async (ctx: AccountContext) => {
         strip.hidden = current === "none";
         if (current === "none") return;
         for (const n of [1, 2, 3]) {
-            const el = $(`acct-step-${n}`);
-            el.classList.toggle("si-done", n < current);
-            el.classList.toggle("si-current", n === current);
+            const node = $(`acct-step-${n}`);
+            node.classList.toggle("si-done", n < current);
+            node.classList.toggle("si-current", n === current);
         }
     };
 
-    const resumeQuery = () =>
-        new URLSearchParams({ app: ctx.app, path: ctx.path }).toString();
-
-    // ------------------------------------------------------------ views
-
-    const showClosed = () => {
-        steps(2);
-        $("acct-title").textContent = "Accounts aren't open yet";
-        $("acct-lede").textContent =
-            "This network isn't creating new accounts right now. You can keep looking around as a guest.";
-        $("acct-providers").hidden = true;
-        $("acct-name-form").hidden = true;
-        $("acct-continue").hidden = true;
-        $("acct-later").textContent = "Back to " + ctx.app;
+    /** Clears the view to its title and text; each view then adds its parts. */
+    const frame = (title: string, lede: string, step: 2 | 3 | "none" = "none") => {
+        steps(step);
+        $("acct-title").textContent = title;
+        $("acct-lede").textContent = lede;
+        for (const id of ["acct-providers", "acct-name-form", "acct-list", "acct-more"]) {
+            $(id).hidden = true;
+        }
         ctx.show("account");
     };
 
-    const showProviders = (status: Status) => {
-        steps(2);
-        $("acct-title").textContent = "Create your account";
-        $("acct-lede").textContent =
-            "First, show you're a real person. We only keep your public handle, to give each person one account.";
+    const guestLink = { label: "Stay a guest", run: () => void ctx.enterApp() };
+    const backLink = { label: "Back", run: () => ctx.go("account") };
+    const links = (...items: { label: string; run: () => void }[]) =>
+        setLinks($("acct-below"), items);
+
+    // -------------------------------------------------------- chooser
+
+    const showChooser = () => {
+        const device = loadDevice();
+        const single = device.accounts.length === 1;
+        frame(
+            single ? `Welcome back, ${device.accounts[0].name}` : "Choose an account",
+            `Use it on ${ctx.app}.${ctx.rootName}.`,
+        );
+        const list = $("acct-list");
+        list.textContent = "";
+        const ordered = [...device.accounts].sort(
+            (a, b) => Number(b.name === device.current) - Number(a.name === device.current),
+        );
+        for (const account of ordered) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className =
+                account.name === device.current ? "si-btn si-primary" : "si-btn si-provider";
+            button.textContent = `Continue as ${account.name}`;
+            button.addEventListener("click", () => void enter(account.name));
+            list.append(button);
+        }
+        list.hidden = false;
+        links(guestLink, { label: "Manage accounts", run: () => ctx.go("manage") });
+        setLinks($("acct-more"), [
+            { label: "Create another account", run: () => ctx.go("account", { intent: "new" }) },
+            { label: "Recover an account", run: () => ctx.go("account", { intent: "recover" }) },
+        ]);
+    };
+
+    const enter = async (name: string) => {
+        notice();
+        const entry = loadDevice().accounts.find((a) => a.name === name);
+        if (entry?.held === false) return ctx.go("manage", { account: name });
+        try {
+            ctx.working("Signing you in", `as ${name}`);
+            setCurrent(name);
+            await ctx.enterApp(name);
+        } catch (e) {
+            console.error(e);
+            showChooser();
+            notice(
+                `${name} could not be signed in. If it is paused or frozen, open Manage accounts.`,
+            );
+        }
+    };
+
+    // ------------------------------------------------------- creating
+
+    const showClosed = () => {
+        frame(
+            "Accounts aren't open yet",
+            "This network isn't creating new accounts right now. You can keep looking around as a guest.",
+            2,
+        );
+        links({ label: `Back to ${ctx.app}`, run: () => void ctx.enterApp() });
+    };
+
+    const providerButtons = (
+        status: Status,
+        start: (provider: string) => void,
+    ) => {
         const list = $("acct-providers");
         list.textContent = "";
         for (const provider of status.providers) {
@@ -140,63 +197,27 @@ export const runAccountStep = async (ctx: AccountContext) => {
             button.type = "button";
             button.className = "si-btn si-provider";
             button.textContent =
-                provider.name === "dev"
-                    ? provider.label
-                    : `Continue with ${provider.label}`;
-            button.addEventListener(
-                "click",
-                () => void startProvider(provider.name),
-            );
+                provider.name === "dev" ? provider.label : `Continue with ${provider.label}`;
+            button.addEventListener("click", () => start(provider.name));
             list.append(button);
         }
         list.hidden = false;
-        $("acct-name-form").hidden = true;
-        $("acct-continue").hidden = true;
-        ctx.show("account");
     };
 
-    const showName = (link: LinkInfo) => {
-        steps(3);
-        $("acct-title").textContent = "Choose your name";
-        $("acct-lede").textContent =
-            link.provider === "dev"
-                ? "This is how others will see you. It can't be changed later."
-                : `Verified as ${link.handle}. Now pick how others will see you here. It can't be changed later.`;
-        $("acct-providers").hidden = true;
-        $("acct-continue").hidden = true;
-        const input = $<HTMLInputElement>("acct-name");
-        if (!input.value) {
-            const suggestion = link.handle
-                .toLowerCase()
-                .replace(/[^a-z0-9-]/g, "")
-                .replace(/^[^a-z]+/, "")
-                .slice(0, 18);
-            if (NAME_RULE.test(suggestion)) input.value = suggestion;
-        }
-        $("acct-name-form").hidden = false;
-        validateName();
-        ctx.show("account");
-        input.focus();
+    const showProviders = (status: Status) => {
+        frame(
+            "Create your account",
+            "First, show you're a real person. We only keep your public handle, to give each person one account.",
+            2,
+        );
+        providerButtons(status, (p) => void startProvider(p, {}));
+        links(guestLink, { label: "Recover an account", run: () => ctx.go("account", { intent: "recover" }) });
     };
 
-    const showContinue = (account: string) => {
-        steps("none");
-        $("acct-title").textContent = `Welcome back, ${account}`;
-        $("acct-lede").textContent = `Use ${account} on ${ctx.app}.${ctx.rootName}.`;
-        $("acct-providers").hidden = true;
-        $("acct-name-form").hidden = true;
-        const button = $("acct-continue");
-        button.textContent = `Continue as ${account}`;
-        button.hidden = false;
-        button.onclick = () => void adopt(account);
-        // Importing some other account is a different task from this one.
-        $("acct-later").textContent = "Stay a guest for now";
-        $("acct-classic").textContent = "Use a different account";
-        ctx.show("account");
-    };
-
-    // The form checks the shape; the node says whether the name fits the
-    // network's name encoding and is free.
+    // The name form serves three questions; `submitName` is the current one.
+    let submitName: (name: string) => void = () => {};
+    let nameRule = NAME_RULE;
+    let checkName: ((name: string) => Promise<{ ok: boolean; problem: string }>) | undefined;
     let nameOk = false;
     let checkSeq = 0;
     let checkTimer: number | undefined;
@@ -209,34 +230,45 @@ export const runAccountStep = async (ctx: AccountContext) => {
 
     const validateName = () => {
         const value = $<HTMLInputElement>("acct-name").value;
-        const shapeOk = NAME_RULE.test(value) && !value.endsWith("-");
+        const shapeOk = nameRule.test(value) && !value.endsWith("-");
+        const button = $<HTMLButtonElement>("acct-create");
         nameOk = false;
-        $<HTMLButtonElement>("acct-create").disabled = true;
+        button.disabled = true;
         window.clearTimeout(checkTimer);
         const seq = ++checkSeq;
         if (value.length === 0) {
-            setHint("Lowercase letters, digits and hyphens, starting with a letter.");
-            return;
-        }
-        if (!shapeOk) {
             setHint(
-                value.length < 8
-                    ? `${8 - value.length} more character${value.length === 7 ? "" : "s"} needed.`
-                    : "Use lowercase letters, digits and hyphens, starting with a letter.",
-                value.length >= 8,
+                nameRule === NAME_RULE
+                    ? "8 to 10 lowercase letters, digits or hyphens, starting with a letter."
+                    : "",
             );
             return;
         }
+        if (!shapeOk) {
+            const short = nameRule === NAME_RULE && value.length < 8;
+            setHint(
+                short
+                    ? `${8 - value.length} more character${value.length === 7 ? "" : "s"} needed.`
+                    : "Use lowercase letters, digits and hyphens, starting with a letter.",
+                !short,
+            );
+            return;
+        }
+        if (!checkName) {
+            nameOk = true;
+            button.disabled = false;
+            setHint("");
+            return;
+        }
         setHint("Checking…");
+        const check = checkName;
         checkTimer = window.setTimeout(async () => {
             try {
-                const reply = await api<{ ok: boolean; problem: string }>(
-                    `/check_name?name=${encodeURIComponent(value)}`,
-                );
+                const reply = await check(value);
                 if (seq !== checkSeq) return;
                 nameOk = reply.ok;
                 setHint(reply.ok ? `${value} is available.` : reply.problem, !reply.ok);
-                $<HTMLButtonElement>("acct-create").disabled = !reply.ok;
+                button.disabled = !reply.ok;
             } catch (e) {
                 if (seq !== checkSeq) return;
                 setHint(e instanceof Error ? e.message : "Could not check that name.", true);
@@ -244,29 +276,90 @@ export const runAccountStep = async (ctx: AccountContext) => {
         }, 250);
     };
 
-    // ---------------------------------------------------------- actions
+    const nameForm = (options: {
+        label: string;
+        button: string;
+        rule: RegExp;
+        check?: (name: string) => Promise<{ ok: boolean; problem: string }>;
+        suggestion?: string;
+        submit: (name: string) => void;
+    }) => {
+        $("acct-name-label").textContent = options.label;
+        $("acct-create").textContent = options.button;
+        nameRule = options.rule;
+        checkName = options.check;
+        submitName = options.submit;
+        const input = $<HTMLInputElement>("acct-name");
+        if (!input.value && options.suggestion && options.rule.test(options.suggestion)) {
+            input.value = options.suggestion;
+        }
+        $("acct-name-form").hidden = false;
+        validateName();
+        input.focus();
+    };
 
-    const startProvider = async (provider: string) => {
+    const availability = (name: string) =>
+        api<{ ok: boolean; problem: string }>(`/check_name?name=${encodeURIComponent(name)}`);
+
+    const showName = (link: LinkInfo) => {
+        frame(
+            "Choose your name",
+            link.provider === "dev"
+                ? "This is how others will see you. It can't be changed later."
+                : `Verified as ${link.handle}. Now pick how others will see you here. It can't be changed later.`,
+            3,
+        );
+        nameForm({
+            label: "Your name on this network",
+            button: "Create account",
+            rule: NAME_RULE,
+            check: availability,
+            suggestion: link.handle
+                .toLowerCase()
+                .replace(/[^a-z0-9-]/g, "")
+                .replace(/^[^a-z]+/, "")
+                .slice(0, 10),
+            submit: (name) => void create(name),
+        });
+        links(guestLink);
+    };
+
+    // -------------------------------------------------------- provider
+
+    const resumeQuery = (extra: Record<string, string>) =>
+        new URLSearchParams({ app: ctx.app, path: ctx.path, ...extra }).toString();
+
+    const startProvider = async (provider: string, purpose: { account?: string }) => {
         notice();
         try {
             ctx.working("One moment");
-            const secret = Array.from(
-                crypto.getRandomValues(new Uint8Array(32)),
-                (b) => b.toString(16).padStart(2, "0"),
+            const secret = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) =>
+                b.toString(16).padStart(2, "0"),
             ).join("");
             window.sessionStorage.setItem(SECRET_KEY, secret);
-            const reply = await api<{ url: string; link?: LinkInfo | null }>(
-                "/oauth/start",
-                { provider, browser: sha256Hex(secret), resume: resumeQuery() },
-            );
+            const recovering = purpose.account !== undefined;
+            const reply = await api<{
+                url: string;
+                recovery?: { account: string } | null;
+            }>("/oauth/start", {
+                provider,
+                browser: sha256Hex(secret),
+                resume: resumeQuery(
+                    recovering ? { intent: "recover", account: purpose.account! } : {},
+                ),
+                ...(recovering ? { purpose: "recover", account: purpose.account } : {}),
+            });
             if (reply.url) {
                 window.location.assign(reply.url);
                 return;
             }
-            await refresh();
+            // A provider that answers at once (the development one).
+            if (recovering) await recover(purpose.account!, !!reply.recovery);
+            else await refresh();
         } catch (e) {
-            await refresh();
-            notice(e instanceof Error ? e.message : undefined);
+            if (purpose.account !== undefined) await recover(purpose.account, false);
+            else await refresh();
+            report(e);
         }
     };
 
@@ -275,82 +368,23 @@ export const runAccountStep = async (ctx: AccountContext) => {
         const secret = window.sessionStorage.getItem(SECRET_KEY) ?? "";
         window.sessionStorage.removeItem(SECRET_KEY);
         // Drop the one-time value from the address bar and history.
-        window.history.replaceState(
-            null,
-            "",
-            `${window.location.pathname}?${resumeQuery()}&step=account`,
-        );
+        const kept = new URLSearchParams(window.location.search);
+        kept.delete("state");
+        window.history.replaceState(null, "", `${window.location.pathname}?${kept}`);
         await api("/oauth/finish", { state, secret });
     };
 
-    // The private key: remembered from sign-in when possible, otherwise
-    // re-derived from the passkey.
-    const obtainKey = async (): Promise<string> => {
-        const stored = await ctx.storedKey();
-        if (stored) return stored;
-        ctx.working(
-            "Confirm with your passkey",
-            "Your account uses your passkey's key.",
-        );
-        const secret = await ctx.unlock();
-        try {
-            const chainId = await ctx.fetchChainId();
-            if (guestKeyFrom(secret, chainId).publicKey !== session.publicKey) {
-                throw new Error(
-                    "That is a different passkey from the one you signed in with.",
-                );
-            }
-            return privateKeyPem(secret, chainId);
-        } finally {
-            secret.fill(0);
-        }
-    };
+    // ------------------------------------------------------- creation
 
-    const create = async (name: string) => {
-        notice();
-        try {
-            const pem = await obtainKey();
-
-            ctx.working("Creating your account", `Reserving ${name}`);
-            const reply = await api<{ transaction: string }>("/create", {
+    /** Waits until queries show `name` with this owner key. */
+    const untilVisible = async (name: string, ownerKey: string) => {
+        for (let i = 0; i < 40; ++i) {
+            const record = await fetchRecord(
+                net.siblingOrigin("auth-sig"),
                 name,
-                key: session.publicKey,
-            });
-            const pushed = await fetch(
-                `${ctx.siblingOrigin("transact")}/push_transaction?wait_for=applied`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/octet-stream",
-                        Accept: "application/json",
-                    },
-                    body: new Blob([hexToBytes(reply.transaction).buffer as ArrayBuffer]),
-                },
-            );
-            const trace = pushed.ok
-                ? ((await pushed.json()) as { error?: string | null })
-                : { error: await pushed.text() };
-            if (trace.error) {
-                throw new Error(
-                    "The network did not create the account: " + trace.error,
-                );
-            }
-            await untilVisible(name);
-            await finishAdoption(name, pem);
-        } catch (e) {
-            await refresh();
-            if (!ctx.isCancelled(e)) {
-                notice(e instanceof Error ? e.message : undefined);
-            }
-        }
-    };
-
-    // A transaction is acknowledged before queries can see its effects.
-    // Wait until the node itself reports the account as this guest's.
-    const untilVisible = async (name: string) => {
-        for (let i = 0; i < 30; ++i) {
-            const status = await api<Status>("/status");
-            if (status.link?.account === name) return;
+                net.token,
+            ).catch(() => undefined);
+            if (record && sameKey(record.owner.key, ownerKey)) return record;
             await new Promise((r) => setTimeout(r, 500));
         }
         throw new Error(
@@ -358,68 +392,219 @@ export const runAccountStep = async (ctx: AccountContext) => {
         );
     };
 
-    const adopt = async (account: string) => {
-        notice();
+    /** Stores the key, lists the account under the passkey and goes to the app. */
+    const settle = async (
+        unlocked: Unlocked,
+        name: string,
+        keys: ReturnType<typeof accountKeys>,
+    ) => {
+        ctx.working("Signing you in", `as ${name}`);
+        const entry = { name, ownerSeq: keys.owner.seq, activeSeq: keys.active.seq };
         try {
-            await finishAdoption(account, await obtainKey());
+            await adoptFor(ctx.app, name, keys.activePem);
+        } catch (e) {
+            console.error(e);
+            throw new Error(
+                `Your account ${name} exists, but this browser could not be signed in to it. Try again from Recover an account.`,
+            );
+        }
+        rememberOnDevice(entry, true);
+        // Without this a new device would not find the account by itself;
+        // it can still be found by name from "Recover an account".
+        await recordInList(net, unlocked, entry).catch((e) => console.warn(e));
+        $("done-detail").textContent = `You're ${name} now`;
+        ctx.show("done");
+        await new Promise((r) => setTimeout(r, 900));
+        await ctx.enterApp(name, true);
+    };
+
+    const create = async (name: string) => {
+        notice();
+        let unlocked: Unlocked | undefined;
+        let keys: ReturnType<typeof accountKeys> | undefined;
+        try {
+            unlocked = await ctx.unlock(
+                "Confirm with your passkey",
+                `Your passkey makes the keys for ${name}.`,
+            );
+            keys = accountKeys(unlocked.chainId, unlocked.root, name, 0n, 0n);
+            ctx.working("Creating your account", `Reserving ${name}`);
+            const reply = await api<{ transaction: string }>("/create", {
+                name,
+                owner: keys.owner,
+                active: keys.active,
+            });
+            try {
+                await pushPrepared(transact, reply.transaction);
+            } catch (e) {
+                throw new Error(
+                    "The network did not create the account: " + (e as Error).message,
+                );
+            }
+            await untilVisible(name, keys.owner.key);
+            await settle(unlocked, name, keys);
         } catch (e) {
             await refresh();
-            if (!ctx.isCancelled(e)) {
-                notice(e instanceof Error ? e.message : undefined);
-            }
+            report(e);
+        } finally {
+            keys?.ownerSecret.fill(0);
+            unlocked?.wipe();
         }
     };
 
-    // Puts the key in the supervisor's key store and signs the account in
-    // to the app the visitor came from.
-    const finishAdoption = async (account: string, pem: string) => {
-        ctx.working("Signing you in", `as ${account}`);
-        const { getSupervisor } = await import("@psibase/common-lib");
-        // The key store looks the account up through its own query path,
-        // which can trail the node's view by a block.
-        let lastError: unknown;
-        for (let attempt = 0; attempt < 8; ++attempt) {
-            try {
-                await getSupervisor().functionCall(
-                    {
-                        service: "host",
-                        plugin: "accounts",
-                        intf: "admin",
-                        method: "adoptAccount",
-                        params: [account, pem],
-                    },
-                    { enabled: false, returnPath: ctx.path },
-                );
-                lastError = undefined;
-                break;
-            } catch (e) {
-                lastError = e;
-                if (!String((e as Error)?.message ?? e).includes("not found")) {
-                    break;
-                }
-                await new Promise((r) => setTimeout(r, 700));
-            }
-        }
-        if (lastError) {
-            console.error(lastError);
-            throw new Error(
-                `Your account ${account} exists, but this browser could not be signed in to it. Open the app and choose Connect account to try again.`,
-            );
-        }
-        // The key now lives in the supervisor's key store.
-        await ctx.forgetStoredKey();
-        $("done-detail").textContent = `You're ${account} now`;
-        ctx.show("done");
-        await new Promise((r) => setTimeout(r, 1000));
-        window.location.assign(ctx.siblingOrigin(ctx.app) + ctx.path);
+    // ------------------------------------------------------- recovery
+
+    const showRecoverName = () => {
+        frame(
+            "Recover an account",
+            "Enter the account's name. If this passkey controls it, it is added to this browser. If it is paused or frozen, its recovery partner can release it.",
+        );
+        nameForm({
+            label: "Account name",
+            button: "Continue",
+            rule: ANY_NAME_RULE,
+            suggestion: subject,
+            submit: (name) => void recover(name, false),
+        });
+        links(loadDevice().accounts.length ? backLink : guestLink);
     };
+
+    const describe = (record: ChainRecord) =>
+        record.state === "frozen"
+            ? "is frozen"
+            : record.pending
+              ? "is paused with a change waiting"
+              : record.state === "paused"
+                ? "is paused"
+                : "is in use";
+
+    /**
+     * Gets `name` back for this passkey. `granted` says the sponsor has just
+     * accepted a provider sign-in for it.
+     */
+    const recover = async (name: string, granted: boolean) => {
+        notice();
+        let unlocked: Unlocked | undefined;
+        try {
+            ctx.working("Looking up " + name);
+            const record = await fetchRecord(net.siblingOrigin("auth-sig"), name, net.token);
+            if (!record) {
+                showRecoverName();
+                notice(`There is no account named ${name} that a key controls.`);
+                return;
+            }
+            const status = await api<Status>("/status");
+            const sponsored = !!status.sponsor && record.partner === status.sponsor;
+            granted = granted || status.recovery?.account === name;
+
+            if (record.state === "normal") {
+                // Nothing for a partner to do: either this passkey holds the
+                // account, or another one does.
+                unlocked = await ctx.unlock(
+                    "Confirm with your passkey",
+                    `Checking whether it controls ${name}.`,
+                );
+                const found = await keysFor(net, unlocked, name);
+                if (found) {
+                    found.keys.ownerSecret.fill(0);
+                    await settle(unlocked, name, found.keys);
+                    return;
+                }
+                frame(
+                    `${name} belongs to another passkey`,
+                    `${name} is in use and this passkey does not control it. A recovery partner can only act on an account that has been paused or frozen with one of its own keys.`,
+                );
+                links(backLink);
+                return;
+            }
+
+            if (!sponsored) {
+                frame(
+                    `${name} ${describe(record)}`,
+                    record.partner
+                        ? `Its recovery partner is ${record.partner}. Ask them to open their recovery page and approve; ${name} can send them its new keys from Manage accounts.`
+                        : `${name} has no recovery partner, so nobody can release it.`,
+                );
+                links(backLink);
+                return;
+            }
+
+            if (!granted) {
+                frame(
+                    `${name} ${describe(record)}`,
+                    "This network's sign-up service is its recovery partner. Sign in the way you did when you created the account, and it will release it.",
+                );
+                providerButtons(status, (p) => void startProvider(p, { account: name }));
+                links(backLink);
+                return;
+            }
+
+            if (record.state === "frozen") {
+                unlocked = await ctx.unlock(
+                    "Confirm with your passkey",
+                    `It makes new keys for ${name}.`,
+                );
+                // A sequence value the account has not used, so the keys are
+                // new even under the passkey it had before.
+                const keys = accountKeys(
+                    unlocked.chainId,
+                    unlocked.root,
+                    name,
+                    record.owner.seq + 1n,
+                    0n,
+                );
+                try {
+                    ctx.working("Releasing " + name, "Installing your new keys");
+                    const reply = await api<{ transaction: string }>("/partner/unfreeze", {
+                        account: name,
+                        owner: keys.owner,
+                        active: keys.active,
+                    });
+                    await pushPrepared(transact, reply.transaction);
+                    await untilVisible(name, keys.owner.key);
+                    await settle(unlocked, name, keys);
+                } finally {
+                    keys.ownerSecret.fill(0);
+                }
+                return;
+            }
+
+            // Paused: confirm the change that is waiting, or just end the pause.
+            ctx.working("Releasing " + name);
+            const reply = await api<{ transaction: string }>(
+                record.pending ? "/partner/confirm" : "/partner/end-pause",
+                { account: name },
+            );
+            await pushPrepared(transact, reply.transaction);
+            await new Promise((r) => setTimeout(r, 1500));
+            await recover(name, false);
+        } catch (e) {
+            showRecoverName();
+            report(e);
+        } finally {
+            unlocked?.wipe();
+        }
+    };
+
+    // --------------------------------------------------------- wiring
 
     // Shows whatever comes next for this guest.
     const refresh = async () => {
+        if (intent === "recover") return showRecoverName();
+        if (intent !== "new" && loadDevice().accounts.length) return showChooser();
         const status = await api<Status>("/status");
         if (status.link?.account) {
-            showContinue(status.link.account);
-            return;
+            // The provider identity already has its account.
+            if (loadDevice().accounts.some((a) => a.name === status.link!.account)) {
+                showChooser();
+                if (intent === "new") {
+                    notice(
+                        `This network gives each person one account through sign-up, and yours is ${status.link.account}.`,
+                    );
+                }
+                return;
+            }
+            return recover(status.link.account, false);
         }
         if (!status.open) return showClosed();
         if (status.link) return showName(status.link);
@@ -427,14 +612,6 @@ export const runAccountStep = async (ctx: AccountContext) => {
         return showProviders(status);
     };
 
-    // ----------------------------------------------------------- wiring
-
-    $("acct-later").addEventListener("click", () => ctx.leaveAsGuest());
-    $("acct-classic").addEventListener("click", () => {
-        window.location.assign(
-            `/prompt.html?classic=1&returnPath=${encodeURIComponent(ctx.path)}`,
-        );
-    });
     $<HTMLInputElement>("acct-name").addEventListener("input", (e) => {
         const input = e.target as HTMLInputElement;
         const cleaned = input.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
@@ -443,21 +620,19 @@ export const runAccountStep = async (ctx: AccountContext) => {
     });
     $("acct-name-form").addEventListener("submit", (e) => {
         e.preventDefault();
-        if (nameOk) void create($<HTMLInputElement>("acct-name").value);
+        if (nameOk) submitName($<HTMLInputElement>("acct-name").value);
     });
 
     try {
         const state = params.get("state");
         const providerError = params.get("provider_error");
         if (state) await finishProvider(state);
-        // Someone who already has an account, on a browser that remembers
-        // their key, asked to connect: there is nothing to decide.
-        const first = await api<Status>("/status");
-        if (first.link?.account && !state && (await ctx.storedKey())) {
-            await adopt(first.link.account);
-            return;
+        if (intent === "recover" && subject) {
+            // Sent here for one account: no need to ask its name again.
+            await recover(subject, !!state);
+        } else {
+            await refresh();
         }
-        await refresh();
         if (providerError) {
             notice(
                 providerError === "cancelled"
@@ -467,6 +642,6 @@ export const runAccountStep = async (ctx: AccountContext) => {
         }
     } catch (e) {
         await refresh().catch(() => showClosed());
-        notice(e instanceof Error ? e.message : undefined);
+        report(e);
     }
 };

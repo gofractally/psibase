@@ -583,7 +583,10 @@ namespace
       std::vector<AccountNumber> accounts;
       // The recovery grant this guest holds, if any
       std::optional<RecoveryInfo> recovery;
-      PSIO_REFLECT(Status, open, providers, attr(guest, utf8), link, accounts, recovery)
+      // The account that creates accounts here and so is their default
+      // recovery partner. Public: it is in every such account's record.
+      AccountNumber sponsor;
+      PSIO_REFLECT(Status, open, providers, attr(guest, utf8), link, accounts, recovery, sponsor)
    };
 
    LinkInfo describe(const SignupLink& link)
@@ -595,6 +598,7 @@ namespace
    {
       auto   config = readConfig();
       Status status{.open = config.open && sponsorReady(config), .guest = session.guest};
+      status.sponsor = config.sponsor;
       for (const auto& p : config.providers)
       {
          auto full = withDefaults(p);

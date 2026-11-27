@@ -1,10 +1,12 @@
 // The network's front door. An app host sends a visitor here when the node
-// does not know who they are; the visitor signs in with a passkey, becomes a
-// guest, and is returned to the page they asked for.
+// does not know who they are; the visitor signs in with a passkey and is
+// returned to the page they asked for, as a guest or as one of their
+// accounts.
 //
 // This page runs on the supervisor origin, the only origin allowed to use the
-// passkey. The passkey secret and the key derived from it stay in this
-// module: they are never stored, never posted, and never handed to an app.
+// passkey. The passkey secret, the root derived from it and every owner key
+// stay in this page for the length of one action: they are never stored,
+// never posted, and never handed to an app (gofractally/psibase#2275).
 import {
     type GuestSession,
     clearGuestSession,
@@ -12,26 +14,32 @@ import {
     rootHost,
     saveGuestSession,
 } from "../guest-session";
-import { guestKeyFrom, prfInput, privateKeyPem } from "./guest-key";
-import { clearStash, stashKey, stashedKey } from "./key-stash";
+import { signText } from "./account-keys";
+import { type PageContext, type View } from "./context";
+import {
+    type Network,
+    clearDevice,
+    forgetAccount,
+    loadDevice,
+    loginFor,
+    syncAccounts,
+} from "./device";
+import {
+    Cancelled,
+    type PrfResult,
+    Unsupported,
+    type Unlocked,
+    canLookUpSilently,
+    createPasskey,
+    fromB64Url,
+    unlockWith,
+    readPasskey,
+} from "./passkey";
 
 // ---------------------------------------------------------------- helpers
 
 const $ = <T extends HTMLElement>(id: string) =>
     document.getElementById(id) as T;
-
-const toB64Url = (bytes: Uint8Array): string =>
-    btoa(String.fromCharCode(...bytes))
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
-
-const fromB64Url = (text: string): Uint8Array => {
-    const b64 = text.replace(/-/g, "+").replace(/_/g, "/");
-    return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-};
-
-const randomBytes = (n: number) => crypto.getRandomValues(new Uint8Array(n));
 
 const root = rootHost();
 const rootName = root.replace(/:\d+$/, "");
@@ -52,10 +60,11 @@ interface Destination {
     explicit: boolean;
 }
 
+const query = new URLSearchParams(window.location.search);
+
 const readDestination = (): Destination => {
-    const params = new URLSearchParams(window.location.search);
-    const app = params.get("app");
-    const path = params.get("path") ?? "/";
+    const app = query.get("app");
+    const path = query.get("path") ?? "/";
     const pathOk =
         path.startsWith("/") && !path.startsWith("//") && !path.includes("\\");
     if (app && ACCOUNT_NAME.test(app) && app !== "supervisor") {
@@ -66,14 +75,23 @@ const readDestination = (): Destination => {
 
 const destination = readDestination();
 
-// "step=account": the visitor asked to become a named account.
-const accountStep =
-    new URLSearchParams(window.location.search).get("step") === "account";
+// "step=account": choose, create or recover an account.
+// "step=manage": the accounts on this browser and their owner-key actions.
+const step = query.get("step");
+const accountStep = step === "account" || step === "manage";
+
+const go: PageContext["go"] = (next, extra = {}) => {
+    const params = new URLSearchParams({
+        step: next,
+        ...(destination.explicit ? { app: destination.app, path: destination.path } : {}),
+        ...extra,
+    });
+    window.location.assign(`${window.location.pathname}?${params}`);
+};
 
 // ------------------------------------------------------------------ views
 
-const views = ["welcome", "account", "working", "done", "unsupported"] as const;
-type View = (typeof views)[number];
+const views: View[] = ["welcome", "account", "manage", "working", "done", "unsupported"];
 
 const show = (view: View) => {
     for (const v of views) $(`view-${v}`).hidden = v !== view;
@@ -113,6 +131,8 @@ const setBelow = (text?: string, link?: { label: string; run: () => void }) => {
 
 const shortId = (guest: string) => `${guest.slice(0, 4)}…${guest.slice(-4)}`;
 
+const HAS_PASSKEY_KEY = "psibase.has-passkey.v1";
+
 const renderWelcome = () => {
     $("network").textContent = rootName;
     document.title = `Welcome · ${rootName}`;
@@ -127,7 +147,7 @@ const renderWelcome = () => {
         // Asked to connect an account without being signed in: the passkey
         // comes first, and the older account-and-key prompt stays one
         // click away.
-        setBelow("Already have an account and its key?", {
+        setBelow("Have an account with a key of its own?", {
             label: "Use it instead",
             run: () =>
                 window.location.assign(
@@ -152,118 +172,7 @@ const renderWelcome = () => {
     show("welcome");
 };
 
-// ---------------------------------------------------------------- passkey
-
-const HAS_PASSKEY_KEY = "psibase.has-passkey.v1";
-
-class Unsupported extends Error {}
-class Cancelled extends Error {}
-
-interface PrfResult {
-    credentialId: Uint8Array;
-    secret: Uint8Array;
-}
-
-type PrfExtensionResults = {
-    prf?: { enabled?: boolean; results?: { first?: ArrayBuffer } };
-};
-
-const prfExtension = () => ({ prf: { eval: { first: prfInput() } } });
-
-const asCancelled = (e: unknown): never => {
-    if (e instanceof DOMException && e.name === "NotAllowedError") {
-        throw new Cancelled();
-    }
-    throw e;
-};
-
-/** Uses a passkey this visitor already has. */
-const usePasskey = async (
-    credentialId?: Uint8Array,
-    immediate = false,
-): Promise<PrfResult> => {
-    const credential = (await navigator.credentials
-        .get({
-            // "immediate": show the chooser only if this device already has
-            // a passkey for this site; otherwise fail at once, with no dialog.
-            ...(immediate ? { uiMode: "immediate" } : {}),
-            publicKey: {
-                challenge: randomBytes(32),
-                userVerification: "required",
-                allowCredentials: credentialId
-                    ? [{ type: "public-key", id: credentialId }]
-                    : [],
-                extensions: prfExtension(),
-            } as PublicKeyCredentialRequestOptions,
-        } as CredentialRequestOptions)
-        .catch(asCancelled)) as PublicKeyCredential | null;
-    if (!credential) throw new Cancelled();
-    const ext = credential.getClientExtensionResults() as PrfExtensionResults;
-    const first = ext.prf?.results?.first;
-    if (!first) {
-        throw new Unsupported(
-            "That passkey can't produce the secret this network derives your key from.",
-        );
-    }
-    return {
-        credentialId: new Uint8Array(credential.rawId),
-        secret: new Uint8Array(first),
-    };
-};
-
-/** Creates a new passkey, then reads its secret. */
-const createPasskey = async (): Promise<PrfResult> => {
-    const label = `Guest · ${new Date().toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-    })}`;
-    const credential = (await navigator.credentials
-        .create({
-            publicKey: {
-                rp: { name: rootName },
-                user: {
-                    id: randomBytes(16),
-                    name: `${rootName} (${label})`,
-                    displayName: label,
-                },
-                challenge: randomBytes(32),
-                pubKeyCredParams: [
-                    { type: "public-key", alg: -7 },
-                    { type: "public-key", alg: -257 },
-                ],
-                authenticatorSelection: {
-                    residentKey: "required",
-                    userVerification: "required",
-                },
-                extensions: prfExtension(),
-            } as PublicKeyCredentialCreationOptions,
-        })
-        .catch(asCancelled)) as PublicKeyCredential | null;
-    if (!credential) throw new Cancelled();
-
-    const ext = credential.getClientExtensionResults() as PrfExtensionResults;
-    const credentialId = new Uint8Array(credential.rawId);
-    const first = ext.prf?.results?.first;
-    if (first) return { credentialId, secret: new Uint8Array(first) };
-    if (ext.prf?.enabled === false || !ext.prf) {
-        throw new Unsupported(
-            "This device made a passkey, but it can't produce the secret this network derives your key from.",
-        );
-    }
-    // Some devices only release the secret when the passkey is used, not when
-    // it is created. That takes one more confirmation.
-    working("One more touch", "Confirm once more to finish setting up.");
-    return usePasskey(credentialId);
-};
-
 // ------------------------------------------------------------------ node
-
-const fetchChainId = async (): Promise<string> => {
-    const res = await fetch("/common/chainid");
-    if (!res.ok) throw new Error("Could not reach the network.");
-    return (await res.json()) as string;
-};
 
 interface GuestLoginReply {
     access_token: string;
@@ -271,23 +180,19 @@ interface GuestLoginReply {
     exp: number;
 }
 
-const guestLogin = async (prf: PrfResult): Promise<GuestSession> => {
-    const chainId = await fetchChainId();
-    const key = guestKeyFrom(prf.secret, chainId);
-    // Remembered (encrypted, on this device only) so becoming an account
-    // later does not need the passkey again.
-    await stashKey(privateKeyPem(prf.secret, chainId), key.publicKey);
-    prf.secret.fill(0);
-
+const guestLogin = async (unlocked: Unlocked): Promise<GuestSession> => {
     const exp = Math.floor(Date.now() / 1000) + 60;
-    const proof = key.sign(`psibase guest login\n${rootName}\n${exp}`);
+    const proof = signText(
+        `psibase guest login\n${rootName}\n${exp}`,
+        unlocked.guest.secret,
+    );
     const res = await fetch(`${siblingOrigin("transact")}/guest-login`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
         },
-        body: JSON.stringify({ key: key.publicKey, exp, sig: proof }),
+        body: JSON.stringify({ key: unlocked.guest.publicKey, exp, sig: proof }),
     });
     if (!res.ok) {
         throw new Error("The network did not accept the sign-in. Try again.");
@@ -297,19 +202,11 @@ const guestLogin = async (prf: PrfResult): Promise<GuestSession> => {
         token: reply.access_token,
         guest: reply.guest,
         exp: reply.exp,
-        publicKey: key.publicKey,
-        credentialId: toB64Url(prf.credentialId),
+        publicKey: unlocked.guest.publicKey,
+        credentialId: unlocked.credentialId,
     };
 };
 
-/**
- * Hands the session to the destination app and goes there.
- *
- * This is a top-level form post, not a background request: the app's host
- * sets its own cookie as the page the visitor is navigating to, which every
- * browser keeps, and then redirects to the page that was asked for. The
- * token travels in the request body, never in a URL.
- */
 // The apps this browser was given a session for, so signing out can take
 // those sessions back.
 const APPS_KEY = "psibase.guest-apps.v1";
@@ -322,7 +219,7 @@ const rememberApp = (app: string) => {
     window.localStorage.setItem(APPS_KEY, JSON.stringify([...apps]));
 };
 
-/** Ends the session everywhere this browser holds it. */
+/** Ends the session everywhere this browser holds it, and drops its keys. */
 const signOutEverywhere = async () => {
     const apps: string[] = JSON.parse(
         window.localStorage.getItem(APPS_KEY) ?? "[]",
@@ -344,8 +241,13 @@ const signOutEverywhere = async () => {
                 }),
             ),
     );
+    // The active keys leave the supervisor's key store too; the passkey
+    // brings them back at the next sign-in.
+    for (const account of loadDevice().accounts) {
+        await forgetAccount(account.name).catch((e) => console.warn(e));
+    }
     window.localStorage.removeItem(APPS_KEY);
-    await clearStash();
+    clearDevice();
     clearGuestSession();
 };
 
@@ -358,6 +260,9 @@ const resolveAppOrigin = async (app: string): Promise<string> => {
     try {
         const res = await fetch(`${direct}/common/rootdomain`, {
             redirect: "follow",
+            // Nothing here is the visitor's; and a redirected reply that
+            // allows any origin cannot be read with credentials.
+            credentials: "omit",
         });
         const landed = new URL(res.url);
         const parent = (host: string) => host.split(".").slice(1).join(".");
@@ -370,7 +275,19 @@ const resolveAppOrigin = async (app: string): Promise<string> => {
     return direct;
 };
 
-const submitSession = async (session: GuestSession) => {
+/**
+ * Hands the session to the destination app and goes there.
+ *
+ * This is a top-level form post, not a background request: the app's host
+ * sets its own cookie as the page the visitor is navigating to, which every
+ * browser keeps, and then sends the visitor on to the page that was asked
+ * for. The token travels in the request body, never in a URL.
+ *
+ * `visitorOnly`: the app already holds an account's session, so only the
+ * network-wide identity that usage is counted under is set, and the app's
+ * own session is left as it is.
+ */
+const submitSession = async (session: GuestSession, visitorOnly = false) => {
     rememberApp(destination.app);
     const appOrigin = await resolveAppOrigin(destination.app);
     const maxAge = Math.max(0, session.exp - Math.floor(Date.now() / 1000));
@@ -388,6 +305,7 @@ const submitSession = async (session: GuestSession) => {
     field("token", session.token);
     field("path", destination.path);
     field("maxAge", String(maxAge));
+    if (visitorOnly) field("visitorOnly", "1");
     document.body.append(form);
     form.submit();
 };
@@ -421,16 +339,41 @@ const returnedRecently = (): boolean => {
     return Date.now() - at < BOUNCE_WINDOW_MS;
 };
 
-const goToDestination = async (session: GuestSession, celebrate: boolean) => {
+/**
+ * Leaves for the destination: as `account` when this browser acts as one,
+ * otherwise as a guest.
+ */
+const enterApp = async (
+    session: GuestSession,
+    account: string | undefined,
+    signedIn = false,
+) => {
     window.sessionStorage.setItem(BOUNCE_KEY, String(Date.now()));
+    if (account && !signedIn) await loginFor(destination.app, account);
+    await submitSession(session, !!account);
+};
+
+const goToDestination = async (session: GuestSession, celebrate: boolean) => {
+    const device = loadDevice();
+    const entry = device.accounts.find((a) => a.name === device.current);
+    const account = entry && entry.held !== false ? entry.name : undefined;
     if (celebrate) {
-        $("done-detail").textContent = destination.explicit
-            ? `Taking you to ${destination.app}.${rootName}`
-            : "Taking you inside";
+        $("done-detail").textContent = account
+            ? `Welcome back, ${account}`
+            : destination.explicit
+              ? `Taking you to ${destination.app}.${rootName}`
+              : "Taking you inside";
         show("done");
         await new Promise((r) => setTimeout(r, 900));
     }
-    await submitSession(session);
+    try {
+        await enterApp(session, account);
+    } catch (e) {
+        // The account could not be signed in (paused, frozen, or its key was
+        // replaced elsewhere). The visitor still gets in, as a guest.
+        console.warn(e);
+        await enterApp(session, undefined);
+    }
 };
 
 // ------------------------------------------------------------------ flow
@@ -443,19 +386,21 @@ const describeFailure = (e: unknown): string | undefined => {
 
 type Mode = "auto" | "create" | "existing";
 
-/** Whether the browser can look for a passkey without showing a dialog. */
-const canLookUpSilently = async (): Promise<boolean> => {
+const loadRememberedCredential = (): Uint8Array | undefined => {
+    const id = window.localStorage.getItem(HAS_PASSKEY_KEY);
     try {
-        const caps = await (
-            PublicKeyCredential as unknown as {
-                getClientCapabilities?: () => Promise<Record<string, boolean>>;
-            }
-        ).getClientCapabilities?.();
-        return caps?.immediateGet === true;
+        return id ? fromB64Url(id) : undefined;
     } catch {
-        return false;
+        return undefined;
     }
 };
+
+const newPasskey = () =>
+    createPasskey(rootName, () =>
+        working("One more touch", "Confirm once more to finish setting up."),
+    );
+
+class NoPasskeyChosen extends Error {}
 
 /**
  * One button signs a visitor up or in.
@@ -470,51 +415,65 @@ const canLookUpSilently = async (): Promise<boolean> => {
 const obtainPasskey = async (mode: Mode): Promise<PrfResult> => {
     if (mode === "create") {
         working("Creating your passkey", "Follow the prompt from your device.");
-        return createPasskey();
+        return newPasskey();
     }
     const remembered = loadRememberedCredential();
     if (remembered || mode === "existing") {
         working("Checking your passkey", "Follow the prompt from your device.");
-        return usePasskey(remembered);
+        return readPasskey(remembered);
     }
     if (await canLookUpSilently()) {
         working("Looking for your passkey");
         try {
-            return await usePasskey(undefined, true);
+            return await readPasskey(undefined, true);
         } catch (e) {
             if (!(e instanceof Cancelled)) throw e;
         }
         working("Creating your passkey", "Follow the prompt from your device.");
-        return createPasskey();
+        return newPasskey();
     }
     working("Checking for a passkey", "Follow the prompt from your device.");
     try {
-        return await usePasskey();
+        return await readPasskey();
     } catch (e) {
         if (e instanceof Cancelled) throw new NoPasskeyChosen();
         throw e;
     }
 };
 
-class NoPasskeyChosen extends Error {}
+const network = (session: GuestSession): Network => ({
+    siblingOrigin,
+    token: session.token,
+});
 
 let nextMode: Mode = "auto";
 
 const signIn = async (mode: Mode) => {
     setNotice();
+    let unlocked: Unlocked | undefined;
     try {
         const prf = await obtainPasskey(mode);
-        working("Signing you in", "Deriving your key on this device.");
-        const session = await guestLogin(prf);
+        working("Signing you in", "Deriving your keys on this device.");
+        unlocked = await unlockWith(prf);
+        const session = await guestLogin(unlocked);
         saveGuestSession(session);
         window.localStorage.setItem(HAS_PASSKEY_KEY, session.credentialId);
+        // The passkey says which accounts are this visitor's; bring their
+        // signing keys to this browser while the root is at hand.
+        try {
+            await syncAccounts(network(session), unlocked, destination.app);
+        } catch (e) {
+            console.warn("Could not bring accounts to this browser", e);
+        }
+        unlocked.wipe();
         if (accountStep) {
-            // Signed in on the way to creating an account: carry on there.
+            // Signed in on the way to an account step: carry on there.
             window.location.reload();
             return;
         }
         await goToDestination(session, true);
     } catch (e) {
+        unlocked?.wipe();
         if (e instanceof Unsupported) {
             $("unsupported-detail").textContent = e.message;
             show("unsupported");
@@ -547,14 +506,30 @@ const signIn = async (mode: Mode) => {
     }
 };
 
-const loadRememberedCredential = (): Uint8Array | undefined => {
-    const id = window.localStorage.getItem(HAS_PASSKEY_KEY);
-    try {
-        return id ? fromB64Url(id) : undefined;
-    } catch {
-        return undefined;
-    }
-};
+const pageContext = (session: GuestSession): PageContext => ({
+    session,
+    app: destination.app,
+    path: destination.path,
+    rootName,
+    net: network(session),
+    $,
+    show,
+    working,
+    unlock: async (why, detail) => {
+        working(why, detail);
+        const unlocked = await unlockWith(await readPasskey(loadRememberedCredential()));
+        if (unlocked.guest.publicKey !== session.publicKey) {
+            unlocked.wipe();
+            throw new Error(
+                "That is a different passkey from the one you signed in with.",
+            );
+        }
+        return unlocked;
+    },
+    enterApp: (account, signedIn) => enterApp(session, account, signedIn),
+    isCancelled: (e) => e instanceof Cancelled,
+    go,
+});
 
 const start = async () => {
     $("network").textContent = rootName;
@@ -572,6 +547,15 @@ const start = async () => {
         void signIn(mode);
     });
 
+    // The home page is served from the network name's host, but the
+    // supervisor's plugins know it as "homepage". Whichever name the visitor
+    // arrived with, the plugins are given theirs; the hand-off form finds
+    // the host again (resolveAppOrigin).
+    if (destination.explicit && destination.app !== "homepage") {
+        const home = new URL(await resolveAppOrigin("homepage")).host.split(".")[0];
+        if (destination.app === home) destination.app = "homepage";
+    }
+
     const session = loadGuestSession();
     const forget = $("btn-forget");
     forget.addEventListener("click", async () => {
@@ -583,27 +567,17 @@ const start = async () => {
     });
 
     if (session) {
-        $("foot-id").textContent = `Guest ${shortId(session.guest)}`;
+        const current = loadDevice().current;
+        $("foot-id").textContent = current ?? `Guest ${shortId(session.guest)}`;
         forget.hidden = false;
-        if (accountStep) {
+        if (step === "manage") {
+            const { runManageStep } = await import("./manage");
+            await runManageStep(pageContext(session));
+            return;
+        }
+        if (step === "account") {
             const { runAccountStep } = await import("./account");
-            await runAccountStep({
-                session,
-                app: destination.app,
-                path: destination.path,
-                rootName,
-                siblingOrigin,
-                $,
-                show,
-                working,
-                unlock: async () =>
-                    (await usePasskey(loadRememberedCredential())).secret,
-                fetchChainId,
-                storedKey: () => stashedKey(session.publicKey),
-                forgetStoredKey: clearStash,
-                leaveAsGuest: () => void submitSession(session),
-                isCancelled: (e) => e instanceof Cancelled,
-            });
+            await runAccountStep(pageContext(session));
             return;
         }
         if (returnedRecently()) {
@@ -620,7 +594,7 @@ const start = async () => {
         // An app sent the visitor here because the supervisor inside it
         // had no session, although this page has one. Find out which side
         // is wrong before sending them back into the same failure.
-        if (new URLSearchParams(window.location.search).has("refresh")) {
+        if (query.has("refresh")) {
             const valid = await sessionAccepted(session);
             if (!valid) {
                 clearGuestSession();
