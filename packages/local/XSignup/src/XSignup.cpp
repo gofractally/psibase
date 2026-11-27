@@ -11,9 +11,11 @@
 #include <services/local/XAdmin.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/local/XKeys.hpp>
+#include <services/local/XUsage.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/RTransact.hpp>
+#include <services/system/Transact.hpp>
 
 using namespace psibase;
 using namespace LocalService;
@@ -29,6 +31,11 @@ namespace
    // chosen name is held for it.
    constexpr std::uint32_t creationSeconds = 45;
    constexpr auto          devProvider     = "dev";
+   // How long a recovery grant lasts once a provider sign-in has earned it
+   constexpr auto          recoveryGrantTtl = std::chrono::minutes(10);
+   // An account list is exactly this long: the browser pads it, so that its
+   // size does not show how many accounts it holds.
+   constexpr std::size_t   accountListSize = 4096;
    // Shorter names are sold by the name market; the accounts service
    // refuses them here (MIN_ALLOWED_ACCOUNT_LENGTH in Accounts.cpp).
    constexpr std::size_t minAccountNameLength = 8;
@@ -63,13 +70,6 @@ namespace
       char bytes[32];
       raw::getRandom(bytes, sizeof(bytes));
       return hexOf(bytes);
-   }
-
-   // The guest id RTransact puts in a guest session for this key.
-   std::string guestIdOf(const std::vector<unsigned char>& key)
-   {
-      auto hash = sha256(reinterpret_cast<const char*>(key.data()), key.size());
-      return hexOf({reinterpret_cast<const char*>(hash.data()), 16});
    }
 
    std::string formEncode(std::initializer_list<std::pair<std::string_view, std::string_view>> fields)
@@ -266,33 +266,35 @@ namespace
       return result;
    }
 
-   // Whether `account` exists and is an auth-sig account with exactly this
-   // key. Asked of auth-sig itself: its tables are not readable from here.
-   bool hasKey(AccountNumber account, const std::vector<unsigned char>& key)
+   // The auth-sig record of `account`, if it is an auth-sig account. Asked
+   // of auth-sig itself: its tables are not readable from here. Who the
+   // account's keys and partner are does not depend on its state, so this
+   // answers the same while the account is paused or frozen.
+   std::optional<AuthSig::AuthRecord> recordOf(AccountNumber account)
    {
       auto row = to<Accounts>().getAccount(account);
       if (!row || row->authService != AuthSig::AuthSig::service)
-         return false;
-      auto type = keyType(key);
-      if (!type)
-         return false;
-      // The account may have chosen any verifier allowed for the key; which
-      // one makes no difference to whose key it is.
-      std::vector<Claim> claims;
-      for (auto verifier : allowedVerifiers(*type))
-         claims.push_back(Claim{.service = verifier, .rawData = {key.begin(), key.end()}});
-      return to<AuthSig::AuthSig>().checkAuthSys(AuthInterface::firstAuthFlag, account,
-                                                 ServiceMethod{}, std::move(claims));
+         return std::nullopt;
+      return to<AuthSig::AuthSig>().getRecord(account);
    }
 
-   // Notices that an issued creation transaction has landed.
+   // Whether `account` is an auth-sig account whose owner key is `key`.
+   bool hasOwnerKey(AccountNumber account, const std::vector<unsigned char>& key)
+   {
+      auto record = recordOf(account);
+      return record && record->owner.key.data == key;
+   }
+
+   // Notices that an issued creation transaction has landed. The account is
+   // this link's if it exists with the owner key the transaction was issued
+   // for.
    SignupLink settle(SignupLink link)
    {
       if (link.account || !link.pending)
          return link;
       auto name    = *link.pending;
       auto account = to<Accounts>().getAccount(name);
-      bool mine    = account && hasKey(name, link.pending_key);
+      bool mine    = account && hasOwnerKey(name, link.pending_key);
       if (mine)
       {
          link.account = name;
@@ -313,7 +315,27 @@ namespace
       {
          XSignup{}.open<SignupLinkTable>().put(link);
       }
+      // What the guest used of this node so far becomes the account's.
+      // (x-usage is a dependency of this service's package.)
+      if (mine)
+         to<XUsage>().carryOver(link.guest, name);
       return link;
+   }
+
+   // Every link of a guest, each settled
+   std::vector<SignupLink> linksOfGuest(std::string_view guest)
+   {
+      std::vector<SignupLink> result;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         result.clear();
+         auto index = XSignup{}.open<SignupLinkTable>().getIndex<1>();
+         for (auto row : index.subindex(std::string{guest}))
+            result.push_back(std::move(row));
+      }
+      for (auto& link : result)
+         link = settle(std::move(link));
+      return result;
    }
 
    // Links a provider identity to a guest. Returns an error message if the
@@ -385,7 +407,77 @@ namespace
       }
       if (!row)
          return false;
-      return hasKey(config.sponsor, row->key.data);
+      // The sponsor signs with the key x-keys holds for it: either of its keys.
+      auto record = recordOf(config.sponsor);
+      return record && (record->active.key.data == row->key.data ||
+                        record->owner.key.data == row->key.data);
+   }
+
+   // ----------------------------------------------------- recovery grants
+
+   std::optional<SignupRecoveryGrant> grantOf(std::string_view guest)
+   {
+      std::optional<SignupRecoveryGrant> result;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto table = XSignup{}.open<SignupRecoveryGrantTable>();
+         result     = table.get(std::string{guest});
+         if (result && result->expires <= wallNow())
+         {
+            table.remove(*result);
+            result.reset();
+         }
+      }
+      return result;
+   }
+
+   void putGrant(std::string_view guest, AccountNumber account)
+   {
+      PSIBASE_SUBJECTIVE_TX
+      {
+         XSignup{}.open<SignupRecoveryGrantTable>().put(SignupRecoveryGrant{
+             .guest = std::string{guest}, .account = account, .expires = wallNow() + recoveryGrantTtl});
+      }
+   }
+
+   struct RecoveryInfo
+   {
+      AccountNumber account;
+      std::uint32_t valid_seconds = 0;
+      PSIO_REFLECT(RecoveryInfo, account, valid_seconds)
+   };
+
+   RecoveryInfo describe(const SignupRecoveryGrant& grant)
+   {
+      auto left = std::chrono::duration_cast<std::chrono::seconds>(grant.expires - wallNow());
+      return RecoveryInfo{grant.account,
+                          static_cast<std::uint32_t>(std::max<std::int64_t>(left.count(), 0))};
+   }
+
+   // Whether the provider identity (provider, subject) is the one `account`
+   // was created with. The development provider checks nothing when it
+   // links, and checks nothing here: any account created through it.
+   bool createdWith(std::string_view provider, std::string_view subject, AccountNumber account)
+   {
+      std::vector<SignupLink> candidates;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         candidates.clear();
+         auto table = XSignup{}.open<SignupLinkTable>();
+         if (provider == devProvider)
+         {
+            for (auto row : table.getIndex<2>().subindex(account))
+               if (row.provider == devProvider)
+                  candidates.push_back(std::move(row));
+         }
+         else if (auto link = table.get(std::tuple{std::string{provider}, std::string{subject}}))
+            candidates.push_back(std::move(*link));
+      }
+      // A creation that has landed but was not looked at since is the link's account too.
+      for (auto& link : candidates)
+         if (settle(std::move(link)).account == account)
+            return true;
+      return false;
    }
 
    // ----------------------------------------------------------- outbound
@@ -487,7 +579,11 @@ namespace
       std::vector<ProviderInfo> providers;
       std::string               guest;
       std::optional<LinkInfo>   link;
-      PSIO_REFLECT(Status, open, providers, attr(guest, utf8), link)
+      // The accounts created with this guest's provider identities
+      std::vector<AccountNumber> accounts;
+      // The recovery grant this guest holds, if any
+      std::optional<RecoveryInfo> recovery;
+      PSIO_REFLECT(Status, open, providers, attr(guest, utf8), link, accounts, recovery)
    };
 
    LinkInfo describe(const SignupLink& link)
@@ -508,19 +604,46 @@ namespace
       if (config.dev_provider)
          status.providers.push_back({devProvider, "Development sign-in (no identity check)"});
       if (!session.guest.empty())
-         if (auto link = linkOfGuest(session.guest))
-            status.link = describe(settle(std::move(*link)));
+      {
+         for (auto& link : linksOfGuest(session.guest))
+         {
+            if (link.account)
+               status.accounts.push_back(*link.account);
+            // Prefer the link that already has an account.
+            if (!status.link || link.account)
+               status.link = describe(link);
+         }
+         if (auto grant = grantOf(session.guest))
+            status.recovery = describe(*grant);
+      }
       return json(req, status);
    }
 
    // --------------------------------------------------------------- oauth
+
+   struct RecoveryReply
+   {
+      RecoveryInfo recovery;
+      PSIO_REFLECT(RecoveryReply, recovery)
+   };
+
+   constexpr auto notCreatedWith =
+       "That account was not created with this sign-in.";
 
    struct StartRequest
    {
       std::string provider;
       std::string browser;
       std::string resume;
-      PSIO_REFLECT(StartRequest, attr(provider, utf8), attr(browser, utf8), attr(resume, utf8))
+      // "signup" (the default) or "recover", which needs `account`
+      std::optional<std::string>   purpose;
+      std::optional<AccountNumber> account;
+      PSIO_REFLECT(StartRequest,
+                   attr(provider, utf8),
+                   attr(browser, utf8),
+                   attr(resume, utf8),
+                   attr(purpose, utf8),
+                   account)
    };
 
    struct StartReply
@@ -528,7 +651,9 @@ namespace
       // Where to send the browser; empty when the link is already made.
       std::string             url;
       std::optional<LinkInfo> link;
-      PSIO_REFLECT(StartReply, attr(url, utf8), link)
+      // Set when a recovery was granted without leaving the page
+      std::optional<RecoveryInfo> recovery;
+      PSIO_REFLECT(StartReply, attr(url, utf8), link, recovery)
    };
 
    HttpReply serveStart(const HttpRequest&          req,
@@ -537,13 +662,32 @@ namespace
    {
       auto body   = psio::from_ijson<StartRequest>(req.body);
       auto config = readConfig();
-      if (!config.open)
+      // A sign-in is for signing up, or for proving ownership of an account
+      // so that the sponsor acts as its recovery partner.
+      std::optional<AccountNumber> recover;
+      if (body.purpose && *body.purpose == "recover")
+      {
+         if (!body.account || *body.account == AccountNumber{})
+            return fail(req, HttpStatus::badRequest, "Which account?");
+         recover = body.account;
+      }
+      else if (body.purpose && *body.purpose != "signup")
+         return fail(req, HttpStatus::badRequest, "Unknown purpose.");
+      // A node that has stopped creating accounts still stands by the ones it created.
+      if (!config.open && !recover)
          return fail(req, HttpStatus::serviceUnavailable, "This node is not creating accounts.");
 
       if (body.provider == devProvider)
       {
          if (!config.dev_provider)
             return fail(req, HttpStatus::notFound, "Unknown sign-in provider.");
+         if (recover)
+         {
+            if (!createdWith(devProvider, session.guest, *recover))
+               return fail(req, HttpStatus::forbidden, notCreatedWith);
+            putGrant(session.guest, *recover);
+            return json(req, StartReply{.recovery = describe(*grantOf(session.guest))});
+         }
          if (auto error = linkGuest(devProvider, session.guest, "developer", session.guest))
             return fail(req, HttpStatus::conflict, *error);
          return json(req, StartReply{.link = describe(*linkOfGuest(session.guest))});
@@ -564,7 +708,8 @@ namespace
           .redirect_uri  = siblingOrigin(req, socket, XSignup::service) + "/oauth/callback",
           .browser       = body.browser,
           .resume        = body.resume,
-          .expires       = now + authRequestTtl};
+          .expires       = now + authRequestTtl,
+          .recover       = recover};
       PSIBASE_SUBJECTIVE_TX
       {
          auto                           table = XSignup{}.open<SignupAuthRequestTable>();
@@ -692,7 +837,8 @@ namespace
             SignupPendingRequest{.client   = *socket,
                                  .guest    = session.guest,
                                  .provider = provider->name,
-                                 .origin   = std::string{req.getHeader("origin").value_or("")}});
+                                 .origin   = std::string{req.getHeader("origin").value_or("")},
+                                 .recover  = started->recover});
       PSIBASE_SUBJECTIVE_TX
       {
          to<XHttp>().autoClose(*socket, false);
@@ -702,11 +848,29 @@ namespace
 
    // -------------------------------------------------------------- create
 
+   // A key as the page sends it
+   struct KeyInput
+   {
+      std::vector<char> key;  // DER SubjectPublicKeyInfo
+      std::uint64_t     seq = 0;
+      PSIO_REFLECT(KeyInput, key, seq)
+
+      // As auth-sig takes it, or nothing if no verifier accepts the key
+      std::optional<AuthSig::KeySpec> spec() const
+      {
+         SubjectPublicKeyInfo spki{{key.begin(), key.end()}};
+         if (!verifierFor(spki.data))
+            return std::nullopt;
+         return AuthSig::KeySpec{std::move(spki), seq, {}};
+      }
+   };
+
    struct CreateRequest
    {
-      std::string       name;
-      std::vector<char> key;
-      PSIO_REFLECT(CreateRequest, attr(name, utf8), key)
+      std::string name;
+      KeyInput    owner;
+      KeyInput    active;
+      PSIO_REFLECT(CreateRequest, attr(name, utf8), owner, active)
    };
 
    struct CreateReply
@@ -759,10 +923,12 @@ namespace
       if (!config.open || !sponsorReady(config))
          return fail(req, HttpStatus::serviceUnavailable, "This node is not creating accounts.");
 
-      // The account gets the guest's own key: the one this session proved.
-      SubjectPublicKeyInfo key{{body.key.begin(), body.key.end()}};
-      if (guestIdOf(key.data) != session.guest || !verifierFor(key.data))
-         return fail(req, HttpStatus::forbidden, "That is not this guest's key.");
+      // The account's keys are derived by the browser for this account; they
+      // are not the guest's key, and only their public halves come here.
+      auto owner  = body.owner.spec();
+      auto active = body.active.spec();
+      if (!owner || !active)
+         return fail(req, HttpStatus::badRequest, "Unsupported public key.");
 
       auto found = linkOfGuest(session.guest);
       if (!found)
@@ -781,7 +947,7 @@ namespace
                      "Still finishing " + link.pending->str() + ". Try again in a moment.");
       // Hold the name before signing, so one sign-in cannot mint two.
       link.pending       = name;
-      link.pending_key   = key.data;
+      link.pending_key   = owner->key.data;
       link.pending_until = wallNow() + std::chrono::seconds(creationSeconds + 15);
       PSIBASE_SUBJECTIVE_TX
       {
@@ -791,12 +957,194 @@ namespace
       Action create{.sender  = config.sponsor,
                     .service = AuthSig::AuthSig::service,
                     .method  = MethodNumber{"newAccount"},
-                    // The guest has one key: it is both the owner and the
-                    // active key. The sponsor, as the sender, becomes the
-                    // account's recovery partner.
-                    .rawData = psio::to_pssz(std::tuple{name, AuthSig::KeySpec::of(key),
-                                                        AuthSig::KeySpec::of(key)})};
+                    // The sponsor, as the sender, becomes the account's
+                    // recovery partner.
+                    .rawData = psio::to_pssz(std::tuple{name, *owner, *active})};
       auto   trx = to<XKeys>().signTxFor(std::vector<Action>{std::move(create)}, creationSeconds);
+      return json(req, CreateReply{psio::to_pssz(trx), creationSeconds});
+   }
+
+   // ------------------------------------------------------- account lists
+
+   struct ListReply
+   {
+      std::vector<char> blob;
+      std::uint64_t     version = 0;
+      PSIO_REFLECT(ListReply, blob, version)
+   };
+
+   struct ListWrite
+   {
+      std::vector<char> blob;
+      std::vector<char> key;  // DER SubjectPublicKeyInfo of the guest key
+      std::uint64_t     version = 0;
+      std::vector<char> sig;  // 64 bytes, r || s, low S
+      PSIO_REFLECT(ListWrite, blob, key, version, sig)
+   };
+
+   // What the writer of an account list signs (its SHA-256):
+   //
+   //    "psibase account list\n" <locator, lowercase hex> "\n" <version, decimal> "\n"
+   //    <SHA-256 of the blob, lowercase hex>
+   std::string listMessage(std::string_view locator, std::uint64_t version, std::span<const char> blob)
+   {
+      auto hash = sha256(blob.data(), blob.size());
+      return "psibase account list\n" + std::string{locator} + "\n" + std::to_string(version) +
+             "\n" + hexOf({reinterpret_cast<const char*>(hash.data()), hash.size()});
+   }
+
+   // 32 bytes as lowercase hex
+   bool validLocator(std::string_view text)
+   {
+      return text.size() == 64 && std::ranges::all_of(text, [](char c) {
+                return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+             });
+   }
+
+   HttpReply serveList(const HttpRequest& req, std::string_view locator)
+   {
+      if (!validLocator(locator))
+         return fail(req, HttpStatus::badRequest, "Malformed locator.");
+      auto table = XSignup{}.open<SignupAccountListTable>();
+
+      if (req.method == "GET")
+      {
+         // Whoever can compute the locator may read: it comes from the passkey.
+         std::optional<SignupAccountList> row;
+         PSIBASE_SUBJECTIVE_TX
+         {
+            row = table.get(std::string{locator});
+         }
+         if (!row)
+            return fail(req, HttpStatus::notFound, "No such list.");
+         return json(req, ListReply{std::move(row->blob), row->version});
+      }
+      if (req.method != "PUT")
+         return HttpReply::methodNotAllowed(req);
+      if (req.contentType != "application/json")
+         return fail(req, HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
+
+      auto body = psio::from_ijson<ListWrite>(req.body);
+      if (body.blob.size() != accountListSize)
+         return fail(req, HttpStatus::badRequest,
+                     "An account list is exactly " + std::to_string(accountListSize) + " bytes.");
+      if (body.sig.size() != 64)
+         return fail(req, HttpStatus::badRequest, "Malformed signature.");
+      auto verifier = verifierFor(body.key);
+      if (!verifier)
+         return fail(req, HttpStatus::badRequest, "Unsupported public key.");
+
+      std::optional<SignupAccountList> existing;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         existing = table.get(std::string{locator});
+      }
+      // The first writer's key owns the locator, and versions only go up.
+      auto sameKey = [&](const SignupAccountList& row)
+      {
+         return std::ranges::equal(row.key, body.key, {}, {},
+                                   [](char c) { return static_cast<unsigned char>(c); });
+      };
+      if (existing)
+      {
+         if (!sameKey(*existing))
+            return fail(req, HttpStatus::forbidden, "This list belongs to another key.");
+         if (body.version <= existing->version)
+            return fail(req, HttpStatus::conflict,
+                        "The list is already at version " + std::to_string(existing->version) + ".");
+      }
+
+      // Aborts the request if the signature is not this key's over this write.
+      auto message = listMessage(locator, body.version, body.blob);
+      Actor<VerifyInterface> verify(XSignup::service, *verifier);
+      verify.verifySys(sha256(message.data(), message.size()), Claim{*verifier, body.key}, body.sig);
+
+      bool stored = false;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         // Another write may have landed since the checks above.
+         auto current = table.get(std::string{locator});
+         stored = current ? sameKey(*current) && current->version < body.version : true;
+         if (stored)
+            table.put(SignupAccountList{.locator = std::string{locator},
+                                        .blob    = body.blob,
+                                        .key     = {body.key.begin(), body.key.end()},
+                                        .version = body.version});
+      }
+      if (!stored)
+         return fail(req, HttpStatus::conflict, "The list changed. Read it and try again.");
+      return json(req, ListReply{{}, body.version});
+   }
+
+   // ------------------------------------------- the sponsor as partner
+
+   struct PartnerRequest
+   {
+      AccountNumber           account;
+      std::optional<KeyInput> owner;
+      std::optional<KeyInput> active;
+      PSIO_REFLECT(PartnerRequest, account, owner, active)
+   };
+
+   // The node's sponsor is the recovery partner of the accounts it created.
+   // A guest holding a recovery grant for an account (see serveStart and
+   // onUser) gets one transaction, signed by the sponsor, that acts on it.
+   HttpReply servePartner(const HttpRequest& req, const SessionInfo& session, std::string_view what)
+   {
+      auto body   = psio::from_ijson<PartnerRequest>(req.body);
+      auto config = readConfig();
+      if (!sponsorReady(config))
+         return fail(req, HttpStatus::serviceUnavailable, "This node has no sponsor account.");
+
+      auto grant = grantOf(session.guest);
+      if (!grant || grant->account != body.account)
+         return fail(req, HttpStatus::forbidden,
+                     "Sign in with the provider the account was created with first.");
+
+      auto record = recordOf(body.account);
+      if (!record)
+         return fail(req, HttpStatus::notFound, "No such account.");
+      if (record->partner != config.sponsor)
+         return fail(req, HttpStatus::forbidden,
+                     "This node's sponsor is not that account's recovery partner.");
+
+      using AuthSig::AccountState;
+      Action act{.sender = config.sponsor, .service = AuthSig::AuthSig::service};
+      if (what == "confirm" || what == "reject")
+      {
+         if (record->state != AccountState::paused || !record->pending)
+            return fail(req, HttpStatus::conflict, "That account has no pending change.");
+         act.method  = MethodNumber{what};
+         act.rawData = psio::to_pssz(std::tuple{body.account});
+      }
+      else if (what == "end-pause")
+      {
+         if (record->state != AccountState::paused)
+            return fail(req, HttpStatus::conflict, "That account is not paused.");
+         if (record->pending)
+            return fail(req, HttpStatus::conflict,
+                        "That account has a pending change: confirm or reject it.");
+         act.method  = MethodNumber{"endPause"};
+         act.rawData = psio::to_pssz(std::tuple{body.account});
+      }
+      else
+      {
+         if (record->state != AccountState::frozen)
+            return fail(req, HttpStatus::conflict, "That account is not frozen.");
+         auto owner  = body.owner ? body.owner->spec() : std::nullopt;
+         auto active = body.active ? body.active->spec() : std::nullopt;
+         if (!owner || !active)
+            return fail(req, HttpStatus::badRequest, "New owner and active keys are needed.");
+         act.method  = MethodNumber{"unfreezeWith"};
+         act.rawData = psio::to_pssz(std::tuple{body.account, *owner, *active});
+      }
+
+      // One transaction per grant.
+      PSIBASE_SUBJECTIVE_TX
+      {
+         XSignup{}.open<SignupRecoveryGrantTable>().erase(session.guest);
+      }
+      auto trx = to<XKeys>().signTxFor(std::vector<Action>{std::move(act)}, creationSeconds);
       return json(req, CreateReply{psio::to_pssz(trx), creationSeconds});
    }
 
@@ -884,6 +1232,9 @@ auto XSignup::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
       return serveCallback(request, socket);
    }
 
+   if (target.starts_with("/list/"))
+      return serveList(request, std::string_view{target}.substr(6));
+
    // Everything else is the sign-in page acting for a guest.
    auto session = to<RTransact>().getSession(request);
 
@@ -903,7 +1254,8 @@ auto XSignup::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
       return serveCheckName(request);
    }
 
-   if (target == "/oauth/start" || target == "/oauth/finish" || target == "/create")
+   if (target == "/oauth/start" || target == "/oauth/finish" || target == "/create" ||
+       target.starts_with("/partner/"))
    {
       if (request.method != "POST")
          return HttpReply::methodNotAllowed(request);
@@ -916,7 +1268,12 @@ auto XSignup::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
          return serveStart(request, socket, session);
       if (target == "/oauth/finish")
          return serveFinish(request, socket, session);
-      return serveCreate(request, session);
+      if (target == "/create")
+         return serveCreate(request, session);
+      auto what = std::string_view{target}.substr(9);
+      if (what == "confirm" || what == "reject" || what == "end-pause" || what == "unfreeze")
+         return servePartner(request, session, what);
+      return std::nullopt;
    }
 
    return std::nullopt;
@@ -959,6 +1316,21 @@ void XSignup::onUser(std::int32_t socket, HttpReply reply)
       return;
    }
    auto handle = jsonText(*body, *provider->handle_field).value_or(*subject);
+   if (pending.recover)
+   {
+      // The identity is not linked to this guest (who may hold a new
+      // passkey): it only has to be the one the account was created with.
+      if (!createdWith(pending.provider, *subject, *pending.recover))
+      {
+         replyToBrowser(pending, failNoCors(HttpStatus::forbidden, notCreatedWith));
+         return;
+      }
+      putGrant(pending.guest, *pending.recover);
+      HttpReply granted{.contentType = "application/json"};
+      psio::to_ijson(RecoveryReply{describe(*grantOf(pending.guest))}, granted.body);
+      replyToBrowser(pending, std::move(granted));
+      return;
+   }
    if (auto error = linkGuest(pending.provider, *subject, handle, pending.guest))
    {
       replyToBrowser(pending, failNoCors(HttpStatus::conflict, *error));

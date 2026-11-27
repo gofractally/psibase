@@ -90,6 +90,10 @@ namespace LocalService
       /// The provider's authorization code, once the browser has returned.
       std::optional<std::string> code;
       psibase::TimePointUSec expires;
+      /// What the sign-in is for: nothing for signing up, or the account
+      /// whose owner wants this node's sponsor to act as its recovery
+      /// partner.
+      std::optional<psibase::AccountNumber> recover;
       using ByExpires = psibase::CompositeKey<&SignupAuthRequest::expires,
                                               &SignupAuthRequest::state>;
       PSIO_REFLECT(SignupAuthRequest,
@@ -101,7 +105,8 @@ namespace LocalService
                    attr(browser, utf8),
                    attr(resume, utf8),
                    attr(code, utf8),
-                   expires)
+                   expires,
+                   recover)
    };
    using SignupAuthRequestTable = psibase::Table<SignupAuthRequest,
                                                  &SignupAuthRequest::state,
@@ -122,7 +127,8 @@ namespace LocalService
       std::string                           guest;
       std::optional<psibase::AccountNumber> account;
       std::optional<psibase::AccountNumber> pending;
-      /// The key the pending account is being created with.
+      /// The owner key the pending account is being created with. The
+      /// account is this link's once it exists with that owner key.
       std::vector<unsigned char>            pending_key;
       psibase::TimePointUSec                pending_until;
       psibase::TimePointUSec                created;
@@ -130,6 +136,15 @@ namespace LocalService
       using ByGuest = psibase::CompositeKey<&SignupLink::guest,
                                             &SignupLink::provider,
                                             &SignupLink::subject>;
+      /// The account, or the name it is being created with, or the null
+      /// account while there is neither
+      psibase::AccountNumber accountOrNone() const
+      {
+         return account.value_or(pending.value_or(psibase::AccountNumber{}));
+      }
+      using ByAccount = psibase::CompositeKey<&SignupLink::accountOrNone,
+                                              &SignupLink::provider,
+                                              &SignupLink::subject>;
       PSIO_REFLECT(SignupLink,
                    attr(provider, utf8),
                    attr(subject, utf8),
@@ -141,9 +156,43 @@ namespace LocalService
                    pending_until,
                    created)
    };
-   using SignupLinkTable =
-       psibase::Table<SignupLink, SignupLink::Key{}, SignupLink::ByGuest{}>;
+   using SignupLinkTable = psibase::Table<SignupLink,
+                                          SignupLink::Key{},
+                                          SignupLink::ByGuest{},
+                                          SignupLink::ByAccount{}>;
    PSIO_REFLECT_TYPENAME(SignupLinkTable)
+
+   /// A passkey holder's encrypted list of accounts. The node cannot read
+   /// it: `locator` and the encryption key both come from the passkey.
+   /// `key` is the guest key that first wrote it; only that key may replace
+   /// it, and only with a higher `version`.
+   struct SignupAccountList
+   {
+      /// 32 bytes, lowercase hex
+      std::string                locator;
+      std::vector<char>          blob;
+      std::vector<unsigned char> key;
+      std::uint64_t              version = 0;
+      PSIO_REFLECT(SignupAccountList, attr(locator, utf8), blob, key, version)
+   };
+   using SignupAccountListTable =
+       psibase::Table<SignupAccountList, &SignupAccountList::locator>;
+   PSIO_REFLECT_TYPENAME(SignupAccountListTable)
+
+   /// A guest who has just proved, by signing in with the provider identity
+   /// an account was created with, that they are its owner. It lets the
+   /// guest have this node's sponsor act once as the account's recovery
+   /// partner.
+   struct SignupRecoveryGrant
+   {
+      std::string            guest;
+      psibase::AccountNumber account;
+      psibase::TimePointUSec expires;
+      PSIO_REFLECT(SignupRecoveryGrant, attr(guest, utf8), account, expires)
+   };
+   using SignupRecoveryGrantTable =
+       psibase::Table<SignupRecoveryGrant, &SignupRecoveryGrant::guest>;
+   PSIO_REFLECT_TYPENAME(SignupRecoveryGrantTable)
 
    /// An outbound request to a provider, and the browser waiting on it.
    struct SignupPendingRequest
@@ -153,37 +202,68 @@ namespace LocalService
       std::string  guest;
       std::string  provider;
       std::string  origin;
+      /// See SignupAuthRequest::recover
+      std::optional<psibase::AccountNumber> recover;
       PSIO_REFLECT(SignupPendingRequest,
                    socket,
                    client,
                    attr(guest, utf8),
                    attr(provider, utf8),
-                   attr(origin, utf8))
+                   attr(origin, utf8),
+                   recover)
    };
    using SignupPendingRequestTable =
        psibase::Table<SignupPendingRequest, &SignupPendingRequest::socket>;
    PSIO_REFLECT_TYPENAME(SignupPendingRequestTable)
 
-   /// Turns a guest into a named account.
+   /// Turns a guest into a named account, keeps the encrypted account lists
+   /// of passkey holders, and lets the node's sponsor act as the recovery
+   /// partner of the accounts it created.
    ///
    /// A guest (see RTransact::getSession) proves who they are to a sign-in
    /// provider, which makes them eligible for one account. The guest then
-   /// picks a name, and this service issues a transaction, signed by the
-   /// node's sponsor account, that creates the account with the guest's
-   /// own key. The guest's browser submits it. The node never holds the
-   /// guest's private key, and no provider token or secret goes on chain.
+   /// picks a name and supplies the account's owner and active public keys,
+   /// and this service issues a transaction, signed by the node's sponsor
+   /// account, that creates the account with them. The guest's browser
+   /// submits it. The node never holds a private key of the account, and no
+   /// provider token or secret goes on chain. The sponsor, as the creator,
+   /// is the account's recovery partner; a user who signs in again with the
+   /// same provider identity may have it confirm or reject a pending
+   /// change, end a pause, or release a freeze.
    ///
-   /// HTTP interface (host `x-signup.`):
-   /// - `GET /status`: what is offered, and the caller's own state.
-   /// - `POST /oauth/start {provider, browser, resume}`: begins a provider
-   ///   sign-in for the calling guest; returns `{url}` to send the browser
-   ///   to. `browser` is the SHA-256 (hex) of a secret the page keeps.
+   /// HTTP interface (host `x-signup.`). Replies are JSON; an error is
+   /// `{"error": text}`. Bytes are hex. Everything but the administrator
+   /// endpoints is readable by the supervisor's pages only (CORS).
+   ///
+   /// - `GET /status`: what is offered, and the caller's own state:
+   ///   `{open, providers: [{name, label}], guest, link: {provider, handle,
+   ///   account, pending} | null, accounts: [name], recovery: {account,
+   ///   valid_seconds} | null}`.
+   /// - `GET /check_name?name=`: `{ok, problem}`.
+   /// - `POST /oauth/start {provider, browser, resume, purpose?, account?}`:
+   ///   begins a provider sign-in for the calling guest; returns `{url,
+   ///   link, recovery}` (`url` is where to send the browser, empty when
+   ///   nothing more is needed). `browser` is the SHA-256 (hex) of a secret
+   ///   the page keeps. `purpose` is `"signup"` (the default) or
+   ///   `"recover"`, which needs `account`.
    /// - `GET /oauth/callback`: where the provider returns the browser. It
    ///   records the result and sends the browser back to the sign-in page.
    /// - `POST /oauth/finish {state, secret}`: the same guest, showing the
    ///   secret, completes the sign-in. Only the browser that started a
-   ///   sign-in can finish it.
-   /// - `POST /create {name, key}`: returns the signed creation transaction.
+   ///   sign-in can finish it. Replies with the link `{provider, handle,
+   ///   account, pending}`, or for a recovery `{recovery: {account,
+   ///   valid_seconds}}`.
+   /// - `POST /create {name, owner: {key, seq}, active: {key, seq}}`:
+   ///   `{transaction, valid_seconds}`, the signed creation transaction.
+   /// - `GET /list/<locator>`: `{blob, version}`, or 404. No session.
+   /// - `PUT /list/<locator> {blob, key, version, sig}`: stores an account
+   ///   list. See `listMessage` in XSignup.cpp for what is signed.
+   /// - `POST /partner/confirm|reject|end-pause {account}` and
+   ///   `POST /partner/unfreeze {account, owner: {key, seq}, active: {key,
+   ///   seq}}`: with a recovery grant for `account`, `{transaction,
+   ///   valid_seconds}`: a transaction signed by the sponsor that calls
+   ///   auth-sig's confirm, reject, endPause or unfreezeWith. The grant is
+   ///   used up.
    /// - `GET|PUT /config`, `GET /sponsor`: node administrators only.
    struct XSignup : psibase::Service
    {
@@ -191,7 +271,9 @@ namespace LocalService
       using Subjective              = psibase::SubjectiveTables<SignupConfigTable,
                                                                 SponsorKeyTable,
                                                                 SignupAuthRequestTable,
-                                                                SignupLinkTable>;
+                                                                SignupLinkTable,
+                                                                SignupAccountListTable,
+                                                                SignupRecoveryGrantTable>;
       using Session                 = psibase::SessionTables<SignupPendingRequestTable>;
 
       auto serveSys(psibase::HttpRequest        request,
