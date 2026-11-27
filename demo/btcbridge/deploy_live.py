@@ -7,7 +7,8 @@ BTCBRIDGE_SCHEME=https, BTCBRIDGE_CLI (a psibase that reaches the node), BTCBRID
 local port that answers queries for the chain's hosts), BTCBRIDGE_RPC_PORT, BTCBRIDGE_RPC_COOKIE,
 BTCBRIDGE_CHECKPOINT_EPOCH, BTCBRIDGE_TREASURY (an existing account), BTCBRIDGE_RELAYER_ACCOUNT,
 BTCBRIDGE_DAEMON_CLI (what the signing daemons run to push), BTCBRIDGE_PACKAGE_DIR (holds
-Signing.psi and BtcBridge.psi). STATE/account-keys/psibase.pem is the key that signs for the
+Signing.psi and BtcBridge.psi), BTCBRIDGE_MIN_DEPOSIT and BTCBRIDGE_MIN_WITHDRAWAL (default 1000 each).
+`deploy_live.py minimums` applies those two to a bridge that is already initialized (setTestMins). STATE/account-keys/psibase.pem is the key that signs for the
 chain's service accounts; the treasury's key is STATE/account-keys/<treasury>.pem.
 """
 import shutil,sys,time
@@ -56,7 +57,7 @@ def main():
    number=int.from_bytes(data,'big');out=''
    while number:number,rem=divmod(number,58);out=alphabet[rem]+out
    return out
-  p={'network':NETWORK,'xpubs':[testnet_root(k['public_root']) for k in keys],'fee_rate':2,'max_fee_rate':100,'service_fee':100,'min_withdrawal':10000,'min_deposit':1000,'dust':1000,'batch_seconds':300,'batch_size':2,'max_inputs':64}
+  p={'network':NETWORK,'xpubs':[testnet_root(k['public_root']) for k in keys],'fee_rate':2,'max_fee_rate':100,'service_fee':100,**TEST_MINIMUMS,'dust':1000,'batch_seconds':300,'batch_size':2,'max_inputs':64}
   token=call('btcbridge','btcbridge','init',policy_json=json.dumps(p),treasury=TREASURY);print('bridge token',token,flush=True);done('bridge')
  if not progress.get('deposit-fees'):
   call('btcbridge','btcbridge','setDepFees',fee_bps=10,publisher_bps=5000);done('deposit-fees')
@@ -72,4 +73,8 @@ def main():
  if os.environ.get('BTCBRIDGE_AUTO_RELAY','1')=='1':proc('relayer',[sys.executable,Path(__file__).parent/'relayer.py','--state',STATE])
  (STATE/'ready.json').write_text(json.dumps({'network':NETWORK,'url':ORIGIN,'token':snapshot(RELAYER)['config']['token']},indent=2))
  print(ORIGIN+'/')
-if __name__=='__main__':main()
+def minimums():
+ """`deploy_live.py minimums`: set the running bridge's smallest deposit and withdrawal to common.TEST_MINIMUMS."""
+ before,after=set_test_minimums()
+ print(json.dumps({k:{'before':before[k],'now':after[k]} for k in TEST_MINIMUMS},indent=2))
+if __name__=='__main__':minimums() if sys.argv[1:]==['minimums'] else main()

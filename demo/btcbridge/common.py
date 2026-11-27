@@ -26,6 +26,16 @@ LOCK=threading.RLock()
 RELAYER=os.environ.get('BTCBRIDGE_RELAYER_ACCOUNT','alice')
 # 'signet': an existing signet node (BTCBRIDGE_RPC_PORT, BTCBRIDGE_RPC_COOKIE) in place of this harness's own regtest node.
 NETWORK=os.environ.get('BTCBRIDGE_NETWORK','regtest')
+# The smallest deposit and withdrawal of a test-network bridge (BTCBRIDGE_MIN_DEPOSIT,
+# BTCBRIDGE_MIN_WITHDRAWAL, in satoshis). 1,000 is the floor the policy allows; a signet faucet pays
+# 10,000. The network fee is not taken from the amount: the recipient receives the amount, and the
+# requester's fee allowance pays the fee (380 sat for one request and one input at 2 sat/vB).
+TEST_MINIMUMS={'min_deposit':int(os.environ.get('BTCBRIDGE_MIN_DEPOSIT','1000')),'min_withdrawal':int(os.environ.get('BTCBRIDGE_MIN_WITHDRAWAL','1000'))}
+def set_test_minimums():
+ """Apply TEST_MINIMUMS to an initialized bridge on signet or regtest (btcbridge.setTestMins)."""
+ current=snapshot(RELAYER)['policy']
+ if any(current[k]!=v for k,v in TEST_MINIMUMS.items()):call('btcbridge','btcbridge','setTestMins',**TEST_MINIMUMS)
+ return current,snapshot(RELAYER)['policy']
 def http(path,service='btcbridge'):
  req=urllib.request.Request(f'http://127.0.0.1:{NODE_PORT}{path}',headers={'Host':f'{service}.{HOST}'})
  with urllib.request.urlopen(req,timeout=30) as r:return json.load(r)

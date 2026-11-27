@@ -111,6 +111,35 @@ set at initialization. The relay's own account can change it afterwards with
 `setRequired`, within the same range (1 to 144): on mainnet it can only be
 raised, never lowered; on signet and regtest any value in range is accepted. No
 keeper or other account can change it.
+
+The bridge's custody policy is likewise set at `init`. On a test network
+(signet, regtest) the bridge's own account can change two of its values with
+`setTestMins(min_deposit, min_withdrawal)`: the smallest deposit and the
+smallest withdrawal, each at least 1,000 sat, and the smallest deposit at least
+what its custody output costs to spend (105 vB at the policy's fee rate). It is
+refused on mainnet, where the minimums are fixed at initialization, and it
+cannot change the network, the custody keys, the fee rate and its cap, the
+service fee, the dust limit or the batching limits. A request queued before a
+change is still paid: the minimum is the rule for new requests, and a batch
+enforces only the fixed 1,000 sat floor. Everything else about a queued request
+is judged when its batch is made (fee rate, dust, batch size), except the
+service fee and fee allowance, which it keeps from when it was made.
+
+A withdrawal's network fee is not taken from the amount. The recipient receives
+the amount; the requester sets aside the amount, a fee allowance (`max_fee`)
+and the service fee, and the unused allowance comes back. A batch with one
+request and one custody input is budgeted at 190 vB to a P2WPKH address and 202
+vB to a P2TR or P2WSH address (380 and 404 sat at 2 sat/vB); a second request
+adds 31 or 43 vB and the fee is shared; each further input adds 105 vB.
+`withdraw` refuses an allowance below the least share the request could ever be
+charged (a full batch with one input: 221 sat to P2WPKH at 2 sat/vB with
+batches of two). A larger allowance that still proves too small when the batch
+is made sets the request aside for its owner to cancel; it does not hold up the
+queue. The bridge always keeps at least `dust` as change, so from a reserve of
+one 10,000 sat output at most 10,000 - 380 - 1,000 = 8,620 sat can be paid out.
+A request the reserve cannot pay that way is not set aside: `makeBatch` fails
+while it is at the head of the queue, until deposits arrive or its owner
+cancels it.
 Accepted transfers protect their Bitcoin history. A higher-work reorg removing
 that history, or exceeding the bounded update window, persistently freezes the
 relay. A stale tip stops new credit and withdrawal authorization. A pause cannot

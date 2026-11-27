@@ -192,6 +192,16 @@ pub fn validate_next_header(
     Ok(h)
 }
 
+/// The smallest payment a batch may carry, whatever the policy: above every standard script's
+/// dust threshold. A policy's `min_withdrawal` (the admission rule for new requests) is at least this.
+pub const MIN_PAYMENT: u64 = 1000;
+/// Weight units `build_plan` budgets for one custody input: 41 bytes of input and a 2-of-3
+/// witness of two 73-byte signatures and the 105-byte script (105 virtual bytes).
+pub const INPUT_WEIGHT: u64 = 41 * 4 + 256;
+/// What spending one custody input costs at the policy's fee rate, in satoshis.
+pub fn input_cost(fee_rate: u64) -> u64 {
+    (INPUT_WEIGHT * fee_rate).div_ceil(4)
+}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Policy {
@@ -216,7 +226,7 @@ impl Policy {
             || self.max_fee_rate > 1000
             || self.service_fee > 1_000_000
             || self.min_deposit < 1000
-            || self.min_withdrawal < 1000
+            || self.min_withdrawal < MIN_PAYMENT
             || !(330..=10000).contains(&self.dust)
             || self.batch_size == 0
             || self.batch_size > 32
@@ -244,6 +254,48 @@ impl Policy {
     pub fn id(&self) -> String {
         sha256::Hash::hash(&serde_json::to_vec(self).unwrap()).to_string()
     }
+}
+
+/// `setTestMins`: the policy with the two minimums replaced, on a test network only.
+///
+/// * Refused on mainnet (the network is parsed here, not compared as text elsewhere).
+/// * Nothing else changes; the result passes `Policy::validate`, so both are at least 1,000 sat.
+/// * `min_deposit` covers what spending the deposit's own custody output costs at the fee rate.
+///
+/// The network fee is not taken from the withdrawn amount: the recipient output is the amount,
+/// which is at least `MIN_PAYMENT`, and the requester's separate allowance pays the fee. So a
+/// withdrawal at the minimum can complete and `min_withdrawal` needs no fee term.
+pub fn with_test_minimums(current: &Policy, min_deposit: u64, min_withdrawal: u64) -> Result<Policy> {
+    if network(&current.network)? == Network::Bitcoin {
+        return Err("Limits are fixed on mainnet".into());
+    }
+    let new = Policy {
+        min_deposit,
+        min_withdrawal,
+        ..current.clone()
+    };
+    new.validate()?;
+    if new.min_deposit < input_cost(new.fee_rate) {
+        return Err("Minimum deposit does not cover the cost of spending it".into());
+    }
+    Ok(new)
+}
+/// Weight units of a batch transaction as `build_plan` budgets it: `inputs` custody inputs,
+/// payments to scripts of the given lengths, and the change output.
+pub fn budgeted_weight(inputs: u64, payment_scripts: &[usize]) -> u64 {
+    let outputs: u64 = payment_scripts.iter().map(|n| 9 + *n as u64).sum::<u64>() + 43;
+    // Version, counts and locktime; the two witness-flag bytes count once.
+    4 * (10 + outputs) + 2 + INPUT_WEIGHT * inputs
+}
+/// The least network fee a request paying to a script of this length can be charged under the
+/// policy: a full batch spending one input, the other payments to the shortest standard script
+/// (22 bytes), shared equally. A request whose fee allowance is below this can never be paid at
+/// the policy's fee rate.
+pub fn least_fee_share(policy: &Policy, script_len: usize) -> u64 {
+    let requests = policy.batch_size.max(1) as usize;
+    let mut scripts = vec![22; requests];
+    scripts[0] = script_len;
+    budgeted_weight(1, &scripts).div_ceil(4) * policy.fee_rate / requests as u64
 }
 
 pub fn custody_keys(policy: &Policy, branch: u32, index: u32) -> Result<Vec<(usize, PublicKey)>> {
@@ -421,7 +473,9 @@ fn build_plan_inner(
     let mut output = Vec::new();
     let mut total = 0;
     for p in &payments {
-        if p.amount < policy.min_withdrawal || p.amount > bitcoin::Amount::MAX_MONEY.to_sat() {
+        // `min_withdrawal` is the admission rule for new requests. A request admitted under an
+        // earlier, lower minimum is still paid: only the hard floor applies here.
+        if p.amount < MIN_PAYMENT || p.amount > bitcoin::Amount::MAX_MONEY.to_sat() {
             return Err("Withdrawal amount limit".into());
         }
         let script = ScriptBuf::from_bytes(hex::decode(&p.script).map_err(err)?);

@@ -269,15 +269,12 @@ pub mod service {
     /// withdrawal: the amounts a test faucet pays are far below what suits mainnet, and a
     /// deployment's first choice should not be final there. Refused on mainnet, where these
     /// are fixed at initialization. Nothing else in the custody policy can be changed.
+    /// Requests already queued are still paid: a batch enforces only the fixed floor.
     #[action]
     fn setTestMins(min_deposit: u64, min_withdrawal: u64) {
         assert_eq!(get_sender(), Wrapper::SERVICE, "Bridge policy authority");
         let mut c = config();
-        let mut p = policy(&c);
-        assert!(p.network != "bitcoin", "Limits are fixed on mainnet");
-        p.min_deposit = min_deposit;
-        p.min_withdrawal = min_withdrawal;
-        must(p.validate());
+        let p = must(btc::with_test_minimums(&policy(&c), min_deposit, min_withdrawal));
         c.policy = serde_json::to_string(&p).unwrap();
         ConfigTable::read_write().put(&c).unwrap();
     }
@@ -472,10 +469,17 @@ pub mod service {
             max_fee > 0 && max_fee <= 10_000_000,
             "Withdrawal fee cap limit"
         );
-        let script = btc::hex::encode(must(btc::destination(&p, &address)).as_bytes());
+        let destination = must(btc::destination(&p, &address));
+        let script = btc::hex::encode(destination.as_bytes());
         assert!(
             ScriptTable::read().get_index_pk().get(&script).is_none(),
             "Withdraw to an external Bitcoin address"
+        );
+        // An allowance below the least this request could ever be charged would be accepted
+        // and then set aside at every batch until its owner cancelled it.
+        assert!(
+            max_fee >= btc::least_fee_share(&p, destination.len()),
+            "Maximum network fee is below the least share of a batch fee"
         );
         let locked = plus(plus(amount, max_fee), p.service_fee);
         Tokens::call().debit(
