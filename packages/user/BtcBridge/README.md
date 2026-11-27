@@ -51,8 +51,17 @@ proof of work, target sign/overflow/limits, parent linkage, median time, future
 time, buried block-version rules and exact mainnet difficulty transitions.
 Timestamp and epoch metadata are cached per parent. Fork choice uses accumulated
 work, not height. Regtest has its own easier target and no-retarget rules;
-mainnet cannot accept those headers. Other Bitcoin test networks and signet are
-not enabled.
+mainnet cannot accept those headers. Signet (`network = "signet"`) uses
+Bitcoin's retarget arithmetic with signet's proof-of-work limit and no
+minimum-difficulty exception. Testnet3 and testnet4 are not enabled.
+
+Signet blocks are authorized by a signature that lives in the coinbase
+transaction. A header relay never sees it, so on signet this relay checks only
+signet's proof of work, which is tiny: about 2 x 10^8 hashes per block in
+November 2026, under a minute of work for one processor core. Anyone can therefore produce
+a longer, valid-looking signet header chain. Permissionless header submission
+on signet is suitable only for coins without value and a relay that may be
+reset; it is not a security model.
 
 The creator must select a genuinely trusted Bitcoin checkpoint; for mainnet use
 a recent independently verified checkpoint. A recent-looking low-work branch

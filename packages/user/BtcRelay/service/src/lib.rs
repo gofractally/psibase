@@ -1,4 +1,6 @@
-//! Permissionless, checkpoint-anchored Bitcoin header relay. Mainnet and regtest have disjoint rules.
+//! Permissionless, checkpoint-anchored Bitcoin header relay. Mainnet, signet and regtest have disjoint rules.
+//! Signet headers are checked for signet's proof of work only: the block signature is in the coinbase
+//! transaction, which a header relay does not see.
 use btcbridge_core as btc;
 use psibase::*;
 
@@ -111,7 +113,8 @@ pub mod service {
             RelayTable::read().get_index_pk().get(&()).is_none(),
             "Relay already initialized"
         );
-        must(btc::network(&network));
+        // Rejects unsupported networks; signet and bitcoin need the checkpoint's difficulty-epoch start.
+        let needed = must(btc::context_start(&network, checkpoint_height));
         assert!((1..=144).contains(&required), "Confirmation policy range");
         assert!(
             !context.is_empty()
@@ -120,11 +123,6 @@ pub mod service {
             "Checkpoint context bounds"
         );
         let start = checkpoint_height + 1 - context.len() as u32;
-        let needed = if network == "bitcoin" {
-            (checkpoint_height / 2016 * 2016).min(checkpoint_height.saturating_sub(10))
-        } else {
-            checkpoint_height.saturating_sub(10)
-        };
         assert!(
             start <= needed,
             "Checkpoint lacks timestamp/difficulty context"
