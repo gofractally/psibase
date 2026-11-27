@@ -134,6 +134,38 @@ mod tests {
         fn fetch(&self, id: &str) -> Option<Vec<u8>> {
             self.0.borrow().get(id).cloned()
         }
+        fn remove(&self, id: &str) {
+            self.0.borrow_mut().remove(id);
+        }
+    }
+
+    #[test]
+    fn a_forgotten_key_is_gone_whichever_encoding_names_it() {
+        use k256::elliptic_curve::sec1::ToEncodedPoint;
+        use k256::pkcs8::EncodePrivateKey;
+        let store = MemoryStore::default();
+        let key = k256::ecdsa::SigningKey::from_slice(&[7; 32]).unwrap();
+        let other = k256::ecdsa::SigningKey::from_slice(&[9; 32]).unwrap();
+        for k in [&key, &other] {
+            keys::import(&store, k.to_pkcs8_der().unwrap().as_bytes()).unwrap();
+        }
+        let spki = |k: &k256::ecdsa::SigningKey, compress: bool| {
+            let point = k.verifying_key().to_encoded_point(compress);
+            let mut der = vec![0x30, (K256_ALGORITHM.len() + 3 + point.len()) as u8];
+            der.extend_from_slice(&K256_ALGORITHM);
+            der.extend_from_slice(&[0x03, (point.len() + 1) as u8, 0x00]);
+            der.extend_from_slice(point.as_bytes());
+            der
+        };
+        assert!(keys::find(&[&store], &spki(&key, false)).unwrap().is_some());
+        // Named by its compressed encoding; stored under the canonical one
+        keys::forget(&store, &spki(&key, true)).unwrap();
+        assert!(keys::find(&[&store], &spki(&key, false)).unwrap().is_none());
+        assert!(keys::find(&[&store], &spki(&key, true)).unwrap().is_none());
+        // The other key is untouched, and forgetting again is harmless.
+        assert!(keys::find(&[&store], &spki(&other, false)).unwrap().is_some());
+        keys::forget(&store, &spki(&key, false)).unwrap();
+        assert!(keys::forget(&store, b"not a key").is_err());
     }
 
     // id-ecPublicKey, then the curve

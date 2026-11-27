@@ -9,6 +9,8 @@ world impl {
 
     import auth-sig:plugin/api;
     import auth-sig:plugin/keyvault;
+    import auth-sig:plugin/queries;
+    import host:crypto/keyvault;
 
     export api;
     export admin;

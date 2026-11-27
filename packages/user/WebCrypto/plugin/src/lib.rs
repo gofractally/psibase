@@ -57,6 +57,12 @@ impl Api for WebCryptoShim {
 
         import(&TempKeys, private_key)
     }
+
+    fn delete_key(public_key: Vec<u8>) -> Result<(), HostTypes::Error> {
+        assert!(Client::get_sender() == "supervisor");
+
+        Ok(keys::forget(&ManagedKeys, &public_key).map_err(CryptoError)?)
+    }
 }
 
 bindings::export!(WebCryptoShim with_types_in bindings);

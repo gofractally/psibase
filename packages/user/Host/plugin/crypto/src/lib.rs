@@ -117,6 +117,16 @@ impl KeyVault for HostCrypto {
         assert_authorized(FunctionName::import_key_transient)?;
         Supervisor::import_key_transient(&private_key)
     }
+
+    fn delete_key(public_key: Vec<u8>) -> Result<(), HostTypes::Error> {
+        // Only the host's own plugins: forgetting an account on this device.
+        assert_eq!(
+            bindings::host::client::api::get_sender(),
+            "host",
+            "delete-key@host:crypto/keyvault: unauthorized caller"
+        );
+        Supervisor::delete_key(&public_key)
+    }
 }
 
 bindings::export!(HostCrypto with_types_in bindings);

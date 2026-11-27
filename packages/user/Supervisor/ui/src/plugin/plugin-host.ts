@@ -256,6 +256,7 @@ export class PluginHost implements HostInterface {
                     this.supervisor.importKey(privateKey),
                 importKeyTransient: (privateKey) =>
                     this.supervisor.importKeyTransient(privateKey),
+                deleteKey: (publicKey) => this.supervisor.deleteKey(publicKey),
                 getClientKey: () => this.supervisor.getClientKey(),
             },
             "supervisor:bridge/database": {

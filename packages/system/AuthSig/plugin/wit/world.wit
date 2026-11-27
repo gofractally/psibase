@@ -41,6 +41,38 @@ interface actions {
     /// The private key of the new account is returned to the caller, and is not yet 
     /// imported onto this device. To import, the caller must explicitly call `keyvault:import-key`.
     create-account: func(new-account-name: string) -> result<string, error>;
+
+    /// Schedules the creation of an account with the specified owner and active keys.
+    /// The current user sends it and so becomes the new account's recovery partner.
+    /// Nothing is stored on this device.
+    ///
+    /// The keys are DER SubjectPublicKeyInfo as hex, as the sign-in page and x-signup
+    /// write them; `owner-seq` and `active-seq` are the sequence values the keys were
+    /// derived with.
+    ///
+    /// Callable only by `supervisor` and `host`.
+    create-account-with: func(name: string, owner-key: string, owner-seq: u64, active-key: string, active-seq: u64) -> result<_, error>;
+}
+
+/// What an account does as the recovery partner of other accounts. Each schedules
+/// the auth-sig action of the same name from the current user.
+interface partner {
+    use host:types/types.{error};
+
+    /// The pending change of `account` takes effect now.
+    confirm: func(account: string) -> result<_, error>;
+
+    /// The pending change of `account` is dropped.
+    reject: func(account: string) -> result<_, error>;
+
+    /// Ends a pause of `account` that has no pending change.
+    end-pause: func(account: string) -> result<_, error>;
+
+    /// Installs the keys of a recovery request in `account`, which is frozen.
+    unfreeze: func(account: string, request-id: u32) -> result<_, error>;
+
+    /// Drops a recovery request of `account`.
+    reject-recovery: func(account: string, request-id: u32) -> result<_, error>;
 }
 
 interface api {
@@ -65,4 +97,5 @@ world imports {
     import actions;
     import api;
     import queries;
+    import partner;
 }

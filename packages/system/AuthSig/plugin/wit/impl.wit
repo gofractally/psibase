@@ -13,4 +13,5 @@ world impl {
     export actions;
     export api;
     export queries;
+    export partner;
 }

@@ -59,8 +59,10 @@ impl ActivePrompts {
         tables::active_prompt().set(PROMPT_KEY, &psio::to_pssz(&prompt));
     }
 
+    /// The active prompt, or nothing if there is none (or what is stored is
+    /// not one).
     pub fn get() -> Option<ActivePrompt> {
-        let val = tables::active_prompt().get(PROMPT_KEY).unwrap();
-        Some(psio::from_pssz::<ActivePrompt>(&val).unwrap())
+        let val = tables::active_prompt().get(PROMPT_KEY)?;
+        psio::from_pssz::<ActivePrompt>(&val).ok()
     }
 }

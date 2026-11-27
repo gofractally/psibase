@@ -87,6 +87,31 @@ impl Admin for HostAccounts {
         import::adopt_account(account, private_key, &Client::get_active_app())
     }
 
+    fn adopt_account_for(app: String, account: String, private_key: String) -> Result<(), Error> {
+        check_caller(&["supervisor"], "adopt-account-for@host:accounts/admin");
+        import::adopt_account(account, private_key, &app)
+    }
+
+    fn known_accounts() -> Vec<String> {
+        check_caller(&["supervisor"], "known-accounts@host:accounts/admin");
+        import::known_accounts()
+    }
+
+    fn login_for(app: String, account: String) -> Result<(), Error> {
+        check_caller(&["supervisor"], "login-for@host:accounts/admin");
+        import::login_for(&app, &account)
+    }
+
+    fn logout_for(app: String) {
+        check_caller(&["supervisor"], "logout-for@host:accounts/admin");
+        AppsTable::new(&app).logout();
+    }
+
+    fn forget_account(account: String) {
+        check_caller(&["supervisor"], "forget-account@host:accounts/admin");
+        import::forget_account(&account);
+    }
+
     fn login(user: String, app: String) -> Result<(), Error> {
         check_caller(&[HOST_APP], "login@host:accounts/admin");
         AppsTable::new(&app).login(&user)

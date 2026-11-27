@@ -46,7 +46,12 @@ export const App = () => {
                     intf: "admin",
                     method: "getActivePrompt",
                     params: [],
-                })) as PromptDetails;
+                })) as PromptDetails | undefined | null;
+
+                if (!promptDetails) {
+                    setError("No prompt is active.");
+                    return;
+                }
 
                 if (promptDetails.created) {
                     const createdDate = new Date(promptDetails.created);

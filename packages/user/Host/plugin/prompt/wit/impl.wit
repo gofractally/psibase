@@ -12,10 +12,10 @@ interface admin {
         packed-context: option<list<u8>>,
     }
 
-    /// Used by the supervisor app to facilitate the interaction with the user
-    /// Also sets the return-payload on the prompt object to ensure it persists and can 
-    ///    be queried in `get-return-payload`.
-    get-active-prompt: func() -> prompt-details;
+    /// Used by the supervisor app to facilitate the interaction with the user.
+    /// Nothing if no prompt is active: a page of the supervisor that is not a
+    /// prompt (the sign-in page) asks too.
+    get-active-prompt: func() -> option<prompt-details>;
 } 
 
 world impl {

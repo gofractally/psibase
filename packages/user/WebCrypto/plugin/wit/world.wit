@@ -20,6 +20,10 @@ interface api {
     ///   is automatically cleared at the end of the current transaction
     ///   context. Returns the corresponding public key in PEM format.
     import-key-transient: func(private-key: pem) -> result<pem, error>;
+
+    /// Removes the private key of the DER-encoded public key from the keyvault.
+    /// Nothing happens if it is not there.
+    delete-key: func(public-key: list<u8>) -> result<_, error>;
 }
 
 world imports {

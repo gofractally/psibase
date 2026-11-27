@@ -17,9 +17,9 @@ use supervisor::bridge::prompt::request_prompt;
 struct HostPrompt;
 
 impl Admin for HostPrompt {
-    fn get_active_prompt() -> PromptDetails {
+    fn get_active_prompt() -> Option<PromptDetails> {
         assert_eq!(get_sender(), "supervisor", "Unauthorized");
-        ActivePrompts::get().unwrap().into()
+        ActivePrompts::get().map(Into::into)
     }
 }
 
@@ -38,7 +38,7 @@ impl Api for HostPrompt {
     }
 
     fn get_context() -> Result<Vec<u8>, Error> {
-        let prompt = ActivePrompts::get().unwrap();
+        let prompt = ActivePrompts::get().ok_or(ErrorType::NoActivePrompt)?;
         if !context_policy::can_read_context(&get_sender(), &prompt.prompt_app) {
             return Err(ErrorType::ContextAppMismatch.into());
         }

@@ -7,4 +7,5 @@ plugin_error! {
     AccountNotFound(account: String) => "Account not found: {account}",
     UnsupportedAuthService(service: String) => "Account uses unsupported auth service: {service}",
     AuthorizationFailed(account: String) => "Key cannot authorize account: {account}",
+    UnknownAccount(account: String) => "Account is not known to this device: {account}",
 }

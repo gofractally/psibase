@@ -18,7 +18,7 @@ use bindings::transact::plugin::api as Transact;
 // Exported interfaces
 use bindings::exports::auth_sig::plugin::{
     actions::Guest as Actions, api::Guest as Api, keyvault::Guest as KeyVault,
-    queries::Guest as Queries,
+    partner::Guest as Partner, queries::Guest as Queries,
 };
 use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
 
@@ -38,6 +38,7 @@ psibase::define_trust! {
         High => "
             - Set the public key for your account
             - Sign transactions on your behalf
+            - Act as the recovery partner of accounts you created: confirm or reject their pending changes, end their pauses, and release their freezes
 
         Warning: This will grant the caller the ability to control how your account is authorized, including the capability to take control of your account! Make sure you completely trust the caller's legitimacy.
         ",
@@ -46,7 +47,7 @@ psibase::define_trust! {
         None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit, can_authorize, get_pubkey, get_accounts_with_key],
         Low => [import_key],
         Medium => [create_account],
-        High => [set_key, sign],
+        High => [set_key, sign, confirm, reject, end_pause, unfreeze, reject_recovery],
     }
 }
 
@@ -169,6 +170,111 @@ impl Actions for AuthSig {
         )?;
 
         Ok(keypair.private_key)
+    }
+
+    fn create_account_with(
+        name: String,
+        owner_key: String,
+        owner_seq: u64,
+        active_key: String,
+        active_seq: u64,
+    ) -> Result<(), HostTypes::Error> {
+        // The trusted sign-in page and the host's own plugins, and nobody else.
+        let sender = bindings::host::client::api::get_sender();
+        if sender != "supervisor" && sender != "host" {
+            return Err(Unauthorized("create-account-with".to_string()).into());
+        }
+        Transact::add_action_to_transaction(
+            <MyService::newAccount as psio::interface::Method>::NAME,
+            &psio::to_pssz(&MyService::newAccount {
+                name: account_number(&name)?,
+                owner: key_spec(&owner_key, owner_seq)?,
+                active: key_spec(&active_key, active_seq)?,
+            }),
+        )
+    }
+}
+
+/// A DER SubjectPublicKeyInfo written as hex
+fn key_spec(hex: &str, seq: u64) -> Result<psibase::services::auth_sig::KeySpec, HostTypes::Error> {
+    let is_hex = hex.len() % 2 == 0 && hex.bytes().all(|b| b.is_ascii_hexdigit());
+    if !is_hex {
+        return Err(CryptoError("public key is not hex".to_string()).into());
+    }
+    let der: Vec<u8> = (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+        .collect();
+    if psibase::verifier_for(&der).is_none() {
+        return Err(CryptoError("unsupported public key".to_string()).into());
+    }
+    Ok(psibase::services::auth_sig::KeySpec {
+        key: der.into(),
+        seq,
+        verifier: None,
+    })
+}
+
+fn account_number(name: &str) -> Result<psibase::AccountNumber, HostTypes::Error> {
+    Ok(psibase::AccountNumber::from_exact(name).map_err(|_| ErrorType::InvalidAccountName(name))?)
+}
+
+/// The recovery-partner page lives in homepage; this plugin's own app may call too.
+fn partner_callers() -> Vec<String> {
+    vec!["homepage".into(), "auth-sig".into()]
+}
+
+impl Partner for AuthSig {
+    fn confirm(account: String) -> Result<(), HostTypes::Error> {
+        assert_authorized_with_whitelist(FunctionName::confirm, partner_callers())?;
+        Transact::add_action_to_transaction(
+            <MyService::confirm as psio::interface::Method>::NAME,
+            &psio::to_pssz(&MyService::confirm {
+                account: account_number(&account)?,
+            }),
+        )
+    }
+
+    fn reject(account: String) -> Result<(), HostTypes::Error> {
+        assert_authorized_with_whitelist(FunctionName::reject, partner_callers())?;
+        Transact::add_action_to_transaction(
+            <MyService::reject as psio::interface::Method>::NAME,
+            &psio::to_pssz(&MyService::reject {
+                account: account_number(&account)?,
+            }),
+        )
+    }
+
+    fn end_pause(account: String) -> Result<(), HostTypes::Error> {
+        assert_authorized_with_whitelist(FunctionName::end_pause, partner_callers())?;
+        Transact::add_action_to_transaction(
+            <MyService::endPause as psio::interface::Method>::NAME,
+            &psio::to_pssz(&MyService::endPause {
+                account: account_number(&account)?,
+            }),
+        )
+    }
+
+    fn unfreeze(account: String, request_id: u32) -> Result<(), HostTypes::Error> {
+        assert_authorized_with_whitelist(FunctionName::unfreeze, partner_callers())?;
+        Transact::add_action_to_transaction(
+            <MyService::unfreeze as psio::interface::Method>::NAME,
+            &psio::to_pssz(&MyService::unfreeze {
+                account: account_number(&account)?,
+                requestId: request_id,
+            }),
+        )
+    }
+
+    fn reject_recovery(account: String, request_id: u32) -> Result<(), HostTypes::Error> {
+        assert_authorized_with_whitelist(FunctionName::reject_recovery, partner_callers())?;
+        Transact::add_action_to_transaction(
+            <MyService::rejectRecovery as psio::interface::Method>::NAME,
+            &psio::to_pssz(&MyService::rejectRecovery {
+                account: account_number(&account)?,
+                requestId: request_id,
+            }),
+        )
     }
 }
 

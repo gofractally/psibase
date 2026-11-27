@@ -114,6 +114,14 @@ impl PublicKey {
 pub trait KeyStore {
     fn put(&self, id: &str, private_key: &[u8]);
     fn fetch(&self, id: &str) -> Option<Vec<u8>>;
+    fn remove(&self, id: &str);
+}
+
+/// Removes the private key of a DER SubjectPublicKeyInfo from a store,
+/// however the public key is encoded.
+pub fn forget(store: &dyn KeyStore, public_key: &[u8]) -> Result<(), String> {
+    store.remove(&PublicKey::from_spki_der(public_key)?.storage_id()?);
+    Ok(())
 }
 
 /// Stores a PKCS #8 DER private key and returns its public key.

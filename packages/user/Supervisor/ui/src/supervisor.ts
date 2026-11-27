@@ -167,6 +167,9 @@ export class Supervisor implements AppInterface {
                         [],
                     ),
                 );
+                // A page of the supervisor that is not a prompt (the sign-in
+                // page) has no active prompt and so no embedder: its calls
+                // are the supervisor's own.
                 if (promptDetails) {
                     this.embedder = promptDetails.activeApp;
                     delete this.context; // A new one will be created with the embedder
@@ -308,6 +311,14 @@ export class Supervisor implements AppInterface {
         return this.supervisorCall(
             getCallArgs("webcrypto", "plugin", "api", "import-key-transient", [
                 privateKey,
+            ]),
+        );
+    }
+
+    deleteKey(publicKey: Uint8Array): void {
+        this.supervisorCall(
+            getCallArgs("webcrypto", "plugin", "api", "delete-key", [
+                publicKey,
             ]),
         );
     }

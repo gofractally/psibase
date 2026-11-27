@@ -31,6 +31,10 @@ impl KeyStore for ManagedKeys {
     fn fetch(&self, id: &str) -> Option<Vec<u8>> {
         keys_table().get(id)
     }
+
+    fn remove(&self, id: &str) {
+        keys_table().delete(id);
+    }
 }
 
 pub struct TempKeys;
@@ -42,5 +46,9 @@ impl KeyStore for TempKeys {
 
     fn fetch(&self, id: &str) -> Option<Vec<u8>> {
         temp_keys_table().get(id)
+    }
+
+    fn remove(&self, id: &str) {
+        temp_keys_table().delete(id);
     }
 }

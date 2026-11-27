@@ -77,6 +77,45 @@ interface admin {
     /// and whoever was logged in to it before still is.
     adopt-account: func(account: string, private-key: string) -> result<_, error>;
 
+    /// As `adopt-account`, for the app that is named instead of the active app. For a
+    /// page of the supervisor that is not a prompt (the sign-in page), which has no
+    /// active app of its own.
+    /// Callable only by the supervisor.
+    ///
+    /// Parameters:
+    /// * `app`: The app to log the account in to
+    /// * `account`: The name of an existing account that uses the `auth-sig` auth service
+    /// * `private-key`: The account's ACTIVE private key (P-256 or secp256k1), PKCS #8 in
+    ///   PEM format. It is compared with the account's active key as a curve point.
+    ///
+    /// The account and key are verified before anything is stored. On success the key is
+    /// in the key vault, the account is known to this device, `app` is one of its
+    /// connected apps, and it is logged in to `app` (query token and app cookie
+    /// included). If the login fails after the key was verified, the key stays imported
+    /// and the account stays known to this device, but it is neither connected nor logged
+    /// in to `app`, and whoever was logged in to it before still is.
+    adopt-account-for: func(app: string, account: string, private-key: string) -> result<_, error>;
+
+    /// The accounts known to this device: those that were imported or adopted here.
+    /// Callable only by the supervisor.
+    known-accounts: func() -> list<string>;
+
+    /// Makes an account that is already known to this device the logged-in user of `app`,
+    /// and connects it to `app`. For the account switcher.
+    /// Callable only by the supervisor.
+    login-for: func(app: string, account: string) -> result<_, error>;
+
+    /// Logs the current user out of `app`. Nothing happens if nobody is logged in.
+    /// Callable only by the supervisor.
+    logout-for: func(app: string);
+
+    /// Removes an account from this device: it is logged out of and disconnected from
+    /// every app it was connected to, it is no longer a known account, and the private
+    /// key stored for its current active key is deleted from the key vault. Nothing on
+    /// chain changes. Nothing happens for an account that is not known here.
+    /// Callable only by the supervisor.
+    forget-account: func(account: string);
+
     /// Logs the user into the specified app and connects them to it
     login: func(user: string, app: string) -> result<_, error>;
 
