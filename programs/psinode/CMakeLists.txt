@@ -91,6 +91,11 @@ if(Python_Interpreter_FOUND)
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     set_tests_properties(py_test_wif PROPERTIES
         ENVIRONMENT PYTHONPATH=${PSINODE_TEST_PYTHONPATH})
+    # The key of the `guest` account is what its derivation gives, and the
+    # boot actions and the C++ constants carry that key.
+    add_test(
+        NAME py_guest_key
+        COMMAND ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/packages/system/AuthSig/guest-key.py --check)
     add_psinode_test(test_connect)
     add_psinode_test(test_routing)
     set_tests_properties(psinode_test_routing PROPERTIES PROCESSORS 7)

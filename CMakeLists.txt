@@ -781,8 +781,10 @@ psibase_package(
     SERVICE auth-sig+1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig-schema.json
+    # Creates the `guest` account: packages/system/AuthSig/include/services/system/GuestAccount.hpp
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/AuthSig/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "VerifyK1(^${PSIBASE_VERSION}.0)" "VerifyR1(^${PSIBASE_VERSION}.0)" "VerifyBr1(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "VerifyK1(^${PSIBASE_VERSION}.0)" "VerifyR1(^${PSIBASE_VERSION}.0)" "VerifyBr1(^${PSIBASE_VERSION}.0)"
 )
 
 # The verifier services. psibase/verifier.hpp says which of them a key may

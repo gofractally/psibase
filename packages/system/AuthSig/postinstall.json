@@ -1,0 +1,30 @@
+[
+    {
+        "sender": "accounts",
+        "service": "accounts",
+        "method": "newAccount",
+        "data": {
+            "name": "guest",
+            "authService": "auth-sig",
+            "mode": 1
+        }
+    },
+    {
+        "sender": "auth-sig",
+        "service": "auth-sig",
+        "method": "initKeys",
+        "data": {
+            "account": "guest",
+            "owner": {
+                "key": "3036301006072a8648ce3d020106052b8104000a032200029ae2e83237cfbe0037e80f6098c6cae957e8f024fcb8bb4221f67461208b0710",
+                "seq": 0,
+                "verifier": null
+            },
+            "active": {
+                "key": "3036301006072a8648ce3d020106052b8104000a032200029ae2e83237cfbe0037e80f6098c6cae957e8f024fcb8bb4221f67461208b0710",
+                "seq": 0,
+                "verifier": null
+            }
+        }
+    }
+]

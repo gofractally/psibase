@@ -317,6 +317,31 @@ namespace SystemService
          eraseRecoveryRequests(sender);
       }
 
+      void AuthSig::initKeys(psibase::AccountNumber account, KeySpec owner, KeySpec active)
+      {
+         check(getSender() == getReceiver(), "only auth-sig itself may give an account keys");
+         check(to<Accounts>().getAuthOf(account) == AuthSig::service,
+               "account does not use auth-sig");
+         auto ownerKey  = resolve(std::move(owner));
+         auto activeKey = resolve(std::move(active));
+         auto authTable = open<AuthTable>(KvMode::readWrite);
+         if (auto existing = authTable.getIndex<0>().get(account))
+         {
+            // Never a way to change a record: only to find it as it would
+            // have been written.
+            check(existing->owner == ownerKey && existing->active == activeKey &&
+                      !existing->partner.has_value(),
+                  "account already has keys");
+            return;
+         }
+         authTable.put(AuthRecord{
+             .account = account,
+             .owner   = std::move(ownerKey),
+             .active  = std::move(activeKey),
+         });
+         eraseRecoveryRequests(account);
+      }
+
       void AuthSig::setActive(KeySpec active)
       {
          auto own = loadOwn();

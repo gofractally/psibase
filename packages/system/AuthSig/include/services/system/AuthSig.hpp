@@ -335,6 +335,18 @@ namespace SystemService
          /// `requestOwnerChange`.
          void setKeys(KeySpec owner, KeySpec active);
 
+         /// By this service's own account: give keys to `account`, which uses this auth
+         /// service and has no keys here. The account gets no recovery partner.
+         ///
+         /// Such an account exists only when `accounts::newAccount` was called directly
+         /// with this service as the auth service; until it has keys nothing can authorize
+         /// it. This is how an account is created whose keys nobody holds and whose creator
+         /// is not its recovery partner: `newAccount` would make the sender the partner,
+         /// and `setKeys` has to be sent by the account. A record that exists is never
+         /// changed: if `account` already has exactly these keys and no recovery partner,
+         /// nothing happens, so the action may be repeated; with any other record it fails.
+         void initKeys(psibase::AccountNumber account, KeySpec owner, KeySpec active);
+
          /// Replace the sender's active key. Owner key only. Immediate.
          void setActive(KeySpec active);
 
@@ -440,6 +452,7 @@ namespace SystemService
                    method(canAuthUserSys, user),
                    method(newAccount, name, owner, active),
                    method(setKeys, owner, active),
+                   method(initKeys, account, owner, active),
                    method(setActive, active),
                    method(requestOwnerChange, owner, active),
                    method(requestPartnerChange, partner),

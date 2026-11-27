@@ -1,0 +1,12 @@
+{
+ "description": "The key of the `guest` account, which nobody can authorize (gofractally/psibase #2307). Written by guest-key.py beside this file; see there for the derivation. Do not edit by hand.",
+ "account": "guest",
+ "seed": "psibase guest account: nobody holds this key",
+ "counter": 0,
+ "x": "9ae2e83237cfbe0037e80f6098c6cae957e8f024fcb8bb4221f67461208b0710",
+ "y": "7863dc9d04dba002c8de875be700782545e6b34b96e3e47e887b40c2aa7297aa",
+ "point": "029ae2e83237cfbe0037e80f6098c6cae957e8f024fcb8bb4221f67461208b0710",
+ "spki": "3036301006072a8648ce3d020106052b8104000a032200029ae2e83237cfbe0037e80f6098c6cae957e8f024fcb8bb4221f67461208b0710",
+ "fingerprint": "58be7657f21e26fba9bf86a08bb0069a2f7f3bad34b87a2924b4fa611de10053",
+ "pem": "-----BEGIN PUBLIC KEY-----\nMDYwEAYHKoZIzj0CAQYFK4EEAAoDIgACmuLoMjfPvgA36A9gmMbK6Vfo8CT8uLtC\nIfZ0YSCLBxA=\n-----END PUBLIC KEY-----\n"
+}

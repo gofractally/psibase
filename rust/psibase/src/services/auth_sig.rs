@@ -355,6 +355,14 @@ mod service {
         unimplemented!()
     }
 
+    /// By this service's own account: give keys to `account`, which uses
+    /// this auth service and has no keys here. The account gets no
+    /// recovery partner. A record that exists is never changed.
+    #[action]
+    fn initKeys(account: AccountNumber, owner: KeySpec, active: KeySpec) {
+        unimplemented!()
+    }
+
     /// Replace the sender's active key. Owner key only. Immediate.
     #[action]
     fn setActive(active: KeySpec) {

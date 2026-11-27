@@ -2,12 +2,14 @@
 // account lists, and the node's sponsor acting as recovery partner.
 #include <services/local/XSignup.hpp>
 
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/nativeTables.hpp>
 #include <services/local/XAdmin.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthSig.hpp>
+#include <services/system/GuestAccount.hpp>
 #include <services/system/PrivateKeyInfo.hpp>
 #include <services/system/Spki.hpp>
 #include "Guest.hpp"
@@ -386,6 +388,37 @@ TEST_CASE("x-signup: a creation that is taken by another owner key is not this g
    CHECK(status.accounts.empty());
    CHECK(!status.link->account);
    CHECK(!status.link->pending);
+}
+
+TEST_CASE("x-signup: signing up cannot produce the guest account")
+{
+   // `guest` is an account like any other (gofractally/psibase #2307), so
+   // the name is taken; and it is shorter than the names sign-up gives out.
+   Fixture f;
+   auto    visitor = TestGuest::login(f.t);
+   Key     owner, active;
+   auto    name = AuthSig::guest::account;
+   f.link(visitor);
+   auto reply = f.as(visitor).post<HttpReply>(
+       "/create", CreateRequest{name.str(), {owner.bytes(), 1}, {active.bytes(), 2}});
+   CHECK(reply.status == HttpStatus::badRequest);
+   CHECK(errorOf(reply).find("Names need at least") != std::string::npos);
+
+   auto status = f.status(visitor);
+   CHECK(status.accounts.empty());
+   CHECK(!status.link->account);
+   CHECK(!status.link->pending);
+
+   // The account is as boot made it: not the visitor's keys, and the
+   // sponsor is not its recovery partner.
+   auto record = f.record(name);
+   CHECK(std::ranges::equal(record.owner.key.data, AuthSig::guest::keySpki));
+   CHECK(record.active == record.owner);
+   CHECK(!record.partner);
+
+   // The visitor can still sign up under another name.
+   f.create(visitor, "newcomer2", owner, active);
+   CHECK(f.status(visitor).accounts == std::vector{AccountNumber{"newcomer2"}});
 }
 
 TEST_CASE("x-signup: encrypted account lists")

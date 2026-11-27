@@ -535,6 +535,54 @@ class TestPsibase(unittest.TestCase):
         a.run_psibase(['boot'] + a.node_args() + ['-p', a.producer, '--block-key', keyfile, '--account-key', txkeyfile] + packages)
 
     @testutil.psinode_test
+    def test_guest_account(self, cluster):
+        '''A chain booted with `psibase boot` has the account `guest`, with the published key and no recovery partner (gofractally/psibase #2307)'''
+        import base64
+        source = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../packages/system/AuthSig')
+        with open(os.path.join(source, 'guest-key.json')) as f:
+            published = json.load(f)
+
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer', 'AuthSig'])
+
+        def der(pem):
+            return base64.b64decode(''.join(line for line in pem.splitlines() if not line.startswith('-----'))).hex()
+        def check():
+            res = a.graphql('accounts', 'query { getAccount(accountName: "guest") { authService } }')
+            self.assertEqual(res['getAccount']['authService'], 'auth-sig')
+            res = a.graphql('auth-sig', '''query { account(name: "guest") {
+                owner { verifier key seq } active { verifier key seq }
+                partner state pending { kind } priorOwners { expires } } }''')['account']
+            for role in ('owner', 'active'):
+                self.assertEqual(der(res[role]['key']), published['spki'])
+                self.assertEqual(res[role]['verifier'], 'verify-k1')
+                self.assertEqual(int(res[role]['seq']), 0)
+            self.assertIsNone(res['partner'])
+            self.assertEqual(res['state'], 'normal')
+            self.assertIsNone(res['pending'])
+            self.assertEqual(res['priorOwners'], [])
+        check()
+
+        # What an operator sends on a chain that was booted before the
+        # account existed. Here the account exists: sending it again changes nothing.
+        a.run_psibase(['push', os.path.join(source, 'postinstall.json')] + a.node_args())
+        a.wait(new_block())
+        check()
+
+        # Nothing authorizes the account, on a chain where root needs no signature either.
+        action = [{"sender": "guest", "service": "accounts", "method": "setAuthServ", "data": {"authService": "auth-any"}}]
+        res = a.run_psibase(['push'] + a.node_args(), input=json.dumps(action), text=True, check=False, stderr=subprocess.PIPE)
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn('Authorization for', res.stderr)
+        # and it cannot be created again
+        for sender, auth in (('accounts', 'auth-any'), ('root', 'auth-any')):
+            action = [{"sender": sender, "service": "accounts", "method": "newAccount",
+                       "data": {"name": "guest", "authService": auth, "mode": 2}}]
+            res = a.run_psibase(['push'] + a.node_args(), input=json.dumps(action), text=True, check=False, stderr=subprocess.PIPE)
+            self.assertNotEqual(res.returncode, 0)
+        check()
+
+    @testutil.psinode_test
     def test_json_trace(self, cluster):
         (a,) = cluster.complete(*testutil.generate_names(1));
         a.boot(packages=['Minimal', 'Explorer'])
