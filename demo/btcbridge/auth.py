@@ -27,10 +27,12 @@ def secure_account(account):
   return
  if info and info['authService']!='auth-any':raise ValueError('Refusing to change existing account authority: '+account)
  if not info:
+  # The key is written as its DER SubjectPublicKeyInfo in hex.
+  der=subprocess.check_output(['openssl','pkey','-pubin','-in',str(public),'-outform','DER']).hex()
   # Names shorter than eight characters require Accounts' explicit preapproval.
   # Create directly under AuthSig in the same signed transaction; never expose
   # an intermediate AuthAny account.
-  push([action('accounts','accounts','preapproveAcc',{'name':account}),action('accounts','auth-sig','newAccount',{'name':account,'owner':{'key':public.read_text(),'seq':0},'active':{'key':public.read_text(),'seq':0}})])
+  push([action('accounts','accounts','preapproveAcc',{'name':account}),action('accounts','auth-sig','newAccount',{'name':account,'owner':{'key':der,'seq':0},'active':{'key':der,'seq':0}})])
  else:
   subprocess.run([str(CLI),'modify','-a',API,'-k',str(public),*signing_flags([account]),account],check=True,stdout=subprocess.DEVNULL)
 def provision():
