@@ -377,6 +377,12 @@ namespace SystemService
          /// stored. Changes nothing that the queries report. Anyone may call it.
          void refresh(psibase::AccountNumber account);
 
+         /// The record of `account` as of the current block (every transition that is due
+         /// applied), or nothing if it has no keys here. For services, which cannot read
+         /// this service's tables: who an account's keys and recovery partner are does not
+         /// depend on whether it is paused or frozen.
+         std::optional<AuthRecord> getRecord(psibase::AccountNumber account);
+
          /// Get the accounts this auth service delegates authority to for a sender: none.
          std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber       sender,
                                                         std::optional<ServiceMethod> method);
@@ -423,6 +429,7 @@ namespace SystemService
                    method(rejectRecovery, account, requestId),
                    method(unfreezeWith, account, owner, active),
                    method(refresh, account),
+                   method(getRecord, account),
                    method(getDlgsSys, sender, method),
                    method(isAuthSys, sender, authorizers, method),
                    method(isRejectSys, sender, rejecters, method)

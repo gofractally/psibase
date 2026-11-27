@@ -503,6 +503,14 @@ namespace SystemService
          a.table.put(a.record);
       }
 
+      std::optional<AuthRecord> AuthSig::getRecord(psibase::AccountNumber account)
+      {
+         auto row = open<AuthTable>(KvMode::read).getIndex<0>().get(account);
+         if (!row)
+            return std::nullopt;
+         return effective(std::move(*row), currentTime());
+      }
+
       std::vector<psibase::AccountNumber> AuthSig::getDlgsSys(psibase::AccountNumber       sender,
                                                               std::optional<ServiceMethod> method)
       {

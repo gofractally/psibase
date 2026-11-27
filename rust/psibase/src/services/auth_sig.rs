@@ -318,7 +318,7 @@ pub struct RecoveryRequest {
 #[crate::service(name = "auth-sig", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use super::KeySpec;
+    use super::{AuthRecord, KeySpec};
     use crate::{services::transact::ServiceMethod, AccountNumber, Claim};
 
     /// Decides whether the claims of a transaction authorize `action` for
@@ -442,6 +442,13 @@ mod service {
     /// Write the account's record as it is now. Anyone may call it.
     #[action]
     fn refresh(account: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// The record of `account` as of the current block, or nothing if it
+    /// has no keys here.
+    #[action]
+    fn getRecord(account: AccountNumber) -> Option<AuthRecord> {
         unimplemented!()
     }
 

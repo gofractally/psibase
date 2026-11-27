@@ -1182,3 +1182,84 @@ TEST_CASE("auth-sig: the active key cannot reach a control action through anothe
       CHECK(f.push({byOther.execute(id, txid)}, {}).failed(""));
    }
 }
+
+// The sign-in page builds owner-key transactions itself: it has the query
+// service pack an action's arguments from JSON. This is the JSON it writes.
+TEST_CASE("auth-sig: packing the control actions from JSON")
+{
+   Fixture f;
+   Key     a, b;
+   struct RawJson
+   {
+      std::string       text;
+      std::string       contentType() const { return "application/json"; }
+      std::vector<char> body() const { return {text.begin(), text.end()}; }
+   };
+   auto pack = [&](const std::string& method, const std::string& json)
+   {
+      INFO(method << " " << json);
+      auto reply = f.t.http(AuthService::service)
+                       .header("Origin", "https://supervisor.psibase.io")
+                       .post<HttpReply>("/pack_action/" + method, RawJson{json});
+      REQUIRE(reply.status == HttpStatus::ok);
+      CHECK(reply.contentType == "application/octet-stream");
+      // The supervisor's page may read it.
+      bool allowed = false;
+      for (auto& h : reply.headers)
+         if (h.matches("access-control-allow-origin"))
+            allowed = h.value == "*" || h.value == "https://supervisor.psibase.io";
+      CHECK(allowed);
+      return reply.body;
+   };
+   // A key is its PEM text, as everywhere in JSON; a JSON string holds it
+   // with its line feeds escaped.
+   auto pem = [](const Key& key)
+   {
+      std::string text = AuthSig::SubjectPublicKeyInfoText::text(key.pub);
+      std::string out  = "\"";
+      for (char c : text)
+         out += c == '\n' ? std::string{"\\n"} : std::string{c};
+      return out + "\"";
+   };
+   auto verifier = verifierFor(a.pub.data)->str();
+
+   // A KeySpec is {"key": PEM, "seq": number or decimal string, "verifier": name or null,
+   // or left out}.
+   auto expected = psio::to_pssz(std::tuple{KeySpec{a.pub, 9, {}}});
+   CHECK(pack("setActive", "{\"active\":{\"key\":" + pem(a) + ",\"seq\":9}}") == expected);
+   CHECK(pack("setActive", "{\"active\":{\"key\":" + pem(a) + ",\"seq\":\"9\"}}") == expected);
+   CHECK(pack("setActive",
+              "{\"active\":{\"key\":" + pem(a) + ",\"seq\":9,\"verifier\":null}}") == expected);
+   CHECK(pack("setActive", "{\"active\":{\"key\":" + pem(a) +
+                               ",\"seq\":\"18446744073709551615\",\"verifier\":\"" + verifier +
+                               "\"}}") ==
+         psio::to_pssz(std::tuple{KeySpec{a.pub, 18446744073709551615ull, AccountNumber{verifier}}}));
+
+   auto both = "{\"owner\":{\"key\":" + pem(a) + ",\"seq\":1},\"active\":{\"key\":" + pem(b) +
+               ",\"seq\":2}}";
+   auto bothPacked = psio::to_pssz(std::tuple{KeySpec{a.pub, 1, {}}, KeySpec{b.pub, 2, {}}});
+   CHECK(pack("requestOwnerChange", both) == bothPacked);
+   CHECK(pack("proposeRecovery", both) == bothPacked);
+
+   CHECK(pack("requestPartnerChange", "{\"partner\":\"somebody\"}") ==
+         psio::to_pssz(std::tuple{std::optional{AccountNumber{"somebody"}}}));
+   CHECK(pack("requestPartnerChange", "{\"partner\":null}") ==
+         psio::to_pssz(std::tuple{std::optional<AccountNumber>{}}));
+   CHECK(pack("requestPartnerChange", "{}") ==
+         psio::to_pssz(std::tuple{std::optional<AccountNumber>{}}));
+
+   CHECK(pack("requestDelays", "{\"pauseSeconds\":172800,\"freezeSeconds\":1209600}") ==
+         psio::to_pssz(std::tuple{std::uint32_t{172800}, std::uint32_t{1209600}}));
+
+   CHECK(pack("pause", "{}") == psio::to_pssz(std::tuple{}));
+   CHECK(pack("freeze", "{}") == psio::to_pssz(std::tuple{}));
+
+   // What is packed is what the action takes: a transaction built from it works.
+   Action act{.sender  = f.alice,
+              .service = AuthService::service,
+              .method  = MethodNumber{"setActive"},
+              .rawData = pack("setActive", "{\"active\":{\"key\":" + pem(a) + ",\"seq\":9}}")};
+   REQUIRE(f.push(act, f.owner).succeeded());
+   CHECK(f.status().active.key == a.pub);
+   CHECK(f.status().active.seq == 9);
+}
