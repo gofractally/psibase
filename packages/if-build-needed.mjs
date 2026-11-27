@@ -45,6 +45,12 @@ buildDirs.push({
     source: path.resolve(scriptDir, 'shared-ui'),
 });
 
+// The build configuration every UI shares decides what a build emits, so a
+// change to it is a change to every UI.
+buildDirs.push({
+    source: path.resolve(scriptDir, 'vite.shared.ts'),
+});
+
 if (shouldSkipBuild(projectDir, buildDirs)) {
     process.exit(0);
 }
