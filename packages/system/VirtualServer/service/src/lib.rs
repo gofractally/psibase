@@ -344,6 +344,7 @@ mod service {
         Tokens::call().debit(sys, buyer, amount, "".into());
         Tokens::call().toSub(sys, for_user.to_string(), amount);
         balance_cache::update_balance(for_user, None, amount.value as i128);
+        refresh_cpu_limit(for_user, None);
 
         if buyer != for_user {
             // No need for a subsidy event if user == buyer because it's not a subsidy and the purchase
@@ -378,7 +379,8 @@ mod service {
             UserSettings::to_sub_account_key(buyer, Some(sub_account.clone())),
             amount,
         );
-        balance_cache::update_balance(buyer, Some(sub_account), amount.value as i128);
+        balance_cache::update_balance(buyer, Some(sub_account.clone()), amount.value as i128);
+        refresh_cpu_limit(buyer, Some(sub_account));
     }
 
     /// Deletes the resource subaccount, returning the resources back to the caller's primary
@@ -411,6 +413,7 @@ mod service {
             Tokens::call().toSub(sys, sender.to_string(), balance);
             balance_cache::update_balance(sender, Some(sub_account), -(balance.value as i128));
             balance_cache::update_balance(sender, None, balance.value as i128);
+            refresh_cpu_limit(sender, None);
         }
     }
 
@@ -448,8 +451,7 @@ mod service {
     /// billable account.
     #[action]
     fn bill_to_sub(sub_account: String) {
-        let billable_account =
-            tx_cache::billable::get_billable_account().expect("Billable account not set");
+        let billable_account = tx_cache::billable::get_account().expect("Billable account not set");
 
         assert!(
             !sub_account.is_empty(),
@@ -830,6 +832,16 @@ mod service {
         }
     }
 
+    /// If the specified account is the current transaction's billable account,
+    /// this action will update the active CPU limit based on the account's
+    /// available resources.
+    fn refresh_cpu_limit(account: AccountNumber, sub_account: Option<String>) {
+        if !tx_cache::billable::is_billed(account, &sub_account) {
+            return;
+        }
+        CpuLimit::rpc().setCpuLimit(get_cpu_limit(account, sub_account));
+    }
+
     // Gets the CPU limit (in ns) for the specified account
     //
     // Returns None if there is no limit for the specified account
@@ -894,7 +906,7 @@ mod service {
     fn setBillableAcc(account: AccountNumber) {
         assert_eq!(get_sender(), Transact::SERVICE, "Unauthorized");
 
-        tx_cache::billable::set_billable_account(account);
+        tx_cache::billable::set_account(account);
 
         CpuLimit::rpc().setCpuLimit(get_cpu_limit(account, None));
     }
