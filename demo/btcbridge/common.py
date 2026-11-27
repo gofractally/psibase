@@ -78,9 +78,18 @@ def relay_headers():
  while http('/header?height='+str(common))['id']!=rpc('getblockhash',common):
   if common<=state['relay']['checkpoint_height']:raise ValueError('Fork crosses checkpoint')
   common-=1
+ if state['relay']['network']=='signet':
+  # A signet header is accepted only with its block-signature proof (BIP 325): the raw coinbase
+  # transaction (with witness) and the coinbase's Merkle branch. Sixteen per action.
+  for start in range(common+1,height+1,16):
+   call(RELAYER,'btcrelay','signetHeaders',blocks=[signet_block(rpc('getblockhash',h)) for h in range(start,min(start+16,height+1))])
+  return
  for start in range(common+1,height+1,32):
   headers=[rpc('getblockheader',rpc('getblockhash',h),False) for h in range(start,min(start+32,height+1))]
   call(RELAYER,'btcrelay','headers',headers=headers)
+def signet_block(block):
+ coinbase=rpc('getblock',block,1)['tx'][0]
+ return {'header':rpc('getblockheader',block,False),'coinbase':rpc('getrawtransaction',coinbase,False,block),'branch':merkle(coinbase,block)['merkle']}
 def prove_deposit(txid):
  if http('/explorer/transaction?txid='+txid) is not None:return
  p=proof(txid);tx=rpc('decoderawtransaction',p['raw'])

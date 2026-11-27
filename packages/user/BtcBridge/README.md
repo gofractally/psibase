@@ -51,8 +51,40 @@ proof of work, target sign/overflow/limits, parent linkage, median time, future
 time, buried block-version rules and exact mainnet difficulty transitions.
 Timestamp and epoch metadata are cached per parent. Fork choice uses accumulated
 work, not height. Regtest has its own easier target and no-retarget rules;
-mainnet cannot accept those headers. Other Bitcoin test networks and signet are
-not enabled.
+mainnet cannot accept those headers. Signet (`network = "signet"`) uses
+Bitcoin's retarget arithmetic with signet's proof-of-work limit and no
+minimum-difficulty exception. Testnet3 and testnet4 are not enabled.
+
+Signet blocks are authorized by a signature in the coinbase transaction (BIP
+325), which an 80-byte header does not carry, and signet's proof of work is
+tiny: about 2 x 10^8 hashes per block in November 2026, under a minute for one
+processor core. So on signet the relay requires both. A signet header is
+submitted with `signetHeaders`, together with its raw coinbase transaction and
+the coinbase's Merkle branch; the plain `headers` action refuses on a signet
+relay. For each header the core library:
+
+- checks that the coinbase is leaf 0 of the header's Merkle tree (64-byte
+  transactions and branches deeper than 32 are refused, as for deposits);
+- cuts the signet solution out of the witness commitment exactly as Bitcoin
+  Core does and recomputes the Merkle root with the modified coinbase under the
+  same branch;
+- builds BIP 325's `to_spend` and `to_sign` transactions, which commit to the
+  block's version, previous hash, transactions and time;
+- verifies the solution against the network's challenge.
+
+`network = "signet"` is the default signet: the challenge is Bitcoin Core's
+`SIGNET_DEFAULT_CHALLENGE`, a bare 1-of-2 `OP_CHECKMULTISIG`. That template
+(bare m-of-n multisig, signatures in the scriptSig, empty witness stack, strict
+DER, empty dummy element) is the only one implemented; other signets are not
+supported. The proof is checked and discarded; only the header is stored. Up
+to 16 signet headers per action; in every block observed the coinbase is 261
+bytes and the branch at most nine hashes.
+
+What remains trusted on signet is its two signers, as for every signet node.
+A header with valid proof of work and no valid signature is refused, so header
+submission is permissionless on signet as on mainnet. The signature does not
+cover `bits` or the nonce; the relay's exact-difficulty and proof-of-work
+rules cover those.
 
 The creator must select a genuinely trusted Bitcoin checkpoint; for mainnet use
 a recent independently verified checkpoint. A recent-looking low-work branch
@@ -203,7 +235,9 @@ python3 demo/btcbridge/test_e2e.py
 
 Host tests cover transaction conservation, deterministic selection, fee limits,
 all signer pairs, modified-payment signature rejection, Merkle proof tampering,
-target encoding and a historical mainnet difficulty transition. E2E tests use
+target encoding, a historical mainnet difficulty transition, a real signet
+retarget, and signet block signatures against real blocks from both signers and
+against re-mined forgeries with valid proof of work. E2E tests use
 actual Bitcoin Core and Psibase nodes, including generic key ownership,
 confirmation depth, native issuance, signer outage, withdrawal settlement,
 replays, account-signature enforcement, retired endpoint rejection, browser-origin restrictions and reorg handling. They use separate

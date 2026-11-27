@@ -4,11 +4,14 @@ pub use hex;
 
 pub type Result<T> = std::result::Result<T, String>;
 
+pub mod signet;
+pub use signet::{signet_sighash, signet_txs, verify_signet_block, SignetParams, SignetTxs};
+
 use bitcoin::{
     absolute,
     bip32::{ChildNumber, Xpriv, Xpub},
     block::Header,
-    consensus::{deserialize, serialize},
+    consensus::{deserialize, serialize, Params},
     hashes::{sha256, sha256d, Hash},
     opcodes::all::OP_CHECKMULTISIG,
     pow::{CompactTarget, Target, Work},
@@ -34,9 +37,39 @@ pub fn decode<T: bitcoin::consensus::Decodable>(s: &str, max_bytes: usize) -> Re
 pub fn network(s: &str) -> Result<Network> {
     match s {
         "regtest" => Ok(Network::Regtest),
+        "signet" => Ok(Network::Signet),
         "bitcoin" => Ok(Network::Bitcoin),
-        _ => Err("Only bitcoin and isolated regtest are supported".into()),
+        _ => Err("Only bitcoin, signet and isolated regtest are supported".into()),
     }
+}
+/// Parameters of the networks whose difficulty is recalculated every 2016 blocks; regtest never retargets.
+/// Signet uses Bitcoin's retarget arithmetic with its own proof-of-work limit and has no minimum-difficulty
+/// exception. Its block signature is committed in the coinbase transaction, so the header rules here
+/// prove only signet's very low proof of work: a signet header must also pass `verify_signet_block`.
+fn retarget_params(net: Network) -> Option<Params> {
+    match net {
+        Network::Bitcoin => Some(Params::MAINNET),
+        Network::Signet => Some(Params::SIGNET),
+        _ => None,
+    }
+}
+/// The block-signature parameters of a network whose blocks are signed: `"signet"` is the default
+/// signet, with Bitcoin Core's default challenge. Other signets have no network name here.
+pub fn signet_params(net: &str) -> Result<Option<SignetParams>> {
+    Ok(match network(net)? {
+        Network::Signet => Some(SignetParams::default_signet()),
+        _ => None,
+    })
+}
+const RETARGET_INTERVAL: u32 = 2016;
+/// Highest height at which trusted checkpoint context may begin: eleven timestamps for the median-time
+/// rule and, on a retargeting network, the first header of the checkpoint's difficulty epoch.
+pub fn context_start(net: &str, checkpoint_height: u32) -> Result<u32> {
+    let times = checkpoint_height.saturating_sub(10);
+    Ok(match retarget_params(network(net)?) {
+        Some(_) => (checkpoint_height / RETARGET_INTERVAL * RETARGET_INTERVAL).min(times),
+        None => times,
+    })
 }
 pub fn header(s: &str) -> Result<Header> {
     decode(s, 80)
@@ -65,6 +98,7 @@ pub fn check_pow(h: &Header, net: &str) -> Result<()> {
         || (mantissa > 0xffff && size > 32);
     let limit = match network(net)? {
         Network::Regtest => Target::MAX_ATTAINABLE_REGTEST,
+        Network::Signet => Target::MAX_ATTAINABLE_SIGNET,
         _ => Target::MAX_ATTAINABLE_MAINNET,
     };
     if invalid || h.target() == Target::ZERO || h.target() > limit {
@@ -83,7 +117,7 @@ pub fn validate_header(
 ) -> Result<Header> {
     let parent = *history.last().ok_or("Missing parent")?;
     let times: Vec<_> = history.iter().rev().take(11).map(|h| h.time).collect();
-    let epoch = if net == "bitcoin" && height % 2016 == 0 {
+    let epoch = if retarget_params(network(net)?).is_some() && height % RETARGET_INTERVAL == 0 {
         if history.len() < 2016 {
             return Err("Missing difficulty epoch context".into());
         }
@@ -105,7 +139,9 @@ pub fn validate_next_header(
 ) -> Result<Header> {
     let h = header(raw)?;
     check_pow(&h, net)?;
-    let minimum_version = if net == "regtest" {
+    let network = network(net)?;
+    // Signet and regtest bury the block-version rules from their first block.
+    let minimum_version = if network != Network::Bitcoin {
         4
     } else if height >= 388381 {
         4
@@ -130,15 +166,12 @@ pub fn validate_next_header(
     if h.time <= times[times.len() / 2] || h.time as u64 > now.saturating_add(7200) {
         return Err("Invalid header timestamp".into());
     }
-    let expected = if net == "regtest" || height % 2016 != 0 {
-        parent.bits
-    } else {
-        let span = (parent.time as i64 - epoch_start as i64).clamp(302400, 4838400) as u64;
-        CompactTarget::from_next_work_required(
-            parent.bits,
-            span,
-            bitcoin::consensus::Params::MAINNET,
-        )
+    let expected = match retarget_params(network) {
+        Some(params) if height % RETARGET_INTERVAL == 0 => {
+            let span = (parent.time as i64 - epoch_start as i64).clamp(302400, 4838400) as u64;
+            CompactTarget::from_next_work_required(parent.bits, span, params)
+        }
+        _ => parent.bits,
     };
     if h.bits != expected {
         return Err("Incorrect difficulty transition".into());
