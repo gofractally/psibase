@@ -344,7 +344,7 @@ export const keysFor = async (
     net: Network,
     unlocked: Unlocked,
     name: string,
-): Promise<{ keys: AccountKeys; record: ChainRecord } | undefined> => {
+): Promise<{ keys: AccountKeys; record: ChainRecord; ownsIt: boolean } | undefined> => {
     const record = await fetchRecord(net.siblingOrigin("auth-sig"), name, net.token);
     if (!record) return undefined;
     const keys = accountKeys(
@@ -354,11 +354,35 @@ export const keysFor = async (
         record.owner.seq,
         record.active.seq,
     );
-    if (!sameKey(keys.owner.key, record.owner.key)) {
-        keys.ownerSecret.fill(0);
-        return undefined;
+    if (sameKey(keys.owner.key, record.owner.key)) {
+        return { keys, record, ownsIt: true };
     }
-    return { keys, record };
+    // The owner key is someone else's (a key file kept offline, say), but
+    // the account's signing key is this passkey's: its owner gave this
+    // passkey the right to sign, and nothing more.
+    keys.ownerSecret.fill(0);
+    if (sameKey(keys.active.key, record.active.key)) {
+        return { keys, record, ownsIt: false };
+    }
+    return undefined;
+};
+
+/**
+ * The signing key this passkey would hold for `name` if the account's owner
+ * installed it: the next unused sequence value, under the owner sequence
+ * the chain has.
+ */
+export const signingKeyOffer = async (
+    net: Network,
+    unlocked: Unlocked,
+    name: string,
+): Promise<{ key: string; seq: string } | undefined> => {
+    const record = await fetchRecord(net.siblingOrigin("auth-sig"), name, net.token);
+    if (!record) return undefined;
+    const seq = record.active.seq + 1n;
+    const keys = accountKeys(unlocked.chainId, unlocked.root, name, record.owner.seq, seq);
+    keys.ownerSecret.fill(0);
+    return keys.active;
 };
 
 /**

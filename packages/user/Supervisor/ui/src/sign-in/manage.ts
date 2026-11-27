@@ -101,8 +101,10 @@ export const runManageStep = async (ctx: PageContext) => {
         try {
             unlocked = await ctx.unlock("Confirm with your passkey", why);
             const found = await keysFor(net, unlocked, name);
-            if (!found) {
-                throw new Error(`This passkey does not hold the owner key of ${name}.`);
+            if (!found || !found.ownsIt) {
+                throw new Error(
+                    `This passkey does not hold the owner key of ${name}. Whoever holds it makes this change.`,
+                );
             }
             ownerSecret = found.keys.ownerSecret;
             ctx.working("Working", why);
@@ -209,8 +211,10 @@ export const runManageStep = async (ctx: PageContext) => {
                 `Exporting the signing key of ${name}.`,
             );
             const found = await keysFor(net, unlocked, name);
-            if (!found) {
-                throw new Error(`This passkey does not hold the owner key of ${name}.`);
+            if (!found || !found.ownsIt) {
+                throw new Error(
+                    `This passkey does not hold the owner key of ${name}, so it cannot export its signing key.`,
+                );
             }
             // The signing key is derived from the owner secret, which is
             // wiped as soon as the file's contents are made.

@@ -35,6 +35,7 @@ import {
     rememberOnDevice,
     sameKey,
     setCurrent,
+    signingKeyOffer,
 } from "./device";
 import { type Unlocked } from "./passkey";
 
@@ -535,6 +536,72 @@ export const runAccountStep = async (ctx: PageContext) => {
         links(loadDevice().accounts.length ? backLink : guestLink);
     };
 
+    // An account this passkey does not control: how its owner lets this
+    // passkey sign for it. Only a public key is shown; the owner's key never
+    // comes near this page.
+    const showKeyOffer = (name: string, offer?: { key: string; seq: string }) => {
+        frame(
+            `${name} is controlled by another key`,
+            offer
+                ? `If you hold the owner key of ${name}, you can let this passkey sign for it. The owner key stays where it is and keeps control of the account.`
+                : `${name} is in use and this passkey does not control it.`,
+        );
+        if (offer) {
+            const actions = JSON.stringify(
+                [
+                    {
+                        sender: name,
+                        service: "auth-sig",
+                        method: "setActive",
+                        // The command-line tool reads a key in an action's
+                        // JSON as hex of its DER form.
+                        data: { active: { key: offer.key, seq: offer.seq } },
+                    },
+                ],
+                null,
+                2,
+            );
+            const file = `${name}.set-active.json`;
+            const node = `${window.location.protocol}//${window.location.host.split(".").slice(1).join(".")}`;
+            const list = $("acct-list");
+            list.textContent = "";
+            const step1 = document.createElement("p");
+            step1.className = "si-hint";
+            step1.textContent = "1. Save this file. It holds only this passkey's public signing key for the account.";
+            const download = document.createElement("button");
+            download.type = "button";
+            download.className = "si-btn si-provider";
+            download.textContent = `Download ${file}`;
+            download.addEventListener("click", () => {
+                const url = URL.createObjectURL(new Blob([actions], { type: "application/json" }));
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = file;
+                document.body.append(link);
+                link.click();
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 10_000);
+            });
+            const step2 = document.createElement("p");
+            step2.className = "si-hint";
+            step2.textContent = `2. Send it with the owner key of ${name}:`;
+            const command = document.createElement("pre");
+            command.className = "si-code";
+            command.textContent = `psibase push -a ${node} -s <owner-key.pem> ${file}`;
+            const step3 = document.createElement("p");
+            step3.className = "si-hint";
+            step3.textContent = "3. Then come back here.";
+            const done = document.createElement("button");
+            done.type = "button";
+            done.className = "si-btn si-primary";
+            done.textContent = `I've done that: sign me in as ${name}`;
+            done.addEventListener("click", () => void recover(name, false));
+            list.append(step1, download, step2, command, step3, done);
+            list.hidden = false;
+        }
+        links(backLink);
+    };
+
     const describe = (record: ChainRecord) =>
         record.state === "frozen"
             ? "is frozen"
@@ -577,11 +644,11 @@ export const runAccountStep = async (ctx: PageContext) => {
                     await settle(unlocked, name, found.keys);
                     return;
                 }
-                frame(
-                    `${name} belongs to another passkey`,
-                    `${name} is in use and this passkey does not control it. A recovery partner can only act on an account that has been paused or frozen with one of its own keys.`,
-                );
-                links(backLink);
+                // Another key controls it. Whoever holds that key can give
+                // this passkey the account's signing key, and keep the owner
+                // key to themselves.
+                const offer = await signingKeyOffer(net, unlocked, name);
+                showKeyOffer(name, offer);
                 return;
             }
 
