@@ -74,6 +74,12 @@ namespace LocalService
       /// from every incoming request first.
       static constexpr auto gateHeader = "x-psibase-require-identity";
 
+      /// Set by this service, and only by it, on a request whose use of the
+      /// node x-usage counts: the chain's HTTP service then tells x-usage
+      /// who the request is for. Removed from every incoming request first.
+      /// Sent only when x-usage is installed.
+      static constexpr auto usageHeader = "x-psibase-count-usage";
+
       using Session = psibase::SessionTables<PendingRequestTable, ResponseHandlerTable>;
 
       static psibase::AccountNumber getService(std::string_view host, std::string_view rootHost)

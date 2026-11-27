@@ -38,6 +38,7 @@ target_mapped_include_directories(services_local INTERFACE
     XSites/include
     XTimer/include
     XTransact/include
+    XUsage/include
 )
 
 if(DEFINED IS_WASM)
@@ -54,4 +55,5 @@ if(DEFINED IS_WASM)
     add_subdirectory(XSites)
     add_subdirectory(XTimer)
     add_subdirectory(XTransact)
+    add_subdirectory(XUsage)
 endif()

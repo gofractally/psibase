@@ -7,6 +7,9 @@
 #include <services/local/XAdmin.hpp>
 #include <services/local/XDb.hpp>
 #include <services/local/XSites.hpp>
+#include <services/local/XUsage.hpp>
+
+#include <chrono>
 
 using namespace psibase;
 using namespace LocalService;
@@ -460,6 +463,21 @@ void XHttp::asyncClose(std::int32_t socket)
    }
 }
 
+namespace
+{
+   // Whether this node counts usage. x-usage is a local service like this
+   // one, and a node may run without it.
+   bool usageInstalled()
+   {
+      bool result = false;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         result = Native::subjective(KvMode::read).open<CodeTable>().get(XUsage::service).has_value();
+      }
+      return result;
+   }
+}  // namespace
+
 void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
 {
    auto sender = getSender();
@@ -477,6 +495,10 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
    {
       abortMessage("Must set autoClose before sending a response");
    }
+   // A reply of the chain's HTTP service, at once or deferred: its size is
+   // counted for whoever the request was for.
+   if (sender == HttpServer::service && usageInstalled())
+      to<XUsage>().reply(socket, result.body.size());
    check(socketSend(socket, psio::to_pssz(result)) == 0, "socketSend failed");
    PSIBASE_SUBJECTIVE_TX
    {
@@ -1008,8 +1030,28 @@ extern "C" [[clang::export_name("serve")]] void serve()
    if (requireIdentity)
       req.headers.push_back({XHttp::gateHeader, "1"});
 
+   // Usage logging (x-usage), if this node has it. The chain's HTTP service
+   // says who the request is for; the time and the sizes are measured here.
+   bool countUsage = usageInstalled();
+   std::erase_if(req.headers,
+                 [](const auto& header) { return header.matches(XHttp::usageHeader); });
+   if (countUsage)
+      req.headers.push_back({XHttp::usageHeader, "1"});
+
    owned.put({.socket = sock, .owner = HttpServer::service});
+   if (!countUsage)
+   {
+      to<HttpServer>().serve(sock, req);
+      return;
+   }
+   // The synchronous handling only: a reply that is deferred is sent in a
+   // later context, and the time until then is not this request's work.
+   auto requestBytes = req.body.size();
+   auto start        = std::chrono::steady_clock::now();
    to<HttpServer>().serve(sock, req);
+   auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+       std::chrono::steady_clock::now() - start);
+   to<XUsage>().request(sock, static_cast<std::uint64_t>(elapsed.count()), requestBytes);
 }  // serve()
 
 #endif
