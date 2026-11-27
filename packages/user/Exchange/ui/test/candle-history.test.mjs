@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {candleHistory,CANDLE_INTERVALS} from '../src/candle-history.js';
+import {candleHistory,chartWindow,CANDLE_INTERVALS,CANDLE_ZOOMS} from '../src/candle-history.js';
 const bar=(time,extra={})=>({time,open:'9007199254740993',high:'9007199254740999',low:'9007199254740991',close:'9007199254740995',volume:'18446744073709551616',trades:'9007199254740993',complete:true,...extra});
 test('native hourly/daily candles preserve exact prices, volume, opaque cursors and missing buckets',()=>{
   for(const interval of CANDLE_INTERVALS){
@@ -23,4 +23,21 @@ test('native price precision supports tiny token prices without rounding OHLC to
   const page=candleHistory({interval:86400,price_precision:36,candles:[bar(86400,{open:'1',high:'2',low:'1',close:'2',volume:'1',trades:'1'})]},86400);
   assert.equal(page.pricePrecision,36);assert.equal(page.candles[0].open,1n);
   for(const precision of [-1,37,null,undefined])assert.throws(()=>candleHistory({interval:86400,price_precision:precision,candles:[]},86400));
+});
+test('the chart shows a fixed number of candles, one slot each, and marks missing time',()=>{
+  const at=n=>({time:n*5000});
+  // 100 candles, then nothing for two hours, then 10 more
+  const candles=[...Array.from({length:100},(_,n)=>at(n)),...Array.from({length:10},(_,n)=>at(1540+n))];
+  for(const count of CANDLE_ZOOMS){
+    const shown=chartWindow(candles,count,5);
+    assert.equal(shown.length,Math.min(count,candles.length));
+    // the latest candle is always in the last slot, and slots are consecutive: no empty space for the gap
+    assert.equal(shown.at(-1).slot,count-1);
+    shown.forEach((s,i)=>assert.equal(s.slot,count-shown.length+i));
+    assert.deepEqual(shown.filter(s=>s.gap).map(s=>s.candle.time),[1540*5000]);
+  }
+  // fewer candles than slots: they sit at the right, as wide as ever
+  assert.deepEqual(chartWindow([at(1),at(2)],60,5).map(s=>s.slot),[58,59]);
+  assert.deepEqual(chartWindow([],60,5),[]);
+  assert.throws(()=>chartWindow(candles,45,5),/zoom/);
 });
