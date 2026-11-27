@@ -218,10 +218,33 @@ export function publicKeyPairToDER({ keyType, keyPair }: any): Uint8Array {
     return result;
 }
 
-export function signatureToBin({ signature }: any) {
+function curveFor(keyType: number): elliptic.ec {
+    if (keyType === KeyType.k1) return getK1();
+    if (keyType === KeyType.r1) return getR1();
+    throw new Error("unsupported key type");
+}
+
+// 64-byte signature r || s in the low-S form (s <= n/2), the only form
+// verify-sig accepts. (r, n - s) is the same signature in its other encoding,
+// so a high-S signature is converted rather than refused.
+export function signatureToBin({ keyType, signature }: any) {
+    const n = curveFor(keyType).n!;
+    const lowS = signature.s.cmp(n.shrn(1)) > 0 ? n.sub(signature.s) : signature.s;
     const r = signature.r.toArray("be", 32);
-    const s = signature.s.toArray("be", 32);
+    const s = lowS.toArray("be", 32);
     return new Uint8Array(r.concat(s));
+}
+
+// Sign a 32-byte digest with {keyType, keyPair}; returns the proof verify-sig
+// expects for that key.
+export function signDigest(
+    key: { keyType: number; keyPair: elliptic.ec.KeyPair },
+    digest: Uint8Array | number[],
+): Uint8Array {
+    return signatureToBin({
+        keyType: key.keyType,
+        signature: key.keyPair.sign(digest as any, { canonical: true }),
+    });
 }
 
 export function keyPairStrings(key: any): any {
