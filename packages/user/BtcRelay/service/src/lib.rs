@@ -1,6 +1,6 @@
 //! Permissionless, checkpoint-anchored Bitcoin header relay. Mainnet, signet and regtest have disjoint rules.
-//! Signet headers are checked for signet's proof of work only: the block signature is in the coinbase
-//! transaction, which a header relay does not see.
+//! A signet header is accepted only with its coinbase transaction and Merkle branch, from which the
+//! block signature (BIP 325) is verified in addition to proof of work.
 use btcbridge_core as btc;
 use psibase::*;
 
@@ -42,6 +42,14 @@ pub mod tables {
         #[primary_key]
         pub height: u32,
         pub id: String,
+    }
+    /// A signet header with the proof of its block signature: the raw coinbase transaction and the
+    /// coinbase's Merkle branch (transaction-ID hex, leaf to root).
+    #[derive(Clone, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+    pub struct SignetBlock {
+        pub header: String,
+        pub coinbase: String,
+        pub branch: Vec<String>,
     }
 }
 pub use tables::*;
@@ -97,6 +105,109 @@ pub fn confirmed(id: &str) -> HeaderRow {
         "Proof is not on selected chain"
     );
     h
+}
+/// Validate one header against its stored parent, store it and follow the chain with the most work.
+/// `signet` carries the block-signature proof on a signed network. Returns false once the relay has
+/// paused itself; the caller stores `c` in either case.
+fn accept(
+    c: &mut Relay,
+    raw: String,
+    signet: Option<(&btc::SignetParams, &str, &[String])>,
+) -> bool {
+    let h = must(btc::header(&raw));
+    let id = h.block_hash().to_string();
+    if HeaderTable::read().get_index_pk().get(&id).is_some() {
+        return true;
+    }
+    let parent = row(&h.prev_blockhash.to_string());
+    assert!(
+        parent.height >= c.checkpoint_height,
+        "Fork precedes relay checkpoint"
+    );
+    let height = parent
+        .height
+        .checked_add(1)
+        .expect("Bitcoin height overflow");
+    let parent_header = must(btc::header(&parent.raw));
+    must(btc::validate_next_header(
+        &raw,
+        height,
+        &parent_header,
+        &parent.times,
+        parent.epoch_start,
+        &c.network,
+        now(),
+    ));
+    if let Some((params, coinbase, branch)) = signet {
+        // Proof of work alone means little on signet: require the block signature.
+        must(btc::verify_signet_block(&h, coinbase, branch, params));
+    }
+    let mut times = parent.times.clone();
+    times.push(h.time);
+    if times.len() > 11 {
+        times.remove(0);
+    }
+    let epoch_start = if height % 2016 == 0 {
+        h.time
+    } else {
+        parent.epoch_start
+    };
+    let parent_work = must(btc::work(&parent.chainwork));
+    let chainwork = parent_work + h.work();
+    assert!(chainwork > parent_work, "Chainwork overflow");
+    let candidate = HeaderRow {
+        id: id.clone(),
+        parent: parent.id,
+        height,
+        raw,
+        chainwork: btc::work_hex(chainwork),
+        times,
+        epoch_start,
+    };
+    HeaderTable::read_write().put(&candidate).unwrap();
+    if chainwork <= must(btc::work(&row(&c.tip).chainwork)) {
+        return true;
+    }
+    let mut path = vec![];
+    let mut cursor = candidate;
+    while CanonicalTable::read()
+        .get_index_pk()
+        .get(&cursor.height)
+        .map(|v| v.id)
+        != Some(cursor.id.clone())
+    {
+        if path.len() >= 129 {
+            c.paused = true;
+            c.reason = "Higher-work fork exceeds bounded reorganization window".into();
+            return false;
+        }
+        path.push(cursor.clone());
+        cursor = row(&cursor.parent);
+    }
+    if cursor.height < c.protected_height {
+        c.paused = true;
+        c.reason = format!(
+            "Higher-work fork removes accepted Bitcoin state at height {}",
+            c.protected_height
+        );
+        return false;
+    }
+    for old in height + 1..=c.height {
+        if let Some(r) = CanonicalTable::read().get_index_pk().get(&old) {
+            CanonicalTable::read_write().remove(&r);
+        }
+    }
+    for h in path {
+        CanonicalTable::read_write()
+            .put(&Canonical {
+                height: h.height,
+                id: h.id,
+            })
+            .unwrap();
+    }
+    c.tip = id;
+    c.height = height;
+    true
 }
 #[psibase::service(name = "btcrelay", tables = "tables")]
 #[allow(non_snake_case)]
@@ -189,98 +300,32 @@ pub mod service {
         );
         let mut c = config();
         assert!(!c.paused, "Relay paused");
+        assert!(
+            must(btc::signet_params(&c.network)).is_none(),
+            "Signet headers need their block-signature proof: use signetHeaders"
+        );
         for raw in headers {
-            let h = must(btc::header(&raw));
-            let id = h.block_hash().to_string();
-            if HeaderTable::read().get_index_pk().get(&id).is_some() {
-                continue;
+            if !accept(&mut c, raw, None) {
+                break;
             }
-            let parent = row(&h.prev_blockhash.to_string());
-            assert!(
-                parent.height >= c.checkpoint_height,
-                "Fork precedes relay checkpoint"
-            );
-            let height = parent
-                .height
-                .checked_add(1)
-                .expect("Bitcoin height overflow");
-            let parent_header = must(btc::header(&parent.raw));
-            must(btc::validate_next_header(
-                &raw,
-                height,
-                &parent_header,
-                &parent.times,
-                parent.epoch_start,
-                &c.network,
-                now(),
-            ));
-            let mut times = parent.times.clone();
-            times.push(h.time);
-            if times.len() > 11 {
-                times.remove(0);
+        }
+        RelayTable::read_write().put(&c).unwrap();
+    }
+    /// Signet: each header with its coinbase transaction and the coinbase's Merkle branch. The
+    /// block signature is verified and the proof discarded; only the header is stored.
+    #[action]
+    fn signetHeaders(blocks: Vec<SignetBlock>) {
+        assert!(
+            !blocks.is_empty() && blocks.len() <= 16,
+            "Header submission limit"
+        );
+        let mut c = config();
+        assert!(!c.paused, "Relay paused");
+        let params = must(btc::signet_params(&c.network)).expect("Not a signet relay");
+        for b in blocks {
+            if !accept(&mut c, b.header, Some((&params, b.coinbase.as_str(), b.branch.as_slice()))) {
+                break;
             }
-            let epoch_start = if height % 2016 == 0 {
-                h.time
-            } else {
-                parent.epoch_start
-            };
-            let parent_work = must(btc::work(&parent.chainwork));
-            let chainwork = parent_work + h.work();
-            assert!(chainwork > parent_work, "Chainwork overflow");
-            let candidate = HeaderRow {
-                id: id.clone(),
-                parent: parent.id,
-                height,
-                raw,
-                chainwork: btc::work_hex(chainwork),
-                times,
-                epoch_start,
-            };
-            HeaderTable::read_write().put(&candidate).unwrap();
-            if chainwork <= must(btc::work(&row(&c.tip).chainwork)) {
-                continue;
-            }
-            let mut path = vec![];
-            let mut cursor = candidate;
-            while CanonicalTable::read()
-                .get_index_pk()
-                .get(&cursor.height)
-                .map(|v| v.id)
-                != Some(cursor.id.clone())
-            {
-                if path.len() >= 129 {
-                    c.paused = true;
-                    c.reason = "Higher-work fork exceeds bounded reorganization window".into();
-                    RelayTable::read_write().put(&c).unwrap();
-                    return;
-                }
-                path.push(cursor.clone());
-                cursor = row(&cursor.parent);
-            }
-            if cursor.height < c.protected_height {
-                c.paused = true;
-                c.reason = format!(
-                    "Higher-work fork removes accepted Bitcoin state at height {}",
-                    c.protected_height
-                );
-                RelayTable::read_write().put(&c).unwrap();
-                return;
-            }
-            for old in height + 1..=c.height {
-                if let Some(r) = CanonicalTable::read().get_index_pk().get(&old) {
-                    CanonicalTable::read_write().remove(&r);
-                }
-            }
-            for h in path {
-                CanonicalTable::read_write()
-                    .put(&Canonical {
-                        height: h.height,
-                        id: h.id,
-                    })
-                    .unwrap();
-            }
-            c.tip = id;
-            c.height = height;
         }
         RelayTable::read_write().put(&c).unwrap();
     }
