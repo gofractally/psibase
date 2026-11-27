@@ -1225,21 +1225,24 @@ TEST_CASE("auth-sig: packing the control actions from JSON")
 
    // A KeySpec is {"key": PEM, "seq": number or decimal string, "verifier": name or null,
    // or left out}.
+   // The packed values hold freshly generated keys. The comparisons are wrapped in
+   // parentheses so a result is reported as true or false: writing out the two byte
+   // vectors has thrown std::length_error for some key bytes (#2299).
    auto expected = psio::to_pssz(std::tuple{KeySpec{a.pub, 9, {}}});
-   CHECK(pack("setActive", "{\"active\":{\"key\":" + pem(a) + ",\"seq\":9}}") == expected);
-   CHECK(pack("setActive", "{\"active\":{\"key\":" + pem(a) + ",\"seq\":\"9\"}}") == expected);
-   CHECK(pack("setActive",
-              "{\"active\":{\"key\":" + pem(a) + ",\"seq\":9,\"verifier\":null}}") == expected);
-   CHECK(pack("setActive", "{\"active\":{\"key\":" + pem(a) +
+   CHECK((pack("setActive", "{\"active\":{\"key\":" + pem(a) + ",\"seq\":9}}") == expected));
+   CHECK((pack("setActive", "{\"active\":{\"key\":" + pem(a) + ",\"seq\":\"9\"}}") == expected));
+   CHECK((pack("setActive",
+              "{\"active\":{\"key\":" + pem(a) + ",\"seq\":9,\"verifier\":null}}") == expected));
+   CHECK((pack("setActive", "{\"active\":{\"key\":" + pem(a) +
                                ",\"seq\":\"18446744073709551615\",\"verifier\":\"" + verifier +
                                "\"}}") ==
-         psio::to_pssz(std::tuple{KeySpec{a.pub, 18446744073709551615ull, AccountNumber{verifier}}}));
+         psio::to_pssz(std::tuple{KeySpec{a.pub, 18446744073709551615ull, AccountNumber{verifier}}})));
 
    auto both = "{\"owner\":{\"key\":" + pem(a) + ",\"seq\":1},\"active\":{\"key\":" + pem(b) +
                ",\"seq\":2}}";
    auto bothPacked = psio::to_pssz(std::tuple{KeySpec{a.pub, 1, {}}, KeySpec{b.pub, 2, {}}});
-   CHECK(pack("requestOwnerChange", both) == bothPacked);
-   CHECK(pack("proposeRecovery", both) == bothPacked);
+   CHECK((pack("requestOwnerChange", both) == bothPacked));
+   CHECK((pack("proposeRecovery", both) == bothPacked));
 
    CHECK(pack("requestPartnerChange", "{\"partner\":\"somebody\"}") ==
          psio::to_pssz(std::tuple{std::optional{AccountNumber{"somebody"}}}));
