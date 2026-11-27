@@ -27,6 +27,7 @@ import {
     rememberOnDevice,
 } from "./device";
 import { pushAsOwner } from "./owner-tx";
+import { toWif } from "./wif";
 import { type Unlocked } from "./passkey";
 
 // What x-usage reports for the caller (packages/local/XUsage). The node
@@ -195,7 +196,7 @@ export const runManageStep = async (ctx: PageContext) => {
     // passkey, held in this page while the panel is open, and never stored.
     // The owner key is not exported: a copy of it in a file would outlive
     // the moment the passkey was used, which is the one thing it must not do.
-    let exported: { name: string; pem: string; seq: string } | undefined;
+    let exported: { name: string; pem: string; wif: string; seq: string } | undefined;
 
     const closeExport = () => {
         exported = undefined;
@@ -225,7 +226,12 @@ export const runManageStep = async (ctx: PageContext) => {
                 found.record.active.seq,
             );
             found.keys.ownerSecret.fill(0);
-            exported = { name, pem: exportedKeyPem(active), seq: found.keys.active.seq };
+            exported = {
+                name,
+                pem: exportedKeyPem(active),
+                wif: toWif(active),
+                seq: found.keys.active.seq,
+            };
             active.fill(0);
             await render();
         } catch (e) {
@@ -238,12 +244,16 @@ export const runManageStep = async (ctx: PageContext) => {
         }
     };
 
-    const exportPanel = (key: { name: string; pem: string; seq: string }) => {
+    const exportPanel = (key: { name: string; pem: string; wif: string; seq: string }) => {
         const file = `${key.name}.active.pem`;
         const panel = el("div", { class: "si-panel si-export" });
+        // The key as one line, the form people expect for a key of this kind.
+        const shown = el("pre", { class: "si-code si-key" });
+        shown.id = "export-wif";
+        shown.textContent = key.wif;
         const download = el("button", {
-            class: "si-btn si-primary",
-            text: "Download key file",
+            class: "si-btn si-ghost",
+            text: "Download as a key file (PEM)",
             type: "button",
         });
         download.addEventListener("click", () => {
@@ -260,9 +270,9 @@ export const runManageStep = async (ctx: PageContext) => {
             setTimeout(() => URL.revokeObjectURL(url), 10_000);
             saved.hidden = false;
         });
-        const copy = el("button", { class: "si-btn si-ghost", text: "Copy to clipboard", type: "button" });
+        const copy = el("button", { class: "si-btn si-primary", text: "Copy the key", type: "button" });
         copy.addEventListener("click", () => {
-            void navigator.clipboard.writeText(key.pem).then(
+            void navigator.clipboard.writeText(key.wif).then(
                 () => (copy.textContent = "Copied"),
                 () => (copy.textContent = "Could not copy"),
             );
@@ -274,7 +284,7 @@ export const runManageStep = async (ctx: PageContext) => {
         saved.hidden = true;
         const command = el("pre", { class: "si-code" });
         const node = `${window.location.protocol}//${window.location.host.split(".").slice(1).join(".")}`;
-        command.textContent = `psibase push -a ${node} -s ${file} actions.json`;
+        command.textContent = `psibase push -a ${node} -s ${file} actions.json\n\n(${file} can be the downloaded key file, or a file holding the key text above)`;
         const done = el("button", { class: "si-btn si-ghost", text: "Done", type: "button" });
         done.addEventListener("click", closeExport);
         panel.append(
@@ -283,13 +293,14 @@ export const runManageStep = async (ctx: PageContext) => {
                 class: "si-hint",
                 text: `Anyone with this file can act as ${key.name}: send transactions and sign in. It cannot change the owner key or the recovery partner, and it stops working when you choose "Sign out other devices". This is signing key number ${key.seq}.`,
             }),
-            el("div", { class: "si-actions" }, download, copy),
+            shown,
+            el("div", { class: "si-actions" }, copy, download),
             saved,
             el("p", { class: "si-label", text: "Use it with the command-line tool" }),
             command,
             el("p", {
                 class: "si-hint",
-                text: "The file is not protected by a password. The key is gone from this page when you press Done or leave.",
+                text: "This is the key in the form Bitcoin wallets use (it starts with K or L), so tools for that format can read it. Neither the text nor the file is protected by a password. The key is gone from this page when you press Done or leave.",
             }),
             done,
         );
@@ -646,8 +657,18 @@ export const runManageStep = async (ctx: PageContext) => {
         const usage = await usageLine();
         if (usage) side.append(usage);
         body.replaceChildren(side, ...(main.childElementCount ? [main] : []));
+        // The way out comes first: back to the app this page was opened
+        // from, and home to the network.
+        const home = `${window.location.protocol}//${window.location.host.split(".").slice(1).join(".")}/`;
+        const toApp = () => window.location.assign(net.siblingOrigin(ctx.app) + ctx.path);
         setLinks($("mg-below"), [
-            { label: "Back", run: () => ctx.go("account") },
+            ...(ctx.app === "homepage"
+                ? [{ label: `Home (${ctx.rootName})`, run: toApp }]
+                : [
+                      { label: `Return to ${ctx.app}`, run: toApp },
+                      { label: `Home (${ctx.rootName})`, run: () => window.location.assign(home) },
+                  ]),
+            { label: "Choose an account", run: () => ctx.go("account") },
             { label: "Create another account", run: () => ctx.go("account", { intent: "new" }) },
             { label: "Recover an account", run: () => ctx.go("account", { intent: "recover" }) },
         ]);

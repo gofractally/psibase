@@ -164,6 +164,14 @@
                 flex: none;
             }
 
+            #signin a.si-network {
+                text-decoration: none;
+            }
+
+            #signin a.si-network:hover {
+                color: var(--si-text);
+            }
+
             #signin .si-network {
                 font-size: 14px;
                 font-weight: 600;
@@ -441,6 +449,11 @@
                 font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
                 white-space: pre-wrap;
                 word-break: break-all;
+            }
+
+            #signin .si-key {
+                font-size: 13.5px;
+                user-select: all;
             }
 
             #signin .si-export .si-btn.si-ghost {
@@ -829,7 +842,7 @@
                             stroke-linejoin="round"
                         />
                     </svg>
-                    <span class="si-network" id="network"></span>
+                    <a class="si-network" id="network" href="/" title="Home"></a>
                 </header>
 
                 <!-- Sign-in view -->

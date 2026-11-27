@@ -119,6 +119,7 @@ import { execFileSync } from "node:child_process";
 const a = await person("A");
 await signUp(a, A);
 const keyFile = `/tmp/pw-signin/export/${A}.active.pem`;
+const wifFile = `/tmp/pw-signin/export/${A}.active.wif`;
 fs.mkdirSync("/tmp/pw-signin/export", { recursive: true });
 const cli = (args) => { try { return execFileSync("/tmp/gate-chain/psibase-sock", [args[0], "-a", "http://psibase.localhost/", ...args.slice(1)], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }); } catch (e) { return "FAILED: " + (e.stderr || e.message).trim().split("\n").slice(-2).join(" | "); } };
 const actions = (bio) => { const f = `/tmp/pw-signin/export/${A}-actions.json`; fs.writeFileSync(f, JSON.stringify([{ sender: A, service: "profiles", method: "setProfile", data: { display_name: "Exported " + A, bio } }])); return f; };
@@ -128,9 +129,12 @@ await step(a, "export the signing key from the Account tab", async (page) => {
     a.log.length = 0;
     await manage(page, A);
     await page.click("text=Export signing key");
-    await page.waitForSelector("text=Download key file", { timeout: 30000 });
+    await page.waitForSelector("#export-wif", { timeout: 30000 });
     await snap(a, "export");
-    const [download] = await Promise.all([page.waitForEvent("download"), page.click("text=Download key file")]);
+    const wif = (await page.textContent("#export-wif")).trim();
+    if (!/^[KL][1-9A-HJ-NP-Za-km-z]{51}$/.test(wif)) throw new Error("not a base58 key: " + wif.slice(0, 6));
+    fs.writeFileSync(wifFile, wif + "\n");
+    const [download] = await Promise.all([page.waitForEvent("download"), page.click("text=Download as a key file")]);
     await download.saveAs(keyFile);
     const pem = fs.readFileSync(keyFile, "utf8");
     const prompts = a.log.filter((l) => l.includes("PASSKEY_PROMPT")).length;
@@ -146,6 +150,17 @@ await step(a, "the command-line tool signs a transaction as the account with the
     await new Promise((r) => setTimeout(r, 2500));
     const p = await profile();
     if (!p.includes("set from the command line")) throw new Error("profile is " + p);
+    return p;
+});
+
+await step(a, "the command-line tool also signs with the base58 key, from a file and as text", async () => {
+    const one = cli(["push", "-s", wifFile, actions("signed with the base58 key file")]);
+    if (one.startsWith("FAILED")) throw new Error(one);
+    const two = cli(["push", "-s", fs.readFileSync(wifFile, "utf8").trim(), actions("signed with the base58 key text")]);
+    if (two.startsWith("FAILED")) throw new Error(two);
+    await new Promise((r) => setTimeout(r, 2500));
+    const p = await profile();
+    if (!p.includes("base58 key text")) throw new Error("profile is " + p);
     return p;
 });
 

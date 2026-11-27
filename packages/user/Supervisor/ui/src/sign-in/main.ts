@@ -755,6 +755,8 @@ const forgetOtherNetwork = async () => {
 
 const start = async () => {
     $("network").textContent = rootName;
+    // The network's name is the way home from any step of this page.
+    $<HTMLAnchorElement>("network").href = `${window.location.protocol}//${root}/`;
     await forgetOtherNetwork();
     // The manage step has more to show than a sign-in card holds.
     if (step === "manage") document.body.dataset.layout = "wide";
@@ -773,13 +775,19 @@ const start = async () => {
         void signIn(mode);
     });
 
-    // The home page is served from the network name's host, but the
-    // supervisor's plugins know it as "homepage". Whichever name the visitor
-    // arrived with, the plugins are given theirs; the hand-off form finds
-    // the host again (resolveAppOrigin).
-    if (destination.explicit && destination.app !== "homepage") {
-        const home = new URL(await resolveAppOrigin("homepage")).host.split(".")[0];
-        if (destination.app === home) destination.app = "homepage";
+    // Find where the app is served today before doing anything for it. A
+    // name can redirect: the home page is served from the network name's
+    // host (which the supervisor's plugins know as "homepage"), and a
+    // renamed network or a moved app leaves its old name redirecting to the
+    // new one. Signing an account in to a name that only redirects fails,
+    // because a browser does not follow a redirect on a cross-origin
+    // preflight.
+    if (destination.explicit) {
+        const label = (origin: string) => new URL(origin).host.split(".")[0];
+        const home = label(await resolveAppOrigin("homepage"));
+        const served = label(await resolveAppOrigin(destination.app));
+        if (served === home) destination.app = "homepage";
+        else if (ACCOUNT_NAME.test(served)) destination.app = served;
     }
 
     const session = loadGuestSession();

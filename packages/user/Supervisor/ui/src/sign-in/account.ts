@@ -207,8 +207,14 @@ export const runAccountStep = async (ctx: PageContext) => {
         } catch (e) {
             console.error(e);
             showChooser();
+            // Say what is known, not a guess.
+            const record = await fetchRecord(net.siblingOrigin("auth-sig"), name, net.token).catch(
+                () => undefined,
+            );
             notice(
-                `${name} could not be signed in. If it is paused or frozen, open Manage accounts.`,
+                record && record.state !== "normal"
+                    ? `${name} is ${record.state}. Open Manage accounts to see what can be done.`
+                    : `${name} could not be signed in to ${ctx.app} just now. Try again.`,
             );
         }
     };
@@ -642,7 +648,7 @@ export const runAccountStep = async (ctx: PageContext) => {
         const key = document.createElement("textarea");
         key.className = "si-input si-textarea";
         key.id = "import-key";
-        key.placeholder = "-----BEGIN PRIVATE KEY-----";
+        key.placeholder = "The key: a base58 string (K… or L…), or a PEM key file";
         key.spellcheck = false;
         key.autocapitalize = "none";
         const go = document.createElement("button");

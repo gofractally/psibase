@@ -11,6 +11,7 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 import { bytesToHex } from "@noble/hashes/utils";
 
 import { hexToBytes, privateKeyPem } from "./account-keys";
+import { fromWif, looksLikeWif } from "./wif";
 
 export type Curve = "secp256k1" | "secp256r1";
 
@@ -28,11 +29,25 @@ const OID_R1 = "2a8648ce3d030107";
 
 const curves = { secp256k1, secp256r1: p256 } as const;
 
-/** Reads a PEM private key (PKCS#8, or SEC1 "EC PRIVATE KEY" for secp256k1). */
+/**
+ * Reads a private key as people hold one: a base58 string (secp256k1), or a
+ * PEM file (PKCS#8, or SEC1 "EC PRIVATE KEY" for secp256k1).
+ */
 export const parsePrivateKey = (text: string): PastedKey => {
+    if (looksLikeWif(text)) {
+        const { secret } = fromWif(text);
+        return {
+            curve: "secp256k1",
+            secret,
+            point: bytesToHex(secp256k1.getPublicKey(secret, true)),
+            pem: privateKeyPem(secret),
+        };
+    }
     const armor = /-----BEGIN ([A-Z ]*PRIVATE KEY)-----([\s\S]*?)-----END \1-----/.exec(text);
     if (!armor) {
-        throw new Error("That is not a private key file. Paste the whole file, including the BEGIN and END lines.");
+        throw new Error(
+            "That is not a private key. Paste the key's base58 string, or the whole key file including its BEGIN and END lines.",
+        );
     }
     if (armor[1].includes("ENCRYPTED")) {
         throw new Error("That key file is protected by a password. Remove the password first.");

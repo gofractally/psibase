@@ -96,7 +96,9 @@ struct TxArgs {
 #[clap(long_about = None)]
 struct SigArgs {
     /// Sign transactions with one or more keys.
-    /// Each KEY may be a PKCS #11 URI or a path to a PEM/DER-encoded private key file.
+    /// Each KEY may be a PKCS #11 URI, a path to a PEM/DER-encoded private key file,
+    /// or a secp256k1 key in base58 form (K..., L... or 5...) or a file holding one.
+    /// Prefer a file: a key typed on the command line stays in the shell's history.
     /// For an account that chose a verify service other than the default
     /// for its key, write VERIFIER=KEY (e.g. verify-br1=alice.pem).
     #[clap(short = 's', long, value_name = "KEY")]

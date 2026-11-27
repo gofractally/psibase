@@ -629,10 +629,114 @@ fn load_pkcs11_private_key(key: &str) -> Result<Arc<dyn Signer>, anyhow::Error> 
     return Err(Error::NoMatchingKey.into());
 }
 
+/// Decodes base58 (Bitcoin's alphabet). None if a character is not in it.
+#[cfg(not(target_family = "wasm"))]
+fn base58_decode(text: &str) -> Option<Vec<u8>> {
+    const ALPHABET: &[u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    let mut bytes: Vec<u8> = Vec::new(); // little-endian
+    for ch in text.bytes() {
+        let mut carry = ALPHABET.iter().position(|c| *c == ch)? as u32;
+        for b in bytes.iter_mut() {
+            carry += (*b as u32) * 58;
+            *b = (carry & 0xff) as u8;
+            carry >>= 8;
+        }
+        while carry > 0 {
+            bytes.push((carry & 0xff) as u8);
+            carry >>= 8;
+        }
+    }
+    let zeros = text.bytes().take_while(|c| *c == b'1').count();
+    bytes.extend(std::iter::repeat(0).take(zeros));
+    bytes.reverse();
+    Some(bytes)
+}
+
+/// A secp256k1 private key written as one base58check string (Bitcoin's
+/// wallet import format): 0x80, the 32-byte key, 0x01 if the public key is
+/// to be used compressed, then four check bytes. Returns the key and
+/// whether the compressed form was asked for; None if the text does not
+/// have that shape, an error if it does but is wrong.
+#[cfg(not(target_family = "wasm"))]
+fn parse_wif(text: &str) -> Result<Option<([u8; 32], bool)>, anyhow::Error> {
+    use sha2::{Digest, Sha256};
+    let text = text.trim();
+    let shaped = (51..=52).contains(&text.len())
+        && matches!(text.as_bytes()[0], b'5' | b'K' | b'L' | b'9' | b'c')
+        && text.bytes().all(|c| c.is_ascii_alphanumeric());
+    if !shaped {
+        return Ok(None);
+    }
+    let Some(bytes) = base58_decode(text) else {
+        return Ok(None);
+    };
+    if bytes.len() != 37 && bytes.len() != 38 {
+        return Ok(None);
+    }
+    let (payload, check) = bytes.split_at(bytes.len() - 4);
+    if Sha256::digest(Sha256::digest(payload))[..4] != *check {
+        return Err(anyhow::anyhow!("base58 private key: check digits do not match"));
+    }
+    // 0x80 is the mainnet version byte; 0xEF is what wallets on Bitcoin's
+    // test networks write. The key is the same number either way.
+    if payload[0] != 0x80 && payload[0] != 0xef {
+        return Ok(None);
+    }
+    let compressed = payload.len() == 34;
+    if compressed && payload[33] != 0x01 {
+        return Err(anyhow::anyhow!("base58 private key: malformed"));
+    }
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&payload[1..33]);
+    Ok(Some((key, compressed)))
+}
+
+/// The signer for a base58 private key, given either as the string itself
+/// or as a file that holds it. None if `key` is neither.
+#[cfg(not(target_family = "wasm"))]
+fn load_wif_private_key(key: &str) -> Result<Option<Arc<dyn Signer>>, anyhow::Error> {
+    let parsed = match parse_wif(key)? {
+        Some(parsed) => Some(parsed),
+        None => match std::fs::read_to_string(key) {
+            // Only a small text file can be one; anything else is left to
+            // the PEM and DER readers.
+            Ok(contents) if contents.len() < 128 => parse_wif(&contents)?,
+            _ => None,
+        },
+    };
+    let Some((secret, compressed)) = parsed else {
+        return Ok(None);
+    };
+    let secret_key = secp256k1::SecretKey::from_slice(&secret)?;
+    let public_key = secp256k1::PublicKey::from_secret_key(secp256k1::SECP256K1, &secret_key);
+    // The claim names the public key in the form the string asks for, which
+    // must be the form the account stores.
+    let point: Vec<u8> = if compressed {
+        public_key.serialize().to_vec()
+    } else {
+        public_key.serialize_uncompressed().to_vec()
+    };
+    let pubkey_info = Encode::to_der(&SubjectPublicKeyInfo {
+        algorithm: spki::AlgorithmIdentifier {
+            oid: OID_ECDSA,
+            parameters: Some(OID_SECP256K1),
+        },
+        subject_public_key: BitStringRef::from_bytes(&point)?,
+    })?;
+    check_supported(&pubkey_info)?;
+    Ok(Some(Arc::new(PKCS8PrivateKeyK1 {
+        key: secret_key,
+        pubkey: pubkey_info,
+    })))
+}
+
 #[cfg(not(target_family = "wasm"))]
 pub fn load_private_key(key: &str) -> Result<Arc<dyn Signer>, anyhow::Error> {
     if key.starts_with("pkcs11:") {
         return load_pkcs11_private_key(key);
+    }
+    if let Some(signer) = load_wif_private_key(key)? {
+        return Ok(signer);
     }
 
     let data = read_key_file(key, "PRIVATE KEY", Error::ExpectedPrivateKey)?;
