@@ -111,17 +111,22 @@ if(DEFINED WASI_SDK_PREFIX)
     # below, and a change of version means reading verify-r1 against the new
     # source again (packages/system/VerifyR1/src/VerifyR1.cpp says what to
     # compare).
+    # The version is part of the build prefix, and the install step clears
+    # what an earlier version installed. Botan's makefile adds to an existing
+    # libbotan-3.a, so building a new version in the old directory left
+    # objects of both versions in the archive (duplicate symbols at link).
+    set(WASM_BOTAN_VERSION 3.14.1)
     ExternalProject_Add(wasm-botan
-        URL https://botan.randombit.net/releases/Botan-3.14.1.tar.xz
+        URL https://botan.randombit.net/releases/Botan-${WASM_BOTAN_VERSION}.tar.xz
         URL_HASH SHA256=5b85cba0f014d344eb8e9919aee0a3bdc31e16acb05816410025be9bee1e0930
         DEPENDS ${wasm-deps}
-        PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm/botan
+        PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm/botan-${WASM_BOTAN_VERSION}
         INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps
         PATCH_COMMAND ${CMAKE_COMMAND} -DTYPES_H=<SOURCE_DIR>/src/lib/utils/types.h -P ${CMAKE_CURRENT_SOURCE_DIR}/wasm/patch-botan-word64.cmake
         CONFIGURE_COMMAND <SOURCE_DIR>/configure.py --cc-bin=${WASI_SDK_PREFIX}/bin/clang++ --cc=gcc --cpu=generic --os=none --ar-command=${WASI_SDK_PREFIX}/bin/llvm-ar --build-targets=static --with-sysroot-dir=${WASI_SDK_PREFIX}/share/wasi-sysroot --minimized-build --enable-modules=ecdsa,bcrypt,raw_hash,auto_rng,sha2_64,getentropy,pcurves_secp256r1,pcurves_secp256k1 --with-os-feature=getentropy "--cxxflags=--target=wasm32-wasip1 -O3 -msign-ext -mnontrapping-fptoint -mbulk-memory -mwide-arithmetic" --without-stack-protector --prefix=<INSTALL_DIR>
         BUILD_COMMAND make -j${NUM_PROCS}
-        INSTALL_COMMAND make install
-        COMMAND ${CMAKE_COMMAND} -E rm -rf <INSTALL_DIR>/include/botan-3-internal
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E rm -rf <INSTALL_DIR>/lib/libbotan-3.a <INSTALL_DIR>/include/botan-3 <INSTALL_DIR>/include/botan-3-internal
+        COMMAND make install
         COMMAND cp -RL <BINARY_DIR>/build/include/internal <INSTALL_DIR>/include/botan-3-internal
     )
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/lib/libbotan-3.a
