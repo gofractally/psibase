@@ -50,7 +50,8 @@ try {
         ],
     };
     const privateKeys = [
-        'PVT_K1_2bfGi9rYsXQSXXTvJbDAPhHLQUojjaNLomdm3cEJ1XTzMqUt3V',
+        // A secp256k1 private key in WIF
+        'KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617',
     ];
 
     // Don't forget the await!

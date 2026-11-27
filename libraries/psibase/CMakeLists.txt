@@ -30,6 +30,7 @@ function(add suffix)
         common/src/WebSocket.cpp
         common/src/HttpHeaders.cpp
         common/src/usage.cpp
+        common/src/wif.cpp
     )
 
     if(DEFINED IS_WASM)

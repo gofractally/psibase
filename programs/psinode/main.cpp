@@ -322,9 +322,19 @@ namespace psibase
          }
          v = result;
       }
+      else if (looksLikeWif(s))
+      {
+         // A secp256k1 private key in WIF, as `psibase key generate` writes it
+         WifError error{};
+         auto     key = wifDecode(s, &error);
+         if (!key)
+            throw std::runtime_error(std::string(wifErrorMessage(error)));
+         v = std::shared_ptr<Prover>(std::make_shared<OpenSSLProver>(*key));
+      }
       else
       {
-         throw std::runtime_error("Not implemented: Key must be specified using a ClaimKey object");
+         throw std::runtime_error(
+             "Not implemented: Key must be a ClaimKey object or a secp256k1 private key in WIF");
       }
    }
 

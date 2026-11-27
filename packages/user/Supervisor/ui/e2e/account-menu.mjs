@@ -136,7 +136,11 @@ await step(a, "Accounts & keys goes to key management and comes back to the same
     await page.click('[role="menuitem"]:has-text("Accounts & keys")');
     await page.waitForSelector("#view-manage:not([hidden])", { timeout: 30000 });
     const url = new URL(page.url());
-    await page.click("#mg-below >> text=Back");
+    const ways = (await page.locator("#mg-below button").allTextContents()).join(" | ");
+    if (!ways.includes("Home (")) throw new Error("no way home: " + ways);
+    const brand = await page.getAttribute("#network", "href");
+    if (!brand || !brand.endsWith(`${root}/`)) throw new Error("network name is not a home link: " + brand);
+    await page.click("#mg-below >> text=Choose an account");
     await page.waitForSelector(`text=Continue as ${A}`, { timeout: 30000 });
     return `manage for app=${url.searchParams.get("app")}; back offers the account chooser`;
 });

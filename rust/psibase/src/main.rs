@@ -45,6 +45,7 @@ use std::sync::Arc;
 use tower::Service;
 
 use psibase::cli::config::{handle_cli_config_cmd, read_host_url, ConfigCommand};
+use psibase::cli::key::{handle_cli_key_cmd, KeyCommand};
 
 /// Basic commands
 #[derive(Parser, Debug)]
@@ -96,7 +97,10 @@ struct TxArgs {
 #[clap(long_about = None)]
 struct SigArgs {
     /// Sign transactions with one or more keys.
-    /// Each KEY may be a PKCS #11 URI or a path to a PEM/DER-encoded private key file.
+    /// Each KEY may be a secp256k1 private key in WIF (K..., L... or 5...) or a
+    /// file holding one (see `psibase key generate`), a path to a
+    /// PEM/DER-encoded private key file, or a PKCS #11 URI.
+    /// Prefer a file: a key typed on the command line stays in the shell's history.
     /// For an account that chose a verify service other than the default
     /// for its key, write VERIFIER=KEY (e.g. verify-br1=alice.pem).
     #[clap(short = 's', long, value_name = "KEY")]
@@ -124,6 +128,9 @@ struct AccountArgs {
     /// requestOwnerChange actions. VERIFIER=KEY chooses a verify service
     /// other than the default for the key (e.g. verify-br1=alice.pub);
     /// the account then signs with -s VERIFIER=KEY.
+    /// KEY may be a PEM/DER-encoded public key file, a PKCS #11 URI, or a
+    /// secp256k1 private key in WIF or a file holding one, which stands for
+    /// its public key.
     #[clap(short = 'k', long, value_name = "KEY")]
     key: Option<AnyPublicKey>,
 
@@ -143,11 +150,15 @@ struct BootArgs {
     #[command(flatten)]
     tx_args: TxArgs,
 
-    /// Sets the producer account to use this key for transaction authentication
+    /// Sets the producer account to use this key for transaction authentication.
+    /// KEY may be a PEM/DER-encoded public key file, a PKCS #11 URI, or a
+    /// secp256k1 private key in WIF or a file holding one, which stands for
+    /// its public key.
     #[clap(short = 'k', long, value_name = "KEY")]
     account_key: Option<AnyPublicKey>,
 
-    /// Sets the producer's block signing key
+    /// Sets the producer's block signing key: the public key of a key that
+    /// the node holds, in any form that -k takes
     #[clap(long, value_name = "BLOCK_KEY")]
     block_key: Option<AnyPublicKey>,
 
@@ -562,6 +573,10 @@ enum Command {
     /// Setup the psibase local config file
     #[command(subcommand)]
     Config(ConfigCommand),
+
+    /// Create a private key, or show a key in another form
+    #[command(subcommand)]
+    Key(KeyCommand),
 
     /// Print help for the subcommands
     Help { command: Vec<OsString> },
@@ -2766,6 +2781,7 @@ async fn main() -> Result<(), anyhow::Error> {
         Command::Info(args) => package_info(&args).await?,
         Command::Login(args) => handle_login(&args).await?,
         Command::Config(config) => handle_cli_config_cmd(&config)?,
+        Command::Key(command) => handle_cli_key_cmd(&command)?,
         Command::Help { command } => print_help(&command)?,
         Command::External(argv) => handle_external(&argv)?,
     }

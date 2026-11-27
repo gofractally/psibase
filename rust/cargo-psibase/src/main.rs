@@ -159,7 +159,8 @@ struct Args {
 #[clap(long_about = None)]
 struct SigArgs {
     /// Sign transactions with one or more keys.
-    /// Each KEY may be a PKCS #11 URI or a path to a PEM/DER-encoded private key file.
+    /// Each KEY may be a secp256k1 private key in WIF or a file holding one,
+    /// a path to a PEM/DER-encoded private key file, or a PKCS #11 URI.
     #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<String>,
 

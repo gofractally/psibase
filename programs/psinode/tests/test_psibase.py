@@ -422,6 +422,70 @@ class TestPsibase(unittest.TestCase):
         a.run_psibase(['modify', 'alice', '-i', '--sign', key_file] + a.node_args())
 
     @testutil.psinode_test
+    def test_sign_wif(self, cluster):
+        '''Private keys in WIF on the command line, in both forms of the public key'''
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer', 'AuthSig'])
+        def psibase_output(args):
+            return a.run_psibase(args, stdout=subprocess.PIPE, encoding='utf-8').stdout
+
+        # A key as the command line makes it: a file holding K... or L...
+        # -k takes the file for its public key; -s signs with the file or the string.
+        alice_file = os.path.join(a.dir, 'alice.key')
+        a.run_psibase(['key', 'generate', '-o', alice_file])
+        self.assertEqual(os.stat(alice_file).st_mode & 0o777, 0o600)
+        with open(alice_file) as f:
+            alice_wif = f.read().strip()
+        self.assertRegex(alice_wif, '^[KL][1-9A-HJ-NP-Za-km-z]{51}$')
+        alice = PrivateKey(alice_wif)
+        self.assertEqual(psibase_output(['key', 'show', alice_file]), alice.spki())
+        self.assertEqual(psibase_output(['key', 'show', '--private', alice_file]).strip(), alice_wif)
+        a.run_psibase(['create', 'alice', '-k', alice_file] + a.node_args())
+        a.run_psibase(['create', 'alice2', '-k', alice_file] + a.node_args())
+        a.wait(new_block())
+        a.run_psibase(['modify', 'alice', '-i', '--sign', alice_wif] + a.node_args())
+        # The PEM form of the same key signs for the same public key
+        alice_pem = os.path.join(a.dir, 'alice.pem')
+        with open(alice_pem, 'w') as f:
+            f.write(psibase_output(['key', 'show', '--private', '--pem', alice_file]))
+        a.run_psibase(['modify', 'alice2', '-i', '--sign', alice_pem] + a.node_args())
+
+        # An account whose stored key is the uncompressed point, as a public
+        # key file written by OpenSSL has it. The chain compares the claim
+        # with the stored key byte for byte, so the K.../L... string of the
+        # same key does not sign for it and the 5... string does.
+        bob = PrivateKey()
+        bob_pub = os.path.join(a.dir, 'bob.pub')
+        with open(bob_pub, 'w') as f:
+            f.write(bob.spki())
+        a.run_psibase(['create', 'bob', '-k', bob_pub] + a.node_args())
+        a.wait(new_block())
+        refused = a.run_psibase(['modify', 'bob', '-i', '--sign', bob.wif(compressed=True)] + a.node_args(), check=False)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertTrue(bob.wif().startswith('5'))
+        a.run_psibase(['modify', 'bob', '-i', '--sign', bob.wif()] + a.node_args())
+
+        # The other way around: created from the 5... string, signed with
+        # the PEM file that holds the uncompressed point
+        carol = PrivateKey()
+        carol_wif = os.path.join(a.dir, 'carol.key')
+        carol_pem = os.path.join(a.dir, 'carol.pem')
+        with open(carol_wif, 'w') as f:
+            f.write(carol.wif() + '\n')
+        with open(carol_pem, 'w') as f:
+            f.write(carol.pkcs8())
+        self.assertEqual(psibase_output(['key', 'show', '--private', carol_pem]).strip(), carol.wif())
+        a.run_psibase(['create', 'carol', '-k', carol_wif] + a.node_args())
+        a.wait(new_block())
+        a.run_psibase(['modify', 'carol', '-i', '--sign', carol_pem] + a.node_args())
+
+        # A mistyped key is refused as a key
+        mistyped = alice_wif[:-1] + ('2' if alice_wif[-1] != '2' else '3')
+        refused = a.run_psibase(['modify', 'alice', '-i', '--sign', mistyped] + a.node_args(), check=False, stderr=subprocess.PIPE, encoding='utf-8')
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn('check digits do not match', refused.stderr)
+
+    @testutil.psinode_test
     def test_staged_install(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'AuthSig'])

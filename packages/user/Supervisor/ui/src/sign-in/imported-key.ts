@@ -10,6 +10,8 @@ import { p256 } from "@noble/curves/p256";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { bytesToHex } from "@noble/hashes/utils";
 
+import { WifError, looksLikeWif, wifDecode } from "@psibase/common-lib";
+
 import { hexToBytes, privateKeyPem } from "./account-keys";
 
 export type Curve = "secp256k1" | "secp256r1";
@@ -28,11 +30,38 @@ const OID_R1 = "2a8648ce3d030107";
 
 const curves = { secp256k1, secp256r1: p256 } as const;
 
-/** Reads a PEM private key (PKCS#8, or SEC1 "EC PRIVATE KEY" for secp256k1). */
+/**
+ * Reads a private key as people hold one: a base58 string (secp256k1), or a
+ * PEM file (PKCS#8, or SEC1 "EC PRIVATE KEY" for secp256k1).
+ */
 export const parsePrivateKey = (text: string): PastedKey => {
+    // A secp256k1 key in Bitcoin's wallet import format: K... or L..., or the
+    // older 5..., or c.../9... from a wallet on one of Bitcoin's test
+    // networks. The format is common-lib's (psibase/wif.hpp).
+    const pasted = text.trim();
+    if (looksLikeWif(pasted)) {
+        let secret: Uint8Array;
+        try {
+            ({ secret } = wifDecode(pasted));
+        } catch (e) {
+            throw new Error(
+                e instanceof WifError && e.reason === "bad-checksum"
+                    ? "That key has a mistake in it: its check digits do not match."
+                    : "That is not a private key in base58 form.",
+            );
+        }
+        return {
+            curve: "secp256k1",
+            secret,
+            point: bytesToHex(secp256k1.getPublicKey(secret, true)),
+            pem: privateKeyPem(secret),
+        };
+    }
     const armor = /-----BEGIN ([A-Z ]*PRIVATE KEY)-----([\s\S]*?)-----END \1-----/.exec(text);
     if (!armor) {
-        throw new Error("That is not a private key file. Paste the whole file, including the BEGIN and END lines.");
+        throw new Error(
+            "That is not a private key. Paste the key's base58 string, or the whole key file including its BEGIN and END lines.",
+        );
     }
     if (armor[1].includes("ENCRYPTED")) {
         throw new Error("That key file is protected by a password. Remove the password first.");

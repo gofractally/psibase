@@ -40,6 +40,7 @@ mod trace;
 mod transaction_builder;
 mod trust;
 mod verifier;
+mod wif;
 mod web_services;
 
 pub use account_number::*;
@@ -76,6 +77,7 @@ pub use to_key::*;
 pub use trace::*;
 pub use transaction_builder::*;
 pub use verifier::*;
+pub use wif::*;
 pub use web_services::*;
 
 

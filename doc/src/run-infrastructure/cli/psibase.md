@@ -11,6 +11,8 @@ psibase - The psibase blockchain command line client
 `psibase` `deploy` [`-a` *url*] [`-p`] *account* *wasm* *schema*  
 `psibase` `info` [`-a` *url*] *packages*\.\.\.  
 `psibase` `install` [`-a` *url*] [`-S` *sender*] *packages*\.\.\.  
+`psibase` `key` `generate` [`--pem`] [`-o` *file*]  
+`psibase` `key` `show` [`--private` [`--pem`]] *key*  
 `psibase` `list` [`-a` *url*] [`--all` | `--available` | `--installed` | `--updates`]  
 `psibase` `login` [`-a` *url*] *account*  
 `psibase` `modify` [`-a` *url*] [`-i` | `-k` *public-key* | `-o` *account*] *account*  
@@ -50,8 +52,13 @@ psibase - The psibase blockchain command line client
 - `-s`, `--sign` *private-key*
 
   Sign transactions with this key. The key can be in any of the following forms:
-  - A file containing a PEM or DER encoded private key
+  - A secp256k1 private key in WIF, the one-line base58 form that Bitcoin tools read and write (`K...` or `L...`; see [key](#key)), or a file containing one. Prefer the file: a key typed on the command line stays in the shell's history.
+  - A file containing a PEM or DER encoded private key (PKCS #8). This is the form for P-256 keys.
   - A PKCS #11 URI
+
+  ```
+  psibase push -s alice.key actions.json
+  ```
 
   The claim for the key names the default verify service for its type. For an account that chose another verify service (see `modify`), write *verifier*`=`*private-key*, for example `-s verify-br1=alice.pem`.
 
@@ -82,12 +89,14 @@ The boot command deploys a set of system services and web interfaces suitable fo
 - `-k`, `--account-key` *public-key*
 
   Set the producer account to use this key for transaction authentication. The public key can be any of the following:
+  - A secp256k1 private key in WIF, or a file containing one (for example the file that `psibase key generate -o` wrote). It stands for its public key; the private key is not sent anywhere.
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
 
 - `--block-key` *public-key*
 
   Set the producer's block signing key. The public key can be any of the following:
+  - A secp256k1 private key in WIF, or a file containing one (for example the file that `psibase key generate -o` wrote). It stands for its public key; the private key is not sent anywhere.
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
 
@@ -116,6 +125,7 @@ Create an account. If the account already exists, verify that its authentication
 - `-k`, `--key` *public-key*
 
   Set the account to authenticate using this key. The public key can be any of the following:
+  - A secp256k1 private key in WIF, or a file containing one (for example the file that `psibase key generate -o` wrote). It stands for its public key; the private key is not sent anywhere.
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
 
@@ -251,6 +261,61 @@ Prints a list of packages from the chain and/or package repositories
 
   Account that would install the packages. If this account has configured package sources on-chain, those sources will be used [default: root]
 
+### key
+
+`psibase` `key` `generate` [`--pem`] [`-o` *file*]  
+`psibase` `key` `show` [`--private` [`--pem`]] *key*  
+
+Create a private key, or show a key in another form. Neither command talks to a node.
+
+A secp256k1 private key is written in WIF (wallet import format), the same string that Bitcoin tools read and write:
+
+```
+KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617
+```
+
+The alternative is a PKCS #8 PEM document, the form OpenSSL reads, and the only form for P-256 keys:
+
+```
+-----BEGIN PRIVATE KEY-----
+MGQCAQAwEAYHKoZIzj0CAQYFK4EEAAoETTBLAgEBBCAMKPyjhseiJ2ALL+ULfK4R
+7IbTvx++RxvomCfhnXKqHaEkAyIAAtDeCq6u+tAri9yKAaG4sRxpa9PWaixfEHgN
+lbffQmRc
+-----END PRIVATE KEY-----
+```
+
+Every option that takes a key takes either form.
+
+`key generate` creates a new secp256k1 key and prints it in WIF.
+
+- `-o`, `--output` *file*
+
+  Write the key to *file* instead of printing it. The file must not exist and is created readable by its owner only.
+
+- `--pem`
+
+  Write the key as a PKCS #8 PEM document instead of WIF
+
+`key show` prints the public key of *key* as a PEM document. *key* is a private key in any form that `--sign` takes.
+
+- `--private`
+
+  Print the private key instead, in WIF. Only secp256k1 keys have that form.
+
+- `--pem`
+
+  With `--private`, print the private key as a PKCS #8 PEM document instead of WIF
+
+```
+psibase key generate -o alice.key           # a new key, in WIF
+psibase create alice -k alice.key           # an account that uses its public key
+psibase push -s alice.key actions.json      # sign with it
+psibase key show alice.key                  # its public key, PEM
+psibase key show --private --pem alice.key  # the private key, PEM
+```
+
+A WIF string also says in which form the public key is used. Strings that start with `K` or `L` (what `key generate` writes) stand for the compressed form of the public key, and the older strings that start with `5` for the uncompressed form. The chain compares the key in a signature's claim with the account's key byte for byte, so an account must be signed for with the form it was created with. A PEM file made by `openssl genpkey` holds the uncompressed form: an account created from such a file's public key is signed for with that file, or with the `5...` string that `psibase key show --private` prints for it. Strings that start with `c` or `9` are the same two forms as written by wallets on Bitcoin's test networks; they are accepted and name the same keys.
+
 ### login
 
 `psibase` `login` [`-a` *url*] *account*  
@@ -278,6 +343,7 @@ Modify an account
 - `-k`, `--key` *public-key*
 
   Set the account to authenticate using this key. The public key can be any of the following:
+  - A secp256k1 private key in WIF, or a file containing one (for example the file that `psibase key generate -o` wrote). It stands for its public key; the private key is not sent anywhere.
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
 

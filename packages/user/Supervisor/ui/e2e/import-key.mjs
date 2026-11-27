@@ -93,6 +93,9 @@ await step(a, "a visitor signs in with a passkey", async (page) => {
 });
 
 const pem = fs.readFileSync(`${dir}/${T}.pem`, "utf8");
+import crypto from "node:crypto";
+const toWif = (secret) => { const A58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"; const payload = Buffer.concat([Buffer.from([0x80]), secret, Buffer.from([1])]); const sum = crypto.createHash("sha256").update(crypto.createHash("sha256").update(payload).digest()).digest().subarray(0, 4); let n = BigInt("0x" + Buffer.concat([payload, sum]).toString("hex")); let out = ""; while (n > 0n) { out = A58[Number(n % 58n)] + out; n /= 58n; } return out; };
+const wif = toWif(Buffer.from(crypto.createPrivateKey(pem).export({ format: "jwk" }).d, "base64url"));
 execFileSync("openssl", ["genpkey", "-algorithm", "EC", "-pkeyopt", "ec_paramgen_curve:secp256k1", "-out", `${dir}/other.pem`]);
 const importUrl = `${S}://supervisor.${root}/sign-in.html?step=account&intent=import&app=${app}&path=/`;
 const profileAction = (bio) => { const f = `${dir}/${T}-p.json`; fs.writeFileSync(f, JSON.stringify([{ sender: T, service: "profiles", method: "setProfile", data: { display_name: "Vault", bio } }])); return f; };
@@ -105,7 +108,7 @@ await step(a, "a key that is not the account's is refused", async (page) => {
     return await page.textContent("#acct-notice");
 });
 await step(a, "importing the account's key signs the browser in and leaves the account as it was", async (page) => {
-    await page.fill("#import-name", T); await page.fill("#import-key", pem);
+    await page.fill("#import-name", T); await page.fill("#import-key", wif);   // the base58 form
     await snap(a, "import");
     await page.click("#import-go");
     await onApp(page);
