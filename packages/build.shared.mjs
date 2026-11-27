@@ -36,7 +36,12 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
   function calculateFileHashes(dir) {
     const fileHashes = new Map();
     
-    if (fs.existsSync(dir)) {
+    if (fs.existsSync(dir) && !fs.statSync(dir).isDirectory()) {
+      // A single file named as a source
+      const hash = createHash('md5');
+      hash.update(fs.readFileSync(dir));
+      fileHashes.set(path.relative(projectDir, dir), hash.digest('hex'));
+    } else if (fs.existsSync(dir)) {
       const items = fs.readdirSync(dir);
       for (const item of items) {
         const filePath = path.join(dir, item);
