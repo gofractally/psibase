@@ -50,10 +50,7 @@ pub mod service {
                 name: "Access-Control-Allow-Credentials".into(),
                 value: "true".into(),
             });
-            cors.push(HttpHeader {
-                name: "Vary".into(),
-                value: "Origin".into(),
-            });
+            // `Vary: Origin` is added by the node for a sibling origin; a second one is not needed.
         }
         let mut reply = answer(&request)?;
         reply.headers.extend(cors);
