@@ -24,6 +24,8 @@ import { getClientKeyBytes } from "./client-key";
 import { getRecoverableError } from "./plugin/errors";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
+import { warm } from "./plugin/prefetch";
+import { getServiceMap } from "./plugin/service-context";
 import { withTransactionLock } from "./transaction-lock";
 import {
     OriginationData,
@@ -143,6 +145,9 @@ export class Supervisor implements AppInterface {
     private async doPreload(plugins: QualifiedPluginId[]) {
         this.inPreload = true;
         try {
+            // Everything this app needed last time is asked for now, in one
+            // go, so the walk below finds it already here.
+            warm(this.parentOrigination?.app ?? "supervisor", getServiceMap);
             await chainIdPromise;
 
             if (plugins.length === 0) {

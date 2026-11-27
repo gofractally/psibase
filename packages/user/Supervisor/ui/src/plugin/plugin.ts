@@ -14,7 +14,8 @@ import {
 } from "../component-loading/loader";
 import { DownloadFailed } from "../errors";
 import { HostInterface } from "../host-interface";
-import { networkName, parser, wasmFromUrl } from "../utils";
+import { parser, wasmFromUrl } from "../utils";
+import { pluginUrl, takeBytes } from "./prefetch";
 import { ComponentAPI } from "../wit-extraction";
 import { InvalidCall, PluginDownloadFailed, PluginInvalid } from "./errors";
 
@@ -61,15 +62,9 @@ export class Plugin {
     }
 
     private async doFetchPlugin(): Promise<Uint8Array> {
-        const { service, plugin } = this.id;
-        // The homepage service is served from the configured network name's
-        // subdomain. Fetching it via the "homepage" alias would redirect,
-        // which breaks authenticated (preflighted) requests.
-        const host =
-            service === "homepage" && networkName ? networkName : service;
-        const url = siblingUrl(null, host, `/${plugin}.wasm`);
+        const url = pluginUrl(this.id);
         try {
-            this.bytes = await wasmFromUrl(url);
+            this.bytes = (await takeBytes(url)) ?? (await wasmFromUrl(url));
             return this.bytes;
         } catch (e) {
             if (e instanceof DownloadFailed) {
