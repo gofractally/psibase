@@ -70,6 +70,8 @@ class TestSites(unittest.TestCase):
             'index.html': 'foo home',
             'plugin.wasm': 'foo plugin',
             'assets/index-DiwrgTda.js': 'foo script',
+            'assets/style-AgyV-iFx.css': 'foo hashed style',
+            'assets/index-D_ZJrvOo.js': 'foo other script',
             'assets/logo.svg': 'foo logo',
             'assets/long-filename.css': 'foo style',
             'other/index-DiwrgTda.js': 'foo other',
@@ -109,9 +111,10 @@ class TestSites(unittest.TestCase):
                 self.assertEqual(reply.headers['Cache-Control'], 'no-cache')
 
         # A bundler's hashed file name under assets/ can be kept; other names can not
-        with a.get('/assets/index-DiwrgTda.js', 'foo') as reply:
-            reply.raise_for_status()
-            self.assertEqual(reply.headers['Cache-Control'], FOREVER)
+        for path in ['/assets/index-DiwrgTda.js', '/assets/style-AgyV-iFx.css', '/assets/index-D_ZJrvOo.js']:
+            with a.get(path, 'foo') as reply:
+                reply.raise_for_status()
+                self.assertEqual(reply.headers['Cache-Control'], FOREVER, path)
         for path in ['/assets/logo.svg', '/assets/long-filename.css', '/other/index-DiwrgTda.js', '/']:
             with a.get(path, 'foo') as reply:
                 reply.raise_for_status()
