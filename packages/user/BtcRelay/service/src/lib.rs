@@ -341,6 +341,20 @@ pub mod service {
         c.protected_height = c.protected_height.max(h.height);
         RelayTable::read_write().put(&c).unwrap();
     }
+    /// The relay's own account may change how many confirmations a proof needs, within the
+    /// range init accepts. Nothing already accepted is undone.
+    #[action]
+    fn setRequired(required: u32) {
+        assert_eq!(
+            get_sender(),
+            Wrapper::SERVICE,
+            "Relay confirmation policy authority"
+        );
+        assert!((1..=144).contains(&required), "Confirmation policy range");
+        let mut c = config();
+        c.required = required;
+        RelayTable::read_write().put(&c).unwrap();
+    }
     #[action]
     fn check(block: String) -> HeaderRow {
         confirmed(&block)
