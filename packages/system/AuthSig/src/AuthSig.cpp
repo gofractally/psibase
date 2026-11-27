@@ -328,7 +328,13 @@ namespace SystemService
          if (auto existing = authTable.getIndex<0>().get(account))
          {
             // Never a way to change a record: only to find it as it would
-            // have been written.
+            // have been written. The comparison is of the keys and the
+            // partner and must stay that: the rest of a record moves by
+            // other actions (nextRequestId with each recovery request, the
+            // state and its times), and a package's postinstall sends this
+            // action again at every upgrade. Comparing the whole record
+            // would make an upgrade fail for an account that is still
+            // exactly whose it was.
             check(existing->owner == ownerKey && existing->active == activeKey &&
                       !existing->partner.has_value(),
                   "account already has keys");

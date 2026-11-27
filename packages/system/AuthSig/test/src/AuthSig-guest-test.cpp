@@ -354,6 +354,53 @@ TEST_CASE("guest: its keys, partner and auth service cannot be changed")
    CHECK(f.push(f.nop()).failed(denied));
 }
 
+TEST_CASE("guest: initKeys stays a no-op whatever others send")
+{
+   // A package's postinstall sends initKeys again at every upgrade, so it
+   // must keep finding the record as it left it. Parts of a record are
+   // advanced by actions (nextRequestId by proposeRecovery, the state by
+   // pause and freeze), but none of those is open to anyone for this
+   // account: they need an owner key, and the actions on recovery requests
+   // need the recovery partner. The one action anyone may send is refresh,
+   // which rewrites the record as it is. So: the refusals, then refresh,
+   // then initKeys again.
+   Fixture f;
+   Key     k;
+   auto    bySelf = f.t.from(AuthService::service).to<AuthService>();
+   auto    again  = [&]
+   { return bySelf.initKeys(guest, KeySpec::of(guestKey()), KeySpec::of(guestKey())); };
+
+   for (auto who : {f.alice, f.root, Accounts::service, AuthService::service})
+   {
+      INFO(who.str());
+      auto by = f.t.from(who).to<AuthService>();
+      CHECK(by.rejectRecovery(guest, 1).failed(notPartner));
+      CHECK(by.unfreeze(guest, 1).failed(notPartner));
+      CHECK(by.unfreezeWith(guest, k.spec(), k.spec()).failed(notPartner));
+      CHECK(by.confirm(guest).failed(notPartner));
+      CHECK(by.reject(guest).failed(notPartner));
+      CHECK(by.endPause(guest).failed(notPartner));
+      REQUIRE(by.refresh(guest).succeeded());
+   }
+   for (auto action : {f.as.proposeRecovery(k.spec(), k.spec()), f.as.requestPartnerChange(f.alice),
+                       f.as.pause(), f.as.freeze()})
+   {
+      CHECK(f.push(action).failed(denied));
+      CHECK(f.push(action, {&k}).failed(denied));
+   }
+
+   auto record = f.t.from(f.alice).to<AuthService>().getRecord(guest).returnVal().value();
+   CHECK(record.nextRequestId == 1);
+   CHECK(!record.partner);
+
+   REQUIRE(again().succeeded());
+   f.t.startBlock(400 * day * 1000);
+   REQUIRE(f.t.from(f.alice).to<AuthService>().refresh(guest).succeeded());
+   REQUIRE(again().succeeded());
+   CHECK(f.unchanged());
+   CHECK(!f.t.from(f.alice).to<AuthService>().getRecord(guest).returnVal().value().partner);
+}
+
 TEST_CASE("guest: the name cannot be created again")
 {
    Fixture f;

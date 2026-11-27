@@ -338,13 +338,18 @@ namespace SystemService
          /// By this service's own account: give keys to `account`, which uses this auth
          /// service and has no keys here. The account gets no recovery partner.
          ///
-         /// Such an account exists only when `accounts::newAccount` was called directly
-         /// with this service as the auth service; until it has keys nothing can authorize
-         /// it. This is how an account is created whose keys nobody holds and whose creator
-         /// is not its recovery partner: `newAccount` would make the sender the partner,
-         /// and `setKeys` has to be sent by the account. A record that exists is never
-         /// changed: if `account` already has exactly these keys and no recovery partner,
-         /// nothing happens, so the action may be repeated; with any other record it fails.
+         /// This is general: it applies to any account that points at this service and has
+         /// no record yet, whatever its name. Such an account exists only when
+         /// `accounts::newAccount` was called directly with this service as the auth service
+         /// (`accounts::setAuthServ` refuses an account that has no keys here); until it has
+         /// keys nothing can authorize it. Whoever controls this service's account could
+         /// do as much without this action, by replacing the service's code.
+         ///
+         /// It is how an account is created whose keys nobody holds and whose creator is
+         /// not its recovery partner: `newAccount` would make the sender the partner, and
+         /// `setKeys` has to be sent by the account. A record that exists is never changed:
+         /// if `account` already has exactly these keys and no recovery partner, nothing
+         /// happens, so the action may be repeated; with other keys or a partner it fails.
          void initKeys(psibase::AccountNumber account, KeySpec owner, KeySpec active);
 
          /// Replace the sender's active key. Owner key only. Immediate.

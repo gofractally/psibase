@@ -68,6 +68,8 @@ The `AuthSigService` package creates it when it is installed, with two actions (
 1. `accounts::newAccount("guest", "auth-sig", matchExisting)`, sent by `accounts`, the one account that may create a name this short. The account then exists, uses `auth-sig` and has no keys: nothing can authorize it.
 2. `auth-sig::initKeys("guest", key, key)`, sent by `auth-sig`. It gives keys, and no recovery partner, to an account in exactly that state, and never changes a record that exists.
 
+`initKeys` is not about `guest`: it names no account. The service's own account can give keys, and no recovery partner, to any account that points at `auth-sig` and has no record there yet. An account gets into that state only when `accounts::newAccount` is called with `auth-sig` as the auth service directly; `accounts::setAuthServ` refuses to move an account to `auth-sig` before it has keys. This gives whoever controls the `auth-sig` account nothing they could not do anyway by replacing the service.
+
 It is not created with `auth-sig::newAccount`, which makes the creator the recovery partner: a partner can install new keys in a frozen account, and only the owner key can remove a partner. Every package set that includes `auth-sig` therefore has the account from the first block: `DevDefault`, `ProdDefault`, `ProdWithFG`, `PrivDefault` and `TestDefault`. `Minimal` has neither `auth-sig` nor accounts for people, and does not have it.
 
 Both actions may be repeated; they do nothing if the account is already as they would make it, and fail if `guest` exists in any other form.
@@ -78,7 +80,7 @@ What this does not cover: the accounts that govern the chain can rewrite anythin
 
 A chain booted before this account existed gets it once, from its operator. The transactions are sent as `accounts` and `auth-sig`, which the producers control through `root`: sign with the key that authorizes `root` on that chain (the producer's block signing key, on a chain with one producer).
 
-1. Check that the name is free. This must print `null`; if it prints an account, stop: somebody holds the name, and that has to be resolved first.
+1. Check that the name is free, before upgrading anything. This must print `null`; if it prints an account, stop: somebody holds the name, and that has to be resolved first. The upgrade of `AuthSigService` in the next step fails as a whole, service code included, if `guest` exists with another auth service, or with `auth-sig` and other keys or a recovery partner. An ordinary account cannot have created a name of 5 characters: it takes `accounts` itself or a name the name market has released, so in practice it is the chain's operator who would know.
 
    ```sh
    curl -s -H 'Content-Type: application/graphql' \
