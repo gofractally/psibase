@@ -91,9 +91,10 @@ def _setup():
  progress_path=STATE/'progress.json';progress=json.loads(progress_path.read_text()) if progress_path.exists() else {}
  def done(stage):progress[stage]=True;progress_path.write_text(json.dumps(progress))
  if not progress.get('boot'):
-  # The released Symbol query module exceeds the normal transaction staging budget.
-  # Include this platform dependency in genesis; application modules install normally.
-  invoke([Path(os.environ.get('BTCBRIDGE_BOOT_CLI',ROOT/'rust/target/release/psibase')),'boot','-a',API,'-p','psibase','--package-source',PACKAGES.resolve(),'-k',auth.keypair('psibase')[1],'Minimal','Symbol','AuthSigService']);done('boot')
+  # Every platform package goes into genesis: their services have short
+  # account names, which only the chain's own boot may create. The bridge's
+  # packages, whose accounts have ordinary names, install afterwards.
+  invoke([Path(os.environ.get('BTCBRIDGE_BOOT_CLI',CLI)),'boot','-a',API,'-p','psibase','--package-source',PACKAGES.resolve(),'-k',auth.keypair('psibase')[1],'DevDefault']);done('boot')
  if not progress.get('install'):
   # Boot uses optimistic pushes. Let their block references and package metadata
   # become visible in the committed head before resolving/installing more apps.
@@ -104,7 +105,7 @@ def _setup():
     if current==previous:raise ValueError('Waiting for committed boot head')
     return current
    wait(advanced)
-  for package in ('AuthSig','Host','Supervisor','WebCrypto','Profiles','Homepage','BtcBridge','Exchange'):
+  for package in ('BtcBridge','Exchange'):
    invoke([CLI,'install','-a',API,'-S','psibase',*signing_flags(['psibase']),'-y','--package-source',PACKAGES.resolve(),package])
   done('install')
  auth.provision()
