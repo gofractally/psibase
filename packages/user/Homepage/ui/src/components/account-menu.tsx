@@ -1,5 +1,6 @@
 import {
     BookUser,
+    LifeBuoy,
     LogOut,
     Monitor,
     Moon,
@@ -16,6 +17,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAccountMarketplaceVisibility } from "@/apps/accounts-marketplace/hooks/use-account-marketplace-visibility";
 import { ACCOUNT_MARKETPLACE_PATH } from "@/apps/accounts-marketplace/route";
+import { useIsRecoveryPartner } from "@/apps/recovery/hooks";
+import { RECOVERY_PATH } from "@/apps/recovery/route";
 import { GenerateInviteDialogContent } from "@/apps/contacts/components/generate-invite-dialog";
 
 import { useAccountSheet } from "@/hooks/use-account-sheet";
@@ -106,6 +109,7 @@ const AccountItems = ({
     const displayName = profile?.profile?.displayName?.trim();
     const { open: openAccount } = useAccountSheet();
     const marketplace = useAccountMarketplaceVisibility();
+    const isRecoveryPartner = useIsRecoveryPartner();
     const {
         restrictsSelfService,
         isLoading: isNetworkLoading,
@@ -168,6 +172,14 @@ const AccountItems = ({
                         <Link to={`/${ACCOUNT_MARKETPLACE_PATH}`}>
                             <Store />
                             Account Marketplace
+                        </Link>
+                    </DropdownMenuItem>
+                )}
+                {isRecoveryPartner && (
+                    <DropdownMenuItem asChild>
+                        <Link to={`/${RECOVERY_PATH}`}>
+                            <LifeBuoy />
+                            Recovery
                         </Link>
                     </DropdownMenuItem>
                 )}
