@@ -296,6 +296,21 @@ namespace SystemService
          return false;
       }
 
+      // Whether this node serves `app`'s pages to someone who is not signed
+      // in to an account. The one place that decides it.
+      //
+      // The rule (gofractally/psibase#2285): an app's developer has to opt in
+      // to serving signed-out visitors, and then pays for those requests;
+      // otherwise the visitor is told to sign in and pays for their own.
+      // Neither the opt-in nor the developer's credit with a node exists
+      // yet, so today no app is served signed out. When they do, this reads
+      // them, and the request's usage is recorded against the app's account
+      // instead of the visitor's address.
+      bool servedSignedOut(AccountNumber /*app*/)
+      {
+         return false;
+      }
+
       // True for a top-level page load, where a redirect is the right answer.
       bool isNavigation(const HttpRequest& req)
       {
@@ -418,10 +433,18 @@ namespace SystemService
           (req.target.starts_with(HttpServer::commonApiPrefix) ? HttpServer::commonApiService
                                                                : service_opt.value());
 
-      // No app code runs for a request that nobody can be billed for.
-      if (requireIdentity && !session.billable() && !gateExempt(service, req))
+      // No app code runs for a request that nobody can be billed for. And an
+      // app's page is for an account: someone who has only a passkey (a
+      // guest) or only a visitor identity is sent to the sign-in page, where
+      // the next step is to make or choose an account. Their other requests
+      // (the supervisor's plugin files and look-ups while they sign up) are
+      // still answered.
+      bool navigation = isNavigation(req);
+      if (requireIdentity && !gateExempt(service, req) &&
+          (!session.billable() ||
+           (navigation && !session.user && !servedSignedOut(*service_opt))))
       {
-         if (isNavigation(req))
+         if (navigation)
          {
             auto loc = getSiblingUrl(req, std::optional{sock}, supervisorService, false);
             loc.pop_back();  // getSiblingUrl ends with '/'

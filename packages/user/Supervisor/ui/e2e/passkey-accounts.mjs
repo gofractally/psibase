@@ -86,6 +86,13 @@ const signUp = async (p, name) => {
         await page.click("#btn-create");
         await page.waitForSelector("#acct-providers button", { timeout: 60000 });
         if (await sessionSub(p)) throw new Error("the app was given a session before there was an account");
+        // Signed in with a passkey but no account: the node does not serve an app's page.
+        const tab = await p.context.newPage();
+        await tab.goto(`${S}://${app}.${root}/`);
+        await tab.waitForLoadState("domcontentloaded");
+        const landed = new URL(tab.url());
+        await tab.close();
+        if (!landed.host.startsWith("supervisor.") || !landed.pathname.endsWith("/sign-in.html")) throw new Error("without an account the app's page was served: " + landed.href);
         const creds = (await p.cdp.send("WebAuthn.getCredentials", { authenticatorId: p.authenticatorId })).credentials;
         return `short name: ${hint}; passkeys on the device: ${creds.length}`;
     });
