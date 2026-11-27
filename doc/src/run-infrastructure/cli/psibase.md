@@ -71,6 +71,10 @@ psibase - The psibase blockchain command line client
 
 The boot command deploys a set of system services and web interfaces suitable for development. The chain will have a single block producer. The chain can only be booted once.
 
+> **A chain booted without `--block-key` is open to everyone.** The `root` account is controlled by the producers, and producers authorize with their block signing keys. With no block key there is nothing to check, so anyone who can reach the node can send an unsigned transaction as `root`: create accounts, change services, anything. This is convenient on a developer's machine and must never be reachable from a network. `-k` alone sets the producer's account key and does not close it.
+>
+> For any node that others can reach, boot with both `--block-key` and `-k`. The node can generate the block key itself (`POST` to `x-admin`'s `/native/admin/keys`, see [x-admin](../../default-apps/x-admin.md)). Afterwards, check it: an unsigned transaction from `root` must be refused.
+
 - *packages*
 
   Packages to install to the chain. If not specifed, a default set will be installed.

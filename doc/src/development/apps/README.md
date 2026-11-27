@@ -407,6 +407,8 @@ fn creates_a_thing(chain: psibase::Chain) -> Result<(), psibase::Error> {
 
 **After install, a package's `postinstall` actions run.** Use them to enable single-page routing (`sites.enablespa`), and to set a content-security policy only if the default does not fit (`sites.setcsp`; see [sites](../../default-apps/sites.md)).
 
+**A development chain is not a public chain.** A chain booted the quick way (`psibase boot` with no `--block-key`) accepts unsigned transactions from `root`, which is what lets `cargo psibase install` and `psibase install` work with no keys. Never expose such a node to a network; see the warning under [`boot`](../../run-infrastructure/cli/psibase.md#boot).
+
 **Upgrades.** Installing a newer version replaces code, plugin and UI. Tables stay. A change to a table's layout needs a migration action; plan it before the first deployment.
 
 ## Checklist
