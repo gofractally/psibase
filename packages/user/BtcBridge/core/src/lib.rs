@@ -4,6 +4,9 @@ pub use hex;
 
 pub type Result<T> = std::result::Result<T, String>;
 
+pub mod signet;
+pub use signet::{signet_sighash, signet_txs, verify_signet_block, SignetParams, SignetTxs};
+
 use bitcoin::{
     absolute,
     bip32::{ChildNumber, Xpriv, Xpub},
@@ -41,14 +44,22 @@ pub fn network(s: &str) -> Result<Network> {
 }
 /// Parameters of the networks whose difficulty is recalculated every 2016 blocks; regtest never retargets.
 /// Signet uses Bitcoin's retarget arithmetic with its own proof-of-work limit and has no minimum-difficulty
-/// exception. Its block signature is committed in the coinbase transaction, so it is NOT checked here:
-/// a signet header proves only signet's very low proof of work.
+/// exception. Its block signature is committed in the coinbase transaction, so the header rules here
+/// prove only signet's very low proof of work: a signet header must also pass `verify_signet_block`.
 fn retarget_params(net: Network) -> Option<Params> {
     match net {
         Network::Bitcoin => Some(Params::MAINNET),
         Network::Signet => Some(Params::SIGNET),
         _ => None,
     }
+}
+/// The block-signature parameters of a network whose blocks are signed: `"signet"` is the default
+/// signet, with Bitcoin Core's default challenge. Other signets have no network name here.
+pub fn signet_params(net: &str) -> Result<Option<SignetParams>> {
+    Ok(match network(net)? {
+        Network::Signet => Some(SignetParams::default_signet()),
+        _ => None,
+    })
 }
 const RETARGET_INTERVAL: u32 = 2016;
 /// Highest height at which trusted checkpoint context may begin: eleven timestamps for the median-time
