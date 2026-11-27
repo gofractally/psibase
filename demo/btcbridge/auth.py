@@ -21,7 +21,7 @@ def secure_account(account):
  private,public=keypair(account)
  info=query('accounts','{getAccount(accountName:'+json.dumps(account)+'){authService}}')['getAccount']
  if info and info['authService']=='auth-sig':
-  actual=query('auth-sig','{account(name:'+json.dumps(account)+'){pubkey}}')['account']['pubkey']
+  actual=query('auth-sig','{account(name:'+json.dumps(account)+'){active{key}}}')['account']['active']['key']
   # Native query uses a PEM public key. Refuse to replace an existing, different owner.
   if actual.strip()!=public.read_text().strip():raise ValueError('Account already has a different signing key: '+account)
   return
