@@ -173,24 +173,40 @@ namespace
 
    std::vector<SignedTransaction> makeTransactions(TestChain& chain, std::vector<Action>&& actions)
    {
-      std::vector<SignedTransaction> result;
-      std::vector<Action>            group;
-      std::size_t                    size = 0;
+      std::vector<std::vector<Action>> groups;
+      std::vector<Action>              group;
+      std::size_t                      size  = 0;
+      const std::size_t                limit = 1024 * 1024;
+      auto                             flush = [&]
+      {
+         groups.push_back(std::move(group));
+         group.clear();
+         size = 0;
+      };
       for (auto& act : actions)
       {
+         // A large action (a UI's biggest file is several MiB) goes into a
+         // transaction of its own. Added to a group already near the limit
+         // it made a transaction of group + action, which with the largest
+         // files was just under a block's size and went over it, into a
+         // block no node would replay, when a package grew by a few bytes.
+         if (!group.empty() && size + act.rawData.size() > limit)
+            flush();
          size += act.rawData.size();
          group.push_back(std::move(act));
-         if (size >= 1024 * 1024)
-         {
-            result.push_back(SignedTransaction{
-                psio::shared_pssz<Transaction>{chain.makeTransaction(std::move(group), 30)}});
-            size = 0;
-         }
+         if (size >= limit)
+            flush();
       }
       if (!group.empty())
+         flush();
+      // Boot pushes one of these per block, a second apart: the last one must
+      // not have expired when its turn comes.
+      auto expireSeconds = static_cast<int>(groups.size()) + 30;
+      std::vector<SignedTransaction> result;
+      for (auto& g : groups)
       {
          result.push_back(SignedTransaction{
-                psio::shared_pssz<Transaction>{chain.makeTransaction(std::move(group), 30)}});
+             psio::shared_pssz<Transaction>{chain.makeTransaction(std::move(g), expireSeconds)}});
       }
       return result;
    }
@@ -229,12 +245,14 @@ void TestChain::boot(const std::vector<std::string>& names, bool installUI)
        makeTransaction(
            {transactor<Transact>{Transact::service, Transact::service}.startBoot(transactionIds)}),
        {});
-   check(psibase::show(false, trace) == "", "Failed to boot");
+   if (auto error = psibase::show(false, trace); error != "")
+         abortMessage("Failed to boot: " + error);
    for (const auto& trx : transactions)
    {
       startBlock();
       auto trace = pushTransaction(trx);
-      check(psibase::show(false, trace) == "", "Failed to boot");
+      if (auto error = psibase::show(false, trace); error != "")
+         abortMessage("Failed to boot: " + error);
    }
    setAutoBlockStart(true);
    startBlock();
