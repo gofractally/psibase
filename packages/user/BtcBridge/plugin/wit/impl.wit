@@ -3,6 +3,7 @@ world impl {
     include host:client/imports;
     include host:http/imports;
     include accounts:query/imports;
+    import host:accounts/api;
     include transact:plugin/imports;
     include permissions:plugin/imports;
     include tokens:plugin/imports;

@@ -36,7 +36,7 @@ struct Plugin;
 impl Guest for Plugin {
     fn submit(actions: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::submit)?;
-        let user = bindings::accounts::query::api::get_current_user()
+        let user = bindings::host::accounts::api::get_current_user()
             .ok_or_else(|| error("Connect a Psibase account"))?;
         let account = bindings::accounts::query::api::get_account(&user)?
             .ok_or_else(|| error("Account no longer exists"))?;
