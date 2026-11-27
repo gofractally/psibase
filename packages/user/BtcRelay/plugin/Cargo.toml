@@ -21,5 +21,5 @@ world = "impl"
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "host:client" = { path = "../../BtcBridge/wallet-wit/client.wit" }
 "accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }
-"transact:plugin" = { path = "../../BtcBridge/wallet-wit/transact.wit" }
+"transact:plugin" = { path = "../../../system/Transact/plugin/transact/wit/world.wit" }
 "permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }

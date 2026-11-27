@@ -11,7 +11,7 @@ struct Plugin;
 impl Guest for Plugin {
     fn headers(headers: Vec<String>) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::headers)?;
-        bindings::transact::plugin::intf::add_action_to_transaction(
+        bindings::transact::plugin::api::add_action_to_transaction(
             "headers",
             &psio::to_pssz(&btcrelay::action_structs::headers { headers }),
         )
@@ -26,7 +26,7 @@ impl Guest for Plugin {
                 branch: b.branch,
             })
             .collect();
-        bindings::transact::plugin::intf::add_action_to_transaction(
+        bindings::transact::plugin::api::add_action_to_transaction(
             "signetHeaders",
             &psio::to_pssz(&btcrelay::action_structs::signetHeaders { blocks }),
         )

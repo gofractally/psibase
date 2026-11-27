@@ -3,7 +3,7 @@
 mod bindings;
 use bindings::exports::btcbridge::plugin::api::Guest;
 use bindings::host::types::types::Error;
-use bindings::transact::plugin::intf::add_action_to_transaction;
+use bindings::transact::plugin::api::add_action_to_transaction;
 
 use serde::Deserialize;
 use serde_json::Value;
