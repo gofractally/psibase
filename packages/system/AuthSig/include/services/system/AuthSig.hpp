@@ -111,6 +111,31 @@ namespace SystemService
       };
       PSIO_REFLECT_ENUM(ChangeKind, ownerKeys, partner, delays)
 
+      /// An `AccountState` or a `ChangeKind` is one of its enumerators: any
+      /// other value is refused wherever one is read or written.
+      inline psio::codec_status accountStateInRange(const AccountState& state) noexcept
+      {
+         if (static_cast<std::uint8_t>(state) <= static_cast<std::uint8_t>(AccountState::frozen))
+            return psio::codec_ok();
+         return psio::codec_fail("state out of range", 0, "AccountState");
+      }
+      inline psio::codec_status changeKindInRange(const ChangeKind& kind) noexcept
+      {
+         if (static_cast<std::uint8_t>(kind) <= static_cast<std::uint8_t>(ChangeKind::delays))
+            return psio::codec_ok();
+         return psio::codec_fail("kind out of range", 0, "ChangeKind");
+      }
+   }  // namespace AuthSig
+}  // namespace SystemService
+
+PSIO_INVARIANT(SystemService::AuthSig::AccountState, SystemService::AuthSig::accountStateInRange)
+PSIO_INVARIANT(SystemService::AuthSig::ChangeKind, SystemService::AuthSig::changeKindInRange)
+
+namespace SystemService
+{
+   namespace AuthSig
+   {
+
       /// A change that was requested and has not taken effect. The account is
       /// paused while it is pending. It takes effect when the pause runs out
       /// (`AuthRecord::stateUntil`) or when the recovery partner confirms it.
