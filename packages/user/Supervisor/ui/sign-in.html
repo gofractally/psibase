@@ -451,6 +451,48 @@
                 word-break: break-all;
             }
 
+            /* The password field of the first screen when it is not shown. Which
+               of these a password manager still fills differs between managers,
+               so the technique is one attribute (set in main.ts). */
+            #signin #start-form .si-field {
+                margin-bottom: 14px;
+            }
+
+            #signin #start-pass-wrap[data-unseen] {
+                position: relative;
+                height: 0;
+                margin: 0;
+                overflow: visible;
+                pointer-events: none;
+            }
+            #signin #start-pass-wrap[data-unseen] label {
+                display: none;
+            }
+            #signin #start-pass-wrap[data-unseen="opacity"] .si-field {
+                position: absolute;
+                inset: 0 0 auto 0;
+                opacity: 0;
+            }
+            #signin #start-pass-wrap[data-unseen="tiny"] .si-field {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                overflow: hidden;
+                border: 0;
+                padding: 0;
+            }
+            #signin #start-pass-wrap[data-unseen="clip"] .si-field {
+                position: absolute;
+                inset: 0 0 auto 0;
+                clip-path: inset(50%);
+            }
+            #signin #start-pass-wrap[data-unseen="offscreen"] .si-field {
+                position: fixed;
+                left: -4000px;
+                top: 0;
+                width: 300px;
+            }
+
             #signin .si-key {
                 font-size: 13.5px;
                 user-select: all;
@@ -860,7 +902,37 @@
 
                     <p class="si-notice" id="notice" hidden></p>
 
-                    <button class="si-btn si-primary" id="btn-create" type="button">
+                    <!-- Username first. The password field belongs to the same form so a
+                         password manager that has an entry for this name fills it; it is only
+                         shown when this device knows the passkey works with a password. -->
+                    <form id="start-form" autocomplete="on" novalidate>
+                        <label class="si-label" for="start-name">Username</label>
+                        <div class="si-field">
+                            <span class="si-at" aria-hidden="true">@</span>
+                            <input
+                                id="start-name"
+                                name="username"
+                                type="text"
+                                autocomplete="username"
+                                autocapitalize="none"
+                                autocorrect="off"
+                                spellcheck="false"
+                                maxlength="18"
+                            />
+                        </div>
+                        <div id="start-pass-wrap">
+                            <label class="si-label" for="start-pass">Password</label>
+                            <div class="si-field">
+                                <input
+                                    id="start-pass"
+                                    name="password"
+                                    type="password"
+                                    autocomplete="current-password"
+                                    spellcheck="false"
+                                />
+                            </div>
+                        </div>
+                    <button class="si-btn si-primary" id="btn-create" type="submit">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                             <circle cx="8" cy="15" r="4" fill="none" stroke="currentColor" stroke-width="1.9" />
                             <path
@@ -872,18 +944,19 @@
                                 stroke-linejoin="round"
                             />
                         </svg>
-                        <span id="btn-create-label">Sign up or sign in</span>
+                        <span id="btn-create-label">Sign up or log in</span>
                     </button>
+                    </form>
                     <p class="si-below" id="below" hidden></p>
 
                     <ul class="si-points">
                         <li>
                             <span class="si-dot"></span>
-                            <span><strong>No password, no email.</strong> Your device's fingerprint, face or PIN is all it takes.</span>
+                            <span><strong>A passkey signs you in.</strong> Your device's fingerprint, face or PIN is all it takes.</span>
                         </li>
                         <li>
                             <span class="si-dot"></span>
-                            <span><strong>Look around as a guest.</strong> Pick a name and create an account only when you want one.</span>
+                            <span><strong>One name, every app.</strong> Your username is your account on this network.</span>
                         </li>
                         <li>
                             <span class="si-dot"></span>
@@ -892,67 +965,19 @@
                     </ul>
                 </div>
 
-                <!-- Pick view: a new visitor chooses a name before the passkey is made -->
-                <div id="view-pick" class="si-view" hidden>
-                    <h1>Pick your name</h1>
-                    <p class="si-lede">
-                        Your passkey is saved under this name, so you can tell it apart later.
-                        It becomes your account name if you create an account.
-                    </p>
-                    <form id="pick-form" novalidate>
-                        <label class="si-label" for="pick-name">Name</label>
-                        <div class="si-field">
-                            <span class="si-at" aria-hidden="true">@</span>
-                            <input
-                                id="pick-name"
-                                type="text"
-                                autocomplete="off"
-                                autocapitalize="none"
-                                autocorrect="off"
-                                spellcheck="false"
-                                maxlength="10"
-                            />
-                        </div>
-                        <p class="si-hint si-form-hint" id="pick-hint"></p>
-                        <label class="si-label" for="pick-display">
-                            Display name <span class="si-optional">optional</span>
-                        </label>
-                        <div class="si-field">
-                            <input
-                                id="pick-display"
-                                type="text"
-                                autocomplete="off"
-                                maxlength="40"
-                                placeholder="How you'd like to be shown"
-                            />
-                        </div>
-                        <p class="si-hint si-form-hint"></p>
-                        <button class="si-btn si-primary" id="pick-create" type="submit" disabled>
-                            Create my passkey
-                        </button>
-                    </form>
-                    <p class="si-below">
-                        <button class="si-link" id="pick-existing" type="button">
-                            I already have a passkey
-                        </button>
-                        ·
-                        <button class="si-link" id="pick-back" type="button">Back</button>
-                    </p>
-                </div>
-
-                <!-- Fallback view: a passkey that gives no secret, and its recovery key -->
+                <!-- Fallback view: a passkey that gives no secret, and its password -->
                 <div id="view-fallback" class="si-view" hidden>
-                    <h1 id="fb-title">Save your recovery key</h1>
+                    <h1 id="fb-title"></h1>
                     <p class="si-lede" id="fb-lede"></p>
                     <!-- A real form with a name and a password field, really submitted:
                          that is what every password manager (not only the browser's own)
                          recognises and offers to save. -->
                     <form id="fb-keep" class="si-stack" autocomplete="on" hidden>
-                        <label class="si-hint" for="fb-keep-name">Saved under this name</label>
+                        <label class="si-hint" for="fb-keep-name">Username</label>
                         <div class="si-field">
                             <input id="fb-keep-name" name="username" type="text" autocomplete="username" readonly />
                         </div>
-                        <label class="si-hint" for="fb-key">Recovery key</label>
+                        <label class="si-hint" for="fb-key">Password</label>
                         <div class="si-field">
                             <input
                                 id="fb-key"
@@ -969,11 +994,10 @@
                             <button class="si-link" id="fb-copy" type="button">Copy</button>
                         </p>
                         <p class="si-hint">
-                            This is a recovery secret, not an account's signing key. It is weaker than a
-                            passkey that derives its own secret: use a device or passkey provider that
-                            supports that if you can.
+                            Make sure your password manager saves this password. It is not an
+                            account's signing key, and it only works together with your passkey.
                         </p>
-                        <button class="si-btn si-primary" id="fb-kept" type="submit">I've saved it</button>
+                        <button class="si-btn si-primary" id="fb-kept" type="submit">Log in or sign up</button>
                     </form>
                     <div id="fb-ask" hidden>
                         <form id="fb-form" autocomplete="on">
@@ -984,7 +1008,7 @@
                                     type="text"
                                     autocomplete="username"
                                     spellcheck="false"
-                                    placeholder="The name it was saved under"
+                                    placeholder="Username"
                                 />
                             </div>
                             <div class="si-field">
@@ -1001,11 +1025,11 @@
                             <button class="si-btn si-primary" type="submit">Continue</button>
                         </form>
                         <details class="si-hint">
-                            <summary>I never saved a recovery key</summary>
+                            <summary>I never saved a password</summary>
                             <p>
                                 Then nothing was ever stored under this passkey that it could open, and
                                 it cannot be used here. Cancel, delete this passkey in your password
-                                manager, and create a new one: you will be shown its recovery key to
+                                manager, and create a new one: you will be shown its password to
                                 save.
                             </p>
                         </details>

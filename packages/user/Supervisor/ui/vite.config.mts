@@ -28,6 +28,8 @@ export default defineConfig((config) => ({
                 main: path.resolve(appDirectory, "index.html"),
                 prompt: path.resolve(appDirectory, "prompt.html"),
                 "sign-in": path.resolve(appDirectory, "sign-in.html"),
+                // A standalone page for trying password managers; not part of sign-in.
+                "password-field-test": path.resolve(appDirectory, "password-field-test.html"),
             },
             output: {
                 entryFileNames: "assets/[name].js",

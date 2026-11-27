@@ -5,6 +5,7 @@ import { assert } from "@/utils";
 import { Supervisor } from "../supervisor";
 import { Plugin } from "./plugin";
 import { PluginHost } from "./plugin-host";
+import { notePlugin } from "./prefetch";
 import { LoadedPlugin, ServiceContext } from "./service-context";
 
 export class Plugins {
@@ -27,7 +28,9 @@ export class Plugins {
     }
 
     public getPlugin(plugin: QualifiedPluginId): LoadedPlugin {
-        return this.getServiceContext(plugin.service).loadPlugin(plugin.plugin);
+        const loaded = this.getServiceContext(plugin.service).loadPlugin(plugin.plugin);
+        if (loaded.new) notePlugin(plugin);
+        return loaded;
     }
 
     public getAssertPlugin(plugin: QualifiedPluginId): Plugin {

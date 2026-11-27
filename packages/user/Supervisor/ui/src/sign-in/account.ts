@@ -13,6 +13,7 @@
 //
 // The active key then goes into the supervisor's key store, the account is
 // added to the passkey's encrypted account list, and the owner key is wiped.
+import { rootHost } from "../guest-session";
 import { accountKeys, publicKeyPem, sha256Hex } from "./account-keys";
 import {
     ANY_NAME_RULE,
@@ -131,7 +132,12 @@ export const runAccountStep = async (ctx: PageContext) => {
         ctx.show("account");
     };
 
-    const guestLink = { label: "Stay a guest", run: () => void ctx.enterApp() };
+    // Nobody goes on to an app without an account; the way out of this page
+    // is the network's front page.
+    const guestLink = {
+        label: "Not now",
+        run: () => window.location.assign(`${window.location.protocol}//${rootHost()}/`),
+    };
     const backLink = { label: "Back", run: () => ctx.go("account") };
     const links = (...items: { label: string; run: () => void }[]) =>
         setLinks($("acct-below"), items);
@@ -224,10 +230,10 @@ export const runAccountStep = async (ctx: PageContext) => {
     const showClosed = () => {
         frame(
             "Accounts aren't open yet",
-            "This network isn't creating new accounts right now. You can keep looking around as a guest.",
+            "This network isn't creating new accounts right now.",
             2,
         );
-        links({ label: `Back to ${ctx.app}`, run: () => void ctx.enterApp() });
+        links(guestLink);
     };
 
     const providerButtons = (
@@ -495,6 +501,7 @@ export const runAccountStep = async (ctx: PageContext) => {
                 "Confirm with your passkey",
                 `Your passkey makes the keys for ${name}.`,
                 name,
+                true,
             );
             keys = accountKeys(unlocked.chainId, unlocked.root, name, 0n, 0n);
             ctx.working("Creating your account", `Reserving ${name}`);

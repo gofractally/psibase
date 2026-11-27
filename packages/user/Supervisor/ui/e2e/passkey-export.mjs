@@ -74,25 +74,37 @@ const provider = async (page, handle) => { await page.waitForSelector("#login", 
 const until = async (what, fn, ms = 30000) => { const end = Date.now() + ms; let last; while (Date.now() < end) { last = await fn(); if (last) return last; await new Promise((r) => setTimeout(r, 700)); } throw new Error("timed out: " + what); };
 
 const signUp = async (p, name) => {
-    await step(p, `${name}: picks a name, makes a passkey and enters as a guest`, async (page) => {
+    await step(p, `${name}: types a free name, makes a passkey and is taken to verify`, async (page) => {
         await page.goto(`${S}://${app}.${root}/`);
         await page.waitForSelector("#view-welcome:not([hidden])");
+        await page.fill("#start-name", "abc");
         await page.click("#btn-create");
-        await page.waitForSelector("#view-pick:not([hidden])", { timeout: 30000 });
-        await page.fill("#pick-name", "abc");
-        const hint = await page.textContent("#pick-hint");
-        await page.fill("#pick-name", name);
-        await page.fill("#pick-display", "Test " + name);
-        await page.waitForSelector("#pick-create:not([disabled])");
-        await snap(p, "pick");
-        await page.click("#pick-create");
-        await onApp(page);
+        await page.waitForSelector("#notice:not([hidden])", { timeout: 30000 });
+        const hint = await page.textContent("#notice");
+        await page.fill("#start-name", name);
+        await snap(p, "start");
+        await page.click("#btn-create");
+        await page.waitForSelector("#acct-providers button", { timeout: 60000 });
+        if (await sessionSub(p)) throw new Error("the app was given a session before there was an account");
+        // Signed in with a passkey but no account: the node does not serve an app's page.
+        const tab = await p.context.newPage();
+        await tab.goto(`${S}://${app}.${root}/`);
+        await tab.waitForLoadState("domcontentloaded");
+        const landed = new URL(tab.url());
+        await tab.close();
+        if (!landed.host.startsWith("supervisor.") || !landed.pathname.endsWith("/sign-in.html")) throw new Error("without an account the app's page was served: " + landed.href);
+        // Nor does the node answer an app's API for the passkey-only session's token, beyond what signing up needs.
+        const token = await page.evaluate(() => JSON.parse(window.localStorage.getItem("psibase.guest-session.v1") ?? "{}").token);
+        if (!token) throw new Error("no passkey session token on the sign-in page");
+        const ask = async (svc, path, method = "POST") => (await p.context.request.fetch(`${S}://${svc}.${root}${path}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/graphql" }, data: method === "POST" ? "{ __typename }" : undefined })).status();
+        const refused = [await ask("tokens", "/graphql"), await ask(app, "/markets", "GET"), await ask("explorer", "/graphql")];
+        const allowed = [await ask("auth-sig", "/graphql"), await ask("dyn-ld", "/graphql"), await ask("tokens", "/plugin.wasm", "GET")];
+        if (refused.some((c) => c !== 401)) throw new Error("a passkey-only token was answered by an app's API: " + refused.join(","));
+        if (allowed.some((c) => c === 401)) throw new Error("what signing up needs was refused: " + allowed.join(","));
         const creds = (await p.cdp.send("WebAuthn.getCredentials", { authenticatorId: p.authenticatorId })).credentials;
-        return `short-name hint: ${hint}; passkeys on the device: ${creds.length}`;
+        return `short name: ${hint}; passkeys on the device: ${creds.length}`;
     });
-    await step(p, `${name}: verifies with the provider and picks a name`, async (page) => {
-        await page.goto(`${S}://supervisor.${root}/sign-in.html?step=account&app=${app}&path=/`);
-        await page.waitForSelector("#acct-providers button", { timeout: 30000 });
+    await step(p, `${name}: verifies with the provider and the name is the one typed`, async (page) => {
         await page.click("#acct-providers button >> nth=0");
         await provider(page, name);
         await page.waitForSelector("#acct-name-form:not([hidden])", { timeout: 30000 });

@@ -83,13 +83,18 @@ execFileSync("openssl", ["genpkey", "-algorithm", "EC", "-pkeyopt", "ec_paramgen
 execFileSync("openssl", ["pkey", "-in", `${dir}/${T}.pem`, "-pubout", "-out", `${dir}/${T}.pub`]);
 console.log("create:", cli(["create", "-k", `${dir}/${T}.pub`, T]).trim().split("\n").pop().slice(0, 120));
 const a = await person("A");
-await step(a, "a visitor signs in with a passkey", async (page) => {
+await step(a, "the account's name, no passkey that opens it: the page offers recovery and a key file", async (page) => {
     await page.goto(`${S}://${app}.${root}/`);
     await page.waitForSelector("#view-welcome:not([hidden])");
+    await page.fill("#start-name", T);
     await page.click("#btn-create");
-    await page.waitForSelector("#view-pick:not([hidden])", { timeout: 30000 });
-    await page.fill("#pick-name", A); await page.waitForSelector("#pick-create:not([disabled])"); await page.click("#pick-create");
-    await onApp(page);
+    await page.waitForSelector("#below button", { timeout: 60000 });
+    const notice = await page.textContent("#notice");
+    const offered = (await page.locator("#below button").allTextContents()).join(" / ");
+    await page.click('#below button:has-text("Sign in with a key file")');
+    await page.waitForURL((u) => u.searchParams.get("intent") === "import", { timeout: 60000 });
+    await page.waitForLoadState("networkidle");
+    return `"${notice}" offers: ${offered}`;
 });
 
 const pem = fs.readFileSync(`${dir}/${T}.pem`, "utf8");

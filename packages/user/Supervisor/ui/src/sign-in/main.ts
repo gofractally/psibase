@@ -1,7 +1,7 @@
 // The network's front door. An app host sends a visitor here when the node
 // does not know who they are; the visitor signs in with a passkey and is
-// returned to the page they asked for, as a guest or as one of their
-// accounts.
+// returned to the page they asked for as one of their accounts. Nobody
+// goes on to an app without an account.
 //
 // This page runs on the supervisor origin, the only origin allowed to use the
 // passkey. The passkey secret, the root derived from it and every owner key
@@ -14,8 +14,11 @@ import {
     rootHost,
     saveGuestSession,
 } from "../guest-session";
+import { looksLikeWif } from "@psibase/common-lib";
+
 import { signText } from "./account-keys";
-import { NAME_RULE, type PageContext, type View } from "./context";
+import { ANY_NAME_RULE, NAME_RULE, type PageContext, type View } from "./context";
+import { dropHeld, holdRoot, sweepHeld, takeHeldRoot } from "./held-root";
 import {
     type Network,
     choiceFor,
@@ -102,7 +105,7 @@ const go: PageContext["go"] = (next, extra = {}) => {
 
 // ------------------------------------------------------------------ views
 
-const views: View[] = ["welcome", "pick", "fallback", "account", "manage", "working", "done", "unsupported"];
+const views: View[] = ["welcome", "fallback", "account", "manage", "working", "done", "unsupported"];
 
 const show = (view: View) => {
     for (const v of views) $(`view-${v}`).hidden = v !== view;
@@ -125,22 +128,23 @@ const setButton = (label: string) => {
 };
 
 /** The line under the button: a sentence and, optionally, one link. */
-const setBelow = (text?: string, link?: { label: string; run: () => void }) => {
+type BelowLink = { label: string; run: () => void };
+
+const setBelow = (text?: string, ...links: (BelowLink | undefined)[]) => {
     const el = $("below");
     el.textContent = text ?? "";
-    el.hidden = !text;
-    if (text && link) {
-        el.append(" ");
+    const shown = links.filter((l): l is BelowLink => !!l);
+    el.hidden = !text && !shown.length;
+    shown.forEach((link, i) => {
+        el.append(i ? " · " : text ? " " : "");
         const a = document.createElement("button");
         a.type = "button";
         a.className = "si-link";
         a.textContent = link.label;
         a.addEventListener("click", link.run);
         el.append(a);
-    }
+    });
 };
-
-const shortId = (guest: string) => `${guest.slice(0, 4)}…${guest.slice(-4)}`;
 
 const HAS_PASSKEY_KEY = "psibase.has-passkey.v1";
 
@@ -194,25 +198,13 @@ const renderWelcome = () => {
     const knownPasskey = !!window.localStorage.getItem(HAS_PASSKEY_KEY);
     const holder = knownPasskey ? currentHolder() : {};
     const greeting = holder.displayName ?? holder.name;
-    $("headline").textContent = !knownPasskey
-        ? "Welcome"
-        : greeting
-          ? `Welcome back, ${greeting}`
-          : "Welcome back";
-    $("lede").textContent = !knownPasskey
-        ? "One passkey gets you in. New here? It takes a few seconds, and you can explore before you decide on anything else."
-        : holder.name
-          ? `Use your passkey to continue as ${holder.name}.`
-          : (holder.accounts ?? 0) > 1
-            ? "Use your passkey, then choose which account to use here or create a new one."
-            : "Use your passkey to pick up where you left off.";
-    setButton(
-        !knownPasskey
-            ? "Sign up or sign in"
-            : holder.name
-              ? `Continue as ${holder.name}`
-              : "Continue with your passkey",
-    );
+    $("headline").textContent = greeting ? `Welcome back, ${greeting}` : "Welcome";
+    $("lede").textContent =
+        "Enter your username. New here? Pick one, and a passkey makes it yours.";
+    const name = $<HTMLInputElement>("start-name");
+    if (!name.value && holder.name) name.value = holder.name;
+    showPasswordField(passkeyNeedsPassword());
+    setButton("Sign up or log in");
     if (accountStep) {
         // Asked to connect an account without being signed in: the passkey
         // comes first, and the older account-and-key prompt stays one
@@ -231,11 +223,21 @@ const renderWelcome = () => {
             run: () => {
                 forgetPasskeyHint();
                 nextMode = "auto";
+                $<HTMLInputElement>("start-name").value = "";
                 renderWelcome();
             },
         });
     } else {
-        setBelow();
+        // Awaiting the owner's word (#2275): someone with a passkey on
+        // another device who types a free name would otherwise be given a
+        // second passkey where the browser cannot look for one silently.
+        setBelow("", {
+            label: "I already have a passkey for this site",
+            run: () => {
+                nextMode = "existing";
+                void signIn("existing");
+            },
+        });
     }
 
     if (destination.explicit) {
@@ -325,6 +327,7 @@ const signOutEverywhere = async () => {
     rememberHolder();
     clearDevice();
     clearGuestSession();
+    await dropHeld();
 };
 
 // The origin that actually serves an app. Some names are aliases that the
@@ -416,39 +419,37 @@ const returnedRecently = (): boolean => {
 };
 
 /**
- * Leaves for the destination: as `account` when this browser acts as one,
- * otherwise as a guest.
+ * Leaves for the destination as `account`. Nobody enters an app without an
+ * account: a visitor who has only a passkey stays on this page until they
+ * have one.
  */
 const enterApp = async (
     session: GuestSession,
     account: string | undefined,
     signedIn = false,
 ) => {
-    window.sessionStorage.setItem(BOUNCE_KEY, String(Date.now()));
-    const before = choiceFor(destination.app);
-    if (account && !signedIn) await loginFor(destination.app, account);
-    // Entering as a guest an app that knew an account: the account leaves.
-    if (!account && before) await logoutFor(destination.app).catch((e) => console.warn(e));
-    rememberChoice(destination.app, account);
-    await submitSession(session, !!account);
-};
-
-const goToDestination = async (session: GuestSession, celebrate: boolean) => {
-    // An app is entered as the account chosen for it. A visitor with
-    // accounts who has not chosen for this app is asked, so an app never
-    // learns of an account the visitor uses elsewhere.
-    const choice = choiceFor(destination.app);
-    if (choice === undefined && heldAccounts().length) {
+    if (!account) {
         go("account");
         return;
     }
-    const account = choice || undefined;
+    window.sessionStorage.setItem(BOUNCE_KEY, String(Date.now()));
+    if (!signedIn) await loginFor(destination.app, account);
+    rememberChoice(destination.app, account);
+    await submitSession(session, true);
+};
+
+const goToDestination = async (session: GuestSession, celebrate: boolean) => {
+    // An app is entered as the account chosen for it. A visitor who has not
+    // chosen for this app is asked, so an app never learns of an account
+    // the visitor uses elsewhere; one with no account yet goes on to make
+    // one.
+    const account = choiceFor(destination.app) || undefined;
+    if (!account) {
+        go("account");
+        return;
+    }
     if (celebrate) {
-        $("done-detail").textContent = account
-            ? `Welcome back, ${account}`
-            : destination.explicit
-              ? `Taking you to ${destination.app}.${rootName}`
-              : "Taking you inside";
+        $("done-detail").textContent = `Welcome back, ${account}`;
         show("done");
         await new Promise((r) => setTimeout(r, 900));
     }
@@ -457,15 +458,9 @@ const goToDestination = async (session: GuestSession, celebrate: boolean) => {
     } catch (e) {
         // The account could not be signed in (paused, frozen, its key was
         // replaced elsewhere, or the network refused). Say so and let the
-        // visitor choose. Entering as a guest here would also record "guest"
-        // as their choice for this app, and the account would then seem to
-        // be ignored on every later visit.
+        // visitor choose.
         console.warn(e);
-        if (account) {
-            go("account", { failed: account });
-            return;
-        }
-        throw e;
+        go("account", { failed: account });
     }
 };
 
@@ -493,10 +488,8 @@ const loadRememberedCredential = (): Uint8Array | undefined => {
 // stops here and the name is asked for.
 let chosenLabel: (PasskeyLabel & { account: string; display?: string }) | undefined;
 
-class NeedsName extends Error {}
-
 const newPasskey = () => {
-    if (!chosenLabel) throw new NeedsName();
+    if (!chosenLabel) throw new Error("Enter a username first.");
     working("Creating your passkey", "Follow the prompt from your device.");
     return createPasskey(rootName, chosenLabel, () =>
         working("One more touch", "Confirm once more to finish setting up."),
@@ -550,11 +543,13 @@ const fallbackShow = (mode: "keep" | "ask") => {
     $("fb-keep").hidden = mode !== "keep";
     $("fb-ask").hidden = mode !== "ask";
     $("fb-title").textContent =
-        mode === "keep" ? "Save your recovery key" : "Enter your recovery key";
+        mode === "keep"
+            ? "Please confirm that your passkey's password is saved"
+            : "Enter your passkey's password";
     $("fb-lede").textContent =
         mode === "keep"
-            ? "Your passkey provider can't derive a secret for this network, so your keys are made from the passkey together with this recovery key. Keep it in your password manager: you need both to sign in. Anyone who has it and can use your passkey controls your accounts."
-            : `This passkey can't derive a secret by itself, so it works together with a recovery key. This site made that key when the passkey was created and offered it to your password manager: look there for the entry for ${window.location.hostname} under your name. It is 52 characters and starts with K or L.`;
+            ? "Your passkey works together with this password: you need both to sign in. Make sure your password manager saves it."
+            : `This passkey works together with a password that this site made when the passkey was created. Look in your password manager for the entry for ${window.location.hostname} under your name. It is 52 characters and starts with K or L.`;
     show("fallback");
 };
 
@@ -605,13 +600,23 @@ onPasskeyWithoutSecret(async (evidence) => {
             }),
         ask: () =>
             new Promise<string>((resolve, reject) => {
+                passwordWasUsed = true;
+                // What the first screen's field held is a hint: used once,
+                // and if it turns out wrong the visible field asks again.
+                if (suppliedPassword) {
+                    const hint = suppliedPassword;
+                    suppliedPassword = undefined;
+                    resolve(hint);
+                    return;
+                }
                 const form = $<HTMLFormElement>("fb-form");
                 const input = $<HTMLInputElement>("fb-input");
                 const name = $<HTMLInputElement>("fb-name");
                 const device = loadDevice();
                 // Filled in when this device knows it, so a password manager
                 // matches its entry and never saves one without a name.
-                name.value = device.current ?? device.accounts[0]?.name ?? device.pendingName ?? "";
+                name.value =
+                    wanted?.name ?? device.current ?? device.accounts[0]?.name ?? device.pendingName ?? "";
                 input.value = "";
                 form.onsubmit = (e) => {
                     e.preventDefault();
@@ -627,86 +632,96 @@ onPasskeyWithoutSecret(async (evidence) => {
     });
 });
 
-// ------------------------------------------------------- picking a name
+// ------------------------------------------------------- the first screen
 
-let pickTimer: number | undefined;
-let pickSeq = 0;
+// The name typed on the first screen, and whether an account has it.
+let wanted: { name: string; exists: boolean } | undefined;
+// What the first screen's password field held, if it looked like a password
+// of ours. A hint only: a manager may have filled another name's entry.
+let suppliedPassword: string | undefined;
+// Whether this sign-in needed the passkey's password (a passkey that gives
+// no secret).
+let passwordWasUsed = false;
 
-const pickHint = (text: string, bad = false) => {
-    const hint = $("pick-hint");
-    hint.textContent = text;
-    hint.classList.toggle("si-bad", bad);
+// How the first screen's password field is kept out of sight when this
+// device does not know that the passkey needs one. Managers differ in which
+// of these they still fill ("opacity", "tiny", "clip", "offscreen"); change
+// it here.
+const UNSEEN_FIELD = "opacity";
+
+const showPasswordField = (visible: boolean) => {
+    const wrap = $("start-pass-wrap");
+    const input = $<HTMLInputElement>("start-pass");
+    if (visible) {
+        delete wrap.dataset.unseen;
+        input.tabIndex = 0;
+        input.removeAttribute("aria-hidden");
+    } else {
+        wrap.dataset.unseen = UNSEEN_FIELD;
+        // Out of the tab order and unannounced. If a manager turns out to
+        // skip a field for either of these, they go before the trick does.
+        input.tabIndex = -1;
+        input.setAttribute("aria-hidden", "true");
+    }
 };
 
-/** Checks the name as it is typed: its shape here, whether it is free on the node. */
-const validatePick = () => {
-    const input = $<HTMLInputElement>("pick-name");
-    const cleaned = input.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
-    if (cleaned !== input.value) input.value = cleaned;
-    const value = input.value;
-    const button = $<HTMLButtonElement>("pick-create");
-    button.disabled = true;
-    window.clearTimeout(pickTimer);
-    const seq = ++pickSeq;
-    if (!value) {
-        pickHint("8 to 10 lowercase letters, digits or hyphens, starting with a letter.");
-        return;
+/** Whether this device has used a passkey here that works with a password. */
+const passkeyNeedsPassword = (): boolean => {
+    const id = loadRememberedCredential();
+    if (!id) return false;
+    try {
+        const hints = JSON.parse(
+            window.localStorage.getItem("psibase.passkey-fallback.v1") ?? "{}",
+        ) as Record<string, unknown>;
+        return Array.from(id, (b) => b.toString(16).padStart(2, "0")).join("") in hints;
+    } catch {
+        return false;
     }
-    if (!NAME_RULE.test(value) || value.endsWith("-")) {
-        const short = value.length < 8;
-        pickHint(
-            short
-                ? `${8 - value.length} more character${value.length === 7 ? "" : "s"} needed.`
-                : "Use lowercase letters, digits and hyphens, starting with a letter.",
-            !short,
+};
+
+/** Whether an account of this name exists, and if not whether it could be made. */
+const lookUpName = async (
+    name: string,
+): Promise<{ exists: boolean; problem?: string }> => {
+    const res = await fetch(
+        `${siblingOrigin("x-signup")}/check_name?name=${encodeURIComponent(name)}`,
+    );
+    if (!res.ok) throw new Error("Could not reach the network. Try again.");
+    const reply = (await res.json()) as { ok?: boolean; problem?: string; taken?: boolean };
+    // A node that does not say `taken` yet says it in words.
+    const exists = reply.taken ?? reply.problem === "That name is taken.";
+    return { exists, problem: reply.ok || exists ? undefined : reply.problem };
+};
+
+/** Reads the first screen. Nothing (and a notice) when it cannot go on. */
+const readStart = async (): Promise<{ name: string; exists: boolean } | undefined> => {
+    const input = $<HTMLInputElement>("start-name");
+    const name = input.value.trim().toLowerCase().replace(/^@/, "");
+    input.value = name;
+    if (!name) {
+        setNotice("Enter a username.");
+        input.focus();
+        return undefined;
+    }
+    if (!ANY_NAME_RULE.test(name)) {
+        setNotice("A username is lowercase letters, digits and hyphens, starting with a letter.");
+        return undefined;
+    }
+    working("Checking that name");
+    const found = await lookUpName(name);
+    if (!found.exists && (found.problem || !NAME_RULE.test(name) || name.endsWith("-"))) {
+        renderWelcome();
+        setNotice(
+            `There is no account called ${name}. ` +
+                (found.problem ??
+                    "A new name needs 8 to 10 lowercase letters, digits or hyphens, starting with a letter."),
         );
-        return;
+        return undefined;
     }
-    pickHint("Checking…");
-    pickTimer = window.setTimeout(async () => {
-        try {
-            const res = await fetch(
-                `${siblingOrigin("x-signup")}/check_name?name=${encodeURIComponent(value)}`,
-            );
-            const reply = (await res.json()) as { ok?: boolean; problem?: string };
-            if (seq !== pickSeq) return;
-            pickHint(
-                reply.ok ? `${value} is available.` : (reply.problem ?? "That name can't be used."),
-                !reply.ok,
-            );
-            button.disabled = !reply.ok;
-        } catch {
-            if (seq !== pickSeq) return;
-            // The name is confirmed again when the account is created.
-            pickHint("Could not check that name just now; you can still continue.");
-            button.disabled = false;
-        }
-    }, 250);
-};
-
-const showPick = () => {
-    show("pick");
-    validatePick();
-    $<HTMLInputElement>("pick-name").focus();
-};
-
-const wirePick = () => {
-    $("pick-name").addEventListener("input", validatePick);
-    $("pick-form").addEventListener("submit", (e) => {
-        e.preventDefault();
-        const account = $<HTMLInputElement>("pick-name").value;
-        const display = $<HTMLInputElement>("pick-display").value.trim().slice(0, 40);
-        if ($<HTMLButtonElement>("pick-create").disabled) return;
-        chosenLabel = {
-            account,
-            display: display || undefined,
-            name: account,
-            displayName: display || account,
-        };
-        void signIn("create");
-    });
-    $("pick-existing").addEventListener("click", () => void signIn("existing"));
-    $("pick-back").addEventListener("click", () => renderWelcome());
+    const typed = $<HTMLInputElement>("start-pass").value.trim();
+    suppliedPassword = looksLikeWif(typed) ? typed : undefined;
+    passwordWasUsed = false;
+    return { name, exists: found.exists };
 };
 
 const network = (session: GuestSession): Network => ({
@@ -720,17 +735,22 @@ const signIn = async (mode: Mode) => {
     setNotice();
     let unlocked: Unlocked | undefined;
     try {
-        const prf = await obtainPasskey(mode);
+        const start = await readStart();
+        if (!start) return;
+        wanted = start;
+        const name = start.name;
+        // A new passkey is made under the name, so the password manager
+        // shows it under something its holder recognises.
+        chosenLabel = { account: name, name, displayName: name };
+        // An existing account is signed in to with a passkey its holder
+        // already has; a passkey is never created for a name that is taken.
+        const prf = await obtainPasskey(start.exists && mode !== "existing" ? "existing" : mode);
         working("Signing you in", "Deriving your keys on this device.");
         unlocked = await unlockWith(prf);
         const session = await guestLogin(unlocked);
         saveGuestSession(session);
         window.localStorage.setItem(HAS_PASSKEY_KEY, session.credentialId);
-        notePasskey({
-            userId: unlocked.userId,
-            displayName: chosenLabel?.display,
-            pendingName: chosenLabel?.account,
-        });
+        notePasskey({ userId: unlocked.userId });
         // The passkey says which accounts are this visitor's; bring their
         // signing keys to this browser while the root is at hand.
         try {
@@ -738,23 +758,52 @@ const signIn = async (mode: Mode) => {
         } catch (e) {
             console.warn("Could not bring accounts to this browser", e);
         }
-        unlocked.wipe();
         rememberHolder();
-        if (accountStep) {
-            // Signed in on the way to an account step: carry on there,
-            // without a message left in the address by an earlier attempt.
-            const kept = new URLSearchParams(window.location.search);
-            kept.delete("failed");
-            window.location.replace(`${window.location.pathname}?${kept}`);
+        const held = heldAccounts();
+
+        if (held.includes(name) || start.exists) unlocked.wipe();
+
+        if (held.includes(name)) {
+            // Theirs: signed in, and this app is entered as it.
+            if (accountStep) {
+                const kept = new URLSearchParams(window.location.search);
+                kept.delete("failed");
+                window.location.replace(`${window.location.pathname}?${kept}`);
+                return;
+            }
+            rememberChoice(destination.app, name);
+            await goToDestination(session, true);
             return;
         }
-        await goToDestination(session, true);
+        if (start.exists) {
+            // An account, but not one these keys open.
+            clearGuestSession();
+            renderWelcome();
+            if (passwordWasUsed) {
+                // The password is half of the keys: a wrong one derives
+                // keys that match nothing. Ask for it in plain sight.
+                showPasswordField(true);
+                $<HTMLInputElement>("start-pass").value = "";
+                setNotice(
+                    `That password does not open ${name} with this passkey. Check the entry for ${name} in your password manager.`,
+                );
+                return;
+            }
+            setNotice(`${name} is taken, and this passkey does not control it.`);
+            offerOwnAccount(name);
+            return;
+        }
+        // A free name: the next step makes the account. With none yet it is
+        // the free account, verified with a provider; with one already, one
+        // of their accounts creates it.
+        notePasskey({ pendingName: name });
+        // What the passkey unlocked is kept for that step (held-root.ts),
+        // so the visitor is not asked for it again a page later.
+        await holdRoot(unlocked);
+        unlocked.wipe();
+        go("account", held.length ? { intent: "new" } : {});
     } catch (e) {
         unlocked?.wipe();
-        if (e instanceof NeedsName) {
-            showPick();
-            return;
-        }
         if (e instanceof Unsupported) {
             $("unsupported-detail").textContent = e.message;
             show("unsupported");
@@ -764,6 +813,11 @@ const signIn = async (mode: Mode) => {
         if (e instanceof NoPasskeyChosen) {
             // The browser found nothing to use, or the visitor closed its
             // dialog. The same button now creates a passkey.
+            if (wanted?.exists) {
+                setNotice(`No passkey was used. ${wanted.name} needs the passkey it was created with.`);
+                offerOwnAccount(wanted.name);
+                return;
+            }
             nextMode = "create";
             setButton("Create a passkey");
             setBelow("No passkey was used. New here? Create one.", {
@@ -772,9 +826,60 @@ const signIn = async (mode: Mode) => {
             });
             return;
         }
+        if (e instanceof Cancelled && wanted?.exists) {
+            // No passkey was used for a name that is an account: say what
+            // it needs, and how someone whose account it is can go on.
+            setNotice(`No passkey was used. ${wanted.name} needs the passkey it was created with.`);
+            offerOwnAccount(wanted.name);
+            return;
+        }
         // The welcome already offers a different passkey to someone who
         // backed out of this one.
         if (e instanceof Cancelled && loadRememberedCredential()) return;
+        setNotice(describeFailure(e));
+    }
+};
+
+// The two ways on for someone whose account a name is although no passkey
+// of theirs opens it: recover it through its recovery partner, or sign in
+// with the account's own key. (Awaiting the owner's word on the wording,
+// #2275.) Both need a passkey to bring the account to: the one this browser
+// has, or a new one made under that name.
+const offerOwnAccount = (name: string) =>
+    setBelow(
+        "Is it yours?",
+        { label: "Recover it", run: () => void takeOverWith(name, "recover") },
+        { label: "Sign in with a key file", run: () => void takeOverWith(name, "import") },
+    );
+
+const takeOverWith = async (name: string, intent: "recover" | "import") => {
+    setNotice();
+    let unlocked: Unlocked | undefined;
+    try {
+        chosenLabel = { account: name, name, displayName: name };
+        let prf: PrfResult;
+        try {
+            prf = await obtainPasskey("auto");
+        } catch (e) {
+            if (!(e instanceof NoPasskeyChosen)) throw e;
+            prf = await newPasskey();
+        }
+        working("Signing you in", "Deriving your keys on this device.");
+        unlocked = await unlockWith(prf);
+        const session = await guestLogin(unlocked);
+        saveGuestSession(session);
+        window.localStorage.setItem(HAS_PASSKEY_KEY, session.credentialId);
+        notePasskey({ userId: unlocked.userId });
+        unlocked.wipe();
+        go("account", { intent, account: name });
+    } catch (e) {
+        unlocked?.wipe();
+        if (e instanceof Unsupported) {
+            $("unsupported-detail").textContent = e.message;
+            show("unsupported");
+            return;
+        }
+        renderWelcome();
         setNotice(describeFailure(e));
     }
 };
@@ -788,7 +893,16 @@ const pageContext = (session: GuestSession): PageContext => ({
     $,
     show,
     working,
-    unlock: async (why, detail, adding) => {
+    unlock: async (why, detail, adding, creating) => {
+        if (creating) {
+            // Creating the account the visitor just asked for: what their
+            // passkey unlocked a page ago is still here (held-root.ts).
+            const kept = await takeHeldRoot(session.credentialId, await fetchChainId());
+            if (kept) {
+                if (kept.guest.publicKey === session.publicKey) return kept;
+                kept.wipe();
+            }
+        }
         working(why, detail);
         const unlocked = await unlockWith(
             await readPasskey(
@@ -846,6 +960,7 @@ const start = async () => {
     // The network's name is the way home from any step of this page.
     $<HTMLAnchorElement>("network").href = `${window.location.protocol}//${root}/`;
     await forgetOtherNetwork();
+    await sweepHeld();
     // The manage step has more to show than a sign-in card holds.
     if (step === "manage") document.body.dataset.layout = "wide";
 
@@ -856,8 +971,8 @@ const start = async () => {
         return;
     }
 
-    wirePick();
-    $("btn-create").addEventListener("click", () => {
+    $("start-form").addEventListener("submit", (e) => {
+        e.preventDefault();
         const mode = nextMode;
         nextMode = "auto";
         void signIn(mode);
@@ -903,25 +1018,21 @@ const start = async () => {
         }
     });
 
-    // "intent=guest": an app's Log out. The account leaves this app, and the
-    // visitor stays in it as a guest, so the app is not asked again which
-    // account to use.
+    // "intent=guest": an app's Log out. The account leaves this app; the
+    // visitor is then asked which account to use here, as on a first visit.
     if (query.get("intent") === "guest") {
         working("Signing out", `of ${destination.app}.${rootName}`);
         await logoutFor(destination.app).catch((e) => console.warn(e));
-        if (session) {
-            await enterApp(session, undefined);
-        } else {
-            window.location.assign(
-                (await resolveAppOrigin(destination.app)) + destination.path,
-            );
-        }
+        rememberChoice(destination.app, undefined);
+        const kept = new URLSearchParams(window.location.search);
+        kept.delete("intent");
+        window.location.replace(`${window.location.pathname}?${kept}`);
         return;
     }
 
     if (session) {
         const device = loadDevice();
-        const who = device.current ?? `Guest ${shortId(session.guest)}`;
+        const who = device.current ?? "No account yet";
         $("foot-id").textContent = device.displayName ? `${device.displayName} · ${who}` : who;
         forget.hidden = false;
         if (step === "manage") {

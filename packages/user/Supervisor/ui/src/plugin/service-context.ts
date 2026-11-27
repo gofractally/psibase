@@ -8,6 +8,7 @@ import { pluginString, postGraphQLGetJson, siblingUrl } from "@psibase/common-li
 import { ServiceMap } from "../component-loading/loader";
 import { HostInterface } from "../host-interface";
 import { Plugin } from "./plugin";
+import { takeMap } from "./prefetch";
 
 export interface LoadedPlugin {
     plugin: Plugin;
@@ -25,7 +26,7 @@ type ServiceUiDeps = {
     };
 };
 
-async function getServiceMap(service: string): Promise<ServiceMap | null> {
+export async function getServiceMap(service: string): Promise<ServiceMap | null> {
     const url = siblingUrl(null, "dyn-ld", `/graphql`);
     const query = `query { depsFor(service: "${service}") { deps { name service }}}`;
     const result = await postGraphQLGetJson<ServiceUiDeps>(
@@ -60,7 +61,11 @@ export class ServiceContext {
     constructor(service: string, hostInterface: HostInterface) {
         this.service = service;
         this.hostInterface = hostInterface;
-        this.services = getServiceMap(service);
+        // Already asked for at start-up if this app used the service before.
+        const early = takeMap(service) as Promise<ServiceMap | null | undefined> | undefined;
+        this.services = early
+            ? early.then((map) => (map === undefined ? getServiceMap(service) : map))
+            : getServiceMap(service);
     }
 
     loadPlugin(plugin: string): LoadedPlugin {

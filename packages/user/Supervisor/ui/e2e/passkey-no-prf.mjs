@@ -77,62 +77,103 @@ const until = async (what, fn, ms = 30000) => { const end = Date.now() + ms; let
 const a = await person("A");
 let wif;
 const giveKey = async (page) => { await page.waitForSelector("#fb-ask:not([hidden])", { timeout: 30000 }); await page.fill("#fb-input", wif); await page.click("#fb-form button[type=submit]"); };
-await step(a, "a passkey with no PRF: the visitor is given a recovery key and gets in as a guest", async (page) => {
+const fresh = async (page, hosts) => {
+    await a.context.clearCookies();
+    for (const host of hosts) await a.cdp.send("Storage.clearDataForOrigin", { origin: `${S}://${host}.${root}`, storageTypes: "all" });
+    await page.goto(`${S}://${app}.${root}/`);
+    await page.waitForSelector("#view-welcome:not([hidden])", { timeout: 30000 });
+};
+await step(a, "a passkey with no PRF: a free name, the password is shown once in a login form, then verify", async (page) => {
     await page.goto(`${S}://${app}.${root}/`);
     await page.waitForSelector("#view-welcome:not([hidden])");
+    const unseen = await page.getAttribute("#start-pass-wrap", "data-unseen");
+    await page.fill("#start-name", A);
     await page.click("#btn-create");
-    await page.waitForSelector("#view-pick:not([hidden])", { timeout: 30000 });
-    await page.fill("#pick-name", A); await page.waitForSelector("#pick-create:not([disabled])"); await page.click("#pick-create");
     await page.waitForSelector("#fb-keep:not([hidden])", { timeout: 30000 });
-    await snap(a, "recovery-key");
+    await snap(a, "password");
     wif = (await page.inputValue("#fb-key")).trim();
     if (!/^[KL][1-9A-HJ-NP-Za-km-z]{51}$/.test(wif)) throw new Error("not a base58 key: " + wif.slice(0, 8));
+    const shownName = await page.inputValue("#fb-keep-name");
+    if (shownName !== A) throw new Error("the form's user name is " + shownName);
+    const title = await page.textContent("#fb-title");
     await page.click("#fb-kept");
-    await onApp(page);
-    const stored = await page.evaluate(() => 0);
-    return `recovery key ${wif.slice(0, 4)}…, ${wif.length} characters`;
+    await page.waitForSelector("#acct-providers button", { timeout: 60000 });
+    if (await sessionSub(a)) throw new Error("the app was given a session before there was an account");
+    return `"${title}"; password ${wif.slice(0, 4)}…, ${wif.length} characters; first screen's password field: ${unseen ? "not shown (" + unseen + ")" : "shown"}`;
 });
-const guestBefore = await a.page.evaluate(() => 0);
-await step(a, "creating an account asks for the passkey and the recovery key, and derives the same identity", async (page) => {
-    await page.goto(`${S}://supervisor.${root}/sign-in.html?step=account&app=${app}&path=/`);
-    await page.waitForSelector("#acct-providers button", { timeout: 30000 });
+await step(a, "the account is created after the provider check without asking for the password again", async (page) => {
     await page.click("#acct-providers button >> nth=0");
     await provider(page, A);
     await page.waitForSelector("#acct-name-form:not([hidden])", { timeout: 30000 });
     await page.waitForSelector("#acct-create:not([disabled])");
+    let asked = false;
+    page.waitForSelector("#fb-ask:not([hidden])", { timeout: 20000 }).then(() => (asked = true), () => {});
     await page.click("#acct-create");
-    await giveKey(page);
     await onApp(page);
+    if (asked) throw new Error("the password was asked for a second time during sign-up");
+    const left = await page.context().newPage();
+    await left.goto(`${S}://supervisor.${root}/sign-in.html?step=manage&app=${app}&path=/`);
+    const carried = await left.evaluate(() => window.sessionStorage.getItem("psibase.sign-in.password-carry.v1"));
+    await left.close();
     const r = await record(a, A);
-    return `${await expectSub(a, A)}; state ${r.state}`;
+    return `${await expectSub(a, A)}; state ${r.state}; password asked once`;
 });
-await step(a, "a new device: passkey plus the recovery key typed in finds the same account", async (page) => {
-    await a.context.clearCookies();
-    for (const host of ["supervisor", app, "homepage", "x-signup"]) await a.cdp.send("Storage.clearDataForOrigin", { origin: `${S}://${host}.${root}`, storageTypes: "all" });
-    await page.goto(`${S}://${app}.${root}/`);
-    await page.waitForSelector("#view-welcome:not([hidden])", { timeout: 30000 });
+await step(a, "a new device, nothing filled in: the name, the passkey, then the password on the second screen", async (page) => {
+    await fresh(page, ["supervisor", app, "homepage", "x-signup"]);
     a.log.length = 0;
+    await page.fill("#start-name", A);
     await page.click("#btn-create");
+    await page.waitForSelector("#fb-ask:not([hidden])", { timeout: 30000 });
+    const name = await page.inputValue("#fb-name");
+    if (name !== A) throw new Error("the second screen's user name is " + name);
     await giveKey(page);
-    await page.waitForSelector(`text=Continue as ${A}`, { timeout: 60000 });
-    const prompts = a.log.filter((l) => l.includes("PASSKEY_PROMPT")).length;
-    await page.click(`text=Continue as ${A}`);
     await onApp(page);
+    const prompts = a.log.filter((l) => l.includes("PASSKEY_PROMPT")).length;
     return `${await expectSub(a, A)}; passkey prompts ${prompts}`;
 });
-await step(a, "a wrong recovery key does not sign in as the account", async (page) => {
+await step(a, "a new device where a manager filled the first screen: no second screen", async (page) => {
+    await fresh(page, ["supervisor", app, "homepage", "x-signup"]);
+    await page.fill("#start-name", A);
+    // What a password manager does: sets the value of the field that is not shown.
+    await page.evaluate((v) => { const i = document.getElementById("start-pass"); i.value = v; i.dispatchEvent(new Event("input", { bubbles: true })); }, wif);
+    let asked = false;
+    page.waitForSelector("#fb-ask:not([hidden])", { timeout: 20000 }).then(() => (asked = true), () => {});
+    await page.click("#btn-create");
+    await onApp(page);
+    if (asked) throw new Error("the second screen was shown although the password was filled");
+    return await expectSub(a, A);
+});
+await step(a, "same device again: it knows the passkey needs a password, so the field is shown", async (page) => {
     await a.context.clearCookies();
-    for (const host of ["supervisor", app]) await a.cdp.send("Storage.clearDataForOrigin", { origin: `${S}://${host}.${root}`, storageTypes: "all" });
-    await page.goto(`${S}://${app}.${root}/`);
+    await page.goto(`${S}://supervisor.${root}/sign-in.html?app=${app}&path=/`);
+    // Signed in already: sign out of this browser first, keeping what it knows of the passkey.
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(() => window.localStorage.removeItem("psibase.guest-session.v1"));
+    await page.goto(`${S}://supervisor.${root}/sign-in.html?app=${app}&path=/`);
     await page.waitForSelector("#view-welcome:not([hidden])", { timeout: 30000 });
+    const unseen = await page.getAttribute("#start-pass-wrap", "data-unseen");
+    if (unseen) throw new Error("the password field is still not shown: " + unseen);
+    if (!(await page.isVisible("#start-pass"))) throw new Error("the password field is not visible");
+    await snap(a, "start-with-password");
+    return `prefilled name "${await page.inputValue("#start-name")}"`;
+});
+await step(a, "a wrong password says so and asks again in plain sight; it never opens another identity", async (page) => {
+    await fresh(page, ["supervisor", app]);
+    await page.fill("#start-name", A);
     await page.click("#btn-create");
     await page.waitForSelector("#fb-ask:not([hidden])", { timeout: 30000 });
     await page.fill("#fb-input", "KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617");
     await page.click("#fb-form button[type=submit]");
+    await page.waitForSelector("#notice:not([hidden])", { timeout: 60000 });
+    const notice = await page.textContent("#notice");
+    if (!/does not open/.test(notice)) throw new Error("notice: " + notice);
+    if (await sessionSub(a)) throw new Error("an app session exists after a wrong password");
+    if (!(await page.isVisible("#start-pass"))) throw new Error("the password field is not shown for the retry");
+    // The retry, with the right one typed into the now-visible field.
+    await page.fill("#start-pass", wif);
+    await page.click("#btn-create");
     await onApp(page);
-    const sub = await sessionSub(a);
-    if (sub === A) throw new Error("signed in as the account with the wrong key");
-    return `lands as a different guest (session sub "${sub ?? ""}")`;
+    return `"${notice.slice(0, 60)}…"; retry: ${await expectSub(a, A)}`;
 });
 for (const l of [...new Set(a.log.filter((l) => l.includes("pageerror") || l.includes("console.error")))].slice(-6)) console.log("     " + l);
 await browser.close();
