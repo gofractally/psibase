@@ -8,6 +8,7 @@
       "DOM"
     ],
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "strict": true,
     "allowJs": true,
     "resolveJsonModule": true,

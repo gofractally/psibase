@@ -42,6 +42,8 @@ psinode - The psibase blockchain server
 
   Use this private key to sign blocks. Any number of keys may be provided, but only the one that matches the public key corresponding to the producer name will be used.
 
+  *private-key* is a secp256k1 private key in WIF (the string that `psibase key generate` prints, see [psibase](psibase.md#key)), or a JSON object `{"service": "verify-k1", "rawData": "..."}` whose `rawData` is the hex of a PKCS #8 DER private key. Give the same WIF key to `psibase boot --block-key` to make it the producer's block signing key.
+
 - `--passphrase-file` *filename*
 
   Provides a passphrase that will be used to encrypt secrets stored by the node. The passphrase can also be passed in the environment variable `PSIBASE_PASSPHRASE`. If no passphrase is provided, secrets will not be stored and will be discarded when the server exits.

@@ -1,0 +1,306 @@
+{
+ "description": "Bitcoin wallet import format (WIF) vectors for secp256k1 private keys. Written by wif-vectors.py beside this file; read by the C++, Rust, TypeScript and Python tests. Do not edit by hand.",
+ "valid": [
+  {
+   "name": "bitcoin-wiki-mainnet-uncompressed",
+   "secret": "0c28fca386c7a227600b2fe50b7cae11ec86d3bf1fbe471be89827e19d72aa1d",
+   "compressed": false,
+   "network": "mainnet",
+   "wif": "5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ",
+   "publicKeyCompressed": "02d0de0aaeaefad02b8bdc8a01a1b8b11c696bd3d66a2c5f10780d95b7df42645c",
+   "publicKeyUncompressed": "04d0de0aaeaefad02b8bdc8a01a1b8b11c696bd3d66a2c5f10780d95b7df42645cd85228a6fb29940e858e7e55842ae2bd115d1ed7cc0e82d934e929c97648cb0a"
+  },
+  {
+   "name": "bitcoin-wiki-mainnet-compressed",
+   "secret": "0c28fca386c7a227600b2fe50b7cae11ec86d3bf1fbe471be89827e19d72aa1d",
+   "compressed": true,
+   "network": "mainnet",
+   "wif": "KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617",
+   "publicKeyCompressed": "02d0de0aaeaefad02b8bdc8a01a1b8b11c696bd3d66a2c5f10780d95b7df42645c",
+   "publicKeyUncompressed": "04d0de0aaeaefad02b8bdc8a01a1b8b11c696bd3d66a2c5f10780d95b7df42645cd85228a6fb29940e858e7e55842ae2bd115d1ed7cc0e82d934e929c97648cb0a"
+  },
+  {
+   "name": "bitcoin-wiki-testnet-uncompressed",
+   "secret": "0c28fca386c7a227600b2fe50b7cae11ec86d3bf1fbe471be89827e19d72aa1d",
+   "compressed": false,
+   "network": "testnet",
+   "wif": "91gGn1HgSap6CbU12F6z3pJri26xzp7Ay1VW6NHCoEayNXwRpu2",
+   "publicKeyCompressed": "02d0de0aaeaefad02b8bdc8a01a1b8b11c696bd3d66a2c5f10780d95b7df42645c",
+   "publicKeyUncompressed": "04d0de0aaeaefad02b8bdc8a01a1b8b11c696bd3d66a2c5f10780d95b7df42645cd85228a6fb29940e858e7e55842ae2bd115d1ed7cc0e82d934e929c97648cb0a"
+  },
+  {
+   "name": "bitcoin-wiki-testnet-compressed",
+   "secret": "0c28fca386c7a227600b2fe50b7cae11ec86d3bf1fbe471be89827e19d72aa1d",
+   "compressed": true,
+   "network": "testnet",
+   "wif": "cMzLdeGd5vEqxB8B6VFQoRopQ3sLAAvEzDAoQgvX54xwofSWj1fx",
+   "publicKeyCompressed": "02d0de0aaeaefad02b8bdc8a01a1b8b11c696bd3d66a2c5f10780d95b7df42645c",
+   "publicKeyUncompressed": "04d0de0aaeaefad02b8bdc8a01a1b8b11c696bd3d66a2c5f10780d95b7df42645cd85228a6fb29940e858e7e55842ae2bd115d1ed7cc0e82d934e929c97648cb0a"
+  },
+  {
+   "name": "one-mainnet-uncompressed",
+   "secret": "0000000000000000000000000000000000000000000000000000000000000001",
+   "compressed": false,
+   "network": "mainnet",
+   "wif": "5HpHagT65TZzG1PH3CSu63k8DbpvD8s5ip4nEB3kEsreAnchuDf",
+   "publicKeyCompressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "publicKeyUncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+  },
+  {
+   "name": "one-mainnet-compressed",
+   "secret": "0000000000000000000000000000000000000000000000000000000000000001",
+   "compressed": true,
+   "network": "mainnet",
+   "wif": "KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU73sVHnoWn",
+   "publicKeyCompressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "publicKeyUncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+  },
+  {
+   "name": "one-testnet-uncompressed",
+   "secret": "0000000000000000000000000000000000000000000000000000000000000001",
+   "compressed": false,
+   "network": "testnet",
+   "wif": "91avARGdfge8E4tZfYLoxeJ5sGBdNJQH4kvjJoQFacbgwmaKkrx",
+   "publicKeyCompressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "publicKeyUncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+  },
+  {
+   "name": "one-testnet-compressed",
+   "secret": "0000000000000000000000000000000000000000000000000000000000000001",
+   "compressed": true,
+   "network": "testnet",
+   "wif": "cMahea7zqjxrtgAbB7LSGbcQUr1uX1ojuat9jZodMN87JcbXMTcA",
+   "publicKeyCompressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "publicKeyUncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+  },
+  {
+   "name": "order-minus-one-mainnet-uncompressed",
+   "secret": "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140",
+   "compressed": false,
+   "network": "mainnet",
+   "wif": "5Km2kuu7vtFDPpxywn4u3NLpbr5jKpTB3jsuDU2KYEqetqj84qw",
+   "publicKeyCompressed": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "publicKeyUncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777"
+  },
+  {
+   "name": "order-minus-one-mainnet-compressed",
+   "secret": "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140",
+   "compressed": true,
+   "network": "mainnet",
+   "wif": "L5oLkpV3aqBjhki6LmvChTCV6odsp4SXM6FfU2Gppt5kFLaHLuZ9",
+   "publicKeyCompressed": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "publicKeyUncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777"
+  },
+  {
+   "name": "order-minus-one-testnet-uncompressed",
+   "secret": "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140",
+   "compressed": false,
+   "network": "testnet",
+   "wif": "93XfLeifX7KMMtUGa7xouxtnFWSSUyzNPgjrJ6Npsyahfqjy7oJ",
+   "publicKeyCompressed": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "publicKeyUncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777"
+  },
+  {
+   "name": "order-minus-one-testnet-compressed",
+   "secret": "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140",
+   "compressed": true,
+   "network": "testnet",
+   "wif": "cWALDjUu1tszsCBMjBjL4mhYj2wHUWYDR8Q8aSjLKzjkW5eBtpzu",
+   "publicKeyCompressed": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "publicKeyUncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777"
+  }
+ ],
+ "whitespace": [
+  {
+   "name": "trailing-newline",
+   "text": "KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617\n",
+   "wif": "KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617"
+  },
+  {
+   "name": "crlf",
+   "text": "KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617\r\n",
+   "wif": "KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617"
+  },
+  {
+   "name": "both-ends",
+   "text": " \t5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ \n",
+   "wif": "5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ"
+  }
+ ],
+ "invalid": [
+  {
+   "name": "bad-checksum",
+   "text": "KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98618",
+   "error": "bad-checksum",
+   "looksLikeWif": true
+  },
+  {
+   "name": "bad-checksum-uncompressed",
+   "text": "5HueCGU8rMjxEXxiPuD52Dku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ",
+   "error": "bad-checksum",
+   "looksLikeWif": true
+  },
+  {
+   "name": "secret-31-bytes",
+   "text": "yPoVP5njSzmEVK4VJGRWWAwqnwCyLPRcMm5XyrKgY1DE64xhu",
+   "error": "bad-length",
+   "looksLikeWif": false
+  },
+  {
+   "name": "secret-34-bytes",
+   "text": "2Sc7S1wac65gQ8sGKeJabXpqNCpxK7masshEtBDGDWT8BmtJ7rsUFD",
+   "error": "bad-length",
+   "looksLikeWif": false
+  },
+  {
+   "name": "last-character-missing",
+   "text": "KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP9861",
+   "error": "bad-checksum",
+   "looksLikeWif": true
+  },
+  {
+   "name": "truncated",
+   "text": "KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1",
+   "error": "bad-length",
+   "looksLikeWif": false
+  },
+  {
+   "name": "empty",
+   "text": "",
+   "error": "bad-length",
+   "looksLikeWif": false
+  },
+  {
+   "name": "only-spaces",
+   "text": "  \n",
+   "error": "bad-length",
+   "looksLikeWif": false
+  },
+  {
+   "name": "very-long",
+   "text": "KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617",
+   "error": "bad-length",
+   "looksLikeWif": false
+  },
+  {
+   "name": "version-00",
+   "text": "1Qdz59dFBGz4VxavNuyXqCQvCrReA7W5dHeg87tihqqWYuW8cSa",
+   "error": "bad-version",
+   "looksLikeWif": false
+  },
+  {
+   "name": "version-00-uncompressed",
+   "text": "16Mcb23muAxyXaSMhmB6B1mqkvLdWhtuFZmnZsxDczHRqir59L",
+   "error": "bad-version",
+   "looksLikeWif": false
+  },
+  {
+   "name": "version-81",
+   "text": "L6Cyjtdfq1TimFfgG9qBEHQF2FmaL96H5ceTrip74S4eqFapbcDJ",
+   "error": "bad-version",
+   "looksLikeWif": true
+  },
+  {
+   "name": "flag-02",
+   "text": "KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvWxyf5d",
+   "error": "bad-flag",
+   "looksLikeWif": true
+  },
+  {
+   "name": "flag-00",
+   "text": "KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvHFRKf6",
+   "error": "bad-flag",
+   "looksLikeWif": true
+  },
+  {
+   "name": "secret-zero",
+   "text": "KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU73Nd2Mcv1",
+   "error": "bad-secret",
+   "looksLikeWif": true
+  },
+  {
+   "name": "secret-zero-uncompressed",
+   "text": "5HpHagT65TZzG1PH3CSu63k8DbpvD8s5ip4nEB3kEsreAbuatmU",
+   "error": "bad-secret",
+   "looksLikeWif": true
+  },
+  {
+   "name": "secret-order",
+   "text": "L5oLkpV3aqBjhki6LmvChTCV6odsp4SXM6FfU2Gppt5kFqRzExJJ",
+   "error": "bad-secret",
+   "looksLikeWif": true
+  },
+  {
+   "name": "secret-order-testnet",
+   "text": "cWALDjUu1tszsCBMjBjL4mhYj2wHUWYDR8Q8aSjLKzjkWaXMLRaY",
+   "error": "bad-secret",
+   "looksLikeWif": true
+  },
+  {
+   "name": "secret-order-plus-one",
+   "text": "5Km2kuu7vtFDPpxywn4u3NLpbr5jKpTB3jsuDU2KYEqetyuszSh",
+   "error": "bad-secret",
+   "looksLikeWif": true
+  },
+  {
+   "name": "secret-all-ones",
+   "text": "L5oLkpV3aqBjhki6LmvChTCq73v9gyymzzMpBbhDLjDpKCuAXpsi",
+   "error": "bad-secret",
+   "looksLikeWif": true
+  },
+  {
+   "name": "character-zero",
+   "text": "KwdMAjGmer0anjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617",
+   "error": "bad-character",
+   "looksLikeWif": false
+  },
+  {
+   "name": "character-capital-o",
+   "text": "KwdMAjGmerOanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617",
+   "error": "bad-character",
+   "looksLikeWif": false
+  },
+  {
+   "name": "character-capital-i",
+   "text": "KwdMAjGmerIanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617",
+   "error": "bad-character",
+   "looksLikeWif": false
+  },
+  {
+   "name": "character-small-l",
+   "text": "KwdMAjGmerlanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617",
+   "error": "bad-character",
+   "looksLikeWif": false
+  },
+  {
+   "name": "character-plus",
+   "text": "KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP9861+",
+   "error": "bad-character",
+   "looksLikeWif": false
+  },
+  {
+   "name": "space-inside",
+   "text": "KwdMAjGmerYanjeui5SHS7Jkmp ZvVipYvB2LJGU1ZxJwYvP98617",
+   "error": "bad-character",
+   "looksLikeWif": false
+  },
+  {
+   "name": "newline-inside",
+   "text": "KwdMAjGmerYanjeui5SHS7Jkmp\nZvVipYvB2LJGU1ZxJwYvP98617",
+   "error": "bad-character",
+   "looksLikeWif": false
+  },
+  {
+   "name": "no-break-space-at-end",
+   "text": "KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617\u00a0",
+   "error": "bad-character",
+   "looksLikeWif": false
+  },
+  {
+   "name": "pem",
+   "text": "-----BEGIN PRIVATE KEY-----",
+   "error": "bad-character",
+   "looksLikeWif": false
+  }
+ ]
+}

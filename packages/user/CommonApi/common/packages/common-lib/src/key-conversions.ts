@@ -1,6 +1,8 @@
 import elliptic from "elliptic";
 import hashJs from "hash.js";
 
+import { looksLikeWif, wifDecode } from "./wif.ts";
+
 // Key type
 export const KeyType = {
     k1: 0,
@@ -119,7 +121,8 @@ function getR1() {
     return r1;
 }
 
-// Convert a private key in string form to {keyType, keyPair}
+// Convert a private key in string form to {keyType, keyPair}. The string is
+// a secp256k1 key in WIF (see wif.ts), or the older PVT_K1_ / PVT_R1_ form.
 export function privateStringToKeyPair(s: string) {
     let keyType, data, ec;
     if (s.substr(0, 7) === "PVT_K1_")
@@ -134,7 +137,14 @@ export function privateStringToKeyPair(s: string) {
             stringToKey(s.substr(7), privateKeyDataSize, "R1"),
             getR1(),
         ];
-    else throw new Error("private key must begin with PVT_K1_ or PVT_R1_");
+    else if (looksLikeWif(s))
+        // Bitcoin's wallet import format. Claims made by this library name
+        // the compressed public key whichever form the string asks for.
+        [keyType, data, ec] = [KeyType.k1, wifDecode(s).secret, getK1()];
+    else
+        throw new Error(
+            "private key must be WIF or begin with PVT_K1_ or PVT_R1_",
+        );
     return { keyType, keyPair: ec.keyFromPrivate(data) };
 }
 

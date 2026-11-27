@@ -5,7 +5,12 @@ if(DEFINED IS_NATIVE)
     find_package(Threads REQUIRED)
     add_executable(psibase-common-tests
         name.cpp
+        wif.cpp
     )
+    # wif.cpp reads the vectors that the Rust, TypeScript and Python tests
+    # also read.
+    target_compile_definitions(psibase-common-tests PRIVATE
+        PSIBASE_WIF_VECTORS="${CMAKE_CURRENT_SOURCE_DIR}/wif-vectors.json")
     target_link_libraries(psibase-common-tests psibase Catch2::Catch2WithMain Threads::Threads )
     set_target_properties(psibase-common-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
     native_test(psibase-common-tests)

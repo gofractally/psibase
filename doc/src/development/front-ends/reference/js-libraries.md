@@ -88,7 +88,7 @@ Currently psibase hosts multiple JavaScript modules in the `/common/` service ta
 
 `privateKeys` is an array which may contain a mix of:
 
-- Private keys in text form, e.g. `"PVT_K1_2bfGi9r..."`
+- Private keys in text form: a secp256k1 key in WIF, e.g. `"KwdMAjGmerYanj..."`, or the older `"PVT_K1_2bfGi9r..."`
 - `{keyType, keyPair}`. See [Key Conversions (js)](#key-conversions-js).
 
 ## Service utilities
@@ -133,7 +133,21 @@ export const KeyType = {
 };
 ```
 
-Here are example private and public keys in text form:
+`privateStringToKeyPair` also reads a secp256k1 private key in WIF (wallet import format), the string that Bitcoin tools and the `psibase` command line read and write:
+
+```
+KwdMAjGmerYanjeui5SHS7JkmpZvVipYvB2LJGU1ZxJwYvP98617
+```
+
+`/common/common-lib.js` exports the format itself:
+
+| Function                                    | Description                                                                                     |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `wifEncode(secret, compressed?, network?)`  | The WIF string of a 32-byte secp256k1 private key. Compressed and `"mainnet"` by default         |
+| `wifDecode(text)`                           | Reads a WIF string: `{secret, compressed, network}`. Throws a `WifError` whose `reason` says why |
+| `looksLikeWif(text)`                        | Whether the text has the shape of a WIF string (not whether it is valid)                         |
+
+Here are example private and public keys in the older text form:
 
 ```
 PVT_K1_2bfGi9rYsXQSXXTvJbDAPhHLQUojjaNLomdm3cEJ1XTzMqUt3V

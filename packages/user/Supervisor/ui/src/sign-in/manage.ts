@@ -4,6 +4,8 @@
 // Every action here asks for the passkey, derives the account's owner key,
 // signs one transaction with it and wipes it (gofractally/psibase#2275,
 // sections 4 and 5).
+import { wifEncode } from "@psibase/common-lib";
+
 import {
     type KeySpec,
     accountKeys,
@@ -27,7 +29,6 @@ import {
     rememberOnDevice,
 } from "./device";
 import { pushAsOwner } from "./owner-tx";
-import { toWif } from "./wif";
 import { type Unlocked } from "./passkey";
 
 // What x-usage reports for the caller (packages/local/XUsage). The node
@@ -229,7 +230,7 @@ export const runManageStep = async (ctx: PageContext) => {
             exported = {
                 name,
                 pem: exportedKeyPem(active),
-                wif: toWif(active),
+                wif: wifEncode(active),
                 seq: found.keys.active.seq,
             };
             active.fill(0);

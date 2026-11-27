@@ -213,20 +213,127 @@ def is_allowed_verifier(service, spki):
     """Whether service is one of the verifiers allowed for this key"""
     return service in allowed_verifiers(spki)
 
+# A secp256k1 private key as one line of text: Bitcoin's wallet import format
+# (WIF), base58(version || secret[32] || [0x01] || check[4]). version is 0x80
+# (mainnet) or 0xEF (Bitcoin's test networks); a trailing 0x01 asks for the
+# compressed public key; check is the start of SHA-256(SHA-256(the rest)).
+# This mirrors psibase/wif.hpp, which is the definition; both are tested
+# against libraries/psibase/common/tests/wif-vectors.json.
+_BASE58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+_WIF_VERSIONS = {'mainnet': 0x80, 'testnet': 0xEF}
+_K1_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+_WIF_MESSAGES = {
+    'bad-character': 'private key (WIF): contains a character that is not base58',
+    'bad-length': 'private key (WIF): wrong length',
+    'bad-checksum': 'private key (WIF): check digits do not match',
+    'bad-version': 'private key (WIF): not a Bitcoin mainnet or testnet private key',
+    'bad-flag': 'private key (WIF): malformed compression flag',
+    'bad-secret': 'private key (WIF): not a valid secp256k1 key',
+}
+
+class WifError(ValueError):
+    """Raised by wif_decode and wif_encode. reason is the first rule the
+    string breaks, by the same name in every language."""
+    def __init__(self, reason):
+        super().__init__(_WIF_MESSAGES[reason])
+        self.reason = reason
+
+WifKey = namedtuple('WifKey', ['secret', 'compressed', 'network'])
+WifKey.__doc__ = """What a WIF string holds: the 32-byte private key (0 < secret < the group
+order), whether the string asks for the compressed public key, and
+'mainnet' or 'testnet'"""
+# The key must not end up in a log
+WifKey.__repr__ = lambda self: 'WifKey(compressed=%r, network=%r)' % (self.compressed, self.network)
+
+def _wif_check(payload):
+    return sha256(sha256(payload).digest()).digest()[:4]
+
+def wif_encode(secret, compressed=True, network='mainnet'):
+    """The WIF string of a private key (32 bytes). Raises WifError('bad-secret')
+    if the key is 0 or is not below the group order."""
+    secret = bytes(secret)
+    if len(secret) != 32 or not 0 < int.from_bytes(secret, 'big') < _K1_ORDER:
+        raise WifError('bad-secret')
+    payload = bytes([_WIF_VERSIONS[network]]) + secret + (b'\x01' if compressed else b'')
+    number = int.from_bytes(payload + _wif_check(payload), 'big')
+    # The version byte is never zero, so there are no leading zeros to write
+    result = ''
+    while number:
+        (number, digit) = divmod(number, 58)
+        result = _BASE58[digit] + result
+    return result
+
+def wif_decode(text):
+    """Reads a WIF string. ASCII white space (space, tab, CR, LF) is ignored
+    at the ends and is an error anywhere else. Raises WifError when the
+    string breaks one of the rules."""
+    text = text.strip(' \t\r\n')
+    if any(ch not in _BASE58 for ch in text):
+        raise WifError('bad-character')
+    # No string of 37 or 38 bytes is longer than 52 characters
+    if len(text) == 0 or len(text) > 52:
+        raise WifError('bad-length')
+    number = 0
+    for ch in text:
+        number = number * 58 + _BASE58.index(ch)
+    # The bytes are the number without its leading zeros, preceded by one
+    # zero byte for each leading '1' of the text
+    data = bytes(len(text) - len(text.lstrip('1'))) + number.to_bytes((number.bit_length() + 7) // 8, 'big')
+    if len(data) not in (37, 38):
+        raise WifError('bad-length')
+    (payload, check) = (data[:-4], data[-4:])
+    if _wif_check(payload) != check:
+        raise WifError('bad-checksum')
+    if payload[0] not in (0x80, 0xEF):
+        raise WifError('bad-version')
+    if len(payload) == 34 and payload[33] != 0x01:
+        raise WifError('bad-flag')
+    secret = payload[1:33]
+    if not 0 < int.from_bytes(secret, 'big') < _K1_ORDER:
+        raise WifError('bad-secret')
+    return WifKey(secret, len(payload) == 34, 'mainnet' if payload[0] == 0x80 else 'testnet')
+
+def looks_like_wif(text):
+    """Whether the text has the shape of a WIF string: 51 or 52 base58
+    characters that start with 5, K, L, 9 or c, with optional white space
+    around them. Cheap, and says nothing about whether the string is valid."""
+    text = text.strip(' \t\r\n')
+    return len(text) in (51, 52) and text[0] in '5KL9c' and all(ch in _BASE58 for ch in text)
+
 class PrivateKey:
+    # Whether claims name the compressed form of the public key. The chain
+    # compares a claim with the stored key byte for byte, so this is part of
+    # which key an account has. A key read from WIF uses the form the string
+    # asks for; any other key uses the uncompressed point, as OpenSSL writes it.
+    compressed = False
     def __init__(self, data=None):
         from cryptography.hazmat.primitives.asymmetric import ec
         from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding, load_pem_private_key, load_der_private_key
         if data is None:
             # Software keys use secp256k1, which is the faster curve to verify
             self.private = ec.generate_private_key(ec.SECP256K1())
+        elif isinstance(data, str) and looks_like_wif(data):
+            key = wif_decode(data)
+            self.private = ec.derive_private_key(int.from_bytes(key.secret, 'big'), ec.SECP256K1())
+            self.compressed = key.compressed
         else:
+            if isinstance(data, str):
+                data = data.encode()
             try:
                 self.private = load_pem_private_key(data, None)
             except ValueError:
                 self.private = load_der_private_key(data, None)
             if not isinstance(self.private, ec.EllipticCurvePrivateKey) or not isinstance(self.private.curve, (ec.SECP256K1, ec.SECP256R1)):
                 raise Exception("Only secp256k1 and P-256 keys are supported")
+    def wif(self, compressed=None, network='mainnet'):
+        """The key in WIF (secp256k1 only). compressed defaults to the form
+        this key's claims use; pass True for the usual K.../L... string, which
+        then signs for the compressed public key."""
+        from cryptography.hazmat.primitives.asymmetric import ec
+        if not isinstance(self.private.curve, ec.SECP256K1):
+            raise Exception("Only secp256k1 keys have a WIF form")
+        secret = self.private.private_numbers().private_value.to_bytes(32, 'big')
+        return wif_encode(secret, self.compressed if compressed is None else compressed, network)
     def sign_prehashed(self, digest):
         from cryptography.hazmat.primitives.hashes import SHA256
         from cryptography.hazmat.primitives.asymmetric import ec, utils
@@ -255,8 +362,7 @@ class PrivateKey:
     def claim(self):
         """The claim for this key. It names the default verifier for the
         key's type unless another was chosen with with_verifier."""
-        from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding
-        pub = self.private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+        pub = self.spki_der()
         service = verifier_for(pub) if self.verifier is None else self.verifier
         if service is None:
             raise Exception("No verifier accepts this key")
@@ -267,11 +373,19 @@ class PrivateKey:
         from cryptography.hazmat.primitives.serialization import PrivateFormat, Encoding, NoEncryption
         return self.private.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()).decode()
     def spki(self):
-        from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding
-        return self.private.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode()
+        import base64
+        body = base64.b64encode(self.spki_der()).decode()
+        lines = [body[i:i + 64] for i in range(0, len(body), 64)]
+        return '-----BEGIN PUBLIC KEY-----\n' + '\n'.join(lines) + '\n-----END PUBLIC KEY-----\n'
     def spki_der(self):
         from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding
-        return self.private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+        public = self.private.public_key()
+        if not self.compressed:
+            return public.public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+        # SEQUENCE { AlgorithmIdentifier, BIT STRING point }
+        point = public.public_bytes(Encoding.X962, PublicFormat.CompressedPoint)
+        algorithm = _VERIFIERS[self.private.curve.name][1]
+        return bytes([0x30, len(algorithm) + 3 + len(point)]) + algorithm + bytes([0x03, len(point) + 1, 0x00]) + point
 
 class API:
     '''Provides an interface to the HTTP API of a psinode server based on requests'''

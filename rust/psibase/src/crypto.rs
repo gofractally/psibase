@@ -629,100 +629,57 @@ fn load_pkcs11_private_key(key: &str) -> Result<Arc<dyn Signer>, anyhow::Error> 
     return Err(Error::NoMatchingKey.into());
 }
 
-/// Decodes base58 (Bitcoin's alphabet). None if a character is not in it.
+/// The WIF text that `key` is or names: the string itself, or the contents
+/// of a small file that holds one. None if `key` is neither (a PEM or DER
+/// file, or nothing readable).
 #[cfg(not(target_family = "wasm"))]
-fn base58_decode(text: &str) -> Option<Vec<u8>> {
-    const ALPHABET: &[u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-    let mut bytes: Vec<u8> = Vec::new(); // little-endian
-    for ch in text.bytes() {
-        let mut carry = ALPHABET.iter().position(|c| *c == ch)? as u32;
-        for b in bytes.iter_mut() {
-            carry += (*b as u32) * 58;
-            *b = (carry & 0xff) as u8;
-            carry >>= 8;
-        }
-        while carry > 0 {
-            bytes.push((carry & 0xff) as u8);
-            carry >>= 8;
-        }
+fn read_wif(key: &str) -> Option<String> {
+    if crate::looks_like_wif(key) {
+        return Some(key.to_string());
     }
-    let zeros = text.bytes().take_while(|c| *c == b'1').count();
-    bytes.extend(std::iter::repeat(0).take(zeros));
-    bytes.reverse();
-    Some(bytes)
+    match std::fs::read_to_string(key) {
+        // Only a small text file can be one; anything else is left to the
+        // PEM and DER readers.
+        Ok(contents) if contents.len() < 128 && crate::looks_like_wif(&contents) => Some(contents),
+        _ => None,
+    }
 }
 
-/// A secp256k1 private key written as one base58check string (Bitcoin's
-/// wallet import format): 0x80, the 32-byte key, 0x01 if the public key is
-/// to be used compressed, then four check bytes. Returns the key and
-/// whether the compressed form was asked for; None if the text does not
-/// have that shape, an error if it does but is wrong.
+/// The SubjectPublicKeyInfo of a secp256k1 key with its point in the given
+/// form. The form matters: a claim must name the key byte for byte as the
+/// account stores it.
 #[cfg(not(target_family = "wasm"))]
-fn parse_wif(text: &str) -> Result<Option<([u8; 32], bool)>, anyhow::Error> {
-    use sha2::{Digest, Sha256};
-    let text = text.trim();
-    let shaped = (51..=52).contains(&text.len())
-        && matches!(text.as_bytes()[0], b'5' | b'K' | b'L' | b'9' | b'c')
-        && text.bytes().all(|c| c.is_ascii_alphanumeric());
-    if !shaped {
-        return Ok(None);
-    }
-    let Some(bytes) = base58_decode(text) else {
-        return Ok(None);
-    };
-    if bytes.len() != 37 && bytes.len() != 38 {
-        return Ok(None);
-    }
-    let (payload, check) = bytes.split_at(bytes.len() - 4);
-    if Sha256::digest(Sha256::digest(payload))[..4] != *check {
-        return Err(anyhow::anyhow!("base58 private key: check digits do not match"));
-    }
-    // 0x80 is the mainnet version byte; 0xEF is what wallets on Bitcoin's
-    // test networks write. The key is the same number either way.
-    if payload[0] != 0x80 && payload[0] != 0xef {
-        return Ok(None);
-    }
-    let compressed = payload.len() == 34;
-    if compressed && payload[33] != 0x01 {
-        return Err(anyhow::anyhow!("base58 private key: malformed"));
-    }
-    let mut key = [0u8; 32];
-    key.copy_from_slice(&payload[1..33]);
-    Ok(Some((key, compressed)))
-}
-
-/// The signer for a base58 private key, given either as the string itself
-/// or as a file that holds it. None if `key` is neither.
-#[cfg(not(target_family = "wasm"))]
-fn load_wif_private_key(key: &str) -> Result<Option<Arc<dyn Signer>>, anyhow::Error> {
-    let parsed = match parse_wif(key)? {
-        Some(parsed) => Some(parsed),
-        None => match std::fs::read_to_string(key) {
-            // Only a small text file can be one; anything else is left to
-            // the PEM and DER readers.
-            Ok(contents) if contents.len() < 128 => parse_wif(&contents)?,
-            _ => None,
-        },
-    };
-    let Some((secret, compressed)) = parsed else {
-        return Ok(None);
-    };
-    let secret_key = secp256k1::SecretKey::from_slice(&secret)?;
-    let public_key = secp256k1::PublicKey::from_secret_key(secp256k1::SECP256K1, &secret_key);
-    // The claim names the public key in the form the string asks for, which
-    // must be the form the account stores.
+fn k1_public_key_info(
+    secret_key: &secp256k1::SecretKey,
+    compressed: bool,
+) -> Result<Vec<u8>, anyhow::Error> {
+    let public_key = secp256k1::PublicKey::from_secret_key(secp256k1::SECP256K1, secret_key);
     let point: Vec<u8> = if compressed {
         public_key.serialize().to_vec()
     } else {
         public_key.serialize_uncompressed().to_vec()
     };
-    let pubkey_info = Encode::to_der(&SubjectPublicKeyInfo {
+    Ok(Encode::to_der(&SubjectPublicKeyInfo {
         algorithm: spki::AlgorithmIdentifier {
             oid: OID_ECDSA,
             parameters: Some(OID_SECP256K1),
         },
         subject_public_key: BitStringRef::from_bytes(&point)?,
-    })?;
+    })?)
+}
+
+/// The signer for a WIF private key, given either as the string itself or
+/// as a file that holds it. None if `key` is neither. The claim names the
+/// public key in the form the string asks for (compressed for K... and
+/// L..., uncompressed for 5...), which must be the form the account stores.
+#[cfg(not(target_family = "wasm"))]
+fn load_wif_private_key(key: &str) -> Result<Option<Arc<dyn Signer>>, anyhow::Error> {
+    let Some(text) = read_wif(key) else {
+        return Ok(None);
+    };
+    let wif = crate::wif_decode(&text)?;
+    let secret_key = secp256k1::SecretKey::from_slice(&wif.secret)?;
+    let pubkey_info = k1_public_key_info(&secret_key, wif.compressed)?;
     check_supported(&pubkey_info)?;
     Ok(Some(Arc::new(PKCS8PrivateKeyK1 {
         key: secret_key,
@@ -870,7 +827,8 @@ impl AnyPrivateKey {
     }
 }
 
-/// `KEY` is a PKCS #11 URI or the path of a PEM or DER private key file.
+/// `KEY` is a PKCS #11 URI, the path of a PEM or DER private key file, or a
+/// secp256k1 private key in WIF (the string, or a file holding it).
 /// `VERIFIER=KEY` is the same key for an account that chose that verify
 /// service for it, e.g. `verify-br1=alice.pem`.
 #[cfg(not(target_family = "wasm"))]
@@ -931,7 +889,9 @@ impl AnyPublicKey {
     }
 }
 
-/// `KEY` is a PKCS #11 URI or the path of a PEM or DER public key file.
+/// `KEY` is a PKCS #11 URI or the path of a PEM or DER public key file, or a
+/// secp256k1 private key in WIF (the string, or a file holding it), which
+/// stands for its public key.
 /// `VERIFIER=KEY` is the same key with that verify service chosen for it
 /// in place of the default for its type, e.g. `verify-br1=alice.pub`.
 impl FromStr for AnyPublicKey {
@@ -947,6 +907,18 @@ impl FromStr for AnyPublicKey {
         #[cfg(not(target_family = "wasm"))]
         if key.starts_with("pkcs11:") {
             return with(Self::from_spki(load_pkcs11_public_key(key)?)?);
+        }
+
+        // A WIF private key stands for its public key, in the form the
+        // string asks for: the key that `--sign` with the same string claims.
+        #[cfg(not(target_family = "wasm"))]
+        if let Some(text) = read_wif(key) {
+            let wif = crate::wif_decode(&text)?;
+            let secret_key = secp256k1::SecretKey::from_slice(&wif.secret)?;
+            return with(Self::from_spki(k1_public_key_info(
+                &secret_key,
+                wif.compressed,
+            )?)?);
         }
 
         let data = read_key_file(key, "PUBLIC KEY", Error::ExpectedPublicKey)?;
@@ -974,6 +946,99 @@ pub fn sign_transaction(
     })
 }
 
+/// A new secp256k1 private key, as the WIF key that `wif_encode` writes by
+/// default: compressed public key, mainnet.
+#[cfg(not(target_family = "wasm"))]
+pub fn generate_k1_private_key() -> crate::WifKey {
+    use rand_core::RngCore;
+    let mut secret = [0u8; 32];
+    loop {
+        OsRng.fill_bytes(&mut secret);
+        // Refuses 0 and anything not below the group order
+        if secp256k1::SecretKey::from_slice(&secret).is_ok() {
+            return crate::WifKey {
+                secret,
+                compressed: true,
+                network: crate::WifNetwork::Mainnet,
+            };
+        }
+    }
+}
+
+/// The secp256k1 private key that `key` is or names (WIF, a file holding
+/// WIF, or a PEM or DER PKCS #8 file), with the form of its public key:
+/// what WIF's compression flag says, or the form of the point in the file.
+/// Fails for keys on other curves and for keys on a PKCS #11 device.
+#[cfg(not(target_family = "wasm"))]
+pub fn load_k1_private_key(key: &str) -> Result<crate::WifKey, anyhow::Error> {
+    if key.starts_with("pkcs11:") {
+        return Err(anyhow::anyhow!(
+            "a key on a PKCS #11 device cannot be exported"
+        ));
+    }
+    if let Some(text) = read_wif(key) {
+        return Ok(crate::wif_decode(&text)?);
+    }
+    let data = read_key_file(key, "PRIVATE KEY", Error::ExpectedPrivateKey)?;
+    let pkcs8_key = data.decode_msg::<pkcs8::PrivateKeyInfo>()?;
+    if pkcs8_key.algorithm.oids()? != (OID_ECDSA, Some(OID_SECP256K1)) {
+        return Err(anyhow::anyhow!(
+            "only secp256k1 keys have a WIF form; other keys stay PEM"
+        ));
+    }
+    let ec_key = sec1::EcPrivateKey::from_der(pkcs8_key.private_key)?;
+    let secret_key = secp256k1::SecretKey::from_slice(ec_key.private_key)?;
+    Ok(crate::WifKey {
+        secret: secret_key.secret_bytes(),
+        // A file without the public key signs with the compressed one
+        compressed: ec_key.public_key.map_or(true, |point| point.len() == 33),
+        network: crate::WifNetwork::Mainnet,
+    })
+}
+
+/// A secp256k1 private key as a PKCS #8 PEM document, the form that OpenSSL
+/// reads. The public key inside is in the form `key.compressed` says, so
+/// that signing with the PEM file claims the same public key as signing
+/// with the WIF string.
+#[cfg(not(target_family = "wasm"))]
+pub fn k1_private_key_pem(key: &crate::WifKey) -> Result<String, anyhow::Error> {
+    let secret_key = secp256k1::SecretKey::from_slice(&key.secret)?;
+    let public_key = secp256k1::PublicKey::from_secret_key(secp256k1::SECP256K1, &secret_key);
+    let point: Vec<u8> = if key.compressed {
+        public_key.serialize().to_vec()
+    } else {
+        public_key.serialize_uncompressed().to_vec()
+    };
+    let ec_key = Encode::to_der(&sec1::EcPrivateKey {
+        private_key: &key.secret,
+        parameters: None,
+        public_key: Some(&point),
+    })?;
+    let der = Encode::to_der(&pkcs8::PrivateKeyInfo {
+        algorithm: spki::AlgorithmIdentifier {
+            oid: OID_ECDSA,
+            parameters: Some(AnyRef::from(&OID_SECP256K1)),
+        },
+        private_key: &ec_key,
+        public_key: None,
+    })?;
+    Ok(pem::encode_config(
+        &pem::Pem::new("PRIVATE KEY", der),
+        pem::EncodeConfig::new().set_line_ending(pem::LineEnding::LF),
+    ))
+}
+
+/// A DER SubjectPublicKeyInfo as a PEM document
+pub fn public_key_pem(spki: &[u8]) -> String {
+    pem::encode_config(
+        &pem::Pem::new("PUBLIC KEY", spki),
+        pem::EncodeConfig::new().set_line_ending(pem::LineEnding::LF),
+    )
+}
+
+/// A new P-256 key pair as PEM documents (public, private). This is what
+/// the plugins that keep keys in the browser use. `generate_k1_private_key`
+/// makes the secp256k1 key that the command line writes as WIF.
 pub fn generate_keypair() -> Result<(String, String), anyhow::Error> {
     let signing_key = SigningKey::random(&mut OsRng);
     let verifying_key: &VerifyingKey = signing_key.verifying_key();

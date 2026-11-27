@@ -4,11 +4,14 @@
 #include <psibase/openssl.hpp>
 
 #include <openssl/bn.h>
+#include <openssl/crypto.h>
 #include <openssl/core_names.h>
 #include <openssl/ec.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/x509.h>
+
+#include <cstring>
 
 using psibase::handleOpenSSLError;
 using psibase::OpenSSLDeleter;
@@ -195,6 +198,32 @@ psibase::OpenSSLProver::OpenSSLProver(AccountNumber service, std::span<const cha
    {
       handleOpenSSLError();
    }
+   pubKey = getPublicKey(pkey.get());
+   checkVerifier(service, pubKey);
+   privateKey = pkey.release();
+}
+
+psibase::OpenSSLProver::OpenSSLProver(const WifKey& key) : service(verifier::k1)
+{
+   // PKCS #8 PrivateKeyInfo { 0, { id-ecPublicKey, secp256k1 },
+   //                          ECPrivateKey { 1, secret } }
+   // The public key is left out; OpenSSL computes it.
+   static constexpr unsigned char prefix[] = {
+       0x30, 0x3e, 0x02, 0x01, 0x00, 0x30, 0x10, 0x06, 0x07, 0x2a, 0x86,
+       0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x05, 0x2b, 0x81, 0x04, 0x00,
+       0x0a, 0x04, 0x27, 0x30, 0x25, 0x02, 0x01, 0x01, 0x04, 0x20};
+   unsigned char der[sizeof(prefix) + 32];
+   std::memcpy(der, prefix, sizeof(prefix));
+   std::memcpy(der + sizeof(prefix), key.secret.data(), key.secret.size());
+   const unsigned char*                      ptr = der;
+   std::unique_ptr<EVP_PKEY, OpenSSLDeleter> pkey(d2i_AutoPrivateKey(nullptr, &ptr, sizeof(der)));
+   OPENSSL_cleanse(der, sizeof(der));
+   if (!pkey)
+   {
+      handleOpenSSLError();
+   }
+   if (key.compressed)
+      setCompressedKey(pkey.get());
    pubKey = getPublicKey(pkey.get());
    checkVerifier(service, pubKey);
    privateKey = pkey.release();
