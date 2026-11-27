@@ -291,31 +291,30 @@ namespace SystemService
       };
 
       // A bundler's content hash in a file name: "/assets/index-DiwrgTda.js".
-      // The last '-' or '.' separated part of the name before the extension,
-      // eight or more characters of the base64url alphabet with a digit or an
-      // upper case letter among them, under an "assets" directory.
+      // The name, before its extension, ends in '-' or '.' and eight
+      // characters of the base64url alphabet with a digit or an upper case
+      // letter among them, and the file is under an "assets" directory.
       bool hasHashedName(std::string_view path)
       {
          if (path.find("/assets/") == std::string_view::npos)
             return false;
          auto name = path.substr(path.rfind('/') + 1);
          auto dot  = name.rfind('.');
-         if (dot == std::string_view::npos || dot == 0)
+         if (dot == std::string_view::npos)
             return false;
-         auto stem  = name.substr(0, dot);
-         auto start = stem.find_last_of("-.");
-         if (start == std::string_view::npos)
+         auto stem = name.substr(0, dot);
+         if (stem.size() < 10)
             return false;
-         auto hash = stem.substr(start + 1);
-         if (hash.size() < 8)
+         char separator = stem[stem.size() - 9];
+         if (separator != '-' && separator != '.')
             return false;
          bool mixed = false;
-         for (char c : hash)
+         for (char c : stem.substr(stem.size() - 8))
          {
             bool digit = c >= '0' && c <= '9';
             bool upper = c >= 'A' && c <= 'Z';
             bool lower = c >= 'a' && c <= 'z';
-            if (!digit && !upper && !lower && c != '_')
+            if (!digit && !upper && !lower && c != '_' && c != '-')
                return false;
             mixed = mixed || digit || upper;
          }
