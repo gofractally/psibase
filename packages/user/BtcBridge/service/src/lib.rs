@@ -265,6 +265,22 @@ pub mod service {
         save(&c);
         row
     }
+    /// On a test network the bridge's own account may change the smallest deposit and
+    /// withdrawal: the amounts a test faucet pays are far below what suits mainnet, and a
+    /// deployment's first choice should not be final there. Refused on mainnet, where these
+    /// are fixed at initialization. Nothing else in the custody policy can be changed.
+    #[action]
+    fn setTestMins(min_deposit: u64, min_withdrawal: u64) {
+        assert_eq!(get_sender(), Wrapper::SERVICE, "Bridge policy authority");
+        let mut c = config();
+        let mut p = policy(&c);
+        assert!(p.network != "bitcoin", "Limits are fixed on mainnet");
+        p.min_deposit = min_deposit;
+        p.min_withdrawal = min_withdrawal;
+        must(p.validate());
+        c.policy = serde_json::to_string(&p).unwrap();
+        ConfigTable::read_write().put(&c).unwrap();
+    }
     /// Administration changes are announced a day before becoming effective.
     #[action]
     fn setDepFees(fee_bps: u16, publisher_bps: u16) {
