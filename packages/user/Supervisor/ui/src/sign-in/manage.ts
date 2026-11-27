@@ -225,8 +225,12 @@ export const runManageStep = async (ctx: PageContext) => {
     };
 
     const detail = (name: string, record: ChainRecord) => {
-        const box = el("div", { class: "si-panel" });
-        box.append(
+        const panel = el("div", { class: "si-panel" });
+        const facts = el("div", { class: "si-facts" });
+        // The actions sit side by side where there is room for them.
+        const box = el("div", { class: "si-actions" });
+        panel.append(el("h2", { class: "si-panel-title", text: name }), facts, box);
+        facts.append(
             row("State", stateText(record)),
             row("Recovery partner", partnerName(record.partner)),
             row("Pause length", duration(record.pauseSeconds)),
@@ -234,7 +238,7 @@ export const runManageStep = async (ctx: PageContext) => {
         );
         const pending = pendingText(record);
         if (pending) {
-            box.append(
+            facts.append(
                 row("Waiting", pending),
                 el("p", {
                     class: "si-hint",
@@ -346,10 +350,10 @@ export const runManageStep = async (ctx: PageContext) => {
                 );
             }
         }
-        box.append(
+        panel.append(
             el("p", { class: "si-below" }, linkButton("Remove from this browser", () => void remove(name))),
         );
-        return box;
+        return panel;
     };
 
     const usageLine = async () => {
@@ -382,10 +386,13 @@ export const runManageStep = async (ctx: PageContext) => {
         $("mg-lede").textContent = device.accounts.length
             ? "Each account has its own keys, all made by your passkey."
             : "This browser has no accounts yet.";
-        const parts: Node[] = [];
         if (!device.accounts.some((a) => a.name === selected)) {
             selected = device.current ?? device.accounts[0]?.name ?? "";
         }
+        // Two columns on a wide screen: the accounts and usage on the left,
+        // the selected account on the right. One column on a narrow one.
+        const side = el("div", { class: "si-stack" });
+        const main = el("div", { class: "si-stack" });
         for (const account of device.accounts) {
             const record = await fetchRecord(authOrigin, account.name, net.token).catch(
                 () => undefined,
@@ -406,16 +413,17 @@ export const runManageStep = async (ctx: PageContext) => {
                 ),
             );
             head.addEventListener("click", () => {
-                selected = open ? "" : account.name;
+                if (open) return;
+                selected = account.name;
                 notice();
                 void render();
             });
-            parts.push(head);
-            if (open && record) parts.push(detail(account.name, record));
+            side.append(head);
+            if (open && record) main.append(detail(account.name, record));
         }
         const usage = await usageLine();
-        if (usage) parts.push(usage);
-        body.replaceChildren(...parts);
+        if (usage) side.append(usage);
+        body.replaceChildren(side, ...(main.childElementCount ? [main] : []));
         setLinks($("mg-below"), [
             { label: "Back", run: () => ctx.go("account") },
             { label: "Create another account", run: () => ctx.go("account", { intent: "new" }) },

@@ -533,6 +533,8 @@ const pageContext = (session: GuestSession): PageContext => ({
 
 const start = async () => {
     $("network").textContent = rootName;
+    // The manage step has more to show than a sign-in card holds.
+    if (step === "manage") document.body.dataset.layout = "wide";
 
     if (!window.PublicKeyCredential || !navigator.credentials) {
         $("unsupported-detail").textContent =
