@@ -39,6 +39,7 @@ import {
     canDiscardPasskey,
     canLookUpSilently,
     createPasskey,
+    fetchChainId,
     discardPasskey,
     fromB64Url,
     unlockWith,
@@ -718,8 +719,35 @@ const pageContext = (session: GuestSession): PageContext => ({
     go,
 });
 
+// Which network this browser's sign-in data belongs to. Accounts, the
+// account chosen for each app and the session are facts about one chain. A
+// node that is started again on a new chain keeps its address, so what this
+// browser remembered would otherwise be offered for accounts that no longer
+// exist.
+const NETWORK_KEY = "psibase.network.v1";
+
+const forgetOtherNetwork = async () => {
+    let id: string;
+    try {
+        id = Array.from(await fetchChainId(), (b) => b.toString(16).padStart(2, "0")).join("");
+    } catch {
+        return; // The node is unreachable; nothing to compare.
+    }
+    const known = window.localStorage.getItem(NETWORK_KEY);
+    if (known !== id) {
+        // The passkey itself (HAS_PASSKEY_KEY) is kept: it still works, and
+        // derives new keys for the new network.
+        clearDevice();
+        clearGuestSession();
+        window.localStorage.removeItem(WHO_KEY);
+        window.localStorage.removeItem(APPS_KEY);
+        window.localStorage.setItem(NETWORK_KEY, id);
+    }
+};
+
 const start = async () => {
     $("network").textContent = rootName;
+    await forgetOtherNetwork();
     // The manage step has more to show than a sign-in card holds.
     if (step === "manage") document.body.dataset.layout = "wide";
 

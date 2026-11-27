@@ -27,7 +27,9 @@ import {
     fetchRecord,
     keysFor,
     callPlugin,
+    dropFromDevice,
     heldAccounts,
+    notePasskey,
     loadDevice,
     loginFor,
     recordAccount,
@@ -773,9 +775,26 @@ export const runAccountStep = async (ctx: PageContext) => {
         }
         const failed = params.get("failed");
         if (failed) {
-            notice(
-                `${failed} could not be signed in to ${ctx.app} just now. Try again, or open Manage accounts if it is paused or frozen.`,
+            // Say what is actually wrong: the account may not exist here at
+            // all (the network was started afresh), which is not the same as
+            // paused or frozen.
+            const record = await fetchRecord(net.siblingOrigin("auth-sig"), failed, net.token).catch(
+                () => "unknown" as const,
             );
+            if (!record) {
+                dropFromDevice(failed);
+                notePasskey({ pendingName: failed });
+                await refresh();
+                notice(
+                    `${failed} does not exist on this network, so it was removed from this browser. You can create it again.`,
+                );
+            } else if (record !== "unknown" && record.state !== "normal") {
+                notice(
+                    `${failed} is ${record.state}. Open Manage accounts to see what can be done.`,
+                );
+            } else {
+                notice(`${failed} could not be signed in to ${ctx.app} just now. Try again.`);
+            }
         }
         if (providerError) {
             notice(

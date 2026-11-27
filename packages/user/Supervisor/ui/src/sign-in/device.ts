@@ -450,5 +450,13 @@ export const syncAccounts = async (
             );
         }
     }
+    // An account this browser remembers that is no longer on the network (or
+    // is no longer this passkey's) is dropped, so it is not offered.
+    for (const entry of loadDevice().accounts) {
+        const still = await keysFor(net, unlocked, entry.name).catch(() => "unknown" as const);
+        if (still === "unknown") continue; // Could not ask; leave it.
+        if (still) still.keys.ownerSecret.fill(0);
+        else dropFromDevice(entry.name);
+    }
     return loadDevice().accounts.map((a) => a.name);
 };
