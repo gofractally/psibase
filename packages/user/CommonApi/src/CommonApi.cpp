@@ -365,6 +365,25 @@ namespace SystemService
                reply.headers.push_back(setCookieHeader("SESSION", *token, age, true));
             return reply;
          }
+         if (request.target == "/common/end-session")
+         {
+            // Signing out: the supervisor asks this host to drop its session
+            // and the network-wide billing identity, which only a host can
+            // do because scripts cannot see either cookie. No body, so no
+            // preflight; only the supervisor's page may ask.
+            auto        headers = allowCredentialedCorsFrom(request, "supervisor"_a);
+            std::string root{to<XHttp>().rootHost(request.host)};
+            root = root.substr(0, root.find(':'));
+            headers.push_back(setCookieHeader("SESSION", "", 0, true));
+            headers.push_back({"Set-Cookie", "__Secure-VISITOR=; Domain=" + root +
+                                                 "; Path=/; SameSite=Lax; Secure; HttpOnly; "
+                                                 "Max-Age=0"});
+            headers.push_back({"Cache-Control", "no-store"});
+            return HttpReply{.status      = HttpStatus::ok,
+                             .contentType = "text/plain",
+                             .body        = {},
+                             .headers     = std::move(headers)};
+         }
          if (request.target == "/common/set-host-cookie")
          {
             if (auto result = requireJson())

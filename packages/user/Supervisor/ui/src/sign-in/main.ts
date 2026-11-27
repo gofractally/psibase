@@ -138,16 +138,63 @@ const shortId = (guest: string) => `${guest.slice(0, 4)}…${guest.slice(-4)}`;
 
 const HAS_PASSKEY_KEY = "psibase.has-passkey.v1";
 
+// Who the remembered passkey belongs to, kept after signing out so the
+// welcome can say whom it is welcoming back. Names only; nothing secret.
+const WHO_KEY = "psibase.passkey-holder.v1";
+
+interface Holder {
+    /** The account (or the name picked for one) the passkey is known by. */
+    name?: string;
+    displayName?: string;
+}
+
+const currentHolder = (): Holder => {
+    const device = loadDevice();
+    const name = device.current ?? device.accounts[0]?.name ?? device.pendingName;
+    if (name || device.displayName) return { name, displayName: device.displayName };
+    try {
+        return JSON.parse(window.localStorage.getItem(WHO_KEY) ?? "{}") as Holder;
+    } catch {
+        return {};
+    }
+};
+
+const rememberHolder = () => {
+    const holder = currentHolder();
+    if (holder.name || holder.displayName) {
+        window.localStorage.setItem(WHO_KEY, JSON.stringify(holder));
+    }
+};
+
+const forgetPasskeyHint = () => {
+    window.localStorage.removeItem(HAS_PASSKEY_KEY);
+    window.localStorage.removeItem(WHO_KEY);
+};
+
 const renderWelcome = () => {
     $("network").textContent = rootName;
     document.title = `Welcome · ${rootName}`;
 
     const knownPasskey = !!window.localStorage.getItem(HAS_PASSKEY_KEY);
-    $("headline").textContent = knownPasskey ? "Welcome back" : "Welcome";
-    $("lede").textContent = knownPasskey
-        ? "Use your passkey to pick up where you left off."
-        : "One passkey gets you in. New here? It takes a few seconds, and you can explore before you decide on anything else.";
-    setButton(knownPasskey ? "Continue with your passkey" : "Sign up or sign in");
+    const holder = knownPasskey ? currentHolder() : {};
+    const greeting = holder.displayName ?? holder.name;
+    $("headline").textContent = !knownPasskey
+        ? "Welcome"
+        : greeting
+          ? `Welcome back, ${greeting}`
+          : "Welcome back";
+    $("lede").textContent = !knownPasskey
+        ? "One passkey gets you in. New here? It takes a few seconds, and you can explore before you decide on anything else."
+        : holder.name
+          ? `Use your passkey to continue as ${holder.name}.`
+          : "Use your passkey to pick up where you left off.";
+    setButton(
+        !knownPasskey
+            ? "Sign up or sign in"
+            : holder.name
+              ? `Continue as ${holder.name}`
+              : "Continue with your passkey",
+    );
     if (accountStep) {
         // Asked to connect an account without being signed in: the passkey
         // comes first, and the older account-and-key prompt stays one
@@ -158,6 +205,16 @@ const renderWelcome = () => {
                 window.location.assign(
                     `/prompt.html?classic=1&returnPath=${encodeURIComponent(destination.path)}`,
                 ),
+        });
+    } else if (knownPasskey) {
+        // Someone else at this browser, or another of the visitor's passkeys.
+        setBelow(greeting ? `Not ${greeting}?` : "Not your passkey?", {
+            label: "Use a different passkey",
+            run: () => {
+                forgetPasskeyHint();
+                nextMode = "auto";
+                renderWelcome();
+            },
         });
     } else {
         setBelow();
@@ -229,22 +286,17 @@ const signOutEverywhere = async () => {
     const apps: string[] = JSON.parse(
         window.localStorage.getItem(APPS_KEY) ?? "[]",
     );
+    // Each app drops its own session, and with it the network-wide
+    // identity that usage is counted under. The destination is included so
+    // that identity goes even if no app was entered from this page.
+    const hosts = new Set([...apps.filter((app) => ACCOUNT_NAME.test(app)), destination.app]);
     await Promise.allSettled(
-        apps
-            .filter((app) => ACCOUNT_NAME.test(app))
-            .map((app) =>
-                fetch(`${siblingOrigin(app)}/common/set-host-cookie`, {
-                    method: "POST",
-                    credentials: "include",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        name: "SESSION",
-                        value: "",
-                        maxAge: 0,
-                        httpOnly: true,
-                    }),
-                }),
-            ),
+        [...hosts].map(async (app) =>
+            fetch(`${await resolveAppOrigin(app)}/common/end-session`, {
+                method: "POST",
+                credentials: "include",
+            }),
+        ),
     );
     // The active keys leave the supervisor's key store too; the passkey
     // brings them back at the next sign-in.
@@ -252,6 +304,7 @@ const signOutEverywhere = async () => {
         await forgetAccount(account.name).catch((e) => console.warn(e));
     }
     window.localStorage.removeItem(APPS_KEY);
+    rememberHolder();
     clearDevice();
     clearGuestSession();
 };
@@ -564,6 +617,7 @@ const signIn = async (mode: Mode) => {
             console.warn("Could not bring accounts to this browser", e);
         }
         unlocked.wipe();
+        rememberHolder();
         if (accountStep) {
             // Signed in on the way to an account step: carry on there.
             window.location.reload();
@@ -593,17 +647,9 @@ const signIn = async (mode: Mode) => {
             });
             return;
         }
-        if (e instanceof Cancelled && loadRememberedCredential()) {
-            setBelow("Not your passkey?", {
-                label: "Use a different one",
-                run: () => {
-                    window.localStorage.removeItem(HAS_PASSKEY_KEY);
-                    nextMode = "auto";
-                    renderWelcome();
-                },
-            });
-            return;
-        }
+        // The welcome already offers a different passkey to someone who
+        // backed out of this one.
+        if (e instanceof Cancelled && loadRememberedCredential()) return;
         setNotice(describeFailure(e));
     }
 };
@@ -684,7 +730,7 @@ const start = async () => {
                 label: "Remove it from your password manager",
                 run: async () => {
                     await discardPasskey(credentialId);
-                    window.localStorage.removeItem(HAS_PASSKEY_KEY);
+                    forgetPasskeyHint();
                     renderWelcome();
                     setBelow("Removed.");
                 },
