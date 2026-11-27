@@ -126,7 +126,7 @@ await step(a, "an account remembered by the browser that is not on the network i
     const notice = await page.textContent("#acct-notice");
     const left = await page.evaluate(() => JSON.parse(localStorage.getItem("psibase.accounts.v1")).accounts.map((x) => x.name).join(","));
     if (left.includes("ghost")) throw new Error("still listed: " + left);
-    if (!notice.includes("does not exist on this network")) throw new Error(notice);
+    if (!notice.includes("not an account on this network")) throw new Error(notice);
     return `${notice} | left: ${left}`;
 });
 await step(a, "a browser whose data is from another chain starts clean, keeping only the passkey", async (page) => {

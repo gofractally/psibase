@@ -380,6 +380,35 @@ export const runManageStep = async (ctx: PageContext) => {
 
         const sponsored = !!sponsor && record.partner === sponsor;
         const release = () => ctx.go("account", { intent: "recover", account: name });
+        const imported =
+            loadDevice().accounts.find((a) => a.name === name)?.source === "imported";
+
+        if (shown === "account" && imported) {
+            // On a key from a file: this browser can sign, and that is all.
+            facts.append(
+                row("State", stateText(record)),
+                row("Signing key", "Imported from a key file"),
+                el("p", {
+                    class: "si-hint",
+                    text: `This key was not made by your passkey. It is kept in this browser only: your passkey cannot bring it back on another device, and the owner key decides everything else about ${name}.`,
+                }),
+            );
+            box.append(
+                action(
+                    "Change it to your passkey",
+                    "Gives your passkey the account's signing key, so it follows you to other devices. Needs the owner key once. The imported key then stops signing for this account.",
+                    () => ctx.go("account", { intent: "import", account: name, convert: "1" }),
+                ),
+            );
+            panel.append(
+                el(
+                    "p",
+                    { class: "si-below" },
+                    linkButton("Remove from this browser", () => void remove(name)),
+                ),
+            );
+            return panel;
+        }
 
         if (shown === "account") {
             facts.append(

@@ -4,6 +4,7 @@
 // What is kept here is public: account names and the sequence values their
 // keys were derived with. The active private keys are in the supervisor's
 // key store; owner keys are nowhere.
+import { p256 } from "@noble/curves/p256";
 import { secp256k1 } from "@noble/curves/secp256k1";
 
 import {
@@ -35,6 +36,12 @@ const DEVICE_KEY = "psibase.accounts.v1";
 /** `held` is false while this browser knows the account but has no key for it. */
 export interface DeviceEntry extends ListedAccount {
     held?: boolean;
+    /**
+     * "imported": the signing key was brought in from a key file, not made
+     * by the passkey. It is kept in this browser only, and the passkey can
+     * neither restore it elsewhere nor act as the account's owner.
+     */
+    source?: "imported";
 }
 
 export interface DeviceAccounts {
@@ -77,11 +84,16 @@ export const rememberOnDevice = (
     entry: ListedAccount,
     makeCurrent: boolean,
     held = true,
+    source?: "imported",
 ) => {
     const device = loadDevice();
     saveDevice({
         ...device,
-        accounts: withAccount(device.accounts, { ...entry, held } as DeviceEntry),
+        accounts: withAccount(device.accounts, {
+            ...entry,
+            held,
+            ...(source ? { source } : {}),
+        } as DeviceEntry),
         current: makeCurrent ? entry.name : (device.current ?? entry.name),
         // The name chosen with the passkey is spoken for once it is an account.
         pendingName: device.pendingName === entry.name ? undefined : device.pendingName,
@@ -220,6 +232,8 @@ export const forgetAccount = (account: string) =>
 export interface ChainKey {
     key: string;
     seq: bigint;
+    /** The service that verifies signatures made with the key. */
+    verifier?: string;
 }
 
 export interface ChainRecord {
@@ -242,7 +256,7 @@ export interface ChainRecord {
 }
 
 const RECORD_FIELDS = `account
-    owner { key seq } active { key seq } partner
+    owner { key seq verifier } active { key seq verifier } partner
     state stateUntil pauseSeconds freezeSeconds
     pending { kind owner { key seq } partner pauseSeconds freezeSeconds }
     recoveryRequests { id owner { key seq } active { key seq } }`;
@@ -259,17 +273,26 @@ const pointOf = (key: string): string => {
     // The point is the tail of the SubjectPublicKeyInfo: 33 bytes
     // compressed, 65 uncompressed.
     const tail = der.length >= 65 + 23 ? der.subarray(-65) : der.subarray(-33);
-    try {
-        return secp256k1.ProjectivePoint.fromHex(bytesToHex(tail)).toHex(true);
-    } catch {
-        return bytesToHex(der);
+    // Either curve: the same bytes are normalised the same way on both
+    // sides of a comparison.
+    for (const curve of [secp256k1, p256]) {
+        try {
+            return curve.ProjectivePoint.fromHex(bytesToHex(tail)).toHex(true);
+        } catch {
+            // Not a point of this curve.
+        }
     }
+    return bytesToHex(der);
 };
 
 export const sameKey = (a: string, b: string) => pointOf(a) === pointOf(b);
 
-type RawKey = { key: string; seq: string | number };
-const chainKey = (raw: RawKey): ChainKey => ({ key: raw.key, seq: BigInt(String(raw.seq)) });
+type RawKey = { key: string; seq: string | number; verifier?: string };
+const chainKey = (raw: RawKey): ChainKey => ({
+    key: raw.key,
+    seq: BigInt(String(raw.seq)),
+    verifier: raw.verifier,
+});
 
 const toRecord = (raw: any): ChainRecord => ({
     account: raw.account,
@@ -453,6 +476,17 @@ export const syncAccounts = async (
     // An account this browser remembers that is no longer on the network (or
     // is no longer this passkey's) is dropped, so it is not offered.
     for (const entry of loadDevice().accounts) {
+        if (entry.source === "imported") {
+            // Its key is not the passkey's; it stays for as long as the
+            // account exists.
+            const record = await fetchRecord(
+                net.siblingOrigin("auth-sig"),
+                entry.name,
+                net.token,
+            ).catch(() => "unknown" as const);
+            if (!record) dropFromDevice(entry.name);
+            continue;
+        }
         const still = await keysFor(net, unlocked, entry.name).catch(() => "unknown" as const);
         if (still === "unknown") continue; // Could not ask; leave it.
         if (still) still.keys.ownerSecret.fill(0);

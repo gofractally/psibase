@@ -653,8 +653,11 @@ const signIn = async (mode: Mode) => {
         unlocked.wipe();
         rememberHolder();
         if (accountStep) {
-            // Signed in on the way to an account step: carry on there.
-            window.location.reload();
+            // Signed in on the way to an account step: carry on there,
+            // without a message left in the address by an earlier attempt.
+            const kept = new URLSearchParams(window.location.search);
+            kept.delete("failed");
+            window.location.replace(`${window.location.pathname}?${kept}`);
             return;
         }
         await goToDestination(session, true);
@@ -726,6 +729,8 @@ const pageContext = (session: GuestSession): PageContext => ({
 // exist.
 const NETWORK_KEY = "psibase.network.v1";
 
+let networkChanged = false;
+
 const forgetOtherNetwork = async () => {
     let id: string;
     try {
@@ -734,6 +739,9 @@ const forgetOtherNetwork = async () => {
         return; // The node is unreachable; nothing to compare.
     }
     const known = window.localStorage.getItem(NETWORK_KEY);
+    // A browser that has data but no record of its network is one that
+    // last signed in before this check existed; it starts clean too.
+    networkChanged = known !== null && known !== id;
     if (known !== id) {
         // The passkey itself (HAS_PASSKEY_KEY) is kept: it still works, and
         // derives new keys for the new network.
@@ -877,6 +885,11 @@ const start = async () => {
     }
 
     renderWelcome();
+    if (networkChanged) {
+        setNotice(
+            "This network was started afresh since you were last here. Your passkey still works; accounts you had before need to be created again.",
+        );
+    }
 };
 
 void start();

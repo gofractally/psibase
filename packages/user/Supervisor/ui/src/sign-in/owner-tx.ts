@@ -39,15 +39,25 @@ const postForBytes = async (
     return new Uint8Array(await res.arrayBuffer());
 };
 
+/** Whatever signs a transaction: the claim it makes and how it proves it. */
+export interface TxSigner {
+    /** The verify service for the key. */
+    verifier: string;
+    /** The public key exactly as the chain stores it, hex DER. */
+    claimHex: string;
+    /** Signs the transaction digest; hex r || s, low-S. */
+    sign(digest: Uint8Array): string;
+}
+
 /**
- * Signs `actions` as `account` with its owner key and submits them. Returns
- * once the transaction has been applied; throws with the network's reason if
- * it was refused.
+ * Signs `actions` as `account` and submits them. Returns once the
+ * transaction has been applied; throws with the network's reason if it was
+ * refused.
  */
-export const pushAsOwner = async (
+export const pushSigned = async (
     net: { siblingOrigin: (service: string) => string; token: string },
     account: string,
-    ownerSecret: Uint8Array,
+    signer: TxSigner,
     actions: OwnerAction[],
 ): Promise<void> => {
     const packedActions = await Promise.all(
@@ -77,10 +87,10 @@ export const pushAsOwner = async (
                 .replace(/\.\d+Z$/, "Z"),
         },
         actions: packedActions,
-        claims: [{ service: VERIFIER_K1, rawData: publicKeyHex(ownerSecret) }],
+        claims: [{ service: signer.verifier, rawData: signer.claimHex }],
     };
     const packed = await postForBytes("/common/pack/Transaction", transaction);
-    const proof = signDigest(sha256(packed), ownerSecret);
+    const proof = signer.sign(sha256(packed));
     const signed = await postForBytes("/common/pack/SignedTransaction", {
         transaction,
         proofs: [proof],
@@ -101,5 +111,23 @@ export const pushAsOwner = async (
         : { error: await res.text() };
     if (trace.error) throw new Error(trace.error);
 };
+
+/** `pushSigned` with an owner key derived from the passkey. */
+export const pushAsOwner = (
+    net: { siblingOrigin: (service: string) => string; token: string },
+    account: string,
+    ownerSecret: Uint8Array,
+    actions: OwnerAction[],
+): Promise<void> =>
+    pushSigned(
+        net,
+        account,
+        {
+            verifier: VERIFIER_K1,
+            claimHex: publicKeyHex(ownerSecret),
+            sign: (digest) => signDigest(digest, ownerSecret),
+        },
+        actions,
+    );
 
 export { hexToBytes };

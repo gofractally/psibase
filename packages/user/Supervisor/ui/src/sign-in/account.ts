@@ -13,7 +13,7 @@
 //
 // The active key then goes into the supervisor's key store, the account is
 // added to the passkey's encrypted account list, and the owner key is wiped.
-import { accountKeys, sha256Hex } from "./account-keys";
+import { accountKeys, publicKeyPem, sha256Hex } from "./account-keys";
 import {
     ANY_NAME_RULE,
     NAME_RULE,
@@ -39,6 +39,8 @@ import {
     setCurrent,
     signingKeyOffer,
 } from "./device";
+import { derHex, parsePrivateKey, signWith } from "./imported-key";
+import { pushSigned } from "./owner-tx";
 import { type Unlocked } from "./passkey";
 
 interface LinkInfo {
@@ -60,7 +62,7 @@ interface Status {
 
 const SECRET_KEY = "psibase.sign-in.provider-secret";
 
-type Intent = "" | "new" | "recover";
+type Intent = "" | "new" | "recover" | "import";
 
 export const runAccountStep = async (ctx: PageContext) => {
     const { $, session, net } = ctx;
@@ -169,6 +171,7 @@ export const runAccountStep = async (ctx: PageContext) => {
         links(guestLink, { label: "Manage accounts", run: () => ctx.go("manage") });
         setLinks($("acct-more"), [
             { label: "Recover an account", run: () => ctx.go("account", { intent: "recover" }) },
+            { label: "Import an account with its key", run: () => ctx.go("account", { intent: "import" }) },
         ]);
     };
 
@@ -246,7 +249,11 @@ export const runAccountStep = async (ctx: PageContext) => {
             2,
         );
         providerButtons(status, (p) => void startProvider(p, {}));
-        links(guestLink, { label: "Recover an account", run: () => ctx.go("account", { intent: "recover" }) });
+        links(
+            guestLink,
+            { label: "Recover an account", run: () => ctx.go("account", { intent: "recover" }) },
+            { label: "Import an account with its key", run: () => ctx.go("account", { intent: "import" }) },
+        );
     };
 
     // The name form serves three questions; `submitName` is the current one.
@@ -601,7 +608,157 @@ export const runAccountStep = async (ctx: PageContext) => {
             list.append(step1, download, step2, command, step3, done);
             list.hidden = false;
         }
-        links(backLink);
+        links(backLink, {
+            label: "Paste its key here instead",
+            run: () => ctx.go("account", { intent: "import", account: name }),
+        });
+    };
+
+    // ------------------------------------------------------- importing
+    //
+    // An account controlled by a key the visitor holds as a file. The key is
+    // checked against the chain and kept in the supervisor's key store; the
+    // account itself is not changed, because the key may be in use
+    // elsewhere. `convert`: the visitor asked to move the account's signing
+    // key to their passkey instead, which the owner key authorises once.
+
+    const showImport = (convert: boolean) => {
+        frame(
+            convert ? "Change it to your passkey" : "Import an account with its key",
+            convert
+                ? "Paste the account's owner key. It is used once, to give your passkey the account's signing key, and is not kept. The owner key itself stays as it is."
+                : "For an account you control with a key file. The key is checked against the network and kept in this browser, so you can use the account here. The account is not changed: the key keeps working wherever else it is used.",
+        );
+        const list = $("acct-list");
+        list.textContent = "";
+        const name = document.createElement("input");
+        name.className = "si-input";
+        name.id = "import-name";
+        name.placeholder = "account name";
+        name.maxLength = 10;
+        name.autocapitalize = "none";
+        name.spellcheck = false;
+        name.value = subject;
+        const key = document.createElement("textarea");
+        key.className = "si-input si-textarea";
+        key.id = "import-key";
+        key.placeholder = "-----BEGIN PRIVATE KEY-----";
+        key.spellcheck = false;
+        key.autocapitalize = "none";
+        const go = document.createElement("button");
+        go.type = "button";
+        go.className = "si-btn si-primary";
+        go.id = "import-go";
+        go.textContent = convert ? "Change to my passkey" : "Import";
+        go.addEventListener("click", () => {
+            const text = key.value;
+            key.value = "";
+            void importAccount(name.value.trim().toLowerCase(), text, convert);
+        });
+        const hint = document.createElement("p");
+        hint.className = "si-hint";
+        hint.textContent =
+            "Owner or signing key, secp256k1 or P-256. Only paste a key on a device you trust: this page can read it.";
+        list.append(name, key, go, hint);
+        list.hidden = false;
+        links(loadDevice().accounts.length ? backLink : guestLink);
+    };
+
+    const importAccount = async (name: string, text: string, convert: boolean) => {
+        notice();
+        let unlocked: Unlocked | undefined;
+        let pasted: ReturnType<typeof parsePrivateKey> | undefined;
+        try {
+            if (!ANY_NAME_RULE.test(name)) throw new Error("Enter the account's name.");
+            pasted = parsePrivateKey(text);
+            ctx.working("Checking the key", `against ${name}`);
+            const record = await fetchRecord(net.siblingOrigin("auth-sig"), name, net.token);
+            if (!record) {
+                throw new Error(
+                    `${name} is not an account controlled by a key on this network.`,
+                );
+            }
+            const key = pasted;
+            const isActive = sameKey(key.point, record.active.key);
+            const isOwner = sameKey(key.point, record.owner.key);
+            if (!isActive && !isOwner) {
+                throw new Error(`That key is neither the owner key nor the signing key of ${name}.`);
+            }
+            if (record.state !== "normal") {
+                throw new Error(`${name} is ${record.state} and cannot be used until that ends.`);
+            }
+
+            if (isActive && !convert) {
+                // The key signs for the account as it is: keep it, change nothing.
+                ctx.working("Importing", `${name}, on its own key`);
+                await adoptFor(ctx.app, name, key.pem);
+                rememberOnDevice(
+                    {
+                        name,
+                        ownerSeq: record.owner.seq.toString(),
+                        activeSeq: record.active.seq.toString(),
+                    },
+                    true,
+                    true,
+                    "imported",
+                );
+                $("done-detail").textContent = `${name} is on this browser, using the key you imported`;
+                ctx.show("done");
+                await new Promise((r) => setTimeout(r, 1200));
+                await ctx.enterApp(name, true);
+                return;
+            }
+
+            if (!isOwner) {
+                throw new Error(
+                    `That is the signing key of ${name}. Only its owner key can give the account a new signing key.`,
+                );
+            }
+            // The owner key, used once: it installs this passkey's signing
+            // key. Kept in the browser it could not sign for the account
+            // anyway, since the account's signing key is a different one.
+            unlocked = await ctx.unlock(
+                "Confirm with your passkey",
+                `It makes the signing key ${name} will use here.`,
+                name,
+            );
+            const offer = await signingKeyOffer(net, unlocked, name);
+            if (!offer) throw new Error(`${name} could not be read.`);
+            ctx.working("Updating " + name, "Installing your passkey's signing key");
+            await pushSigned(
+                net,
+                name,
+                {
+                    verifier:
+                        record.owner.verifier ??
+                        (key.curve === "secp256k1" ? "verify-k1" : "verify-r1"),
+                    claimHex: derHex(record.owner.key),
+                    sign: (digest) => signWith(key, digest),
+                },
+                [
+                    {
+                        method: "setActive",
+                        data: { active: { key: publicKeyPem(offer.key), seq: offer.seq } },
+                    },
+                ],
+            );
+            for (let i = 0; i < 20; ++i) {
+                const found = await keysFor(net, unlocked, name).catch(() => undefined);
+                if (found) {
+                    found.keys.ownerSecret.fill(0);
+                    await settle(unlocked, name, found.keys);
+                    return;
+                }
+                await new Promise((r) => setTimeout(r, 600));
+            }
+            throw new Error(`${name} was updated but has not appeared yet. Use Recover an account in a moment.`);
+        } catch (e) {
+            showImport(convert);
+            report(e);
+        } finally {
+            pasted?.secret.fill(0);
+            unlocked?.wipe();
+        }
     };
 
     const describe = (record: ChainRecord) =>
@@ -728,6 +885,7 @@ export const runAccountStep = async (ctx: PageContext) => {
     // Shows whatever comes next for this guest.
     const refresh = async () => {
         if (intent === "recover") return showRecoverName();
+        if (intent === "import") return showImport(params.get("convert") === "1");
         if (intent !== "new" && loadDevice().accounts.length) return showChooser();
         const status = await api<Status>("/status");
         const device = loadDevice();
@@ -775,6 +933,11 @@ export const runAccountStep = async (ctx: PageContext) => {
         }
         const failed = params.get("failed");
         if (failed) {
+            // Said once: a reload or a later sign-in on this address must
+            // not repeat it.
+            const kept = new URLSearchParams(window.location.search);
+            kept.delete("failed");
+            window.history.replaceState(null, "", `${window.location.pathname}?${kept}`);
             // Say what is actually wrong: the account may not exist here at
             // all (the network was started afresh), which is not the same as
             // paused or frozen.
@@ -786,7 +949,7 @@ export const runAccountStep = async (ctx: PageContext) => {
                 notePasskey({ pendingName: failed });
                 await refresh();
                 notice(
-                    `${failed} does not exist on this network, so it was removed from this browser. You can create it again.`,
+                    `${failed} is not an account on this network any more, so this browser no longer offers it. Your passkey still works: you can create ${failed} again here, or pick another name.`,
                 );
             } else if (record !== "unknown" && record.state !== "normal") {
                 notice(
