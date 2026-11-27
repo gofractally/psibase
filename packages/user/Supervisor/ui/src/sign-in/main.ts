@@ -764,6 +764,22 @@ const start = async () => {
         }
     });
 
+    // "intent=guest": an app's Log out. The account leaves this app, and the
+    // visitor stays in it as a guest, so the app is not asked again which
+    // account to use.
+    if (query.get("intent") === "guest") {
+        working("Signing out", `of ${destination.app}.${rootName}`);
+        await logoutFor(destination.app).catch((e) => console.warn(e));
+        if (session) {
+            await enterApp(session, undefined);
+        } else {
+            window.location.assign(
+                (await resolveAppOrigin(destination.app)) + destination.path,
+            );
+        }
+        return;
+    }
+
     if (session) {
         const device = loadDevice();
         const who = device.current ?? `Guest ${shortId(session.guest)}`;

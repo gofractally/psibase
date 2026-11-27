@@ -1,23 +1,14 @@
-import { ChevronsUpDown, LogIn, LogOut, Moon, Sun, Users } from "lucide-react";
-import { useLocation } from "react-router-dom";
+import type { ReactNode } from "react";
 
+import { ChevronsUpDown, UserRound } from "lucide-react";
+
+import { AccountMenuItems } from "@shared/components/account-menu";
 import { Avatar } from "@shared/components/avatar";
-import { useTheme } from "@shared/components/theme-provider";
-import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { useLogout } from "@shared/hooks/use-logout";
 import { useProfile } from "@shared/hooks/use-profile";
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuGroup,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuPortal,
-    DropdownMenuSeparator,
-    DropdownMenuSub,
-    DropdownMenuSubContent,
-    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
 import {
@@ -28,30 +19,21 @@ import {
 } from "@shared/shadcn/ui/sidebar";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
-export function UserSidebarNavFooter() {
-    const location = useLocation();
-    const { isMobile } = useSidebar();
-    const { setTheme } = useTheme();
+interface Props {
+    onProfile?: () => void;
+    /** The app's own menu items. */
+    children?: ReactNode;
+}
 
+/**
+ * The account menu for the foot of an app's sidebar. It opens the same menu
+ * as `AccountMenu` does from a top bar; only the trigger differs.
+ */
+export function UserSidebarNavFooter({ onProfile, children }: Props = {}) {
+    const { isMobile } = useSidebar();
     const { data: user, isPending: isPendingUser } = useCurrentUser();
     const { data: profile } = useProfile(user);
-
-    const { mutateAsync: logout } = useLogout();
-    const { mutateAsync: login } = useConnectAccount();
-
-    const onLogin = async () => {
-        await login({
-            enabled: true,
-            returnPath: `${location.pathname}${location.search}${location.hash}`,
-        });
-    };
-
-    const onLogout = async () => {
-        await logout();
-        window.location.replace("/");
-    };
-
-    const displayName = profile?.profile?.displayName;
+    const displayName = profile?.profile?.displayName?.trim();
 
     return (
         <SidebarMenu>
@@ -60,107 +42,48 @@ export function UserSidebarNavFooter() {
                     <DropdownMenuTrigger asChild>
                         <SidebarMenuButton
                             size="lg"
+                            aria-label="Account menu"
                             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         >
                             {isPendingUser ? (
                                 <Skeleton className="size-8 rounded-full" />
+                            ) : user ? (
+                                <Avatar account={user} className="h-8 w-8" />
                             ) : (
-                                <Avatar
-                                    account={user || ""}
-                                    className="h-8 w-8"
-                                />
+                                <span className="bg-muted/60 text-muted-foreground flex size-8 items-center justify-center rounded-full border">
+                                    <UserRound className="size-4" />
+                                </span>
                             )}
                             <div className="grid flex-1 text-left text-sm leading-tight">
-                                <span className="truncate ">
-                                    {isPendingUser ? (
-                                        <Skeleton className="h-4 w-32" />
-                                    ) : !user ? (
-                                        "Not logged in"
-                                    ) : (
-                                        (displayName ?? user)
-                                    )}
-                                </span>
+                                {isPendingUser ? (
+                                    <Skeleton className="h-4 w-32" />
+                                ) : (
+                                    <>
+                                        <span className="truncate font-medium">
+                                            {user
+                                                ? displayName || user
+                                                : "Not signed in"}
+                                        </span>
+                                        {user && displayName && (
+                                            <span className="text-muted-foreground truncate font-mono text-[11px]">
+                                                @{user}
+                                            </span>
+                                        )}
+                                    </>
+                                )}
                             </div>
                             <ChevronsUpDown className="ml-auto size-4" />
                         </SidebarMenuButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
-                        className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                        className="w-[--radix-dropdown-menu-trigger-width] min-w-60 rounded-lg"
                         side={isMobile ? "bottom" : "right"}
                         align="end"
                         sideOffset={4}
                     >
-                        <DropdownMenuLabel className="cursor-default select-none p-0 font-normal">
-                            <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                                <Avatar
-                                    account={user || ""}
-                                    className="h-8 w-8"
-                                />
-                                <div className="grid flex-1 text-left text-sm leading-tight">
-                                    <span className="truncate font-semibold">
-                                        {displayName ?? user ?? "Not logged in"}{" "}
-                                        {displayName && (
-                                            <span className="text-muted-foreground text-xs">
-                                                {`(${user})`}
-                                            </span>
-                                        )}
-                                    </span>
-                                </div>
-                            </div>
-                        </DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuGroup>
-                            <DropdownMenuSub>
-                                <DropdownMenuSubTrigger className="[&_svg:not([class*='text-'])]:text-muted-foreground gap-2 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0">
-                                    <Moon className="mr-2 h-4 w-4" />
-                                    <span>Theme</span>
-                                </DropdownMenuSubTrigger>
-                                <DropdownMenuPortal>
-                                    <DropdownMenuSubContent>
-                                        <DropdownMenuItem
-                                            onClick={() => setTheme("light")}
-                                        >
-                                            <Sun className="mr-2 h-4 w-4" />
-                                            <span>Light</span>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                            onClick={() => setTheme("dark")}
-                                        >
-                                            <Moon className="mr-2 h-4 w-4" />
-                                            <span>Dark</span>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem
-                                            onClick={() => setTheme("system")}
-                                        >
-                                            <Sun className="mr-2 h-4 w-4" />
-                                            <span>System</span>
-                                        </DropdownMenuItem>
-                                    </DropdownMenuSubContent>
-                                </DropdownMenuPortal>
-                            </DropdownMenuSub>
-                        </DropdownMenuGroup>
-                        <DropdownMenuSeparator />
-                        {user ? (
-                            <>
-                                <DropdownMenuItem onClick={onLogin}>
-                                    <Users className="mr-2 h-4 w-4" />
-                                    Switch account
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={onLogout}>
-                                    <LogOut className="mr-2 h-4 w-4" />
-                                    Log out
-                                </DropdownMenuItem>
-                            </>
-                        ) : (
-                            <DropdownMenuItem
-                                onClick={onLogin}
-                                disabled={isPendingUser}
-                            >
-                                <LogIn className="mr-2 h-4 w-4" />
-                                Log in
-                            </DropdownMenuItem>
-                        )}
+                        <AccountMenuItems onProfile={onProfile}>
+                            {children}
+                        </AccountMenuItems>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </SidebarMenuItem>
