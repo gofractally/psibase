@@ -9,6 +9,7 @@ import {
     accountKeys,
     accountNumber,
     activeSecret,
+    exportedKeyPem,
     privateKeyPem,
     publicKeyHex,
     publicKeyPem,
@@ -177,6 +178,113 @@ export const runManageStep = async (ctx: PageContext) => {
         if (entry) rememberOnDevice(entry, false, false);
     };
 
+    // --------------------------------------------------------- export
+    //
+    // The account's signing (active) key as an ordinary key file, for the
+    // command-line tool, a bot, or signing when no browser is at hand
+    // (gofractally/psibase#2275, use case U10). It is derived again from the
+    // passkey, held in this page while the panel is open, and never stored.
+    // The owner key is not exported: a copy of it in a file would outlive
+    // the moment the passkey was used, which is the one thing it must not do.
+    let exported: { name: string; pem: string; seq: string } | undefined;
+
+    const closeExport = () => {
+        exported = undefined;
+        void render();
+    };
+
+    const exportKey = async (name: string) => {
+        notice();
+        let unlocked: Unlocked | undefined;
+        try {
+            unlocked = await ctx.unlock(
+                "Confirm with your passkey",
+                `Exporting the signing key of ${name}.`,
+            );
+            const found = await keysFor(net, unlocked, name);
+            if (!found) {
+                throw new Error(`This passkey does not hold the owner key of ${name}.`);
+            }
+            // The signing key is derived from the owner secret, which is
+            // wiped as soon as the file's contents are made.
+            const active = activeSecret(
+                unlocked.chainId,
+                found.keys.ownerSecret,
+                accountNumber(name),
+                found.record.active.seq,
+            );
+            found.keys.ownerSecret.fill(0);
+            exported = { name, pem: exportedKeyPem(active), seq: found.keys.active.seq };
+            active.fill(0);
+            await render();
+        } catch (e) {
+            await render();
+            if (!ctx.isCancelled(e)) {
+                notice(e instanceof Error ? e.message : "Something went wrong.");
+            }
+        } finally {
+            unlocked?.wipe();
+        }
+    };
+
+    const exportPanel = (key: { name: string; pem: string; seq: string }) => {
+        const file = `${key.name}.active.pem`;
+        const panel = el("div", { class: "si-panel si-export" });
+        const download = el("button", {
+            class: "si-btn si-primary",
+            text: "Download key file",
+            type: "button",
+        });
+        download.addEventListener("click", () => {
+            const url = URL.createObjectURL(
+                new Blob([key.pem], { type: "application/x-pem-file" }),
+            );
+            const link = el("a");
+            link.href = url;
+            link.download = file;
+            document.body.append(link);
+            link.click();
+            link.remove();
+            // The download has its own copy by now.
+            setTimeout(() => URL.revokeObjectURL(url), 10_000);
+            saved.hidden = false;
+        });
+        const copy = el("button", { class: "si-btn si-ghost", text: "Copy to clipboard", type: "button" });
+        copy.addEventListener("click", () => {
+            void navigator.clipboard.writeText(key.pem).then(
+                () => (copy.textContent = "Copied"),
+                () => (copy.textContent = "Could not copy"),
+            );
+        });
+        const saved = el("p", {
+            class: "si-hint",
+            text: `Saved as ${file}. Keep it somewhere only you can read.`,
+        });
+        saved.hidden = true;
+        const command = el("pre", { class: "si-code" });
+        const node = `${window.location.protocol}//${window.location.host.split(".").slice(1).join(".")}`;
+        command.textContent = `psibase push -a ${node} -s ${file} actions.json`;
+        const done = el("button", { class: "si-btn si-ghost", text: "Done", type: "button" });
+        done.addEventListener("click", closeExport);
+        panel.append(
+            el("h2", { class: "si-panel-title", text: `Signing key of ${key.name}` }),
+            el("p", {
+                class: "si-hint",
+                text: `Anyone with this file can act as ${key.name}: send transactions and sign in. It cannot change the owner key or the recovery partner, and it stops working when you choose "Sign out other devices". This is signing key number ${key.seq}.`,
+            }),
+            el("div", { class: "si-actions" }, download, copy),
+            saved,
+            el("p", { class: "si-label", text: "Use it with the command-line tool" }),
+            command,
+            el("p", {
+                class: "si-hint",
+                text: "The file is not protected by a password. The key is gone from this page when you press Done or leave.",
+            }),
+            done,
+        );
+        return panel;
+    };
+
     const remove = async (name: string) => {
         ctx.working("Removing " + name, "from this browser");
         await forgetAccount(name).catch((e) => console.warn(e));
@@ -273,6 +381,11 @@ export const runManageStep = async (ctx: PageContext) => {
                         "Sign out other devices",
                         "Replaces the key devices sign with. Use it if a device was lost.",
                         () => void rotateActive(name),
+                    ),
+                    action(
+                        "Export signing key",
+                        "A key file for the command-line tool or a bot. It can sign as this account but cannot change who controls it.",
+                        () => void exportKey(name),
                     ),
                 );
             } else {
@@ -471,11 +584,20 @@ export const runManageStep = async (ctx: PageContext) => {
                 if (open) return;
                 selected = account.name;
                 tab = undefined;
+                exported = undefined;
                 notice();
                 void render();
             });
             side.append(head);
-            if (open && record) main.append(detail(account.name, record));
+            if (open && record) {
+                // While a key is on show nothing else is, so it cannot be
+                // left behind a tab.
+                main.append(
+                    exported?.name === account.name
+                        ? exportPanel(exported)
+                        : detail(account.name, record),
+                );
+            }
         }
         const usage = await usageLine();
         if (usage) side.append(usage);

@@ -182,6 +182,35 @@ export const privateKeyPem = (secret: Uint8Array): string => {
     return `-----BEGIN PRIVATE KEY-----\n${b64.match(/.{1,64}/g)!.join("\n")}\n-----END PRIVATE KEY-----\n`;
 };
 
+// PKCS#8 for a secp256k1 key whose ECPrivateKey carries the public key, which
+// the command-line tool requires:
+//   SEQ { 0, SEQ { ecPublicKey, secp256k1 },
+//         OCTET STRING { SEQ { 1, OCTET STRING key[32], [1] BIT STRING point[33] } } }
+// The point is written compressed. A signer claims the public key in the form
+// it finds in the file, and the chain compares that claim byte for byte with
+// the stored key, which is the compressed form (publicKeyHex above).
+const PKCS8_K1_FULL_HEAD = Uint8Array.from([
+    0x30, 0x64, 0x02, 0x01, 0x00, 0x30, 0x10, 0x06, 0x07, 0x2a, 0x86, 0x48,
+    0xce, 0x3d, 0x02, 0x01, 0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x0a, 0x04,
+    0x4d, 0x30, 0x4b, 0x02, 0x01, 0x01, 0x04, 0x20,
+]);
+const PKCS8_K1_FULL_PUB = Uint8Array.from([0xa1, 0x24, 0x03, 0x22, 0x00]);
+
+/**
+ * A private key as a key file for use outside the browser: PKCS#8 PEM with
+ * the public key included.
+ */
+export const exportedKeyPem = (secret: Uint8Array): string => {
+    const der = concatBytes(
+        PKCS8_K1_FULL_HEAD,
+        need(secret, 32, "private key"),
+        PKCS8_K1_FULL_PUB,
+        secp256k1.getPublicKey(secret, true),
+    );
+    const b64 = btoa(String.fromCharCode(...der));
+    return `-----BEGIN PRIVATE KEY-----\n${b64.match(/.{1,64}/g)!.join("\n")}\n-----END PRIVATE KEY-----\n`;
+};
+
 /** Signs a 32-byte digest; returns hex r || s, low-S. */
 export const signDigest = (digest: Uint8Array, secret: Uint8Array): string =>
     secp256k1.sign(need(digest, 32, "digest"), secret, { lowS: true }).toCompactHex();
