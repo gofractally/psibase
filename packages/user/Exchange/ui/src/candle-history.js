@@ -30,3 +30,15 @@ export function candleTimeLabel(time, interval) {
     : interval >= 3600 ? date.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC'})
     : date.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
 }
+// How many candles the chart shows at each zoom level. The chart always draws
+// this many slots, so a candle is the same width whatever the history holds.
+export const CANDLE_ZOOMS = [30, 60, 120, 200];
+// The candles the chart shows: the latest `count` of a page, each in a slot of
+// its own from the right edge, whatever time lies between them. `gap` marks a
+// candle that does not directly follow the one before it.
+export function chartWindow(candles, count, interval) {
+  if (!CANDLE_ZOOMS.includes(count)) throw new Error('Unsupported chart zoom.');
+  const shown = candles.slice(-count);
+  return shown.map((candle, index) => ({candle, slot: count - shown.length + index,
+    gap: index > 0 && candle.time - shown[index - 1].time > interval * 1000}));
+}

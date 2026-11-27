@@ -2,7 +2,7 @@ import { atoms, decimal, integer, committed as commit, priceTick, priceText, rel
 import { creditStatus, fundingPaused } from './market-policy.js';
 import { depthRows, orderSpread, quoteForSize, maximumBidSize, unitsFromAmount, ownershipForDeposit, ownershipForWithdrawal, tradePriceAtoms } from './order-book.js';
 import { depthBounds } from './market-chart.js';
-import { candleHistory, candleTimeLabel, CANDLE_INTERVALS } from './candle-history.js';
+import { candleHistory, candleTimeLabel, chartWindow, CANDLE_INTERVALS, CANDLE_ZOOMS } from './candle-history.js';
 import { getSupervisor, siblingUrl, isRedirectErrorObject, handlePluginUserPrompt } from '/common/common-lib.js';
 import { createNativeWallet } from './native-wallet.js';
 import { transferHistory } from './token-history.js';
@@ -17,7 +17,7 @@ const $ = selector => document.querySelector(selector);
 const state = { account: null, market: null, data: null, side: 'buy', type: 'market', ticket: 'spot', orderTab: 'orders', pending: false, online: false, activity: [], refresh: 0, fetches: 0, chart: 'price', interval: 5, depthRange: 2, bookView: 'orders', trades: new Map(), tradeRequests: new Set() };
 state.olderStops=null;state.stopPageLoading=false;state.stopPageRequest=0;
 state.accountTab='assets';state.fundsToken=null;state.history=null;state.historyToken=null;state.historyLoading=false;state.historySequence=0;state.historyNeedsLoad=false;state.accountSync=0;
-state.candles=new Map();state.candleRequests=new Set();
+state.candles=new Map();state.candleRequests=new Set();state.candleCount=60;
 state.catalog=createPageView('markets',row=>key(row.id));state.pointMarkets=new Map();
 state.assetsPage=createPageView('',row=>key(row.token??row.token_id));
 state.positionsPage=createPageView('',row=>`${key(row.market)}:${key(row.generation??row.price??'')}:${row.bid??row.base??''}`);
@@ -277,7 +277,7 @@ async function loadCandles(id,{before=null,force=false}={}){
   state.candleRequests.add(request);
   const record={...cached,requestedAt:now};state.candles.set(request,record);
   try{
-    const result=await api(`/candles?market=${encodeURIComponent(key(id))}&interval=${interval}&limit=200${before?`&before=${encodeURIComponent(before)}`:''}`);
+    const result=await api(`/candles?market=${encodeURIComponent(key(id))}&interval=${interval}&limit=${state.candleCount}${before?`&before=${encodeURIComponent(before)}`:''}`);
     const page=candleHistory(result,interval);
     state.candles.set(request,{candles:page.candles,pricePrecision:page.pricePrecision,beforeCursor:page.before,before,requestedAt:now,revision:(cached?.revision||0)+1,error:null});
   }catch(error){state.candles.set(request,{...record,error:error.message,revision:(cached?.revision||0)+1});}
@@ -391,7 +391,7 @@ function drawChart() {
   $('#depth-controls').hidden=state.chart!=='depth';$('#candle-resolution').hidden=state.chart!=='price';$('#candle-pagination').hidden=state.chart!=='price';
   const foot=document.querySelectorAll('.chart-foot span');foot[0].textContent=state.chart==='price'?'':`−${state.depthRange}%`;foot[1].textContent=state.chart==='price'?(state.interval>=3600?'Times in UTC':'Trade volume'):'Cumulative liquidity';foot[2].textContent=state.chart==='price'?'':`+${state.depthRange}%`;
   const rect=$('#depth-chart').getBoundingClientRect(),history=state.candles.get(`${key(m.id)}:${state.interval}`);
-  const signature=state.chart==='price'?`${m.id}:price:${state.interval}:${history?.revision||0}:${history?.before||''}:${rect.width}:${rect.height}`:`${m.id}:depth:${state.depthRange}:${m.x}:${m.y}:${m.k}:${levels(m).map(l=>`${l.bid}:${l.price}:${l.outgoing}`).join(',')}:${rect.width}:${rect.height}`;
+  const signature=state.chart==='price'?`${m.id}:price:${state.interval}:${state.candleCount}:${history?.revision||0}:${history?.before||''}:${rect.width}:${rect.height}`:`${m.id}:depth:${state.depthRange}:${m.x}:${m.y}:${m.k}:${levels(m).map(l=>`${l.bid}:${l.price}:${l.outgoing}`).join(',')}:${rect.width}:${rect.height}`;
   if(signature===previousChartSignature)return;
   previousChartSignature=signature;
   if (state.chart === 'price') { renderPriceChart(m, b, q); return true; }
@@ -430,7 +430,10 @@ function drawChart() {
   return true;
 }
 function renderPriceChart(m, b, q) {
-  const cache=state.candles.get(`${key(m.id)}:${state.interval}`),candles=cache?.candles||[];
+  const cache=state.candles.get(`${key(m.id)}:${state.interval}`),page=cache?.candles||[];
+  // A fixed number of candles, the latest of the page, one slot each.
+  const shown=chartWindow(page,state.candleCount,state.interval),candles=shown.map(s=>s.candle);
+  $('#zoom-in-candles').disabled=state.candleCount===CANDLE_ZOOMS[0];$('#zoom-out-candles').disabled=state.candleCount===CANDLE_ZOOMS.at(-1);
   $('#older-candles').hidden=!cache?.beforeCursor;
   $('#older-candles').disabled=state.candleRequests.has(`${key(m.id)}:${state.interval}`);
   $('#latest-candles').hidden=!cache?.before;
@@ -440,9 +443,11 @@ function renderPriceChart(m, b, q) {
   const priceToken={...q,precision:cache.pricePrecision};
   const scale=10**cache.pricePrecision,lo=Math.min(...candles.map(c=>Number(c.low)/scale)),hi=Math.max(...candles.map(c=>Number(c.high)/scale));
   const pad=Math.max((hi-lo)*.12,hi*.00002),low=lo-pad,high=hi+pad;
-  const interval=state.interval*1000,first=candles[0].time-interval/2,last=candles.at(-1).time+interval/2;
-  const px=time=>left+(time-first)/(last-first)*(right-left),py=p=>bottom-(p-low)/(high-low)*(bottom-top);
-  const width=Math.max(2,Math.min(18,(right-left)/((last-first)/interval)*.66));
+  const slotWidth=(right-left)/state.candleCount,slotOf=new Map(shown.map(s=>[s.candle.time,s.slot]));
+  const px=time=>left+(slotOf.get(time)+.5)*slotWidth,py=p=>bottom-(p-low)/(high-low)*(bottom-top);
+  const width=Math.max(2,Math.min(18,slotWidth*.66));
+  // Where time is missing between two candles, a mark says so in place of empty space.
+  const gaps=shown.filter(s=>s.gap).map(s=>{const x=left+s.slot*slotWidth;return `<line x1="${x}" x2="${x}" y1="${top}" y2="${volumeBottom}" stroke="#3a4a60" stroke-dasharray="1 4"><title>No trades before ${esc(candleTimeLabel(s.candle.time,state.interval))}</title></line>`;}).join('');
   const axisPrice=p=>p>0&&p<.000001?p.toExponential(3):p.toLocaleString(undefined,{maximumFractionDigits:Math.min(18,Math.max(2,-Math.floor(Math.log10(hi))+3))});
   const lines=[0,.25,.5,.75,1].map(f=>{const p=low+(high-low)*f,y=py(p);return `<line x1="${left}" x2="${right}" y1="${y}" y2="${y}" stroke="#223044" stroke-dasharray="2 5"/><text x="${left-8}" y="${y+3}" text-anchor="end" font-size="9" fill="#7187a1">${axisPrice(p)}</text>`;}).join('');
   const bodies=candles.map(c=>{const x=px(c.time),o=Number(c.open)/scale,h=Number(c.high)/scale,l=Number(c.low)/scale,close=Number(c.close)/scale,color=c.close>=c.open?'#33d4a3':'#f47888',y=Math.min(py(o),py(close)),height=Math.max(1.5,Math.abs(py(o)-py(close)));return `<g><title>${esc(state.interval>=3600?new Date(c.time).toLocaleString([],{timeZone:'UTC'}):new Date(c.time).toLocaleTimeString())} · O ${esc(fmt(c.open,priceToken))} H ${esc(fmt(c.high,priceToken))} L ${esc(fmt(c.low,priceToken))} C ${esc(fmt(c.close,priceToken))}</title><line x1="${x}" x2="${x}" y1="${py(h)}" y2="${py(l)}" stroke="${color}" stroke-width="1.2"/><rect x="${x-width/2}" y="${y}" width="${width}" height="${height}" rx=".6" fill="${color}" opacity="${c.complete?1:.7}"/></g>`;}).join('');
@@ -452,7 +457,7 @@ function renderPriceChart(m, b, q) {
   const maxVolume=candles.reduce((maximum,c)=>c.volume>maximum?c.volume:maximum,1n);
   const volumeBars=candles.map(c=>{const height=Number(c.volume)/Number(maxVolume)*(volumeBottom-volumeTop),color=c.close>=c.open?'#33d4a3':'#f47888';return `<rect x="${px(c.time)-width/2}" y="${volumeBottom-height}" width="${width}" height="${Math.max(1,height)}" fill="${color}" opacity=".33"><title>${esc(fmt(c.volume,b))} ${esc(symbol(b))}</title></rect>`;}).join('');
   const volumeAxis=`<line x1="${left}" x2="${right}" y1="${volumeTop}" y2="${volumeTop}" stroke="#223044"/><text x="${left-8}" y="${volumeTop+8}" text-anchor="end" font-size="8" fill="#7187a1">${esc(fmt(maxVolume,b,6))}</text><text x="${left+5}" y="${volumeTop+10}" font-size="8" fill="#7187a1">Volume ${esc(symbol(b))}</text>`;
-  $('#depth-chart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${state.interval===86400?'Daily':state.interval===3600?'Hourly':state.interval+'-second'} trading candlesticks">${lines}<line x1="${left}" x2="${right}" y1="${py(close)}" y2="${py(close)}" stroke="#7187a1" stroke-dasharray="3 5" opacity=".5"/>${bodies}${volumeAxis}${volumeBars}${labels}</svg>`;
+  $('#depth-chart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${state.interval===86400?'Daily':state.interval===3600?'Hourly':state.interval+'-second'} trading candlesticks">${lines}<line x1="${left}" x2="${right}" y1="${py(close)}" y2="${py(close)}" stroke="#7187a1" stroke-dasharray="3 5" opacity=".5"/>${gaps}${bodies}${volumeAxis}${volumeBars}${labels}</svg>`;
 }
 
 function renderTicket() {
@@ -965,6 +970,10 @@ $('#lend-asset').addEventListener('change', () => renderEarn());
 $('#candle-resolution').addEventListener('change',()=>{state.interval=Number($('#candle-resolution').value);renderChart();if(market())loadCandles(market().id,{force:true});});
 $('#older-candles').addEventListener('click',()=>{const cache=state.candles.get(`${key(state.market)}:${state.interval}`);if(cache?.beforeCursor)loadCandles(state.market,{before:cache.beforeCursor,force:true});});
 $('#latest-candles').addEventListener('click',()=>{if(market())loadCandles(market().id,{force:true});});
+function zoomCandles(step){const at=CANDLE_ZOOMS.indexOf(state.candleCount)+step;if(at<0||at>=CANDLE_ZOOMS.length)return;state.candleCount=CANDLE_ZOOMS[at];renderChart();if(market())loadCandles(market().id,{force:true});}
+$('#zoom-in-candles').addEventListener('click',()=>zoomCandles(-1));
+$('#zoom-out-candles').addEventListener('click',()=>zoomCandles(1));
+$('#depth-chart').addEventListener('wheel',event=>{if(state.chart!=='price'||!event.deltaY)return;event.preventDefault();zoomCandles(event.deltaY>0?1:-1);},{passive:false});
 $('#depth-range').addEventListener('input',()=>{try{depthBounds(1,$('#depth-range').value);state.depthRange=Number($('#depth-range').value);renderChart();}catch{/* Keep the prior view while a custom number is incomplete. */}});
 $('#depth-range').addEventListener('change',()=>{try{depthBounds(1,$('#depth-range').value);state.depthRange=Number($('#depth-range').value);renderChart();}catch(error){toast(error.message,'error');$('#depth-range').value=String(state.depthRange);}});
 let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(market())renderChart();},100);});
