@@ -35,6 +35,8 @@
 
 - [Development guides](development/README.md)
 
+  - [Building an app](development/apps/README.md)
+    - [Call flows](development/apps/call-flows.md)
   - [Services](development/services/README.md)
     - [Action scripts](development/services/action-scripts.md)
     - [Standards](development/services/standards.md)
