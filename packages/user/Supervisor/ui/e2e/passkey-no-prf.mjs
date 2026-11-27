@@ -101,16 +101,22 @@ await step(a, "a passkey with no PRF: a free name, the password is shown once in
     if (await sessionSub(a)) throw new Error("the app was given a session before there was an account");
     return `"${title}"; password ${wif.slice(0, 4)}…, ${wif.length} characters; first screen's password field: ${unseen ? "not shown (" + unseen + ")" : "shown"}`;
 });
-await step(a, "the account is created after the provider check, with keys from the passkey and the password", async (page) => {
+await step(a, "the account is created after the provider check without asking for the password again", async (page) => {
     await page.click("#acct-providers button >> nth=0");
     await provider(page, A);
     await page.waitForSelector("#acct-name-form:not([hidden])", { timeout: 30000 });
     await page.waitForSelector("#acct-create:not([disabled])");
+    let asked = false;
+    page.waitForSelector("#fb-ask:not([hidden])", { timeout: 20000 }).then(() => (asked = true), () => {});
     await page.click("#acct-create");
-    await giveKey(page);
     await onApp(page);
+    if (asked) throw new Error("the password was asked for a second time during sign-up");
+    const left = await page.context().newPage();
+    await left.goto(`${S}://supervisor.${root}/sign-in.html?step=manage&app=${app}&path=/`);
+    const carried = await left.evaluate(() => window.sessionStorage.getItem("psibase.sign-in.password-carry.v1"));
+    await left.close();
     const r = await record(a, A);
-    return `${await expectSub(a, A)}; state ${r.state}`;
+    return `${await expectSub(a, A)}; state ${r.state}; password asked once`;
 });
 await step(a, "a new device, nothing filled in: the name, the passkey, then the password on the second screen", async (page) => {
     await fresh(page, ["supervisor", app, "homepage", "x-signup"]);

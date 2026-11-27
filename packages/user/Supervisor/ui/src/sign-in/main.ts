@@ -557,6 +557,40 @@ const submittedToPasswordManager = (field: HTMLInputElement) => {
     window.setTimeout(() => (field.value = ""), 5000);
 };
 
+// A new account is created a page later than its password was shown or
+// typed (the provider check is a round trip to another site), and the keys
+// are derived again there. So that the visitor is not asked for the password
+// a second time, it is carried to that step: in this tab's session storage,
+// for this origin only, for a few minutes, and removed the moment it is read.
+// It is the password alone, never the passkey's part or anything derived:
+// what it can open still needs the passkey prompt that follows.
+const CARRY_KEY = "psibase.sign-in.password-carry.v1";
+const CARRY_MS = 10 * 60 * 1000;
+
+const carryPassword = (wif: string) => {
+    try {
+        window.sessionStorage.setItem(CARRY_KEY, JSON.stringify({ wif, until: Date.now() + CARRY_MS }));
+    } catch {
+        // Then it is asked for again.
+    }
+};
+
+const takeCarriedPassword = (): string | undefined => {
+    try {
+        const raw = window.sessionStorage.getItem(CARRY_KEY);
+        if (!raw) return undefined;
+        window.sessionStorage.removeItem(CARRY_KEY);
+        const { wif, until } = JSON.parse(raw) as { wif?: string; until?: number };
+        return wif && until && Date.now() < until && looksLikeWif(wif) ? wif : undefined;
+    } catch {
+        return undefined;
+    }
+};
+
+// Set while the first screen is signing someone in under a free name: the
+// account step that follows will need the password again.
+let carryToAccountStep = false;
+
 onPasskeyWithoutSecret(async (evidence) => {
     const { secretWithoutPrf } = await import("./fallback");
     return secretWithoutPrf(evidence, {
@@ -587,6 +621,7 @@ onPasskeyWithoutSecret(async (evidence) => {
                 form.onsubmit = (e) => {
                     e.preventDefault();
                     key.type = "password";
+                    if (carryToAccountStep) carryPassword(wif);
                     submittedToPasswordManager(key);
                     working("Signing you in", "Deriving your keys on this device.");
                     resolve();
@@ -598,9 +633,10 @@ onPasskeyWithoutSecret(async (evidence) => {
                 passwordWasUsed = true;
                 // What the first screen's field held is a hint: used once,
                 // and if it turns out wrong the visible field asks again.
-                if (suppliedPassword) {
-                    const hint = suppliedPassword;
+                const hint = suppliedPassword ?? takeCarriedPassword();
+                if (hint) {
                     suppliedPassword = undefined;
+                    if (carryToAccountStep) carryPassword(hint);
                     resolve(hint);
                     return;
                 }
@@ -616,6 +652,7 @@ onPasskeyWithoutSecret(async (evidence) => {
                 form.onsubmit = (e) => {
                     e.preventDefault();
                     const text = input.value;
+                    if (carryToAccountStep && looksLikeWif(text.trim())) carryPassword(text.trim());
                     submittedToPasswordManager(input);
                     working("Signing you in", "Deriving your keys on this device.");
                     resolve(text);
@@ -737,6 +774,8 @@ const signIn = async (mode: Mode) => {
         // A new passkey is made under the name, so the password manager
         // shows it under something its holder recognises.
         chosenLabel = { account: name, name, displayName: name };
+        carryToAccountStep = !start.exists;
+        if (start.exists) window.sessionStorage.removeItem(CARRY_KEY);
         // An existing account is signed in to with a passkey its holder
         // already has; a passkey is never created for a name that is taken.
         const prf = await obtainPasskey(start.exists && mode !== "existing" ? "existing" : mode);
