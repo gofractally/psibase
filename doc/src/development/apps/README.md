@@ -135,6 +135,7 @@ pub mod tables {
 
 - **Derives.** Use the `psio::` set above. The older `Pack`, `Unpack` and `ToSchema` derives no longer exist; pages of this book that still show them are out of date.
 - **Authorization.** `get_sender()` is the account the action runs as. Check it; nothing else says who is acting.
+- **`guest`** is the account that stands for a visitor who is not signed in. It is an ordinary account that nobody can authorize ([auth-sig](../../default-apps/auth-sig.md#the-guest-account)), so it is never the sender of an action, and a service needs no rule about it. As an argument (a recipient, an owner) it is an account like any other, shared by everybody and controlled by nobody.
 - **Never change a table index number or reorder keys** once the service is deployed.
 - **Events** are declared with `#[event(history)]` and emitted with `Wrapper::emit().history()`.
 - **Calling another service:** `other::Wrapper::call().action(args)`.
