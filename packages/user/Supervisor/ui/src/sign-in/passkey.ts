@@ -30,8 +30,42 @@ type ExtensionResults = {
 
 const randomBytes = (n: number) => crypto.getRandomValues(new Uint8Array(n));
 
+// The browser allows one credential request at a time, and refuses a new one
+// ("A request is already pending") while the dialog of the last is still
+// closing or a password chooser is open. A real passkey provider is slower
+// to let go than a test authenticator, so every request on this page goes
+// through here: one after another, and tried again for a few seconds if the
+// browser says it is still busy.
+const isStillBusy = (e: unknown) =>
+    e instanceof DOMException && /already pending/i.test(e.message);
+
+export class Busy extends Error {
+    constructor() {
+        super("The browser is still finishing an earlier passkey request. Wait a moment and try again.");
+    }
+}
+
+let lastRequest: Promise<unknown> = Promise.resolve();
+
+export const credentialRequest = <T>(request: () => Promise<T>): Promise<T> => {
+    const run = async (): Promise<T> => {
+        for (let attempt = 0; ; attempt++) {
+            try {
+                return await request();
+            } catch (e) {
+                if (!isStillBusy(e)) throw e;
+                if (attempt >= 6) throw new Busy();
+                await new Promise((r) => setTimeout(r, 500));
+            }
+        }
+    };
+    const next = lastRequest.then(run, run);
+    lastRequest = next.catch(() => undefined);
+    return next;
+};
+
 const asCancelled = (e: unknown): never => {
-    if (e instanceof DOMException && e.name === "NotAllowedError") {
+    if (e instanceof DOMException && e.name === "NotAllowedError" && !isStillBusy(e)) {
         throw new Cancelled();
     }
     throw e;
@@ -119,7 +153,8 @@ export const readPasskey = async (
     write?: PasskeyNotes,
 ): Promise<PrfResult> => {
     const writing = !!write && !!credentialId;
-    const credential = (await navigator.credentials
+    const credential = (await credentialRequest(() =>
+        navigator.credentials
         .get({
             // "immediate": show the chooser only if this device already has
             // a passkey for this site; otherwise fail at once, with no dialog.
@@ -136,7 +171,7 @@ export const readPasskey = async (
                 },
             } as PublicKeyCredentialRequestOptions,
         } as CredentialRequestOptions)
-        .catch(asCancelled)) as PublicKeyCredential | null;
+        ).catch(asCancelled)) as PublicKeyCredential | null;
     if (!credential) throw new Cancelled();
     const ext = credential.getClientExtensionResults() as ExtensionResults;
     const first = ext.prf?.results?.first;
@@ -174,7 +209,8 @@ const assertionOf = (r: AuthenticatorAssertionResponse): Assertion => ({
 
 /** One more signature from a known passkey, with nothing asked of it. */
 const signOnce = async (credentialId: Uint8Array): Promise<Assertion> => {
-    const credential = (await navigator.credentials
+    const credential = (await credentialRequest(() =>
+        navigator.credentials
         .get({
             publicKey: {
                 challenge: randomBytes(32),
@@ -182,7 +218,7 @@ const signOnce = async (credentialId: Uint8Array): Promise<Assertion> => {
                 allowCredentials: [{ type: "public-key", id: credentialId }],
             } as PublicKeyCredentialRequestOptions,
         })
-        .catch(asCancelled)) as PublicKeyCredential | null;
+        ).catch(asCancelled)) as PublicKeyCredential | null;
     if (!credential) throw new Cancelled();
     return assertionOf(credential.response as AuthenticatorAssertionResponse);
 };
@@ -202,7 +238,8 @@ export const createPasskey = async (
     // Random and fixed for the life of the passkey: it names nobody, and is
     // what later renames and removals refer to.
     const userId = randomBytes(16);
-    const credential = (await navigator.credentials
+    const credential = (await credentialRequest(() =>
+        navigator.credentials
         .create({
             publicKey: {
                 rp: { name: rootName },
@@ -226,7 +263,7 @@ export const createPasskey = async (
                 },
             } as PublicKeyCredentialCreationOptions,
         })
-        .catch(asCancelled)) as PublicKeyCredential | null;
+        ).catch(asCancelled)) as PublicKeyCredential | null;
     if (!credential) throw new Cancelled();
 
     const ext = credential.getClientExtensionResults() as ExtensionResults;
@@ -241,16 +278,24 @@ export const createPasskey = async (
         }
         const made = credential.response as AuthenticatorAttestationResponse;
         const spki = made.getPublicKey?.();
-        const secret = await noPrf({
-            credentialId,
-            registration: {
-                publicKey: spki ? new Uint8Array(spki) : undefined,
-                algorithm: made.getPublicKeyAlgorithm?.(),
-                label: label.name,
-            },
-            again: () => signOnce(credentialId),
-        });
-        return { credentialId, secret, userId };
+        try {
+            const secret = await noPrf({
+                credentialId,
+                registration: {
+                    publicKey: spki ? new Uint8Array(spki) : undefined,
+                    algorithm: made.getPublicKeyAlgorithm?.(),
+                    label: label.name,
+                },
+                again: () => signOnce(credentialId),
+            });
+            return { credentialId, secret, userId };
+        } catch (e) {
+            // No recovery key was kept for this passkey, so nothing could
+            // ever be opened with it. Leaving it in the password manager
+            // would have the next sign-in ask for a key that was never made.
+            await discardPasskey(toB64Url(credentialId));
+            throw e;
+        }
     }
     // Some devices only release the secret when the passkey is used, not when
     // it is created. That takes one more confirmation.

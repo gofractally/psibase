@@ -39,6 +39,8 @@ import {
     wifEncode,
 } from "@psibase/common-lib";
 
+import { credentialRequest } from "./passkey";
+
 export type FallbackKind = "es256" | "credential-id";
 
 const TAG: Record<FallbackKind, Uint8Array> = {
@@ -145,12 +147,14 @@ const offerToPasswordManager = async (account: string, wif: string) => {
     const Ctor = passwordApi();
     if (!Ctor) return;
     try {
-        await navigator.credentials.store(
-            new Ctor({
-                id: account,
-                password: wif,
-                name: "Recovery secret (not a signing key)",
-            }),
+        await credentialRequest(() =>
+            navigator.credentials.store(
+                new Ctor({
+                    id: account,
+                    password: wif,
+                    name: "Recovery secret (not a signing key)",
+                }),
+            ),
         );
     } catch (e) {
         console.warn("The password manager did not take the recovery key", e);
@@ -161,10 +165,12 @@ const offerToPasswordManager = async (account: string, wif: string) => {
 const fromPasswordManager = async (): Promise<{ wif: string; mark?: string } | undefined> => {
     if (!passwordApi()) return undefined;
     try {
-        const found = (await navigator.credentials.get({
-            password: true,
-            mediation: "optional",
-        } as CredentialRequestOptions)) as PasswordCredentialLike | null;
+        const found = (await credentialRequest(() =>
+            navigator.credentials.get({
+                password: true,
+                mediation: "optional",
+            } as CredentialRequestOptions),
+        )) as PasswordCredentialLike | null;
         if (found?.type === "password" && found.password && looksLikeWif(found.password)) {
             return { wif: found.password, mark: markFrom(found.id) };
         }
