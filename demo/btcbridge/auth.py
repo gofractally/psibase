@@ -30,7 +30,7 @@ def secure_account(account):
   # Names shorter than eight characters require Accounts' explicit preapproval.
   # Create directly under AuthSig in the same signed transaction; never expose
   # an intermediate AuthAny account.
-  push([action('accounts','accounts','preapproveAcc',{'name':account}),action('accounts','auth-sig','newAccount',{'name':account,'key':subprocess.check_output(['openssl','pkey','-pubin','-in',str(public),'-outform','DER']).hex()})])
+  push([action('accounts','accounts','preapproveAcc',{'name':account}),action('accounts','auth-sig','newAccount',{'name':account,'owner':{'key':public.read_text(),'seq':0},'active':{'key':public.read_text(),'seq':0}})])
  else:
   subprocess.run([str(CLI),'modify','-a',API,'-k',str(public),*signing_flags([account]),account],check=True,stdout=subprocess.DEVNULL)
 def provision():
