@@ -94,6 +94,9 @@ let
     "packages/local/XProxy/ui"
   ];
 
+  # .psi packages exposed as .#pkg-<Name>. Names must match the packages the
+  # root CMakeLists.txt builds (test packages are left out on purpose). The
+  # `pack` derivation fails if a name here is not produced.
   psiNames = [
     "Accounts" "AccountsService" "Aes" "AuthAny" "AuthNone" "AuthDyn"
     "AuthDelegate" "AuthDelegateService" "AuthRecover" "AuthSig" "AuthSigService"
@@ -561,7 +564,7 @@ let
       cp ${userServices}/*.psi ${systemServices}/*.psi nix-cargo/
       cmake -S . -B build \
         -DCMAKE_BUILD_TYPE=Release \
-        -DPSIBASE_NIX_PACKAGE_ONLY=ON \
+        -DPSIBASE_PREBUILT_PACKAGES=ON \
         -DBUILD_EXAMPLES=OFF \
         -DFORCE_COLORED_OUTPUT=OFF \
         -DPSIBASE_PLUGIN_DIR=$PWD/nix-plugins \
@@ -572,6 +575,14 @@ let
       test -f $out/share/psibase/packages/index.json
       test -f $out/share/psibase/packages/ProdDefault.psi
       test -f $out/share/psibase/packages/Minimal.psi
+      missing=""
+      for name in ${lib.concatStringsSep " " psiNames}; do
+        if [ ! -f "$out/share/psibase/packages/$name.psi" ]; then
+          echo "psiNames lists $name but the build produced no $name.psi; update psiNames in nix/release.nix" >&2
+          missing=1
+        fi
+      done
+      test -z "$missing"
     '';
     dontInstall = true;
   };

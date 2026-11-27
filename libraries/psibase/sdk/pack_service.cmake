@@ -411,7 +411,7 @@ function(cargo_psibase_package)
         message(FATAL_ERROR "Both PATH and OUTPUT must be specified for cargo_psibase_package")
     endif()
 
-    if(PSIBASE_NIX_PACKAGE_ONLY)
+    if(PSIBASE_PREBUILT_PACKAGES)
         get_filename_component(PACKAGE_NAME ${ARG_OUTPUT} NAME)
         get_filename_component(TARGET_NAME ${ARG_OUTPUT} NAME_WE)
         set(PREBUILT ${PSIBASE_CARGO_PACKAGES}/${PACKAGE_NAME})
