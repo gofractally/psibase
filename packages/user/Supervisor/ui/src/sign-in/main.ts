@@ -128,19 +128,22 @@ const setButton = (label: string) => {
 };
 
 /** The line under the button: a sentence and, optionally, one link. */
-const setBelow = (text?: string, link?: { label: string; run: () => void }) => {
+type BelowLink = { label: string; run: () => void };
+
+const setBelow = (text?: string, ...links: (BelowLink | undefined)[]) => {
     const el = $("below");
     el.textContent = text ?? "";
-    el.hidden = !text;
-    if (text && link) {
-        el.append(" ");
+    const shown = links.filter((l): l is BelowLink => !!l);
+    el.hidden = !text && !shown.length;
+    shown.forEach((link, i) => {
+        el.append(i ? " · " : text ? " " : "");
         const a = document.createElement("button");
         a.type = "button";
         a.className = "si-link";
         a.textContent = link.label;
         a.addEventListener("click", link.run);
         el.append(a);
-    }
+    });
 };
 
 const HAS_PASSKEY_KEY = "psibase.has-passkey.v1";
@@ -787,12 +790,7 @@ const signIn = async (mode: Mode) => {
                 return;
             }
             setNotice(`${name} is taken, and this passkey does not control it.`);
-            // Awaiting the owner's word (#2275): the two ways on for
-            // someone whose account it is.
-            setBelow("Is it yours?", {
-                label: "Recover it",
-                run: () => void recoverInstead(name),
-            });
+            offerOwnAccount(name);
             return;
         }
         // A free name: the next step makes the account. With none yet it is
@@ -817,6 +815,7 @@ const signIn = async (mode: Mode) => {
             // dialog. The same button now creates a passkey.
             if (wanted?.exists) {
                 setNotice(`No passkey was used. ${wanted.name} needs the passkey it was created with.`);
+                offerOwnAccount(wanted.name);
                 return;
             }
             nextMode = "create";
@@ -827,6 +826,13 @@ const signIn = async (mode: Mode) => {
             });
             return;
         }
+        if (e instanceof Cancelled && wanted?.exists) {
+            // No passkey was used for a name that is an account: say what
+            // it needs, and how someone whose account it is can go on.
+            setNotice(`No passkey was used. ${wanted.name} needs the passkey it was created with.`);
+            offerOwnAccount(wanted.name);
+            return;
+        }
         // The welcome already offers a different passkey to someone who
         // backed out of this one.
         if (e instanceof Cancelled && loadRememberedCredential()) return;
@@ -834,17 +840,45 @@ const signIn = async (mode: Mode) => {
     }
 };
 
-// Recovering an account needs a passkey to recover it to: the one just
-// used signs the visitor in as far as the recovery step.
-const recoverInstead = async (name: string) => {
+// The two ways on for someone whose account a name is although no passkey
+// of theirs opens it: recover it through its recovery partner, or sign in
+// with the account's own key. (Awaiting the owner's word on the wording,
+// #2275.) Both need a passkey to bring the account to: the one this browser
+// has, or a new one made under that name.
+const offerOwnAccount = (name: string) =>
+    setBelow(
+        "Is it yours?",
+        { label: "Recover it", run: () => void takeOverWith(name, "recover") },
+        { label: "Sign in with a key file", run: () => void takeOverWith(name, "import") },
+    );
+
+const takeOverWith = async (name: string, intent: "recover" | "import") => {
+    setNotice();
+    let unlocked: Unlocked | undefined;
     try {
-        working("Checking your passkey", "Follow the prompt from your device.");
-        const unlocked = await unlockWith(await readPasskey(loadRememberedCredential()));
+        chosenLabel = { account: name, name, displayName: name };
+        let prf: PrfResult;
+        try {
+            prf = await obtainPasskey("auto");
+        } catch (e) {
+            if (!(e instanceof NoPasskeyChosen)) throw e;
+            prf = await newPasskey();
+        }
+        working("Signing you in", "Deriving your keys on this device.");
+        unlocked = await unlockWith(prf);
         const session = await guestLogin(unlocked);
         saveGuestSession(session);
+        window.localStorage.setItem(HAS_PASSKEY_KEY, session.credentialId);
+        notePasskey({ userId: unlocked.userId });
         unlocked.wipe();
-        go("account", { intent: "recover", account: name });
+        go("account", { intent, account: name });
     } catch (e) {
+        unlocked?.wipe();
+        if (e instanceof Unsupported) {
+            $("unsupported-detail").textContent = e.message;
+            show("unsupported");
+            return;
+        }
         renderWelcome();
         setNotice(describeFailure(e));
     }
