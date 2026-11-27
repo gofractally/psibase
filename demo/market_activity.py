@@ -20,7 +20,8 @@ from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-from bridge import ROOT, CLI, API, action, push, quantity, read_state, settlements, fund_claims
+from bridge import (ROOT, CLI, API, KEYS, NODE_ARGS, sign_flags, action, push, quantity,
+                    read_state, settlements, fund_claims)
 from run import active, start
 
 MAKERS = ("demomakera", "demomakerb", "demomakerc")
@@ -103,8 +104,27 @@ def fund_accounts(config):
         if owner in config["accounts"]:
             continue
         # Account creation uses KEEP_EXISTING; -i selects local AuthAny.
-        result = subprocess.run([CLI, "create", "-a", API, "-i", "-S", "accounts", owner],
-                                capture_output=True, text=True, timeout=60)
+        if KEYS:
+            # A chain whose accounts sign: the owner gets a key of its own and
+            # is created by the account named in EXCHANGE_CREATOR.
+            key = Path(KEYS) / f"{owner}.key.pem"
+            public = Path(KEYS) / f"{owner}.pub.pem"
+            if not key.exists():
+                subprocess.run(["openssl", "genpkey", "-algorithm", "EC", "-pkeyopt",
+                                "ec_paramgen_curve:secp256k1", "-out", str(key)],
+                               check=True, capture_output=True)
+                key.chmod(0o600)
+            subprocess.run(["openssl", "pkey", "-in", str(key), "-pubout", "-out", str(public)],
+                           check=True, capture_output=True)
+            creator = os.environ.get("EXCHANGE_CREATOR", "prod")
+            result = subprocess.run([CLI, "create", *NODE_ARGS, "-S", creator,
+                                     *sign_flags([creator]), "-k", str(public), owner],
+                                    capture_output=True, text=True, timeout=60)
+            if result.returncode and "already exists" in (result.stderr or ""):
+                result = subprocess.CompletedProcess(result.args, 0, "", "")
+        else:
+            result = subprocess.run([CLI, "create", "-a", API, "-i", "-S", "accounts", owner],
+                                    capture_output=True, text=True, timeout=60)
         if result.returncode:
             raise RuntimeError(result.stderr)
         send([action(owner, "tokens", "setUserConf", {"index": 0, "enabled": False})])
@@ -277,7 +297,8 @@ def submit_concurrently(actions):
     The node serializes all financial mutations. Bounded concurrent waiters let
     us submit once/second without altering the CLI or weakening confirmation.
     """
-    result = subprocess.run([CLI, "push", "-a", API, "--trace", "json", "--console=false", "-"],
+    result = subprocess.run([CLI, "push", *NODE_ARGS, "--trace", "json", "--console=false",
+                             *sign_flags(a["sender"] for a in actions), "-"],
                             input=json.dumps(actions), text=True, capture_output=True, timeout=30)
     trace = json.loads(result.stdout or "{}")
     if result.returncode or trace.get("error"):

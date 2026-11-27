@@ -20,6 +20,27 @@ ROOT = Path(__file__).resolve().parents[1]
 CLI = os.environ.get("EXCHANGE_CLI", str(ROOT / "rust/target/release/psibase"))
 API = os.environ.get("EXCHANGE_CHAIN", "http://psibase.localhost:8089/")
 PORT = int(os.environ.get("EXCHANGE_PORT", "8090"))
+# A chain that is not the loopback fixture: reached through a proxy (the
+# node's Unix socket), with accounts that sign, and with the node's HTTP
+# listener and public host name given separately.
+PROXY = os.environ.get("EXCHANGE_PROXY")
+KEYS = os.environ.get("EXCHANGE_KEYS")
+_PORT = urlsplit(API).port or 80
+LOCAL = os.environ.get("EXCHANGE_LOCAL", f"127.0.0.1:{_PORT}")
+HOST = os.environ.get("EXCHANGE_HOST", f"exchange.psibase.localhost:{_PORT}")
+LOCAL_HEADERS = {"X-Psibase-Local": "1"} if os.environ.get("EXCHANGE_LOCAL_OPERATOR") else {}
+NODE_ARGS = ["-a", API] + (["--proxy", PROXY] if PROXY else [])
+
+
+def sign_flags(senders):
+    """--sign for each sender that has a key file under EXCHANGE_KEYS."""
+    flags = []
+    if KEYS:
+        for sender in dict.fromkeys(senders):
+            key = Path(KEYS) / f"{sender}.key.pem"
+            if key.exists():
+                flags += ["--sign", str(key)]
+    return flags
 NATIVE_UI_ORIGIN = f"http://exchange.psibase.localhost:{urlsplit(API).port or 80}"
 UI_ORIGINS = (f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}", NATIVE_UI_ORIGIN)
 ACCOUNTS = {"alice", "bob", "carol", "liquidity"}
@@ -36,7 +57,7 @@ def bearer(account):
         cached = AUTH.get(account)
         if cached and time.monotonic() - cached[0] < 240:
             return cached[1]
-        result = subprocess.run([CLI, "login", "-a", API, account],
+        result = subprocess.run([CLI, "login", *NODE_ARGS, *sign_flags([account]), account],
                                 capture_output=True, text=True, timeout=60)
         token = result.stdout.strip()
         if result.returncode or not token.lower().startswith("bearer "):
@@ -59,8 +80,9 @@ def native_numbers(value):
 def push(actions):
     """Uses on-chain schemas to pack/sign and push one atomic transaction."""
     with LOCK:
-        result = subprocess.run([CLI, "push", "-a", API, "--trace", "json",
-                                 "--console=false", "-"],
+        result = subprocess.run([CLI, "push", *NODE_ARGS, "--trace", "json",
+                                 "--console=false",
+                                 *sign_flags(a["sender"] for a in actions), "-"],
                                 input=json.dumps(actions), text=True,
                                 capture_output=True, timeout=120)
     try:
@@ -104,8 +126,8 @@ def read_state(account, retry=True):
     # Override Host explicitly: no dependency on OS resolution of *.localhost.
     endpoint = urlsplit(API)
     req = urllib.request.Request(
-        f"http://127.0.0.1:{endpoint.port or 80}/snapshot?owner={account}",
-        headers={"Host": f"exchange.psibase.localhost:{endpoint.port or 80}",
+        f"http://{LOCAL}/snapshot?owner={account}",
+        headers={**LOCAL_HEADERS, "Host": HOST,
                  "Authorization": bearer(account)})
     try:
         with urllib.request.urlopen(req, timeout=30) as reply:
@@ -130,8 +152,8 @@ def read_tokens(after=0, limit=200):
         raise ValueError("Invalid native token cursor or page size")
     endpoint = urlsplit(API)
     req = urllib.request.Request(
-        f"http://127.0.0.1:{endpoint.port or 80}/tokens?after={after}&limit={limit}",
-        headers={"Host": f"exchange.psibase.localhost:{endpoint.port or 80}"})
+        f"http://{LOCAL}/tokens?after={after}&limit={limit}",
+        headers={**LOCAL_HEADERS, "Host": HOST})
     with urllib.request.urlopen(req, timeout=30) as reply:
         return json.load(reply)
 
@@ -153,8 +175,8 @@ def read_trades(market, limit="50", before=None, after=None):
     cursor += "" if after is None else f"&after={parsed(after, 'trade cursor', (1 << 64) - 1)}"
     endpoint = urlsplit(API)
     req = urllib.request.Request(
-        f"http://127.0.0.1:{endpoint.port or 80}/trades?market={market}&limit={limit}{cursor}",
-        headers={"Host": f"exchange.psibase.localhost:{endpoint.port or 80}"})
+        f"http://{LOCAL}/trades?market={market}&limit={limit}{cursor}",
+        headers={**LOCAL_HEADERS, "Host": HOST})
     with urllib.request.urlopen(req, timeout=30) as reply:
         return json.load(reply)
 
@@ -184,8 +206,8 @@ def private_stop_query(account, path, retry=True):
         raise ValueError("Unknown demo wallet")
     endpoint = urlsplit(API)
     req = urllib.request.Request(
-        f"http://127.0.0.1:{endpoint.port or 80}{path}",
-        headers={"Host": f"exchange.psibase.localhost:{endpoint.port or 80}",
+        f"http://{LOCAL}{path}",
+        headers={**LOCAL_HEADERS, "Host": HOST,
                  "Authorization": bearer(account)})
     try:
         with urllib.request.urlopen(req, timeout=30) as reply:
