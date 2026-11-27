@@ -19,6 +19,8 @@ PACKAGE_SOURCE=Path(os.environ.get('BTCBRIDGE_PACKAGE_SOURCE',ROOT/'demo/artifac
 BITCOIN=Path(os.environ.get('BTCBRIDGE_BITCOIN_BIN',Path(__file__).parent/'bin/bitcoin-32.1/bin'))
 LOCK=threading.RLock()
 RELAYER=os.environ.get('BTCBRIDGE_RELAYER_ACCOUNT','alice')
+# 'signet': an existing signet node (BTCBRIDGE_RPC_PORT, BTCBRIDGE_RPC_COOKIE) in place of this harness's own regtest node.
+NETWORK=os.environ.get('BTCBRIDGE_NETWORK','regtest')
 def http(path,service='btcbridge'):
  req=urllib.request.Request(f'http://127.0.0.1:{NODE_PORT}{path}',headers={'Host':f'{service}.psibase.localhost:{NODE_PORT}'})
  with urllib.request.urlopen(req,timeout=30) as r:return json.load(r)
@@ -53,7 +55,7 @@ def push(actions,*,signed=True):
 
 def call(_sender,_service,_method,**data):return push([action(_sender,_service,_method,data)])[0]
 def rpc(method,*params,wallet=None):
- cookie=(STATE/'bitcoin/regtest/.cookie').read_text().strip()
+ cookie=Path(os.environ.get('BTCBRIDGE_RPC_COOKIE',STATE/'bitcoin/regtest/.cookie')).read_text().strip()
  url=f'http://127.0.0.1:{RPC_PORT}/'+('wallet/'+wallet if wallet else '')
  req=urllib.request.Request(url,json.dumps({'jsonrpc':'2.0','id':'btcbridge-test','method':method,'params':list(params)}).encode(),{'Authorization':'Basic '+base64.b64encode(cookie.encode()).decode(),'Content-Type':'application/json'})
  try:

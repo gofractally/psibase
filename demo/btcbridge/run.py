@@ -72,7 +72,7 @@ def prepare_packages():
  (PACKAGES/'index.json').write_text(json.dumps(index))
 def start_base():
  (STATE/'bitcoin').mkdir(parents=True,exist_ok=True)
- proc('bitcoin',[BITCOIN/'bitcoind',f'-datadir={STATE}/bitcoin','-regtest','-server','-txindex=1','-listen=0','-connect=0','-dnsseed=0','-discover=0',f'-rpcport={RPC_PORT}','-rpcbind=127.0.0.1','-rpcallowip=127.0.0.1',f'-port={P2P_PORT}','-fallbackfee=0.00001000'])
+ if NETWORK=='regtest':proc('bitcoin',[BITCOIN/'bitcoind',f'-datadir={STATE}/bitcoin','-regtest','-server','-txindex=1','-listen=0','-connect=0','-dnsseed=0','-discover=0',f'-rpcport={RPC_PORT}','-rpcbind=127.0.0.1','-rpcallowip=127.0.0.1',f'-port={P2P_PORT}','-fallbackfee=0.00001000'])
  wait(lambda:rpc('getblockchaininfo'))
  (STATE/'chain').mkdir(parents=True,exist_ok=True)
  conf=STATE/'chain/config'
@@ -109,7 +109,8 @@ def _setup():
    invoke([CLI,'install','-a',API,'-S','psibase',*signing_flags(['psibase']),'-y','--package-source',PACKAGES.resolve(),package])
   done('install')
  auth.provision()
- if not progress.get('faucet'):
+ if NETWORK!='regtest':pass
+ elif not progress.get('faucet'):
   try:rpc('createwallet','faucet')
   except ValueError:rpc('loadwallet','faucet')
   if rpc('getblockcount')<105:mine(105-rpc('getblockcount'))
@@ -133,8 +134,17 @@ def _setup():
   return keys
  keys=wait(keys_ready)
  if not progress.get('relay'):
-  genesis=rpc('getblockheader',rpc('getblockhash',0),False)
-  call('btcrelay','btcrelay','init',network='regtest',checkpoint_height=0,context=[genesis],required=7);done('relay')
+  if NETWORK=='regtest':
+   genesis=rpc('getblockheader',rpc('getblockhash',0),False)
+   call('btcrelay','btcrelay','init',network='regtest',checkpoint_height=0,context=[genesis],required=7)
+  else:
+   # The checkpoint is eleven blocks past a difficulty-period start chosen by the operator
+   # (BTCBRIDGE_CHECKPOINT_EPOCH), so its context holds both that start and the eleven
+   # timestamps before the checkpoint.
+   epoch=int(os.environ['BTCBRIDGE_CHECKPOINT_EPOCH']);assert epoch%2016==0
+   context=[rpc('getblockheader',rpc('getblockhash',h),False) for h in range(epoch,epoch+12)]
+   call('btcrelay','btcrelay','init',network=NETWORK,checkpoint_height=epoch+11,context=context,required=int(os.environ.get('BTCBRIDGE_REQUIRED','6')))
+  done('relay')
  if not progress.get('bridge'):
   # Extended-key network prefixes are a Bitcoin app concern; generic signers publish neutral xpub roots.
   alphabet='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
@@ -145,12 +155,13 @@ def _setup():
    number=int.from_bytes(data,'big');out=''
    while number:number,rem=divmod(number,58);out=alphabet[rem]+out
    return out
-  p={'network':'regtest','xpubs':[testnet_root(k['public_root']) for k in keys],'fee_rate':2,'max_fee_rate':100,'service_fee':100,'min_withdrawal':10000,'min_deposit':1000,'dust':1000,'batch_seconds':300,'batch_size':2,'max_inputs':64}
+  p={'network':NETWORK,'xpubs':[testnet_root(k['public_root']) for k in keys],'fee_rate':2,'max_fee_rate':100,'service_fee':100,'min_withdrawal':10000,'min_deposit':1000,'dust':1000,'batch_seconds':300,'batch_size':2,'max_inputs':64}
   token=call('btcbridge','btcbridge','init',policy_json=json.dumps(p),treasury='liquidity');done('bridge')
  if not progress.get('deposit-fees'):
   call('btcbridge','btcbridge','setDepFees',fee_bps=10,publisher_bps=5000);done('deposit-fees')
  relay_headers()
- if not progress.get('deposits'):
+ if NETWORK!='regtest':pass
+ elif not progress.get('deposits'):
   for owner,amount in [('alice',1),('bob',1),('carol',1),('liquidity',10)]:
    address=call(owner,'btcbridge','newAddress');txid=rpc('sendtoaddress',address['address'],amount,wallet='faucet');(STATE/f'deposit-{owner}.json').write_text(json.dumps({'txid':txid,'amount':amount,'address':address['address']}))
   mine(7);relay_headers()
@@ -159,7 +170,7 @@ def _setup():
  # Native user funds are immediately spendable for familiar wallet behavior.
  for owner in ('alice','bob','carol','liquidity'):call(owner,'tokens','setUserConf',index=0,enabled=True)
  publish()
- (STATE/'ready.json').write_text(json.dumps({'network':'regtest','url':ORIGIN,'token':snapshot()['config']['token']},indent=2));start()
+ (STATE/'ready.json').write_text(json.dumps({'network':NETWORK,'url':ORIGIN,'token':snapshot()['config']['token']},indent=2));start()
 def setup():
  import fcntl
  STATE.mkdir(parents=True,exist_ok=True)
@@ -179,7 +190,7 @@ def publish():
  invoke([CLI,'upload','-a',API,'-S','btcbridge',*signing_flags(['btcbridge']),'-r',public,'/'],stdout=subprocess.DEVNULL)
 def start():
  start_base()
- if 'faucet' not in rpc('listwallets'):rpc('loadwallet','faucet')
+ if NETWORK=='regtest' and 'faucet' not in rpc('listwallets'):rpc('loadwallet','faucet')
  start_signers()
  if os.environ.get('BTCBRIDGE_AUTO_RELAY','1')=='1':proc('relayer',[sys.executable,Path(__file__).parent/'relayer.py','--state',STATE])
  proc('gateway',[sys.executable,Path(__file__).parent/'server.py','--state',STATE])
