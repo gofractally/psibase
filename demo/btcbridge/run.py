@@ -39,6 +39,8 @@ def build():
  if 'BTCBRIDGE_CLI' not in os.environ:
   invoke(['cargo','build','--locked','--manifest-path',ROOT/'rust/Cargo.toml','-p','psibase','--release','--target',RUST_HOST])
  invoke(['npm','run','build'],cwd=ROOT/'packages/user/BtcBridge/ui')
+ # The Exchange package is made here too, and a package is not made without its UI.
+ invoke(['node','build.mjs'],cwd=ROOT/'packages/user/Exchange/ui')
  env=os.environ.copy();sdk=Path(os.environ.get('BTCBRIDGE_WASI_SDK','/Users/dlarimer/psibase/build/wasi-sdk-prefix/src/wasi-sdk'))
  env.update(CC_wasm32_wasip1=str(sdk/'bin/clang'),AR_wasm32_wasip1=str(sdk/'bin/llvm-ar'))
  invoke([CARGO_PSIBASE,'psibase','--manifest-path',ROOT/'packages/user/Cargo.toml','--psitest',PSITEST,'-p','signing-pkg','-p','btcbridge-pkg','-p','exchange-pkg','package'],env=env)
