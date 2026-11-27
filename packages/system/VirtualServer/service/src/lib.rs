@@ -451,8 +451,7 @@ mod service {
     /// billable account.
     #[action]
     fn bill_to_sub(sub_account: String) {
-        let billable_account =
-            tx_cache::billable::get_billable_account().expect("Billable account not set");
+        let billable_account = tx_cache::billable::get_account().expect("Billable account not set");
 
         assert!(
             !sub_account.is_empty(),
@@ -833,12 +832,9 @@ mod service {
         }
     }
 
-    /// A transaction's CPU limit is what the balance it is billed to can
-    /// afford. The limit is set when the transaction starts; when that balance
-    /// changes while the transaction runs, the limit has to follow, or a
-    /// transaction that funds itself part-way is still stopped at what it
-    /// could afford before. Does nothing unless `account`/`sub_account` is the
-    /// balance the running transaction is billed to.
+    /// If the specified account is the current transaction's billable account,
+    /// this action will update the active CPU limit based on the account's
+    /// available resources.
     fn refresh_cpu_limit(account: AccountNumber, sub_account: Option<String>) {
         if !tx_cache::billable::is_billed(account, &sub_account) {
             return;
@@ -910,7 +906,7 @@ mod service {
     fn setBillableAcc(account: AccountNumber) {
         assert_eq!(get_sender(), Transact::SERVICE, "Unauthorized");
 
-        tx_cache::billable::set_billable_account(account);
+        tx_cache::billable::set_account(account);
 
         CpuLimit::rpc().setCpuLimit(get_cpu_limit(account, None));
     }

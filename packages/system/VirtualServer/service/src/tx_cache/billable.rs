@@ -7,11 +7,11 @@ thread_local! {
     static BILL_TO_SUB: RefCell<Option<HashMap<AccountNumber, String>>> = const { RefCell::new(None) };
 }
 
-pub fn get_billable_account() -> Option<AccountNumber> {
+pub fn get_account() -> Option<AccountNumber> {
     BILLABLE_ACCOUNT.with(|cell| cell.get())
 }
 
-pub fn set_billable_account(account: AccountNumber) {
+pub fn set_account(account: AccountNumber) {
     BILLABLE_ACCOUNT.with(|cell| cell.set(Some(account)));
 }
 
@@ -26,9 +26,6 @@ pub fn set_sub(user: AccountNumber, sub_account: String) {
     });
 }
 
-/// Whether `account`'s balance in `sub_account` (its main balance when `None`)
-/// is the one the running transaction is billed to. A change to that balance
-/// changes what the transaction can afford, so its CPU limit must follow.
 pub fn is_billed(account: AccountNumber, sub_account: &Option<String>) -> bool {
-    get_billable_account() == Some(account) && get_sub(account) == *sub_account
+    get_account() == Some(account) && get_sub(account) == *sub_account
 }
