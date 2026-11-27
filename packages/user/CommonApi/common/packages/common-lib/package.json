@@ -45,6 +45,7 @@
         "dev": "vite",
         "build": "node ../../../../../if-build-needed.mjs 'tsc -b --noEmit && vite build'",
         "preview": "vite preview",
+        "test": "node --test test/*.test.mjs",
         "format": "prettier --write 'src/**/*.ts'"
     },
     "devDependencies": {

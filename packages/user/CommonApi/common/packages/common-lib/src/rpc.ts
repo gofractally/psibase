@@ -3,7 +3,7 @@ import hashJs from "hash.js";
 import {
     privateStringToKeyPair,
     publicKeyPairToDER,
-    signatureToBin,
+    signDigest,
 } from "./key-conversions";
 
 export class RPCError extends Error {
@@ -310,14 +310,7 @@ export async function signTransaction(
     };
     const packed = new Uint8Array(await packTransaction(baseUrl, transaction));
     const digest = new (hashJs as any).sha256().update(packed).digest();
-    const proofs = keys.map((k) =>
-        uint8ArrayToHex(
-            signatureToBin({
-                keyType: k.keyType,
-                signature: k.keyPair.sign(digest),
-            }),
-        ),
-    );
+    const proofs = keys.map((k) => uint8ArrayToHex(signDigest(k, digest)));
     const result = { transaction, proofs };
     return result;
 }
