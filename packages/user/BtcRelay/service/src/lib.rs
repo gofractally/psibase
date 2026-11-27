@@ -342,7 +342,8 @@ pub mod service {
         RelayTable::read_write().put(&c).unwrap();
     }
     /// The relay's own account may change how many confirmations a proof needs, within the
-    /// range init accepts. Nothing already accepted is undone.
+    /// range init accepts. On mainnet the depth may only be raised; signet and regtest may
+    /// set any value in range. Nothing already accepted is undone.
     #[action]
     fn setRequired(required: u32) {
         assert_eq!(
@@ -350,8 +351,8 @@ pub mod service {
             Wrapper::SERVICE,
             "Relay confirmation policy authority"
         );
-        assert!((1..=144).contains(&required), "Confirmation policy range");
         let mut c = config();
+        must(btc::check_required_change(&c.network, c.required, required));
         c.required = required;
         RelayTable::read_write().put(&c).unwrap();
     }

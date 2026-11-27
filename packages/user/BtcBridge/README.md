@@ -107,7 +107,10 @@ Headers plus inclusion proofs are SPV, not full transaction/UTXO validation.
 
 Confirmation count includes the containing block. The demo requires seven
 confirmations for both deposit issuance and withdrawal completion. The depth is
-configurable at initialization, not retrospectively lowered by a keeper.
+set at initialization. The relay's own account can change it afterwards with
+`setRequired`, within the same range (1 to 144): on mainnet it can only be
+raised, never lowered; on signet and regtest any value in range is accepted. No
+keeper or other account can change it.
 Accepted transfers protect their Bitcoin history. A higher-work reorg removing
 that history, or exceeding the bounded update window, persistently freezes the
 relay. A stale tip stops new credit and withdrawal authorization. A pause cannot

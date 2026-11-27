@@ -61,6 +61,19 @@ pub fn signet_params(net: &str) -> Result<Option<SignetParams>> {
         _ => None,
     })
 }
+/// How many confirmations a proof needs may be changed after initialization, within the range
+/// initialization accepts. On mainnet it may only be raised: a depth users relied on is not
+/// lowered afterwards. Test networks (signet, regtest) may set any value in range.
+pub fn check_required_change(net: &str, current: u32, new: u32) -> Result<()> {
+    let net = network(net)?;
+    if !(1..=144).contains(&new) {
+        return Err("Confirmation policy range".into());
+    }
+    if net == Network::Bitcoin && new < current {
+        return Err("Confirmation depth cannot be lowered on mainnet".into());
+    }
+    Ok(())
+}
 const RETARGET_INTERVAL: u32 = 2016;
 /// Highest height at which trusted checkpoint context may begin: eleven timestamps for the median-time
 /// rule and, on a retargeting network, the first header of the checkpoint's difficulty epoch.

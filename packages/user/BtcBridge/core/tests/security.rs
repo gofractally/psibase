@@ -215,3 +215,23 @@ fn mainnet_retarget_matches_historical_bitcoin_headers() {
     )
     .is_err());
 }
+#[test]
+fn confirmation_depth_is_never_lowered_on_mainnet() {
+    // Raising, or keeping, is allowed everywhere within the range.
+    for net in ["bitcoin", "signet", "regtest"] {
+        check_required_change(net, 6, 6).unwrap();
+        check_required_change(net, 6, 7).unwrap();
+        check_required_change(net, 1, 144).unwrap();
+        assert!(check_required_change(net, 6, 0).is_err());
+        assert!(check_required_change(net, 6, 145).is_err());
+    }
+    assert_eq!(
+        check_required_change("bitcoin", 6, 5).unwrap_err(),
+        "Confirmation depth cannot be lowered on mainnet"
+    );
+    assert!(check_required_change("bitcoin", 144, 1).is_err());
+    // Test networks may lower it.
+    check_required_change("signet", 7, 2).unwrap();
+    check_required_change("regtest", 7, 1).unwrap();
+    assert!(check_required_change("testnet4", 6, 7).is_err());
+}
