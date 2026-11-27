@@ -7,8 +7,13 @@ NODE_PORT=int(os.environ.get('BTCBRIDGE_NODE_PORT','8091'))
 WEB_PORT=int(os.environ.get('BTCBRIDGE_WEB_PORT','8092'))
 RPC_PORT=int(os.environ.get('BTCBRIDGE_RPC_PORT','18453'))
 P2P_PORT=int(os.environ.get('BTCBRIDGE_P2P_PORT','18454'))
-API=f'http://psibase.localhost:{NODE_PORT}/'
-ORIGIN=f'http://btcbridge.psibase.localhost:{NODE_PORT}'
+# A chain other than this harness's own: its root host (BTCBRIDGE_HOST, e.g. example.net), the URL
+# the CLI is given (BTCBRIDGE_API) and the scheme its pages are reached by (BTCBRIDGE_SCHEME).
+# Queries still go to 127.0.0.1:NODE_PORT with the service's Host header.
+HOST=os.environ.get('BTCBRIDGE_HOST',f'psibase.localhost:{NODE_PORT}')
+SCHEME=os.environ.get('BTCBRIDGE_SCHEME','http')
+API=os.environ.get('BTCBRIDGE_API',f'http://{HOST}/')
+ORIGIN=f'{SCHEME}://btcbridge.{HOST}'
 RUST_HOST=next(line.split(': ',1)[1] for line in subprocess.check_output(['rustc','-vV'],text=True).splitlines() if line.startswith('host: '))
 CLI=Path(os.environ.get('BTCBRIDGE_CLI',ROOT/f'rust/target/{RUST_HOST}/release/psibase'))
 DAEMON=Path(os.environ.get('BTCBRIDGE_SIGNING_DAEMON',ROOT/f'packages/user/target/{RUST_HOST}/debug/signing-daemon'))
@@ -22,7 +27,7 @@ RELAYER=os.environ.get('BTCBRIDGE_RELAYER_ACCOUNT','alice')
 # 'signet': an existing signet node (BTCBRIDGE_RPC_PORT, BTCBRIDGE_RPC_COOKIE) in place of this harness's own regtest node.
 NETWORK=os.environ.get('BTCBRIDGE_NETWORK','regtest')
 def http(path,service='btcbridge'):
- req=urllib.request.Request(f'http://127.0.0.1:{NODE_PORT}{path}',headers={'Host':f'{service}.psibase.localhost:{NODE_PORT}'})
+ req=urllib.request.Request(f'http://127.0.0.1:{NODE_PORT}{path}',headers={'Host':f'{service}.{HOST}'})
  with urllib.request.urlopen(req,timeout=30) as r:return json.load(r)
 def snapshot(owner='alice'):return http('/snapshot?owner='+owner)
 def action(sender,service,method,data):return dict(sender=sender,service=service,method=method,data=data)

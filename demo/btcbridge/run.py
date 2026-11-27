@@ -122,7 +122,7 @@ def _setup():
   deployment=json.loads(generated.stdout)['deployment'];(STATE/'deployment.json').write_text(json.dumps({'deployment':deployment}));done('secrets')
  deployment=json.loads((STATE/'deployment.json').read_text())['deployment']
  for n,provider in enumerate(PROVIDERS):
-  config={'node_url':f'http://127.0.0.1:{NODE_PORT}','host':f'signhash.psibase.localhost:{NODE_PORT}','chain_url':API,'cli':str(CLI),'provider':provider,'key_path':str(STATE/f'secrets/signer-{n}.key'),'auth_key_path':str(STATE/f'account-keys/{provider}.pem'),'deployment':deployment,'journal':str(STATE/f'secrets/journal-{n}.json')}
+  config={'node_url':f'http://127.0.0.1:{NODE_PORT}','host':f'signhash.{HOST}','chain_url':API,'cli':str(CLI),'provider':provider,'key_path':str(STATE/f'secrets/signer-{n}.key'),'auth_key_path':str(STATE/f'account-keys/{provider}.pem'),'deployment':deployment,'journal':str(STATE/f'secrets/journal-{n}.json')}
   (STATE/f'signer-{n}.json').write_text(json.dumps(config,indent=2))
  if not progress.get('signing'):
   call('signhash','signhash','init',deployment=deployment,providers=PROVIDERS)
@@ -194,7 +194,7 @@ def start():
  start_signers()
  if os.environ.get('BTCBRIDGE_AUTO_RELAY','1')=='1':proc('relayer',[sys.executable,Path(__file__).parent/'relayer.py','--state',STATE])
  # The gateway serves a regtest node's data to the page; on signet the page asks a public API.
- if NETWORK!='regtest':return print(f'http://btcbridge.psibase.localhost:{NODE_PORT}/')
+ if NETWORK!='regtest':return print(ORIGIN+'/')
  proc('gateway',[sys.executable,Path(__file__).parent/'server.py','--state',STATE])
  wait(lambda:urllib.request.urlopen(f'http://127.0.0.1:{WEB_PORT}/api/health',timeout=2))
  print(ORIGIN+'/')

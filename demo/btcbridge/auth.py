@@ -13,7 +13,7 @@ def keypair(account):
  subprocess.run(['openssl','pkey','-in',str(private),'-pubout','-out',str(public)],stderr=subprocess.PIPE,check=True)
  return private,public
 def query(service,query):
- req=urllib.request.Request(f'http://127.0.0.1:{NODE_PORT}/graphql',query.encode(),{'Host':f'{service}.psibase.localhost:{NODE_PORT}','Content-Type':'application/graphql'})
+ req=urllib.request.Request(f'http://127.0.0.1:{NODE_PORT}/graphql',query.encode(),{'Host':f'{service}.{HOST}','Content-Type':'application/graphql'})
  with urllib.request.urlopen(req,timeout=10) as reply:result=json.load(reply)
  if result.get('errors'):raise ValueError(result['errors'])
  return result['data']
