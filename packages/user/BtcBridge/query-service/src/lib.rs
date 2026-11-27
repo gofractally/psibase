@@ -42,6 +42,24 @@ pub mod service {
             psibase::services::http_server::SERVICE,
             "Native HTTP server required"
         );
+        // A plugin reads these from the supervisor's origin, with the user's session; without
+        // these headers the browser withholds the reply from it.
+        let mut cors = psibase::allow_cors_for_subdomains(&request, true);
+        if !cors.is_empty() {
+            cors.push(HttpHeader {
+                name: "Access-Control-Allow-Credentials".into(),
+                value: "true".into(),
+            });
+            cors.push(HttpHeader {
+                name: "Vary".into(),
+                value: "Origin".into(),
+            });
+        }
+        let mut reply = answer(&request)?;
+        reply.headers.extend(cors);
+        Some(reply)
+    }
+    fn answer(request: &HttpRequest) -> Option<HttpReply> {
         let target = request.target.to_string_lossy();
         let (path, query) = target.split_once('?').unwrap_or((&target, ""));
         if request.method == "GET" {
