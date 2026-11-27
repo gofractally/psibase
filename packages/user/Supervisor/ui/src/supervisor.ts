@@ -465,23 +465,36 @@ export class Supervisor implements AppInterface {
         }
     }
 
+    // Calls from this tab run one at a time: the loader and the call context
+    // belong to the tab and are not re-entrant.
+    private entryQueue: Promise<unknown> = Promise.resolve();
+
     // This is an entrypoint for apps to call into plugins.
     async entry(
         callerOrigin: string,
         id: string,
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
-        try {
-            return await withTransactionLock(() => this.lockedEntry(callerOrigin, id, args));
-        } catch (error) {
-            // Lock acquisition happens before a call context exists. Reply to
-            // the validated origin captured by the message handler, without
-            // touching another queued context's mutable origination state.
-            window.parent.postMessage(buildFunctionCallResponse(id, new PluginErrorObject(
-                { service: "host", plugin: "client" },
-                error instanceof Error ? error.message : String(error),
-            )), callerOrigin);
-        }
+        const run = async () => {
+            // A call that has not finished after a while is very likely
+            // waiting on something that will never arrive. It can only hold
+            // up this tab, and this says what it is.
+            const slow = window.setTimeout(
+                () =>
+                    console.error(
+                        `Supervisor: the call ${args.service}:${args.plugin}/${args.intf ?? ""}.${args.method} from ${callerOrigin} has not finished after 30 s; later calls from this tab wait for it.`,
+                    ),
+                30_000,
+            );
+            try {
+                await this.lockedEntry(callerOrigin, id, args);
+            } finally {
+                window.clearTimeout(slow);
+            }
+        };
+        const next = this.entryQueue.then(run, run);
+        this.entryQueue = next.catch(() => undefined);
+        return next;
     }
 
     private async lockedEntry(
@@ -506,24 +519,31 @@ export class Supervisor implements AppInterface {
 
             await this.plugins.instantiateAll();
 
-            this.context = this.getCallContext();
+            // The origin-wide lock covers the transaction context and
+            // nothing else. Everything inside is synchronous, so the lock
+            // cannot be held across a wait: a tab whose plugins never finish
+            // loading (above) never takes it, and cannot stop another tab.
+            const result = await withTransactionLock(async () => {
+                this.context = this.getCallContext();
 
-            // Starts the tx context.
-            this.supervisorCall(
-                getCallArgs("transact", "admin", "admin", "start-tx", []),
-            );
+                // Starts the tx context.
+                this.supervisorCall(
+                    getCallArgs("transact", "admin", "admin", "start-tx", []),
+                );
 
-            // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
-            //   preloaded.
-            const result = this.call(args);
+                // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
+                //   preloaded.
+                const result = this.call(args);
 
-            // Closes the current tx context. If actions were added, tx is submitted.
-            const txResult = this.supervisorCall(
-                getCallArgs("transact", "admin", "admin", "finish-tx", []),
-            );
-            if (txResult !== null && txResult !== undefined) {
-                console.warn(txResult);
-            }
+                // Closes the current tx context. If actions were added, tx is submitted.
+                const txResult = this.supervisorCall(
+                    getCallArgs("transact", "admin", "admin", "finish-tx", []),
+                );
+                if (txResult !== null && txResult !== undefined) {
+                    console.warn(txResult);
+                }
+                return result;
+            });
 
             // Send plugin result to parent window
             this.replyToParent(id, result);
