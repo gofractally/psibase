@@ -940,6 +940,42 @@
                     </p>
                 </div>
 
+                <!-- Fallback view: a passkey that gives no secret, and its recovery key -->
+                <div id="view-fallback" class="si-view" hidden>
+                    <h1 id="fb-title">Save your recovery key</h1>
+                    <p class="si-lede" id="fb-lede"></p>
+                    <div id="fb-keep" class="si-stack" hidden>
+                        <pre class="si-code si-key" id="fb-key"></pre>
+                        <button class="si-btn si-ghost" id="fb-copy" type="button">Copy the recovery key</button>
+                        <p class="si-hint">
+                            This is a recovery secret, not an account's signing key. It is weaker than a
+                            passkey that derives its own secret: use a device or passkey provider that
+                            supports that if you can.
+                        </p>
+                        <button class="si-btn si-primary" id="fb-kept" type="button">I've saved it</button>
+                    </div>
+                    <div id="fb-ask" hidden>
+                        <form id="fb-form" autocomplete="on">
+                            <input type="text" name="username" autocomplete="username" value="recovery key" hidden />
+                            <div class="si-field">
+                                <input
+                                    id="fb-input"
+                                    name="password"
+                                    type="password"
+                                    autocomplete="current-password"
+                                    spellcheck="false"
+                                    placeholder="K… or L…"
+                                />
+                            </div>
+                            <p class="si-hint si-form-hint"></p>
+                            <button class="si-btn si-primary" type="submit">Continue</button>
+                        </form>
+                        <p class="si-below">
+                            <button class="si-link" id="fb-cancel" type="button">Cancel</button>
+                        </p>
+                    </div>
+                </div>
+
                 <!-- Account view: a guest becomes a named account -->
                 <div id="view-account" class="si-view" hidden>
                     <ol class="si-steps" aria-hidden="true">

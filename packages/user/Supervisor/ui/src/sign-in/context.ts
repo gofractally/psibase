@@ -3,7 +3,7 @@ import { type GuestSession } from "../guest-session";
 import { type Network } from "./device";
 import { type Unlocked } from "./passkey";
 
-export type View = "welcome" | "pick" | "account" | "manage" | "working" | "done" | "unsupported";
+export type View = "welcome" | "pick" | "fallback" | "account" | "manage" | "working" | "done" | "unsupported";
 
 export interface PageContext {
     session: GuestSession;

@@ -40,6 +40,7 @@ import {
     canLookUpSilently,
     createPasskey,
     fetchChainId,
+    onPasskeyWithoutSecret,
     discardPasskey,
     fromB64Url,
     unlockWith,
@@ -101,7 +102,7 @@ const go: PageContext["go"] = (next, extra = {}) => {
 
 // ------------------------------------------------------------------ views
 
-const views: View[] = ["welcome", "pick", "account", "manage", "working", "done", "unsupported"];
+const views: View[] = ["welcome", "pick", "fallback", "account", "manage", "working", "done", "unsupported"];
 
 const show = (view: View) => {
     for (const v of views) $(`view-${v}`).hidden = v !== view;
@@ -538,6 +539,64 @@ const obtainPasskey = async (mode: Mode): Promise<PrfResult> => {
         throw e;
     }
 };
+
+// ------------------------------------------ passkeys that give no secret
+//
+// Some passkey providers sign but derive no secret (fallback.ts). The page
+// then keeps a recovery key in the password manager and asks for it at each
+// sign-in. These are the two screens for that.
+
+const fallbackShow = (mode: "keep" | "ask") => {
+    $("fb-keep").hidden = mode !== "keep";
+    $("fb-ask").hidden = mode !== "ask";
+    $("fb-title").textContent =
+        mode === "keep" ? "Save your recovery key" : "Enter your recovery key";
+    $("fb-lede").textContent =
+        mode === "keep"
+            ? "Your passkey provider can't derive a secret for this network, so your keys are made from the passkey together with this recovery key. Keep it in your password manager: you need both to sign in. Anyone who has it and can use your passkey controls your accounts."
+            : "This passkey works together with the recovery key you saved when you first signed in here. It starts with K or L.";
+    show("fallback");
+};
+
+onPasskeyWithoutSecret(async (evidence) => {
+    const { secretWithoutPrf } = await import("./fallback");
+    return secretWithoutPrf(evidence, {
+        keep: ({ wif }) =>
+            new Promise<void>((resolve) => {
+                $("fb-key").textContent = wif;
+                const kept = $<HTMLButtonElement>("fb-kept");
+                const copy = $<HTMLButtonElement>("fb-copy");
+                copy.textContent = "Copy the recovery key";
+                copy.onclick = () =>
+                    void navigator.clipboard.writeText(wif).then(
+                        () => (copy.textContent = "Copied"),
+                        () => (copy.textContent = "Could not copy"),
+                    );
+                kept.onclick = () => {
+                    $("fb-key").textContent = "";
+                    working("Signing you in", "Deriving your keys on this device.");
+                    resolve();
+                };
+                fallbackShow("keep");
+            }),
+        ask: () =>
+            new Promise<string>((resolve, reject) => {
+                const form = $<HTMLFormElement>("fb-form");
+                const input = $<HTMLInputElement>("fb-input");
+                input.value = "";
+                form.onsubmit = (e) => {
+                    e.preventDefault();
+                    const text = input.value;
+                    input.value = "";
+                    working("Signing you in", "Deriving your keys on this device.");
+                    resolve(text);
+                };
+                $("fb-cancel").onclick = () => reject(new Cancelled());
+                fallbackShow("ask");
+                input.focus();
+            }),
+    });
+});
 
 // ------------------------------------------------------- picking a name
 

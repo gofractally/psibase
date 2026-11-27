@@ -11,7 +11,16 @@ import {
     rootFrom,
 } from "./account-keys";
 
+import type { Assertion, NoPrfEvidence } from "./fallback";
+
 export class Unsupported extends Error {}
+
+// What to do with a passkey that signs but gives no secret (no PRF). The
+// page installs this; without it such a passkey is refused.
+let noPrf: ((evidence: NoPrfEvidence) => Promise<Uint8Array>) | undefined;
+export const onPasskeyWithoutSecret = (handler: typeof noPrf) => {
+    noPrf = handler;
+};
 export class Cancelled extends Error {}
 
 type ExtensionResults = {
@@ -131,19 +140,51 @@ export const readPasskey = async (
     if (!credential) throw new Cancelled();
     const ext = credential.getClientExtensionResults() as ExtensionResults;
     const first = ext.prf?.results?.first;
-    if (!first) {
+    const response = credential.response as AuthenticatorAssertionResponse;
+    let secret: Uint8Array;
+    if (first) {
+        secret = new Uint8Array(first);
+    } else if (noPrf) {
+        const id = new Uint8Array(credential.rawId);
+        secret = await noPrf({
+            credentialId: id,
+            assertion: assertionOf(response),
+            again: () => signOnce(id),
+        });
+    } else {
         throw new Unsupported(
             "That passkey can't produce the secret this network derives your keys from.",
         );
     }
-    const handle = (credential.response as AuthenticatorAssertionResponse).userHandle;
+    const handle = response.userHandle;
     return {
         credentialId: new Uint8Array(credential.rawId),
-        secret: new Uint8Array(first),
+        secret,
         userId: handle && handle.byteLength ? new Uint8Array(handle) : undefined,
         notes: writing ? undefined : decodeNotes(ext.largeBlob?.blob),
         notesWritten: writing ? ext.largeBlob?.written === true : undefined,
     };
+};
+
+const assertionOf = (r: AuthenticatorAssertionResponse): Assertion => ({
+    authenticatorData: new Uint8Array(r.authenticatorData),
+    clientDataJSON: new Uint8Array(r.clientDataJSON),
+    signature: new Uint8Array(r.signature),
+});
+
+/** One more signature from a known passkey, with nothing asked of it. */
+const signOnce = async (credentialId: Uint8Array): Promise<Assertion> => {
+    const credential = (await navigator.credentials
+        .get({
+            publicKey: {
+                challenge: randomBytes(32),
+                userVerification: "required",
+                allowCredentials: [{ type: "public-key", id: credentialId }],
+            } as PublicKeyCredentialRequestOptions,
+        })
+        .catch(asCancelled)) as PublicKeyCredential | null;
+    if (!credential) throw new Cancelled();
+    return assertionOf(credential.response as AuthenticatorAssertionResponse);
 };
 
 /** How a passkey is shown in the password manager. */
@@ -193,9 +234,23 @@ export const createPasskey = async (
     const first = ext.prf?.results?.first;
     if (first) return { credentialId, secret: new Uint8Array(first), userId };
     if (ext.prf?.enabled === false || !ext.prf) {
-        throw new Unsupported(
-            "This device made a passkey, but it can't produce the secret this network derives your keys from.",
-        );
+        if (!noPrf) {
+            throw new Unsupported(
+                "This device made a passkey, but it can't produce the secret this network derives your keys from.",
+            );
+        }
+        const made = credential.response as AuthenticatorAttestationResponse;
+        const spki = made.getPublicKey?.();
+        const secret = await noPrf({
+            credentialId,
+            registration: {
+                publicKey: spki ? new Uint8Array(spki) : undefined,
+                algorithm: made.getPublicKeyAlgorithm?.(),
+                label: label.name,
+            },
+            again: () => signOnce(credentialId),
+        });
+        return { credentialId, secret, userId };
     }
     // Some devices only release the secret when the passkey is used, not when
     // it is created. That takes one more confirmation.
