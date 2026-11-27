@@ -15,6 +15,11 @@
 #include <tuple>
 #include <vector>
 
+namespace psibase
+{
+   struct UsageRecord;
+}
+
 namespace psibase::net
 {
    struct connection_base
@@ -40,6 +45,10 @@ namespace psibase::net
       virtual void close(close_code)                               = 0;
       // Information for display
       virtual std::string endpoint() const { return ""; }
+      // Usage metering (gofractally/psibase#2270): the record that what
+      // arrives on this connection is charged to: its owner. Null if the
+      // connection is not metered.
+      virtual std::shared_ptr<UsageRecord> usageRecord() const { return nullptr; }
       //
       loggers::common_logger logger;
       bool                   closed = false;
@@ -140,6 +149,12 @@ namespace psibase::net
             return true;
          }
          return false;
+      }
+
+      std::shared_ptr<UsageRecord> usage(peer_id id) const
+      {
+         auto iter = _connections.find(id);
+         return iter != _connections.end() ? iter->second->usageRecord() : nullptr;
       }
 
       loggers::common_logger& logger(peer_id id)

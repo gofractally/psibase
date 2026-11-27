@@ -1,6 +1,10 @@
 #pragma once
 
 #include <chrono>
+#include <functional>
+#include <optional>
+#include <stdexcept>
+#include <string>
 #include <psibase/Prover.hpp>
 #include <psibase/SystemContext.hpp>
 #include <psibase/log.hpp>
@@ -8,12 +12,30 @@
 
 namespace psibase
 {
+   struct UsageRecord;
+   // A block producer is not ready to apply a transaction from its queue in
+   // the block it has open: the transaction needs service code this node has
+   // not compiled (WasmCache::mustDefer). Nothing about the transaction: it
+   // has no trace and no result, nobody is told it failed, and it is offered
+   // again in a later block.
+   struct TransactionDeferred : std::runtime_error
+   {
+      using std::runtime_error::runtime_error;
+   };
+
    struct BlockContext
    {
       SystemContext&    systemContext;
       Database          db;
       WriterPtr         writer;
       Database::Session session;
+      // Usage metering (gofractally/psibase#2270): the record that the work
+      // done in this context is charged to, and that is remembered as the
+      // origin of every run posted from it. Set by whoever creates the
+      // context for a request, a socket message or a posted run. Always
+      // null in a context that produces or applies a block: nothing on the
+      // consensus path reads or writes it.
+      std::shared_ptr<UsageRecord> usage;
       Block             current           = {};
       bool              isProducing       = false;
       bool              isReadOnly        = false;
@@ -45,6 +67,22 @@ namespace psibase
       // Initialized on first use
       std::optional<Checksum256> verifyContextId;
 
+      // Set by a block producer around a transaction it took from its queue
+      // (ForkDb::pushTransaction): the transaction is not to compile service
+      // code or wait for a compile, at the write of a code row or at the
+      // first execution of a service. If it would, exec throws
+      // TransactionDeferred: at once where the code has to be executed, at
+      // the end of the transaction where it was only stored (so that one
+      // deferral starts the compile of everything the transaction stores).
+      // Not set for boot blocks or by the tester, which
+      // have no later block to defer to and no speculative run to have
+      // compiled anything: they compile where they need the module.
+      bool deferUncompiledCode = false;
+      // Why the transaction being executed was deferred, set where that is
+      // decided: exec tells a deferral from a failure by this and not by
+      // the exception, which has passed through the engine by then.
+      std::optional<std::string> deferral;
+
       loggers::common_logger trxLogger;
 
       BlockContext(SystemContext&                  systemContext,
@@ -72,6 +110,9 @@ namespace psibase
       std::vector<Checksum256>                 callPreverify(const SignedTransaction& trx);
       void callRun(psio::pssz_view<RunRow> row,
                    std::optional<std::chrono::microseconds> proofTimeout = std::nullopt);
+      void reportSpeculativeCompile(std::uint64_t run, std::chrono::nanoseconds time);
+      // Tests only: what reportSpeculativeCompile reported.
+      std::function<void(std::uint64_t, std::chrono::nanoseconds)> speculativeCompileHook;
       void                                     callTimer(psio::pssz_view<TimerRow> row);
       Checksum256                              makeEventMerkleRoot();
       Checksum256                              makeTransactionMerkle();

@@ -111,6 +111,40 @@ int main(int argc, char** argv)
    };
    try
    {
+      test("more threads read one database than the engine has session slots",
+           [&]
+           {
+              // gofractally/psibase#2273: the engine has 64 session slots per
+              // database and ends the process when asked for a 65th. Every
+              // thread that reads counts, also one that has since exited.
+              database db(base / "many-readers", config, open_mode::create_new);
+              shared_root top;
+              {
+                 auto w = db.start_write_session();
+                 top    = w->get_top_root();
+                 put(*w, top, "key", "value");
+                 w->set_top_root(top);
+              }
+              auto read = [&]
+              {
+                 auto r = db.start_read_session();
+                 require(get(*r, top, "key") == "value", "a reader missed the value");
+              };
+              // 100 threads, one after another: each leaves its reader behind.
+              for (unsigned i = 0; i < 100; ++i)
+                 std::thread(read).join();
+              // 100 threads at once, each reading repeatedly.
+              std::vector<std::thread> threads;
+              for (unsigned i = 0; i < 100; ++i)
+                 threads.emplace_back(
+                     [&]
+                     {
+                        for (unsigned n = 0; n < 50; ++n)
+                           read();
+                     });
+              for (auto& thread : threads)
+                 thread.join();
+           });
       test("temporary stores never adopt a stale same-process name",
            [&]
            {
@@ -215,25 +249,6 @@ int main(int argc, char** argv)
               require(w->get_greater_equal(r, key, &key, &value) && key == std::vector<char>{'a'},
                       "aliased key buffers");
               require(w->is_empty(r, span("a"), span("a")), "empty half-open range");
-           });
-      test("optimistic range comparison and splice",
-           [&]
-           {
-              database    db(base / "occ", config, open_mode::create_new);
-              auto        w = db.start_write_session();
-              shared_root original;
-              put(*w, original, "a", "1");
-              put(*w, original, "z", "1");
-              auto current = original, updated = original;
-              put(*w, current, "z", "2");
-              put(*w, updated, "a", "2");
-              require(w->is_equal_weak(original, current, span("a"), span("b")),
-                      "unrelated write conflicts");
-              require(!w->is_equal_weak(original, current, span("z"), {}), "overlap not detected");
-              w->splice(current, updated, span("a"), span("b"));
-              require(get(*w, current, "a") == "2" && get(*w, current, "z") == "2",
-                      "splice overwrote unrelated keys");
-              require(get(*w, original, "a") == "1", "splice changed owned base");
            });
       test("large opaque value and exception cleanup",
            [&]
@@ -354,14 +369,15 @@ int main(int argc, char** argv)
                  put(*w, small, "key" + std::to_string(i), "value" + std::to_string(i));
               for (unsigned i = 0; i < 20000; ++i)
                  put(*w, large, "bulk" + std::to_string(i), std::string(64, 'x'));
-              // One long writer operation: it holds the single-writer gate throughout.
+              // A long run of writer operations.
               std::atomic<bool> writing{false}, written{false};
               std::thread       writer(
                   [&]
                   {
-                     shared_root copy;
+                     shared_root copy = large;
                      writing = true;
-                     w->splice(copy, large, {}, {});
+                     for (unsigned i = 0; i < 20000; ++i)
+                        put(*w, copy, "more" + std::to_string(i), std::string(64, 'y'));
                      written = true;
                   });
               while (!writing)

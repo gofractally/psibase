@@ -6,7 +6,6 @@
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/nativeTables.hpp>
 #include <services/local/XAdmin.hpp>
-#include <services/local/XUsage.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/PrivateKeyInfo.hpp>
@@ -133,35 +132,6 @@ namespace
       std::string error;
       PSIO_REFLECT(ErrorBody, error)
    };
-   struct UsageLine
-   {
-      std::string                  identity;
-      UsageKind                    kind;
-      std::uint64_t                requests;
-      std::uint64_t                elapsed_us;
-      std::uint64_t                request_bytes;
-      std::uint64_t                response_bytes;
-      std::int64_t                 first_seen;
-      std::int64_t                 last_seen;
-      std::optional<AccountNumber> carried_to;
-      PSIO_REFLECT(UsageLine,
-                   identity,
-                   kind,
-                   requests,
-                   elapsed_us,
-                   request_bytes,
-                   response_bytes,
-                   first_seen,
-                   last_seen,
-                   carried_to)
-   };
-   struct UsagePage
-   {
-      std::vector<UsageLine> rows;
-      bool                  more;
-      PSIO_REFLECT(UsagePage, rows, more)
-   };
-
    // A body that is already JSON text
    struct RawJson
    {
@@ -397,26 +367,6 @@ TEST_CASE("x-signup: an account is created with an owner key and an active key")
    CHECK(f.status(guest).accounts == std::vector{name});
    f.act(as.freeze(), owner);
    CHECK(f.status(guest).accounts == std::vector{name});
-
-   // What the guest used of the node became the account's, once.
-   auto usage = f.t.http(XUsage::service).get<UsagePage>("/all");
-   const UsageLine* guestRow   = nullptr;
-   const UsageLine* accountRow = nullptr;
-   for (auto& row : usage.rows)
-   {
-      if (row.identity == guest.id && row.kind == UsageKind::guest)
-         guestRow = &row;
-      if (row.identity == name.str() && row.kind == UsageKind::account)
-         accountRow = &row;
-   }
-   REQUIRE(guestRow);
-   CHECK(guestRow->requests == 2);
-   CHECK(guestRow->carried_to == name);
-   REQUIRE(accountRow);
-   CHECK(accountRow->requests == 2);
-   CHECK(accountRow->request_bytes == guestRow->request_bytes);
-   CHECK(accountRow->response_bytes == guestRow->response_bytes);
-   CHECK(accountRow->first_seen == guestRow->first_seen);
 }
 
 TEST_CASE("x-signup: a creation that is taken by another owner key is not this guest's")

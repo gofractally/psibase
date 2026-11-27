@@ -4,8 +4,4 @@ endfunction(add)
 
 conditional_add()
 
-add_subdirectory(test)
-
 install(DIRECTORY include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS on)

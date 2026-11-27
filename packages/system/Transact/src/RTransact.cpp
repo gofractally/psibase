@@ -109,13 +109,17 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
       {
          flushTransactions(reverify, invalidated, verifyId);
       }
-      nextSequence = std::max(nextSequence, invalidated.endSequence);
-      auto table   = Subjective{}.open<PendingTransactionTable>();
-      auto index   = table.getIndex<1>();
-      for (auto iter = index.lower_bound(nextSequence), end = index.end(); iter != end; ++iter)
+      // Every pass of the body starts from the sequence that was read
+      // before it and from no result: a second pass must not start after
+      // the transaction the first one found.
+      result.reset();
+      auto sequence = std::max(nextSequence, invalidated.endSequence);
+      auto table    = Subjective{}.open<PendingTransactionTable>();
+      auto index    = table.getIndex<1>();
+      for (auto iter = index.lower_bound(sequence), end = index.end(); iter != end; ++iter)
       {
-         auto item    = *iter;
-         nextSequence = item.sequence + 1;
+         auto item = *iter;
+         sequence  = item.sequence + 1;
          if (!included.get(std::tuple(item.expiration, item.id)))
          {
             auto trxData = Subjective{}.open<TransactionDataTable>();
@@ -125,7 +129,7 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
             break;
          }
       }
-      unapplied.put({nextSequence});
+      unapplied.put({sequence});
       if (!result)
       {
          to<XTransact>().removeCallback(TransactionCallbackType::nextTransaction,
@@ -139,17 +143,16 @@ std::optional<std::vector<std::optional<RunToken>>> RTransact::preverify(
     psio::pssz_view<SignedTransaction> trx)
 {
    auto id = sha256(trx.transaction().bytes().data(), trx.transaction().bytes().size());
-   PSIBASE_SUBJECTIVE_TX
+   // A lookup of one row, once for every transaction that goes into a
+   // block: no section, so no lock (gofractally/psibase#2276).
+   if (auto pending = open<PendingTransactionTable>().get(id))
    {
-      if (auto pending = open<PendingTransactionTable>().get(id))
+      std::vector<std::optional<RunToken>> result;
+      for (auto& token : pending->verifies)
       {
-         std::vector<std::optional<RunToken>> result;
-         for (auto& token : pending->verifies)
-         {
-            result.push_back(std::move(token));
-         }
-         return result;
+         result.push_back(std::move(token));
       }
+      return result;
    }
    return {};
 }
@@ -274,7 +277,7 @@ namespace
    // x-http, which each hold the text three times in their 32 MiB.
    // Measured, a trace of 4.55 MiB of many small actions is answered and
    // one of 4.65 MiB is not; with one large argument, 5.21 and 5.31 MiB
-   // (doc/pssz-conversion.md 7.12).
+   // (doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md 7.12).
    constexpr std::size_t maxFullTraceSize = 13 * 1024 * 1024 / 4;
 
    bool isFullSize(psio::pssz_view<TransactionTrace> trace)
@@ -401,6 +404,11 @@ namespace
 
          PSIBASE_SUBJECTIVE_TX
          {
+            // The body may run again (a commit that cannot apply a socket
+            // change returns false): each pass starts with nothing claimed,
+            // or a socket would be listed, and answered, once per pass.
+            json_clients.clear();
+            bin_clients.clear();
             if (auto row_opt = clients.get(id))
             {
                auto& row = *row_opt;
@@ -616,15 +624,18 @@ namespace
          }
          else
          {
+            // The body only takes the row; what depends on it (the count)
+            // is done once, after the commit.
             PSIBASE_SUBJECTIVE_TX
             {
-               if (auto tx = failedTxs.getView(id))
-               {
-                  traceView.emplace((*tx)->trace());
-                  failedTxs.remove(**tx);
-                  failedStorage = std::move(tx);
-                  ++stats.failed;
-               }
+               failedStorage = failedTxs.getView(id);
+               if (failedStorage)
+                  failedTxs.remove(**failedStorage);
+            }
+            if (failedStorage)
+            {
+               traceView.emplace((*failedStorage)->trace());
+               ++stats.failed;
             }
          }
 
@@ -761,23 +772,18 @@ void RTransact::onTrx(const Checksum256& id, psio::pssz_view<TransactionTrace> t
 
    bool waitForApplied = false;
    bool waitForFinal   = false;
-   auto row            = std::optional<TraceClientRow>{};
-   PSIBASE_SUBJECTIVE_TX
-   {
-      row = clients.get(id);
-   }
-
+   // Lookups (this row, and the size of the transaction below) take no
+   // section: this runs on the producer's thread for every transaction and
+   // a section would wait for every writer.
+   std::optional<TraceClientRow> row = clients.get(id);
    if (!isResMonitoring())
    {
       auto          table   = open<BlockSizeTable>();
       auto          sizeRow = table.get({}).value_or(BlockSizeRecord{0});
       std::uint32_t txSize  = 0;
-      PSIBASE_SUBJECTIVE_TX
+      if (auto tx = open<TransactionDataTable>().getView(id))
       {
-         if (auto tx = open<TransactionDataTable>().getView(id))
-         {
-            txSize = tx->size();
-         }
+         txSize = tx->size();
       }
       sizeRow.currentBlockSize += txSize;
       table.put(sizeRow);
@@ -800,6 +806,15 @@ void RTransact::onTrx(const Checksum256& id, psio::pssz_view<TransactionTrace> t
          else
             table.put(
                 TxSuccessRecord{.id = id, .blockNum = blockNum, .trace = reducedTrace(trace)});
+      }
+      else if (Transact::Tables{Transact::service}.open<IncludedTrxTable>().get(
+                   std::tuple(row->expiration, id)))
+      {
+         // The transaction is in the chain: this was a second attempt to
+         // apply it (a producer offering a transaction it had kept, after
+         // another producer included it), and it failed as a duplicate.
+         // That is not the transaction failing, and nothing is reported.
+         return;
       }
       else
       {
@@ -870,31 +885,28 @@ void RTransact::onBlock()
 
    const auto nSuccessful = txids.size();
 
-   PSIBASE_SUBJECTIVE_TX
+   // Get all expired transactions. Reading only, so no section; the rows
+   // need not be read as of one moment, each id is looked up again below.
+   for (auto pendingTx : pendingTxTable.getIndex<3>())
    {
-      // Get all expired transactions
-      for (auto pendingTx : pendingTxTable.getIndex<3>())
-      {
-         if (pendingTx.expiration > finalized->time)
-            break;
+      if (pendingTx.expiration > finalized->time)
+         break;
 
-         if (!successfulTxTable.get(pendingTx.id))
-            txids.push_back(pendingTx.id);
-      }
+      if (!successfulTxTable.get(pendingTx.id))
+         txids.push_back(pendingTx.id);
    }
-
    // Ensure all txids have a client waiting for a reply
    std::vector<psibase::Checksum256> needsReply;
    std::size_t                       i = 0;
    for (auto id : txids)
    {
+      // Set by every pass of the body; the list is appended to once, after
+      // the commit.
+      bool hasClient = false;
       PSIBASE_SUBJECTIVE_TX
       {
-         if (auto client = clientTable.get(id))
-         {
-            needsReply.push_back(id);
-         }
-         else
+         hasClient = clientTable.get(id).has_value();
+         if (!hasClient)
          {  // Stop tracking a finalized tx if no client is waiting for a reply.
             if (auto pending = pendingTxTable.get(id))
             {
@@ -914,6 +926,8 @@ void RTransact::onBlock()
             statsTable.put(stats);
          }
       }
+      if (hasClient)
+         needsReply.push_back(id);
       ++i;
    }
 
@@ -946,7 +960,7 @@ void RTransact::onVerify(std::uint64_t                      id,
             if (auto* vid = std::get_if<std::uint64_t>(&v))
             {
                if (*vid == id)
-                  v = std::move(token.value());
+                  v = token.value();  // a copy: the body may run again
                else
                   ready = false;
             }
@@ -958,15 +972,17 @@ void RTransact::onVerify(std::uint64_t                      id,
          tx->verified |= ready;
          if (!trace.error() && headVerifyId == tx->verifyId && tx->verifyId == runVerifyId)
          {
-            if (ready)
+            if (ready && !tx->speculative)
             {
-               if (!prevVerified && !tx->speculative)
+               if (!prevVerified)
                   broadcastTxId = tx->id;
-               queueTransaction(tx->id, tx->expiration, std::move(tx->verifies), tx->speculative);
+               queueTransaction(tx->id, tx->expiration, std::move(tx->verifies), std::nullopt);
                unverifiedTransactions.remove(*tx);
             }
             else
             {
+               // Signatures still being checked, or checked and the
+               // speculative run not finished: onSpecTrx queues it.
                unverifiedTransactions.put(*tx);
             }
          }
@@ -1029,9 +1045,35 @@ void RTransact::onSpecTrx(std::uint64_t id, psio::pssz_view<TransactionTrace> tr
                check(*trx->speculative == id,
                      "Wrong runid for speculative transaction in unverified");
                trx->speculative.reset();
-               unverified.put(*trx);
                if (trx->verified)
                   broadcastTxId = trx->id;
+               // The run has passed. If every signature is checked too the
+               // transaction can now be included; otherwise onVerify
+               // queues it.
+               const bool ready = std::ranges::none_of(
+                   trx->verifies,
+                   [](const auto& v) { return std::holds_alternative<std::uint64_t>(v); });
+               if (!ready)
+                  unverified.put(*trx);
+               else if (trx->verifies.empty() ||
+                        trx->verifyId == open<ReverifySignaturesTable>()
+                                             .get({})
+                                             .value_or(ReverifySignaturesRecord{})
+                                             .verifyId)
+               {
+                  queueTransaction(trx->id, trx->expiration, std::move(trx->verifies),
+                                   std::nullopt);
+                  unverified.remove(*trx);
+               }
+               else
+               {
+                  // The verify services changed while the run was in
+                  // flight: the signatures are checked again, as onVerify
+                  // does.
+                  auto data = open<TransactionDataTable>().getView(trx->id);
+                  check(data.has_value(), "Missing transaction data");
+                  scheduleVerify(trx->id, (*data)->trx(), trx->verified, std::nullopt);
+               }
             }
             else if (auto trx = pending.get(row->txid))
             {
@@ -1090,7 +1132,7 @@ namespace
    // twice, the token of that run where it carries the action (the tester),
    // the stored row, and the call of sendProds, which is one buffer.
    // Measured, 6 MiB is handed on and 6.5 MiB is not
-   // (doc/pssz-conversion.md 7.11).
+   // (doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md 7.11).
    constexpr std::size_t maxPushedTransactionSize = 5 * 1024 * 1024;
 
    std::uint64_t scheduleSpeculative(const Checksum256& id, psio::pssz_view<SignedTransaction> trx)
@@ -1124,10 +1166,20 @@ namespace
          remaining.push_back(runid);
          pendingVerifies.put({.txid = id, .runid = runid});
       }
-      if (claims.empty())
+      // A transaction can be included once its signatures are checked AND
+      // its speculative run, if it has one, has passed: until both, it
+      // waits in the unverified table and next() cannot return it. A
+      // transaction whose run fails is dropped and reported as failed
+      // (onSpecTrx), also when it failed only because it depends on a
+      // transaction that is not in a block yet. The project owner's rule
+      // (gofractally/psibase#2256): "the speculative run must pass... dependent
+      // transactions cannot pre-validate unless separated by a block
+      // boundary... it rate limits the user to 1 per second dependent... or
+      // forces them to group it into one transaction."
+      if (claims.empty() && !speculative)
       {
          queueTransaction(id, trx.transaction()->tapos().expiration(), std::move(remaining),
-                          speculative);
+                          std::nullopt);
       }
       else
       {
@@ -1135,7 +1187,8 @@ namespace
              .id          = id,
              .expiration  = trx.transaction()->tapos().expiration(),
              .verifies    = std::move(remaining),
-             .verified    = verified,
+             // Nothing to check: only the speculative run is awaited.
+             .verified    = verified || claims.empty(),
              .speculative = speculative,
          };
          unverifiedTransactions.put(row);
@@ -1199,11 +1252,7 @@ namespace
    void forwardStoredTransaction(const Checksum256& id)
    {
       auto table = RTransact{}.open<TransactionDataTable>();
-      decltype(table.getView(id)) data;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         data = table.getView(id);
-      }
+      auto data  = table.getView(id);  // a lookup: no section
       if (data)
          forwardTransaction((*data)->trx());
    }
@@ -1309,18 +1358,24 @@ namespace
 
    std::vector<char> getJWTKey()
    {
-      std::optional<JWTKeyRecord> row;
-      PSIBASE_SUBJECTIVE_TX
+      // Every request reads the key (getUser); only the first one on a node
+      // makes it. The read takes no section and so no lock; making the key
+      // does, and looks again inside it, since another thread may have
+      // made one meanwhile.
+      auto table = Subjective{}.open<JWTKeyTable>();
+      auto row   = table.getIndex<0>().get({});
+      if (!row)
       {
-         auto table = Subjective{}.open<JWTKeyTable>();
-         auto index = table.getIndex<0>();
-         row        = index.get({});
-         if (!row)
+         PSIBASE_SUBJECTIVE_TX
          {
-            char buf[16];
-            raw::getRandom(buf, sizeof(buf));
-            row = JWTKeyRecord{std::vector(buf, buf + sizeof(buf))};
-            table.put(*row);
+            row = table.getIndex<0>().get({});
+            if (!row)
+            {
+               char buf[16];
+               raw::getRandom(buf, sizeof(buf));
+               row = JWTKeyRecord{std::vector(buf, buf + sizeof(buf))};
+               table.put(*row);
+            }
          }
       }
       return std::move(row->key);
@@ -1766,11 +1821,7 @@ std::optional<HttpReply> RTransact::serveSys(psio::pssz_view<psibase::HttpReques
           .contentType = "application/json",
           .headers     = allowCors(request, AccountNumber{"x-admin"}),
       };
-      TxStatsRecord stats;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         stats = open<TxStatsTable>().get({}).value_or(TxStatsRecord{});
-      }
+      TxStatsRecord stats = open<TxStatsTable>().get({}).value_or(TxStatsRecord{});
       psio::to_ijson(stats, reply.body);
       return reply;
    }

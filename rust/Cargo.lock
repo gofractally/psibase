@@ -3245,6 +3245,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "psibase-load"
+version = "0.29.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "psibase",
+ "psibase-rust-workspace-hack",
+ "psio",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "psibase-macros-derive"
 version = "0.29.0"
 dependencies = [

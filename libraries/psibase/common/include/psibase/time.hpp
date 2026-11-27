@@ -17,7 +17,8 @@ namespace psibase
 
    // Monotonic (steady_clock) time points have no epoch that another node, or
    // another run of this node, shares. PSIO has no form for them: psio/time.hpp
-   // accepts system_clock time points only (see doc/pssz-conversion.md).
+   // accepts system_clock time points only (see
+   // doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md).
    using MonotonicTimePointSec  = std::chrono::time_point<std::chrono::steady_clock, Seconds>;
    using MonotonicTimePointUSec = std::chrono::time_point<std::chrono::steady_clock, MicroSeconds>;
 }  // namespace psibase

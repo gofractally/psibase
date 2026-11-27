@@ -29,13 +29,20 @@ import {
 import { pushAsOwner } from "./owner-tx";
 import { type Unlocked } from "./passkey";
 
+// What x-usage reports for the caller (packages/local/XUsage). The node
+// measures by connection identity: the account a login token names,
+// otherwise the address.
 interface Usage {
+    enabled: boolean;
     identity: string;
-    kind: string;
-    requests: number;
-    elapsed_us: number;
-    request_bytes: number;
-    response_bytes: number;
+    usage?: {
+        total: {
+            requests: number | string;
+            bytesIn: number | string;
+            bytesOut: number | string;
+            requestNs: number | string;
+        };
+    } | null;
 }
 
 const duration = (seconds: number) =>
@@ -531,13 +538,17 @@ export const runManageStep = async (ctx: PageContext) => {
             });
             if (!res.ok) return undefined;
             const u = (await res.json()) as Usage;
+            if (!u.enabled) return undefined;
+            const t = u.usage?.total;
+            const n = (v: number | string | undefined) => Number(v ?? 0);
             return el(
                 "div",
                 { class: "si-panel" },
                 el("p", { class: "si-label", text: "What you have used on this node" }),
-                row("Requests", u.requests.toLocaleString()),
-                row("Time", `${(u.elapsed_us / 1000).toFixed(1)} ms`),
-                row("Sent / received", `${bytes(u.request_bytes)} / ${bytes(u.response_bytes)}`),
+                row("Counted as", u.identity),
+                row("Requests", n(t?.requests).toLocaleString()),
+                row("Time", `${(n(t?.requestNs) / 1e6).toFixed(1)} ms`),
+                row("Sent / received", `${bytes(n(t?.bytesIn))} / ${bytes(n(t?.bytesOut))}`),
                 el("p", {
                     class: "si-hint",
                     text: "Totals only. Nothing is charged for yet.",

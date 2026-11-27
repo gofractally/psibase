@@ -658,10 +658,18 @@ fn disk_accounting_invariant(chain: psibase::Chain) -> Result<(), psibase::Error
     // Test a few actions that exercise edge-case paths in database writes, namely those
     // cases where a table is written to by both native and a service.
 
-    // The status row is written by native internally during an isVerify service upload
+    // The status row is written by native internally during an isVerify service upload.
+    // The service is never called, but its code is checked when it is stored: the
+    // smallest thing that is admitted is a module that exports the two entry points
+    // every service must have, `start: (i64) -> ()` and `called: (i64, i64) -> ()`,
+    // here with empty bodies.
     chain.deploy_service_with_flags(
         account!("vrfy-svc"),
-        b"verify service placeholder code",
+        b"\0asm\x01\0\0\0\
+          \x01\x0a\x02\x60\x01\x7e\0\x60\x02\x7e\x7e\0\
+          \x03\x03\x02\0\x01\
+          \x07\x12\x02\x05start\0\0\x06called\0\x01\
+          \x0a\x07\x02\x02\0\x0b\x02\0\x0b",
         psibase::CodeRow::IS_VERIFY,
     )?;
     chain.finish_block();

@@ -7,9 +7,7 @@
 #include <services/local/XAdmin.hpp>
 #include <services/local/XDb.hpp>
 #include <services/local/XSites.hpp>
-#include <services/local/XUsage.hpp>
-
-#include <chrono>
+#include <services/system/RTransact.hpp>
 
 using namespace psibase;
 using namespace LocalService;
@@ -88,12 +86,10 @@ namespace
                       std::string_view             rootHost,
                       std::optional<AccountNumber> subdomain = {})
    {
-      std::string              location;
-      std::optional<SocketRow> socketRow;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         socketRow = Native::session(KvMode::read).open<SocketTable>().get(socket);
-      }
+      std::string location;
+      // A read needs no section: outside one it is a read of what was
+      // published last and takes no lock (gofractally/psibase#2276).
+      auto socketRow = Native::session(KvMode::read).open<SocketTable>().get(socket);
       if (auto proto = forwardedProto(req))
          location += *proto + "://";
       else if (hasTls(socketRow.value().info))
@@ -180,6 +176,37 @@ namespace
       auto native = Native::Tables{to<XDb>().open(DbId::native, prefix, mode), mode};
       auto row    = native.open<StatusTable>().get({});
       return row && row->head;
+   }
+
+   // Usage metering (gofractally/psibase#2270): a request with a valid
+   // login token is charged to the account it names, not to the client's
+   // address. Native resolves the address; the token can only be checked
+   // here, by the transaction service that issued it. A request without
+   // credentials pays nothing for this; one with credentials pays one
+   // call. The result is handed to native as a SocketIdentityRow, which
+   // native consumes without storing anything.
+   //
+   // This is done by x-http, the node's own service, and not by
+   // http-server, which resolves the user again for the requests it
+   // routes: http-server is a chain service, the same on every node, and
+   // must not depend on what one node's local services provide.
+   void identifyUser(std::int32_t sock, const HttpRequestRef& req)
+   {
+      if (!req.getHeader("authorization") && req.getCookie("__Host-SESSION").empty())
+         return;
+      if (!chainIsBooted())
+         return;
+      HttpRequest credentials{.host        = req.host,
+                              .method      = req.method,
+                              .target      = req.target,
+                              .contentType = req.contentType,
+                              .headers     = req.headers};
+      if (auto user = to<RTransact>().getUser(std::move(credentials)))
+      {
+         Native::sessionDirect(KvMode::readWrite)
+             .open<SocketIdentityTable>()
+             .put(SocketIdentityRow{sock, *user});
+      }
    }
 }  // namespace
 
@@ -289,12 +316,8 @@ extern "C" [[clang::export_name("close")]] void closeSocket()
    check(psio::validate_pssz<std::tuple<std::int32_t>>(args).ok(), "invalid arguments of close");
    auto [socket] = psio::pssz_view<std::tuple<std::int32_t>>(args);
    // if this is a response to an HTTP request, send it to the owner
-   auto                              requests = XHttp{}.open<ResponseHandlerTable>();
-   std::optional<ResponseHandlerRow> row;
-   PSIBASE_SUBJECTIVE_TX
-   {
-      row = requests.get(socket);
-   }
+   auto requests = XHttp{}.open<ResponseHandlerTable>();
+   auto row      = requests.get(socket);
 
    if (row)
    {
@@ -335,12 +358,8 @@ void XHttp::send(std::int32_t socket, psio::pssz_view<std::vector<char>> data, s
    }
    else
    {
-      auto                              requests = XHttp{}.open<ResponseHandlerTable>();
-      std::optional<ResponseHandlerRow> row;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         row = requests.get(socket);
-      }
+      auto requests = XHttp{}.open<ResponseHandlerTable>();
+      auto row      = requests.get(socket);
       if (!row || row->service != getSender() || row->type != SocketType::websocket)
          abortMessage("Wrong sender");
    }
@@ -353,11 +372,8 @@ std::int32_t XHttp::sendRequest(HttpRequest                   request,
 {
    auto sender    = getSender();
    auto codeTable = Native::subjective(KvMode::read).open<CodeTable>();
-   PSIBASE_SUBJECTIVE_TX
-   {
-      if (!codeTable.get(sender))
-         abortMessage("Only local services can use sendRequest");
-   }
+   if (!codeTable.get(sender))
+      abortMessage("Only local services can use sendRequest");
    auto requests = Temporary{}.open<TempResponseHandlerTable>();
    auto sock     = socketOpen(request, tls, endpoint);
    check(sock >= 0, "Failed to open socket");
@@ -390,11 +406,8 @@ std::int32_t XHttp::websocket(HttpRequest                   request,
    {
       request.headers.push_back({"Sec-WebSocket-Version", "13"});
    }
-   PSIBASE_SUBJECTIVE_TX
-   {
-      if (!codeTable.get(sender))
-         abortMessage("Only local services can use sendRequest");
-   }
+   if (!codeTable.get(sender))
+      abortMessage("Only local services can use sendRequest");
    auto requests = Temporary{}.open<TempResponseHandlerTable>();
    auto sock     = socketOpen(request, tls, endpoint);
    check(sock >= 0, "Failed to open socket");
@@ -463,21 +476,6 @@ void XHttp::asyncClose(std::int32_t socket)
    }
 }
 
-namespace
-{
-   // Whether this node counts usage. x-usage is a local service like this
-   // one, and a node may run without it.
-   bool usageInstalled()
-   {
-      bool result = false;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         result = Native::subjective(KvMode::read).open<CodeTable>().get(XUsage::service).has_value();
-      }
-      return result;
-   }
-}  // namespace
-
 void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
 {
    auto sender = getSender();
@@ -495,10 +493,6 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
    {
       abortMessage("Must set autoClose before sending a response");
    }
-   // A reply of the chain's HTTP service, at once or deferred: its size is
-   // counted for whoever the request was for.
-   if (sender == HttpServer::service && usageInstalled())
-      to<XUsage>().reply(socket, result.body.size());
    check(socketSend(socket, psio::to_pssz(result)) == 0, "socketSend failed");
    PSIBASE_SUBJECTIVE_TX
    {
@@ -656,19 +650,19 @@ bool XHttp::isSecure(int32_t socket)
       return false;
    };
 
-   std::optional<SocketRow> socketRow;
-   PSIBASE_SUBJECTIVE_TX
-   {
-      auto session = Session{receiver, KvMode::read};
-      auto temp    = Temporary{receiver, KvMode::read};
-      if (!ownedBySender(session.open<PendingRequestTable>(), &PendingRequestRow::owner) &&
-          !ownedBySender(temp.open<TempPendingRequestTable>(), &TempPendingRequestRow::owner) &&
-          !ownedBySender(session.open<ResponseHandlerTable>(), &ResponseHandlerRow::service) &&
-          !ownedBySender(temp.open<TempResponseHandlerTable>(), &TempResponseHandlerRow::service))
-         abortMessage(sender.str() + " does not own socket " + std::to_string(socket));
+   // Lookups only, so no section. The rows need not be read as of one
+   // moment: a socket's row in the socket table does not change while the
+   // socket is open, and its place in the four tables is changed only on
+   // behalf of its owner, which is the caller.
+   auto session = Session{receiver, KvMode::read};
+   auto temp    = Temporary{receiver, KvMode::read};
+   if (!ownedBySender(session.open<PendingRequestTable>(), &PendingRequestRow::owner) &&
+       !ownedBySender(temp.open<TempPendingRequestTable>(), &TempPendingRequestRow::owner) &&
+       !ownedBySender(session.open<ResponseHandlerTable>(), &ResponseHandlerRow::service) &&
+       !ownedBySender(temp.open<TempResponseHandlerTable>(), &TempResponseHandlerRow::service))
+      abortMessage(sender.str() + " does not own socket " + std::to_string(socket));
 
-      socketRow = Native::session(KvMode::read).open<SocketTable>().get(socket);
-   }
+   auto socketRow = Native::session(KvMode::read).open<SocketTable>().get(socket);
 
    return hasTls(socketRow.value().info);
 }
@@ -882,17 +876,18 @@ extern "C" [[clang::export_name("serve")]] void serve()
       return;
    }
 
+   identifyUser(sock, req);
+
    if (auto service = XHttp::getService(req.host, rootHost); service != AccountNumber{})
    {
       auto codeTable   = Native::subjective(KvMode::read).open<CodeTable>();
       auto serverTable = XHttp{}.open<RegServTable>();
-      auto code        = std::optional<CodeRow>{};
-      auto server      = std::optional<RegisteredServiceRow>{};
-      PSIBASE_SUBJECTIVE_TX
-      {
-         server = serverTable.get(service);
-         code   = codeTable.get(service);
-      }
+      // Two lookups on every request, without a section (which would
+      // wait for every writer). The rows are written by different
+      // requests (register_server; the installation of a service) and
+      // need not be read as of one moment.
+      std::optional<RegisteredServiceRow> server = serverTable.get(service);
+      std::optional<CodeRow>              code   = codeTable.get(service);
       // Required for bootstrapping
       if (!server && service == XHttp::service)
          server = {service, service};
@@ -917,10 +912,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
          {
             return;
          }
-         PSIBASE_SUBJECTIVE_TX
-         {
-            code = codeTable.get(XSites::service);
-         }
+         code = codeTable.get(XSites::service);
          if (code)
          {
             owned.put({.socket = sock, .owner = XSites::service});
@@ -1030,28 +1022,8 @@ extern "C" [[clang::export_name("serve")]] void serve()
    if (requireIdentity)
       req.headers.push_back({XHttp::gateHeader, "1"});
 
-   // Usage logging (x-usage), if this node has it. The chain's HTTP service
-   // says who the request is for; the time and the sizes are measured here.
-   bool countUsage = usageInstalled();
-   std::erase_if(req.headers,
-                 [](const auto& header) { return header.matches(XHttp::usageHeader); });
-   if (countUsage)
-      req.headers.push_back({XHttp::usageHeader, "1"});
-
    owned.put({.socket = sock, .owner = HttpServer::service});
-   if (!countUsage)
-   {
-      to<HttpServer>().serve(sock, req);
-      return;
-   }
-   // The synchronous handling only: a reply that is deferred is sent in a
-   // later context, and the time until then is not this request's work.
-   auto requestBytes = req.body.size();
-   auto start        = std::chrono::steady_clock::now();
    to<HttpServer>().serve(sock, req);
-   auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
-       std::chrono::steady_clock::now() - start);
-   to<XUsage>().request(sock, static_cast<std::uint64_t>(elapsed.count()), requestBytes);
 }  // serve()
 
 #endif

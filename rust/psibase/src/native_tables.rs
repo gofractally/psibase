@@ -96,6 +96,54 @@ pub struct VMOptions {
     max_table_elements: u32,
     #[psio(default = 1048576)]
     max_stack_bytes: u32,
+    #[psio(default = 8388608)]
+    max_module_bytes: u32,
+    #[psio(default = 4096)]
+    max_type_section_elements: u32,
+    #[psio(default = 256)]
+    max_import_section_elements: u32,
+    #[psio(default = 20000)]
+    max_function_section_elements: u32,
+    #[psio(default = 1)]
+    max_table_section_elements: u32,
+    #[psio(default = 1)]
+    max_memory_section_elements: u32,
+    #[psio(default = 1024)]
+    max_global_section_elements: u32,
+    #[psio(default = 256)]
+    max_export_section_elements: u32,
+    #[psio(default = 256)]
+    max_element_section_elements: u32,
+    #[psio(default = 16384)]
+    max_data_section_elements: u32,
+    #[psio(default = 65536)]
+    max_element_segment_elements: u32,
+    #[psio(default = 8388608)]
+    max_data_segment_bytes: u32,
+    #[psio(default = 1024)]
+    max_symbol_bytes: u32,
+    #[psio(default = 100000)]
+    max_type_size: u32,
+    #[psio(default = 64)]
+    max_function_params: u32,
+    #[psio(default = 16)]
+    max_function_results: u32,
+    #[psio(default = 2048)]
+    max_function_locals: u32,
+    #[psio(default = 65536)]
+    max_func_local_bytes: u32,
+    #[psio(default = 1048576)]
+    max_code_bytes: u32,
+    #[psio(default = 4096)]
+    max_br_table_elements: u32,
+    #[psio(default = 1024)]
+    max_nested_structures: u32,
+    #[psio(default = 16)]
+    max_block_params: u32,
+    #[psio(default = 524288)]
+    max_branch_local_pairs: u32,
+    #[psio(default = 4194304)]
+    max_module_branch_local_pairs: u32,
 }
 
 #[derive(

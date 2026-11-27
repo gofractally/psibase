@@ -853,6 +853,38 @@ namespace psibase
    /// point to the primary index.
    ///
    /// `Table` serializes keys using `psio::to_key` (the `psio::key` format). It serializes `T` as PSSZ (`psio::to_pssz`).
+   ///
+   /// A table is the storage of the service that writes it, and its rows are
+   /// trusted: `put` is the fast write and every read is the trusted read
+   /// (`psio::from_pssz<T>(psio::trusted{...})`, a view). Neither holds a row
+   /// against what `T` declares (a bound, `utf8`, an order, an invariant), so
+   /// a row is read back as it was written. What comes from outside the
+   /// service (an action argument, another service's result, an HTTP body)
+   /// is validated where it comes in, before it reaches a row; a service that
+   /// wants a row checked when it is written asks for it
+   /// (`psio::to_pssz_checked`, `psio::validate_value`). The same holds for a
+   /// table of another account opened through these classes: it is read as
+   /// its owner wrote it, without validation.
+   ///
+   /// Who can write a row: the node opens a database only for a privileged
+   /// service; every other service gets its handle from the `db` / `x-db`
+   /// services, which give a write handle only under the caller's own
+   /// account. A privileged service is part of what the chain trusts: one
+   /// that writes under another account is responsible for writing valid
+   /// rows, and the reading service does not defend against it.
+   ///
+   /// Trusted is not unchecked: neither kind of read leaves the row. `get`
+   /// (the trusted decode) and a view (`getView`) both end the action when
+   /// the stored bytes are not a frame of `T`: a truncated row, an offset
+   /// outside the row, a required member missing, a list that claims more
+   /// elements than the row holds (what an incompatible change of `T` leaves
+   /// behind). The decode fails with the decoder's message
+   /// (`pssz: record fixed region truncated`, ...); a view fails where it
+   /// cannot place a member, at `getView` for the record's header and at the
+   /// access for an offset, with
+   /// `view: the bytes are not a frame of the type: ...`. Bytes that place
+   /// every member are read as some value of `T`; whether that value is
+   /// what `T` declares is not checked.
    template <typename T, auto Primary, auto... Secondary>
    class Table
    {

@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "local/XUsage/plugin",
     "system/Accounts/plugin/accounts/",
     "system/Accounts/plugin/query/",
     "system/AuthAny/plugin/",

@@ -260,6 +260,7 @@ pub fn process_service_tables(
             #table_vis struct #table_name {
                 db: #psibase_mod::KvHandle,
                 prefix: Vec<u8>,
+                own: bool,
             }
         };
         items.push(parse_quote! {#table_struct});
@@ -284,8 +285,12 @@ pub fn process_service_tables(
             const TABLE_INDEX: u16 = #table_index;
             const SERVICE: #psibase_mod::AccountNumber = <TablesWrapper as #psibase_mod::ServiceTablesWrapper>::SERVICE;
 
-            fn from_handle(handle: #psibase_mod::KvHandle) -> Self {
-                #table_name_id{db: handle, prefix: Vec::new()}
+            fn from_handle_owned(handle: #psibase_mod::KvHandle, own: bool) -> Self {
+                #table_name_id{db: handle, prefix: Vec::new(), own}
+            }
+
+            fn is_own(&self) -> bool {
+                self.own
             }
 
             fn prefix(&self) -> &[u8] {

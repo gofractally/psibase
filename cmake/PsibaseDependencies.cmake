@@ -21,13 +21,13 @@ function(psibase_declare_dependencies)
     # psibase_acquire_dependency(psio) adds PSIO's project itself; see there.
     FetchContent_Declare(psio
         GIT_REPOSITORY https://github.com/gofractally/psio.git
-        GIT_TAG e11fd099f5a584d259357dad0764502c91b992db
+        GIT_TAG 80b7da2aa6fe673a3256bafa51e317f9e8c08a04
         GIT_SHALLOW FALSE
         SOURCE_DIR "${psibase_root}/external/psio"
         SOURCE_SUBDIR .psibase-no-top-level-cmake)
     FetchContent_Declare(psitri
         GIT_REPOSITORY https://github.com/gofractally/psitri.git
-        GIT_TAG d3bba0e6a5f59e37c3eea08a1a720ae553cafb2c
+        GIT_TAG 0fd4723128f47e9445419f9043a20fe02d3f1306
         GIT_SHALLOW FALSE
         SOURCE_DIR "${psibase_root}/external/psitri"
         SOURCE_SUBDIR .psibase-no-top-level-cmake)
@@ -39,7 +39,7 @@ function(psibase_declare_dependencies)
         SOURCE_SUBDIR .psibase-no-top-level-cmake)
     FetchContent_Declare(psizam
         GIT_REPOSITORY https://github.com/gofractally/psizam.git
-        GIT_TAG 8a328b9aef73ef8885460af3c9023cefc0cfb59a
+        GIT_TAG c1b8d8eb9f6a15ab9148394a5d1e1b364cde0e26
         GIT_SHALLOW FALSE
         # The native adapter does not build the optional spec testsuite.
         GIT_SUBMODULES ""

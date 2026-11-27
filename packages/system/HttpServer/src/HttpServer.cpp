@@ -7,7 +7,6 @@
 #include <psio/pssz.hpp>
 #include <psio/pssz_view.hpp>
 #include <services/local/XHttp.hpp>
-#include <services/local/XUsage.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/HttpServerRequest.hpp>
 #include <services/system/RTransact.hpp>
@@ -357,31 +356,8 @@ namespace SystemService
       std::erase_if(req.headers,
                     [](const auto& header) { return header.matches(XHttp::gateHeader); });
 
-      // Likewise for usage logging: x-http marks the requests it wants
-      // counted, which it does only when the node has x-usage.
-      bool countUsage = req.getHeader(XHttp::usageHeader).has_value();
-      std::erase_if(req.headers,
-                    [](const auto& header) { return header.matches(XHttp::usageHeader); });
-
       auto session = recurse().to<RTransact>().getSession(req);
       auto user    = session.user;
-
-      if (countUsage)
-      {
-         // Who the node's work for this request is counted for: the
-         // account, else the guest, else the visitor, else nobody. This is
-         // the session as it is, whatever the app is later told.
-         using LocalService::UsageKind;
-         using LocalService::XUsage;
-         if (session.user)
-            to<XUsage>().identify(sock, UsageKind::account, session.user->str());
-         else if (!session.guest.empty())
-            to<XUsage>().identify(sock, UsageKind::guest, session.guest);
-         else if (!session.visitor.empty())
-            to<XUsage>().identify(sock, UsageKind::visitor, session.visitor);
-         else
-            to<XUsage>().identify(sock, UsageKind::node, XUsage::nodeIdentity);
-      }
 
       // A page of one app asking another app's host. Browsers send this
       // host's cookies along when the page asks them to, so the app must

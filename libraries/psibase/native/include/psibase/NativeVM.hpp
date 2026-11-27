@@ -8,9 +8,9 @@
 namespace psibase
 {
    // An engine adapter compiled for one profile says which with
-   // PSIBASE_VM_ADAPTER_*. Everything else (the tester, the psizam-specific
-   // tests) gets the build's profile; with a wasmtime or multi-engine node
-   // that is JIT2.
+   // PSIBASE_VM_ADAPTER_*. Everything else (the psizam-specific tests) gets
+   // the build's profile; with a wasmtime or multi-engine node that is JIT2.
+   // psitest does not use this: it runs the test module on wasmtime.
 #if defined(PSIBASE_VM_ADAPTER_JIT1)
    using NativeVM = psizam::jit_profile;
 #elif defined(PSIBASE_VM_ADAPTER_JIT2)

@@ -12,6 +12,10 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
+#include <functional>
+#include <deque>
+#include <condition_variable>
 #include <fstream>
 #include <map>
 #include <mutex>
@@ -50,6 +54,9 @@ namespace psibase::storage
    // Engine root 0 is the flushed manifest (the "top root"). Root 1 is node-local
    // state that is published without flushing.
    constexpr std::uint32_t localRootIndex = 1;
+   // Root 2 is rebuildable data (cache_root): nothing under roots 0 and 1
+   // refers to it.
+   constexpr std::uint32_t cacheRootIndex = 2;
 
    std::string_view bytes(std::span<const char> data)
    {
@@ -175,22 +182,156 @@ namespace psibase::storage
       }
    };
 
+   // The one thread that writes the cache root. It creates the root's write
+   // session itself and nothing else ever touches that session: an engine
+   // write session is created and used on a single thread. Other threads hand
+   // it a change and wait until it is published (or has failed).
+   //
+   // The queue holds no data, only the waiting callers' requests, and each
+   // caller has at most one: what is queued is bounded by the threads that
+   // are waiting, and a waiting thread compiles nothing more. It is capped
+   // all the same; a caller that finds it full waits for room.
+   class CacheWriter
+   {
+     public:
+      using Change = std::function<Snapshot(Engine::write_session&)>;
+
+      explicit CacheWriter(Engine::database& engine) : engine(engine)
+      {
+         thread = std::thread([this] { run(); });
+      }
+      // Finishes every request already handed over, then stops. The session
+      // is closed by its own thread before the join returns.
+      ~CacheWriter()
+      {
+         {
+            std::lock_guard lock(mutex);
+            stopping = true;
+         }
+         ready.notify_all();
+         room.notify_all();
+         thread.join();
+      }
+      std::thread::id id() const { return thread.get_id(); }
+
+      // Applies `change` to the root on the writer thread and returns when it
+      // is visible to readers. Throws what the change threw; throws if the
+      // writer has been told to stop.
+      void apply(const Change& change)
+      {
+         Request          request{&change};
+         std::unique_lock lock(mutex);
+         room.wait(lock, [&] { return stopping || queue.size() < maxQueued; });
+         if (stopping)
+            throw std::runtime_error("the cache root's writer has stopped");
+         queue.push_back(&request);
+         ready.notify_one();
+         finished.wait(lock, [&] { return request.done; });
+         if (request.error)
+            std::rethrow_exception(request.error);
+      }
+
+     private:
+      struct Request
+      {
+         const Change*      change;
+         bool               done = false;
+         std::exception_ptr error;
+      };
+      static constexpr std::size_t maxQueued = 64;
+
+      void run()
+      {
+         // Created here, used here, destroyed here.
+         std::shared_ptr<Engine::write_session> session;
+         std::exception_ptr                     unusable;
+         try
+         {
+            session = engine.start_write_session();
+         }
+         catch (...)
+         {
+            unusable = std::current_exception();
+         }
+         std::unique_lock lock(mutex);
+         for (;;)
+         {
+            ready.wait(lock, [&] { return stopping || !queue.empty(); });
+            if (queue.empty())
+               break;  // stopping, and drained
+            Request* request = queue.front();
+            queue.pop_front();
+            room.notify_one();
+            lock.unlock();
+            std::exception_ptr error = unusable;
+            if (!error)
+               try
+               {
+                  if (auto hook = cacheWriteHook.load())
+                     hook();
+                  session->set_root(cacheRootIndex, (*request->change)(*session));
+               }
+               catch (...)
+               {
+                  // A failed change is the caller's to report; this thread
+                  // goes on to the next.
+                  error = std::current_exception();
+               }
+            lock.lock();
+            request->error = error;
+            request->done  = true;
+            finished.notify_all();
+         }
+         lock.unlock();
+         session.reset();
+      }
+
+      Engine::database&       engine;
+      std::mutex              mutex;
+      std::condition_variable ready, room, finished;
+      std::deque<Request*>    queue;
+      bool                    stopping = false;
+      std::thread             thread;
+
+     public:
+      // Test hook: called on the thread that is about to write the root.
+      static inline std::atomic<void (*)()> cacheWriteHook{nullptr};
+   };
+
    inline std::atomic<std::uint64_t> nextStateId{1};
-   struct State
+   struct State;
+   // storage.hpp names the state without defining it.
+   struct database_state
+   {
+   };
+   struct State : database_state
    {
       SerializedNativeAccess                 access;  // the single writer; never taken by reads
       std::shared_ptr<Engine::database>      engine;
       std::shared_ptr<Engine::write_session> writer;
       ReaderPool                             readers;
       // One engine reader per thread that has read this database.
+      // Engine sessions on one database: 64 slots. This layer uses at most
+      // maxThreadReaders + the pool's 32 for reads and three for writes
+      // (chain, subjective, compiled modules); the rest is the engine's own
+      // background threads and headroom.
+      static constexpr std::size_t                                         maxThreadReaders = 16;
       std::mutex                                                           threadReadersMutex;
       std::map<std::thread::id, std::shared_ptr<Engine::read_session>>     threadReaders;
+      // The cache root's own writer thread (see cache_root), started by the
+      // first write. Never involved with `access`.
+      std::mutex                   cacheWriterMutex;
+      std::unique_ptr<CacheWriter> cacheWriter;
       const std::uint64_t id = nextStateId.fetch_add(1, std::memory_order_relaxed);
       std::filesystem::path                  path;
       bool                                   readonly  = false;
       bool                                   temporary = false;
       ~State()
       {
+         // First: the cache root's writer finishes what it was handed, closes
+         // its session on its own thread and is joined. Nothing can hand it
+         // more: whoever could holds this State, and no one does any longer.
+         cacheWriter.reset();
          access.invoke(
              [&]
              {
@@ -256,7 +397,7 @@ namespace psibase::storage
    // one per database the first time it reads and keeps it. Requests come and go
    // (psibase makes a storage session per request); the thread's reader stays.
    // A strand that moves between threads simply uses whichever thread it is on.
-   // The shared pool is only the fallback when the engine has no session slot left.
+   // The shared pool is the fallback once State::maxThreadReaders threads have one.
    Engine::read_session* threadReader(State& state)
    {
       struct Cached
@@ -272,7 +413,15 @@ namespace psibase::storage
       Engine::read_session* session = nullptr;
       {
          std::lock_guard lock(state.threadReadersMutex);
-         auto&           slot = state.threadReaders[std::this_thread::get_id()];
+         // The engine has a fixed number of session slots per database and
+         // asking for one more ends the process (gofractally/psibase#2273),
+         // so the sessions made here are counted, not tried: beyond the
+         // budget a thread reads through the pool. An entry is kept until
+         // the database closes, also for a thread that has exited.
+         if (state.threadReaders.size() >= State::maxThreadReaders &&
+             !state.threadReaders.contains(std::this_thread::get_id()))
+            return nullptr;
+         auto& slot = state.threadReaders[std::this_thread::get_id()];
          if (!slot)
          {
             try
@@ -474,53 +623,6 @@ namespace psibase::storage
                         auto c = session.borrow_cursor(r->tree);
                         return !c.lower_bound(bytes(lower)) ||
                                (!upper.empty() && c.key() >= bytes(upper));
-                     });
-   }
-
-   bool equalCursors(Cursor a, Cursor b, std::string_view lower, std::string_view upper)
-   {
-      bool av = a.lower_bound(lower), bv = b.lower_bound(lower);
-      while (true)
-      {
-         accounting::check();
-         av = av && (upper.empty() || a.key() < upper);
-         bv = bv && (upper.empty() || b.key() < upper);
-         if (av != bv)
-            return false;
-         if (!av)
-            return true;
-         if (a.key() != b.key() || a.is_subtree() != b.is_subtree())
-            return false;
-         if (a.is_subtree())
-         {
-            if (!equalCursors(a.subtree_cursor(), b.subtree_cursor(), {}, {}))
-               return false;
-         }
-         else if (a.value<std::string>() != b.value<std::string>())
-            return false;
-         av = a.next();
-         bv = b.next();
-      }
-   }
-   bool read_session::is_equal_weak(const shared_root&    a,
-                                    const shared_root&    b,
-                                    std::span<const char> lower,
-                                    std::span<const char> upper)
-   {
-      if (a == b)
-         return true;
-      if (!a)
-         return is_empty(b, lower, upper);
-      if (!b)
-         return is_empty(a, lower, upper);
-      if (a->state != b->state || a->state != view->state)
-         throw std::runtime_error("foreign storage roots");
-      return reading(a,
-                     [&](Engine::read_session& session)
-                     {
-                        return equalCursors(session.borrow_cursor(a->tree),
-                                            session.borrow_cursor(b->tree), bytes(lower),
-                                            bytes(upper));
                      });
    }
 
@@ -863,109 +965,6 @@ namespace psibase::storage
              return publishable(state, edit.get_tree());
           });
    }
-   void write_session::splice(shared_root&          destination,
-                              const shared_root&    source,
-                              std::span<const char> lower,
-                              std::span<const char> upper)
-   {
-      auto state = view->state;
-      state->writable();
-      if ((destination && destination->state != state) || (source && source->state != state))
-         throw std::runtime_error("foreign storage root");
-      // Both roots are immutable snapshots, so what differs between them in
-      // the range can be found by this thread's reader, without the writer
-      // gate. Only the differing keys are then applied under it. Replacing
-      // the range wholesale, every key removed and every key written again
-      // under the gate, made each subjective commit hold the engine's one
-      // writer for as long as its ranges were large, and every other writer,
-      // the block producer included, waited behind it.
-      struct Change
-      {
-         std::string                key;
-         std::optional<std::string> value;  // absent and not a subtree: remove
-         bool                       subtree = false;
-      };
-      std::vector<Change> changes;
-      if (const shared_root& either = destination ? destination : source)
-      {
-         reading(either,
-                 [&](Engine::read_session& session)
-                 {
-                    std::optional<Cursor> before, after;
-                    bool                  hasBefore = false, hasAfter = false;
-                    if (destination)
-                    {
-                       before.emplace(session.borrow_cursor(destination->tree));
-                       hasBefore = before->lower_bound(bytes(lower));
-                    }
-                    if (source)
-                    {
-                       after.emplace(session.borrow_cursor(source->tree));
-                       hasAfter = after->lower_bound(bytes(lower));
-                    }
-                    auto inRange = [&](Cursor& c)
-                    { return upper.empty() || c.key() < bytes(upper); };
-                    auto take = [&](Cursor& c)
-                    {
-                       if (c.is_subtree())
-                          changes.push_back({std::string(c.key()), {}, true});
-                       else
-                          changes.push_back({std::string(c.key()), *c.value<std::string>()});
-                    };
-                    while (true)
-                    {
-                       accounting::check();
-                       hasBefore = hasBefore && inRange(*before);
-                       hasAfter  = hasAfter && inRange(*after);
-                       if (!hasBefore && !hasAfter)
-                          break;
-                       if (hasBefore && (!hasAfter || before->key() < after->key()))
-                       {
-                          changes.push_back({std::string(before->key()), {}, false});
-                          hasBefore = before->next();
-                       }
-                       else if (hasAfter && (!hasBefore || after->key() < before->key()))
-                       {
-                          take(*after);
-                          hasAfter = after->next();
-                       }
-                       else
-                       {
-                          bool same = before->is_subtree() == after->is_subtree();
-                          if (same && after->is_subtree())
-                             same = equalCursors(before->subtree_cursor(), after->subtree_cursor(),
-                                                 {}, {});
-                          else if (same)
-                             same = before->value<std::string>() == after->value<std::string>();
-                          if (!same)
-                             take(*after);
-                          hasBefore = before->next();
-                          hasAfter  = after->next();
-                       }
-                    }
-                    return 0;
-                 });
-      }
-      if (changes.empty())
-         return;
-      destination = state->access.invoke(
-          [&]
-          {
-             auto edit = state->writer->start_write_transaction(native(state, destination));
-             for (const auto& change : changes)
-             {
-                accounting::check();
-                if (change.subtree)
-                   edit.upsert_subtree(change.key, native(state, source).get_subtree(change.key));
-                else if (change.value)
-                   edit.upsert(change.key, *change.value);
-                else
-                   edit.remove(change.key);
-             }
-             return publishable(state, edit.get_tree());
-          });
-   }
-
    std::string readIdentityFile(const std::filesystem::path& path)
    {
       std::ifstream file(path / formatFile, std::ios::binary);
@@ -1239,6 +1238,127 @@ namespace psibase::storage
       }
       return std::shared_ptr<database>(new database(std::move(result)));
    }
+   cache_root database::get_cache_root() const
+   {
+      return cache_root(view->state);
+   }
+
+   namespace
+   {
+      State& cacheState(const std::shared_ptr<database_state>& state)
+      {
+         return static_cast<State&>(*state);
+      }
+      // A read of the cache root on the caller's thread. Unlike `reading`, it
+      // is not charged to, or cancelled with, the request that happens to
+      // need a module: the module is the node's, not the request's.
+      template <class F>
+      auto readingCache(State& state, F&& function)
+      {
+         if (auto* session = threadReader(state))
+            return function(*session);
+         return state.readers.use(*state.engine, function);
+      }
+      // One change to the cache root: continue from what is published, edit
+      // copy-on-write, publish without a flush. Readers see the root before
+      // or after, never between. Runs on the root's writer thread; returns
+      // once the change is published.
+      void editCache(State& state, const CacheWriter::Change& change)
+      {
+         if (state.readonly)
+            return;
+         CacheWriter* writer;
+         {
+            std::lock_guard lock(state.cacheWriterMutex);
+            if (!state.cacheWriter)
+               state.cacheWriter = std::make_unique<CacheWriter>(*state.engine);
+            writer = state.cacheWriter.get();
+         }
+         writer->apply(change);
+      }
+   }  // namespace
+
+   cache_root::cache_root(std::shared_ptr<database_state> state) : state(std::move(state)) {}
+
+   std::thread::id cache_root::writer_thread() const
+   {
+      auto&           s = cacheState(state);
+      std::lock_guard lock(s.cacheWriterMutex);
+      return s.cacheWriter ? s.cacheWriter->id() : std::thread::id{};
+   }
+
+   void cache_root::set_write_hook(void (*hook)())
+   {
+      CacheWriter::cacheWriteHook = hook;
+   }
+
+   bool cache_root::writable() const noexcept
+   {
+      return !cacheState(state).readonly;
+   }
+
+   std::optional<std::vector<char>> cache_root::get(std::span<const char> key)
+   {
+      std::optional<std::vector<char>> result;
+      readingCache(cacheState(state),
+                   [&](Engine::read_session& session)
+                   {
+                      auto cursor = session.create_cursor(cacheRootIndex);
+                      cursor.get(bytes(key), [&](std::string_view value)
+                                 { result.emplace(value.begin(), value.end()); });
+                      return 0;
+                   });
+      return result;
+   }
+
+   void cache_root::put(std::span<const char> key, std::span<const char> value)
+   {
+      editCache(cacheState(state),
+                [&](Engine::write_session& writer)
+                {
+                   auto edit = writer.start_write_transaction(writer.get_root(cacheRootIndex));
+                   edit.upsert(bytes(key), bytes(value));
+                   return edit.get_tree();
+                });
+   }
+
+   void cache_root::erase(std::span<const char> key)
+   {
+      editCache(cacheState(state),
+                [&](Engine::write_session& writer)
+                {
+                   auto edit = writer.start_write_transaction(writer.get_root(cacheRootIndex));
+                   edit.remove(bytes(key));
+                   return edit.get_tree();
+                });
+   }
+
+   void cache_root::clear()
+   {
+      editCache(cacheState(state),
+                [&](Engine::write_session& writer) { return writer.create_temporary_tree(); });
+   }
+
+   std::vector<std::pair<std::vector<char>, std::uint64_t>> cache_root::sizes()
+   {
+      std::vector<std::pair<std::vector<char>, std::uint64_t>> result;
+      readingCache(cacheState(state),
+                   [&](Engine::read_session& session)
+                   {
+                      auto cursor = session.create_cursor(cacheRootIndex);
+                      for (bool found = cursor.seek_begin(); found; found = cursor.next())
+                      {
+                         auto key  = cursor.key();
+                         auto size = cursor.value_size();
+                         if (size >= 0)
+                            result.emplace_back(std::vector<char>(key.begin(), key.end()),
+                                                static_cast<std::uint64_t>(size));
+                      }
+                      return 0;
+                   });
+      return result;
+   }
+
    std::shared_ptr<write_session> database::start_write_session()
    {
       // A compatibility proxy is also used for reads by existing psibase

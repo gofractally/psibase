@@ -29,6 +29,7 @@ function(add suffix)
         common/src/fileUtil.cpp
         common/src/WebSocket.cpp
         common/src/HttpHeaders.cpp
+        common/src/usage.cpp
     )
 
     if(DEFINED IS_WASM)
@@ -218,6 +219,8 @@ function(add suffix)
             native/src/NativeFunctions.cpp
             native/src/PsizamPolicy.cpp
             native/src/NativeAotCache.cpp
+            native/src/NativeArtifactCache.cpp
+            native/src/NativeAotDatabase.cpp
             native/src/OpenSSLProver.cpp
             native/src/pkcs11.cpp
             native/src/PKCS11Prover.cpp
@@ -228,6 +231,7 @@ function(add suffix)
             native/src/Socket.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp
+            native/src/UsageMeter.cpp
             native/src/usePsitri.cpp
             native/src/psitriStorage.cpp
             native/src/VerifyProver.cpp

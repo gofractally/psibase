@@ -1,7 +1,10 @@
 #include <psibase/TransactionContext.hpp>
+#include <psibase/UsageMeter.hpp>
 #include <psibase/saturating.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/finally.hpp>
+
+#include <utility>
 
 namespace psibase
 {
@@ -453,6 +456,26 @@ namespace psibase
       return tokens;
    }
 
+   // What a speculative run cost this node in compiles it started: the time
+   // the project owner decided is to be charged, node-locally, to whoever
+   // submitted the transaction (gofractally/psibase#2256). It is charged to
+   // the usage record of this context, which callRun set to the identity
+   // that posted the run (gofractally/psibase#2270).
+   void BlockContext::reportSpeculativeCompile(std::uint64_t run, std::chrono::nanoseconds time)
+   {
+      if (time <= std::chrono::nanoseconds(0))
+         return;
+      if (usage)
+         usage->add(UsageField::compileNs, time);
+      PSIBASE_LOG(trxLogger, debug)
+          << "Speculative run " << run << " waited "
+          << std::chrono::duration_cast<std::chrono::microseconds>(time).count()
+          << " us for service compiles, charged to "
+          << (usage ? to_string(usage->identity) : std::string("nobody (no usage meter)"));
+      if (speculativeCompileHook)
+         speculativeCompileHook(run, time);
+   }
+
    void BlockContext::callRun(psio::pssz_view<RunRow> row,
                               std::optional<std::chrono::microseconds> proofTimeout)
    {
@@ -474,6 +497,19 @@ namespace psibase
             PSIBASE_LOG(trxLogger, warning) << "Wrong run mode should be caught earlier";
             break;
       }
+      // Usage metering: the run, and its continuation, are charged to the
+      // identity that posted the run; whatever they post in turn inherits it.
+      const auto runMode = row.mode().unpack();
+      if (auto meter = systemContext.usage.get(); meter && meter->enabled())
+      {
+         usage = meter->runOrigin(row.id());
+         meter->enforceQuota(usage);
+         if (runMode == RunMode::speculative)
+            usage->add(UsageField::trxPushed, 1);
+         else if (runMode == RunMode::verify)
+            usage->add(UsageField::verifyRuns, 1);
+      }
+
       SignedTransaction  trx;
       TransactionTrace   trace;
       TransactionContext tc{*this, trx, trace, mode};
@@ -488,8 +524,16 @@ namespace psibase
          tc.setWatchdog(std::max(maxTime, RunClock::duration::zero()));
          if (row.mode() == RunMode::speculative)
          {
+            // The limit measures the transaction's own execution: compiling
+            // what it needs is outside it (BillingPause), bounded on its own
+            // (WasmCache::speculativeCompileWait).
+            tc.speculativeRun = true;
             db.checkoutEmptySubjective();
-            auto _ = psibase::finally{[&] { db.abortSubjective(); }};
+            auto _ = psibase::finally{[&]
+                                      {
+                                         db.abortSubjective();
+                                         reportSpeculativeCompile(row.id(), tc.startedCompileTime);
+                                      }};
             tc.execNonTrxAction(0, action, atrace);
          }
          else
@@ -508,6 +552,22 @@ namespace psibase
                                        << "::" << action.method.str() << " failed: " << e.what();
       }
 
+      if (usage)
+      {
+         // The time the action ran, compiles excluded (they are charged in
+         // reportSpeculativeCompile).
+         auto time = tc.getBillableTime();
+         if (runMode == RunMode::speculative)
+         {
+            usage->add(trace.error ? UsageField::trialFailed : UsageField::trialOk, 1);
+            usage->add(UsageField::trialNs, time);
+         }
+         else if (runMode == RunMode::verify)
+            usage->add(UsageField::verifyNs, time);
+         else
+            usage->add(UsageField::callbackNs, time);
+      }
+
       try
       {
          auto session = db.startWrite(writer);
@@ -524,6 +584,12 @@ namespace psibase
          TransactionTrace   trace;
          TransactionContext tc{*this, trx, trace, DbMode::rpc()};
          auto&              atrace = trace.actionTraces.emplace_back();
+         auto chargeContinuation = psibase::finally{
+             [&]
+             {
+                if (usage)
+                   usage->add(UsageField::callbackNs, tc.getBillableTime());
+             }};
          tc.execNonTrxAction(0, action, atrace);
          BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
          PSIBASE_LOG(trxLogger, debug) << "async continuation " << action.service.str()
@@ -918,6 +984,7 @@ namespace psibase
       try
       {
          checkActive();
+         deferral.reset();
          check(enableUndo || commit, "neither enableUndo or commit is set");
 
          // TODO: verify the PSSZ encoding, allow new fields. Might be redundant elsewhere?
@@ -937,6 +1004,10 @@ namespace psibase
             if (initialWatchdogLimit)
                t.setWatchdog(*initialWatchdogLimit);
             t.execTransaction();
+            // It ran to the end, but stored code this producer has not
+            // compiled: discarded like one that stopped for that reason.
+            if (deferral)
+               throw TransactionDeferred{*deferral};
 
             if (!isProducing)
             {
@@ -958,6 +1029,13 @@ namespace psibase
       }
       catch (const std::exception& e)
       {
+         if (deferral)
+         {
+            // Not a result of the transaction: no trace, no report. Only
+            // asked for with enableUndo, so the block goes on.
+            PSIBASE_LOG(trxLogger, info) << "Transaction deferred: " << *deferral;
+            throw TransactionDeferred{*std::exchange(deferral, std::nullopt)};
+         }
          trace.error = e.what();
          BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
          PSIBASE_LOG(trxLogger, info) << "Transaction failed";

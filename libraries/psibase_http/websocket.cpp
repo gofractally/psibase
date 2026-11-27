@@ -44,12 +44,24 @@ void WebSocket::handleMessage(CloseLock&& l, bool binary)
    auto clearBuffer = psibase::finally{[this] { input.consume(input.size()); }};
    auto flags       = binary ? WebSocketFlags::binary : WebSocketFlags::text;
 
+   // Usage metering: the wall clock of handling this message
+   auto             usageRecord = this->usage();
+   auto             usageStart  = std::chrono::steady_clock::now();
+   psibase::finally chargeUsage{
+       [&]
+       {
+          if (usageRecord)
+             usageRecord->add(UsageField::requestNs,
+                              std::chrono::steady_clock::now() - usageStart);
+       }};
+
    auto system = server.sharedState->getSystemContext();
 
    psibase::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
    BlockContext bc{*system, system->sharedDatabase.getHead(), system->sharedDatabase.createWriter(),
                    true};
    bc.start();
+   bc.usage = usageRecord;
 
    SignedTransaction trx;
    TransactionTrace  trace;

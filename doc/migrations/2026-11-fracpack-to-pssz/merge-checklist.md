@@ -1,6 +1,6 @@
 # Merging the C++ flip (`claude/pssz-flip-cpp`) into the Rust flip (`claude/pssz`)
 
-**Done: `doc/pssz-conversion.md` section 7 records the merge, what each
+**Done: `doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md` section 7 records the merge, what each
 step found and the state.** The temporary items of section 1 are removed;
 the fixture has the additions listed there. This file is kept as the plan
 that was followed.
@@ -13,9 +13,9 @@ it is the reverse. **The merge is the first time PSSZ, keys, schemas and
 I-JSON cross between the two languages.** Nothing below was run on a merged
 tree.
 
-References: `doc/pssz-conversion.md` 6.26 (the Rust side: state, checks,
-gaps), `doc/flip-interop.md` on the C++ branch (the contract: every format
-that crosses the boundary), `doc/team-review.md`.
+References: `doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md` 6.26 (the Rust side: state, checks,
+gaps), `doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md` on the C++ branch (the contract: every format
+that crosses the boundary), `doc/migrations/2026-11-fracpack-to-pssz/team-review.md`.
 
 State when this was written: `claude/pssz` at the commit that adds this
 file; `claude/pssz-flip-cpp` at `868ee42e2` ("S6: byte ranges, cursors and
@@ -68,7 +68,7 @@ At the time of writing (about 390 paths here, 225 there) eleven overlap:
 |---|---|---|---|
 | `cmake/PsibaseDependencies.cmake` | pin | pin, and whatever the flip needed (the `psio1` targets, compile definitions) | take the C++ branch's file; check the pin line is the agreed hash |
 | `tests/cmake/dependencies/CMakeLists.txt`, `tests/cmake/dependencies/README.md` | pin | pin | either; the agreed hash |
-| `doc/pssz-conversion.md` | section 6 (Rust; 6.21–6.26) and the Rust rows of 2.7 | sections 1.17–1.22 and the C++ inventory | keep both: the sections are disjoint. Conflicts will be in the header list and section 0; take the C++ branch's text for sections 0–5 and this branch's for section 6 |
+| `doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md` | section 6 (Rust; 6.21–6.26) and the Rust rows of 2.7 | sections 1.17–1.22 and the C++ inventory | keep both: the sections are disjoint. Conflicts will be in the header list and section 0; take the C++ branch's text for sections 0–5 and this branch's for section 6 |
 | `libraries/psibase/common/tests/rust_twins.cpp` | adds the `names` object: the methods of 24 services with the parameter names the reflection states (94 lines, the includes and one writer) | removes the `"frac"` member and `psio1`; packs a call as the tuple of the parameters' wire types (`wireTuple`) | take the C++ branch's version and re-apply this branch's `names` addition (`git diff 7ae0dde70 claude/pssz -- libraries/psibase/common/tests/rust_twins.cpp`); the two edits touch different functions. Then add the types of section 1 |
 | `libraries/psibase/common/tests/rust-twins.json` | regenerated with `names` | regenerated with the custom ids and `utf8` | take neither: regenerate from the merged C++ (section 3, step 2) |
 | `packages/user/Nft/include/services/user/Nft.hpp`, `…/Symbol.hpp`, `…/Tokens.hpp` | the Rust parameter names in the mirror headers (the same change as the C++ branch's `fa45a2128`) | that, plus `attr(…, utf8)` on string members and parameters | take the C++ branch's files. Then run the name cross-check (`rust_views_name_parameters_as_the_implementation_does`): it compares these headers' reflected names with the Rust services |
@@ -77,7 +77,7 @@ At the time of writing (about 390 paths here, 225 there) eleven overlap:
 
 Paths that do not overlap textually but must agree (check each by hand):
 
-* **`doc/flip-interop.md`** exists only on the C++ branch. Add to it what
+* **`doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md`** exists only on the C++ branch. Add to it what
   6.26 lists under "For flip-interop.md".
 * **C++ mirror headers of Rust services** and **Rust mirrors of C++
   services** (`rust/psibase/src/services/*.rs`): the C++ branch may have
@@ -166,14 +166,14 @@ Each step proves one thing; stop at the first that fails.
 | `value returned from <method> was not serialized as expected` | step 7 | return type differs between mirror and implementation | the two declarations |
 | Rust tool: `json: …` while printing a result; C++ tester: `json: …` reading a Rust reply | step 6, 8 | trace or reply JSON: a member name or a text form differs. Known candidates: `totalTime` (nanoseconds, a number or a string), `error` / `console` (raw strings), `InnerTrace.inner` (variant `{"ConsoleTrace":…}`), `SubjectPublicKeyInfo` (PEM text), `SocketEndpoint` / `IPAddress` (one string), `DbId` / `NewAccountMode` (names) | `rust/psibase/tests/psio_json.rs` pins what Rust expects for each; compare with the text in the failing output |
 | `AccountNumber: not an account name` / `json: text form rejected the value` | anywhere JSON is read | account text is strict in both languages now (it was lenient through serde in Rust): an upper-case, over-long or non-canonical name in a fixture, a `postinstall.json`, a test | the text at the reported offset |
-| GraphQL result has `[1,2,…]` where a client expects hex, or a 64-bit number is a string / a bare number | step 8, UIs | Rust services keep async-graphql: 64-bit integers are bare numbers always; bytes are hex only on the eight members listed in 6.26 (RG20). C++ GraphQL follows `doc/flip-interop.md` 6 | the query against both services |
+| GraphQL result has `[1,2,…]` where a client expects hex, or a 64-bit number is a string / a bare number | step 8, UIs | Rust services keep async-graphql: 64-bit integers are bare numbers always; bytes are hex only on the eight members listed in 6.26 (RG20). C++ GraphQL follows `doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md` 6 | the query against both services |
 | event queries return no rows or `Failed to deserialize` | step 7, 8 (query services) | the Events service's SQL rows: byte columns are hex text, 64-bit columns a number or a string; three Rust readers were changed for bytes, the others read numbers leniently (`deserialize_number_from_string`) | the row text in the error; `rust/psibase/src/graph_ql.rs` `SqlRow` |
 | `setSchema`: `width-changed` / not an upgrade | step 6 on an existing database only | a schema installed by an older build | use a fresh database; there is no live chain |
 | `verify_schema` fails for one service (step 5) | Rust unit tests | the Rust mirror of a C++ service is behind the C++ declaration | the message prints the differing action or type; fix the mirror (C++ is the authority for a C++ service) |
 
 ## 5. After the merge is green
 
-* Remove from `doc/pssz-conversion.md` 6.26 the "needs the C++ flip"
+* Remove from `doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md` 6.26 the "needs the C++ flip"
   classification and record the merged results.
 * `git grep -n -i fracpack -- rust packages` and `git grep -n psio1`: what
   is left is comments and documentation (6.26, "R-F, the rest").

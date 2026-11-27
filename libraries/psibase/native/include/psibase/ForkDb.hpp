@@ -3,10 +3,12 @@
 #include <boost/container/flat_map.hpp>
 #include <boost/log/attributes/constant.hpp>
 #include <iostream>
+#include <psibase/finally.hpp>
 #include <psibase/BlockContext.hpp>
 #include <psibase/KvMerkle.hpp>
 #include <psibase/Prover.hpp>
 #include <psibase/Socket.hpp>
+#include <psibase/UsageMeter.hpp>
 #include <psibase/VerifyProver.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
@@ -1291,7 +1293,6 @@ namespace psibase
          }
          Database database{systemContext->sharedDatabase, systemContext->sharedDatabase.getHead()};
          auto     session = database.startRead();
-         database.checkoutSubjective();
          auto prefixLen = psio::key_size(consensusChangePrefix());
          auto key       = psio::encode(psio::key{}, consensusChangeKey(prev + 1));
          if (auto row = database.kvLessThanRaw(ConsensusChangeRow::db, key, prefixLen))
@@ -1412,7 +1413,6 @@ namespace psibase
       {
          Database db(systemContext->sharedDatabase, systemContext->sharedDatabase.getHead());
          auto     session = db.startRead();
-         db.checkoutSubjective();
          auto key       = psio::encode(psio::key{}, snapshotPrefix());
          auto prefixLen = key.size();
          for (auto row = db.kvMaxRaw(DbId::nativeSubjective, key); row;
@@ -1976,9 +1976,16 @@ namespace psibase
       // (ConfigRow::maxBlockSize). False means it belongs in the next block.
       bool fitsInBlock(const SignedTransaction& trx) { return getBlockContext()->fits(trx); }
 
-      void pushTransaction(SignedTransaction&& trx)
+      // Applies a transaction from the producer's queue to the block being
+      // produced. Returns the transaction if it was deferred instead: it
+      // needs service code this node has not compiled yet, and a producer
+      // does not compile or wait for a compile here (BlockContext::
+      // deferUncompiledCode). The caller offers it again in a later block.
+      std::optional<SignedTransaction> pushTransaction(SignedTransaction&& trx)
       {
          auto bc = getBlockContext();
+         bc->deferUncompiledCode = true;
+         auto restore            = psibase::finally{[&] { bc->deferUncompiledCode = false; }};
 
          auto             revisionAtBlockStart = getHeadRevision();
          TransactionTrace trace;
@@ -2010,12 +2017,18 @@ namespace psibase
          {
             throw;
          }
+         catch (TransactionDeferred&)
+         {
+            // Nothing was applied and the transaction is as it was taken.
+            return std::move(trx);
+         }
          catch (...)
          {
             // Don't give a false positive
             if (!trace.error)
                throw;
          }
+         return std::nullopt;
       }
 
       std::optional<SignedTransaction> nextTransaction()
@@ -2037,7 +2050,11 @@ namespace psibase
       void onSocketOpen(auto&& fn) { dbCallbacks.socketOpen = fn; }
       void onSocketP2P(auto&& fn) { dbCallbacks.socketP2P = fn; }
 
-      void recvMessage(const Socket& sock, const std::vector<char>& data)
+      // `usage`: who the message is charged to (the owner of the connection
+      // it arrived on); null if nobody is.
+      void recvMessage(const Socket&                sock,
+                       const std::vector<char>&     data,
+                       std::shared_ptr<UsageRecord> usage = nullptr)
       {
          Action action{.service = proxyServiceNum,
                        .rawData = psio::to_pssz(std::tuple(sock.id, data, std::uint32_t{0}))};
@@ -2045,6 +2062,17 @@ namespace psibase
          // TODO: This can run concurrently
          BlockContext     bc{*systemContext, systemContext->sharedDatabase.getHead(),
                              systemContext->sharedDatabase.createWriter(), true};
+         // Usage metering: the wall clock of handling the message; runs it
+         // posts are charged to the same record.
+         bc.usage          = usage;
+         auto usageStart   = std::chrono::steady_clock::now();
+         auto chargeUsage  = psibase::finally{
+             [&]
+             {
+                if (usage)
+                   usage->add(UsageField::requestNs,
+                              std::chrono::steady_clock::now() - usageStart);
+             }};
          TransactionTrace trace;
          try
          {

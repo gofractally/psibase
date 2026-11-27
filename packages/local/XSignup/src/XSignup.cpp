@@ -11,7 +11,6 @@
 #include <services/local/XAdmin.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/local/XKeys.hpp>
-#include <services/local/XUsage.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/RTransact.hpp>
@@ -315,10 +314,6 @@ namespace
       {
          XSignup{}.open<SignupLinkTable>().put(link);
       }
-      // What the guest used of this node so far becomes the account's.
-      // (x-usage is a dependency of this service's package.)
-      if (mine)
-         to<XUsage>().carryOver(link.guest, name);
       return link;
    }
 

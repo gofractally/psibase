@@ -1,6 +1,7 @@
 #include "close.hpp"
 
 #include <psibase/BlockContext.hpp>
+#include <psibase/UsageMeter.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/finally.hpp>
 
@@ -12,9 +13,20 @@ void psibase::http::callClose(const server_state&     server,
    psibase::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
    if (socket.notifyClose)
    {
+      // Usage metering: the wall clock of the close handler
+      auto             usageRecord = socket.usage();
+      auto             usageStart  = std::chrono::steady_clock::now();
+      psibase::finally chargeUsage{
+          [&]
+          {
+             if (usageRecord)
+                usageRecord->add(UsageField::requestNs,
+                                 std::chrono::steady_clock::now() - usageStart);
+          }};
       BlockContext bc{*system, system->sharedDatabase.getHead(),
                       system->sharedDatabase.createWriter(), true};
       bc.start();
+      bc.usage = usageRecord;
 
       SignedTransaction trx;
       TransactionTrace  trace;

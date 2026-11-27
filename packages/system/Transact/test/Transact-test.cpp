@@ -473,6 +473,138 @@ TEST_CASE("Test push_transaction")
    }
 }
 
+// The project owner's rule (gofractally/psibase#2256): "the speculative run must
+// pass... dependent transactions cannot pre-validate unless separated by a
+// block boundary... it rate limits the user to 1 per second dependent... or
+// forces them to group it into one transaction."
+TEST_CASE("A pushed transaction is included only after its speculative run has passed")
+{
+   DefaultTestChain t;
+   auto             newAccount = [&](AccountNumber name)
+   {
+      auto accounts = transactor<Accounts>{Accounts::service, Accounts::service};
+      return accounts.newAccount(name, AuthAny::service, NewAccountMode::requireNew);
+   };
+   auto push = [&](SignedTransaction trx)
+   {
+      return t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
+                         PsszBody{std::move(trx)});
+   };
+   auto exists = [&](AccountNumber name)
+   { return t.from(Accounts::service).to<Accounts>().exists(name).returnVal(); };
+   t.setAutoRun(false);
+
+   SECTION("not offered while the run is in flight, offered once it has passed")
+   {
+      // No signatures to check: only the speculative run stands between the
+      // transaction and a block.
+      auto reply = push(t.signTransaction(t.makeTransaction({newAccount("alice"_a)})));
+      CHECK_FALSE(t.pushNextTransaction().has_value());
+      CHECK_FALSE(exists("alice"_a));
+      // The speculative run, and its continuation.
+      REQUIRE(t.runQueueItem());
+      CHECK_FALSE(t.runQueueItem());
+      auto trace = t.pushNextTransaction();
+      REQUIRE(trace.has_value());
+      CHECK_FALSE(trace->error.has_value());
+      CHECK(exists("alice"_a));
+      CHECK(Result<void>(reply.get<TransactionTrace>()).succeeded());
+   }
+   SECTION("with signatures, both the run and the checks must have finished")
+   {
+      t.setAutoRun(true);
+      auto alice = t.addAccount("alice", aliceKeys.first);
+      t.setAutoRun(false);
+      auto accounts = transactor<Accounts>{alice, Accounts::service};
+      auto reply    = push(t.signTransaction(
+          t.makeTransaction({accounts.setAuthServ(AuthAny::service)}), {aliceKeys}));
+      // Two items are queued, the run and one signature check. After
+      // either alone the transaction is not offered.
+      CHECK_FALSE(t.pushNextTransaction().has_value());
+      REQUIRE(t.runQueueItem());
+      CHECK_FALSE(t.pushNextTransaction().has_value());
+      REQUIRE(t.runQueueItem());
+      CHECK_FALSE(t.runQueueItem());
+      auto trace = t.pushNextTransaction();
+      REQUIRE(trace.has_value());
+      CHECK_FALSE(trace->error.has_value());
+      CHECK(Result<void>(reply.get<TransactionTrace>()).succeeded());
+   }
+   SECTION("dropped, with the failure reported, when the run fails")
+   {
+      t.setAutoRun(true);
+      t.addAccount("alice");
+      t.setAutoRun(false);
+      auto reply = push(t.signTransaction(t.makeTransaction({newAccount("alice"_a)})));
+      REQUIRE(t.runQueueItem());
+      // Never offered to a block; the submitter is told.
+      CHECK_FALSE(t.pushNextTransaction().has_value());
+      CHECK(reply.get<TransactionTrace>().error.has_value());
+      t.startBlock();
+      CHECK_FALSE(t.pushNextTransaction().has_value());
+   }
+   SECTION("of two dependent transactions sent together the second fails")
+   {
+      // The first creates an account, the second needs it. Intended: the
+      // second is judged against the chain as it is, where the first is not
+      // in a block yet. Whoever sends them waits for the first to be
+      // applied, or puts both actions in one transaction.
+      const auto bob      = "bob"_a;
+      auto       system   = transactor<Accounts>{Accounts::service, Accounts::service};
+      auto       accounts = transactor<Accounts>{bob, Accounts::service};
+      auto firstReply = push(t.signTransaction(t.makeTransaction({newAccount(bob)})));
+      // Sent by the new account: refused where it is submitted, before any
+      // speculative run, because its sender does not exist.
+      auto refused =
+          t.post(Transact::service, "/push_transaction?wait_for=applied",
+                 PsszBody{t.signTransaction(
+                     t.makeTransaction({accounts.setAuthServ(AuthAny::service)}))});
+      CHECK(refused.status == HttpStatus::internalServerError);
+      // Sent by an existing account and reading the new one: accepted, and
+      // dropped when its speculative run fails.
+      auto secondReply = push(t.signTransaction(t.makeTransaction({system.getAuthOf(bob)})));
+      while (t.runQueueItem())
+      {
+      }
+      CHECK(secondReply.get<TransactionTrace>().error.has_value());
+      auto trace = t.pushNextTransaction();
+      REQUIRE(trace.has_value());
+      CHECK_FALSE(trace->error.has_value());
+      CHECK_FALSE(t.pushNextTransaction().has_value());
+      CHECK(Result<void>(firstReply.get<TransactionTrace>()).succeeded());
+      CHECK(exists(bob));
+
+      // Sent again once the first is in a block, both pass and are included.
+      t.startBlock();
+      auto again = push(t.signTransaction(t.makeTransaction({system.getAuthOf(bob)}, 6)));
+      auto byBob = push(t.signTransaction(
+          t.makeTransaction({accounts.setAuthServ(AuthAny::service)}, 6)));
+      while (t.runQueueItem())
+      {
+      }
+      for (int i = 0; i < 2; ++i)
+      {
+         trace = t.pushNextTransaction();
+         REQUIRE(trace.has_value());
+         CHECK_FALSE(trace->error.has_value());
+      }
+      CHECK(Result<void>(again.get<TransactionTrace>()).succeeded());
+      CHECK(Result<void>(byBob.get<TransactionTrace>()).succeeded());
+
+      // Or both in one transaction, with no block between.
+      const auto carol   = "carol"_a;
+      auto       grouped = push(t.signTransaction(
+          t.makeTransaction({newAccount(carol), system.getAuthOf(carol)}, 7)));
+      while (t.runQueueItem())
+      {
+      }
+      trace = t.pushNextTransaction();
+      REQUIRE(trace.has_value());
+      CHECK_FALSE(trace->error.has_value());
+      CHECK(Result<void>(grouped.get<TransactionTrace>()).succeeded());
+   }
+}
+
 TEST_CASE("Test firstAuth")
 {
    DefaultTestChain t;
@@ -750,7 +882,8 @@ namespace
 // (WasmConfigRow: 512 pages, 32 MiB). r-transact, which takes a transaction
 // from a client, hands it on and answers it, has two limits of its own: a
 // body of push_transaction is at most 5 MiB, and a trace of more than
-// 3.25 MiB is answered by its outcome alone. See doc/pssz-conversion.md 7.9.
+// 3.25 MiB is answered by its outcome alone. See
+// doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md 7.9.
 TEST_CASE("Test transaction size")
 {
    DefaultTestChain t;
@@ -940,7 +1073,8 @@ TEST_CASE("Test transaction size")
    }
 }
 
-// Measurements behind doc/pssz-conversion.md 7.9, 7.11 and 7.12. Not part of the suite:
+// Measurements behind doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md 7.9,
+// 7.11 and 7.12. Not part of the suite:
 // psitest Transact-test.wasm "[.measure]"
 TEST_CASE("Measure transaction size", "[.measure]")
 {

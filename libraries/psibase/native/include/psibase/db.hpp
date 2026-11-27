@@ -33,31 +33,7 @@ namespace psibase
 
    using DbPtr = storage::shared_root;
 
-   struct DbChangeSet
-   {
-      struct Range
-      {
-         std::vector<unsigned char> lower;
-         std::vector<unsigned char> upper;
-         bool                       write;
-      };
-      std::vector<Range> ranges;
-      void               onRead(std::span<const char> value);
-      void               onGreaterEqual(std::span<const char> key,
-                                        std::size_t           prefixLen,
-                                        bool                  found,
-                                        std::span<const char> result);
-      void               onLessThan(std::span<const char> key,
-                                    std::size_t           prefixLen,
-                                    bool                  found,
-                                    std::span<const char> result);
-      void               onMax(std::span<const char> key, bool found, std::span<const char> result);
-      void               onWrite(std::span<const char> key);
-   };
-
    using IndependentRevision  = std::array<DbPtr, numIndependentDatabases>;
-   using IndependentChangeSet = std::array<DbChangeSet, numIndependentDatabases>;
-
    // Certain rows may trigger callbacks when they are written.
    //
    struct DatabaseCallbacks
@@ -122,6 +98,10 @@ namespace psibase
       // the storage is shared.
       SharedDatabase clone() const;
 
+      // The root of this database that is no part of the chain: rebuildable
+      // data, kept out of every revision, fork and snapshot (storage.hpp).
+      storage::cache_root cacheRoot() const;
+
       ConstRevisionPtr getHead();
       ConstRevisionPtr emptyRevision();
       WriterPtr        createWriter();
@@ -138,15 +118,40 @@ namespace psibase
                                                        DbId                  db,
                                                        std::span<const char> key);
 
+      // Several puts and removes of native rows published together: the
+      // write lock of the node-local databases is taken once for the whole
+      // batch, as kvPutSubjective takes it for one row. For native code
+      // that writes many rows off the request path (the usage meter's
+      // flush); keep a batch small, since every section and every other
+      // direct write waits while it is applied. Like the other direct
+      // writes it must not be called on a thread that is inside a section.
+      struct SubjectiveWrite
+      {
+         std::vector<char>                key;
+         std::optional<std::vector<char>> value;  // empty: remove
+      };
+      void kvWriteSubjective(Writer& writer, DbId db, std::span<const SubjectiveWrite> writes);
+      // Every row whose key starts with `prefix`, in key order, from the
+      // current published state.
+      void kvScanSubjective(
+          Writer&               reader,
+          DbId                  db,
+          std::span<const char> prefix,
+          const std::function<void(std::span<const char> key, std::span<const char> value)>& f);
+
       IndependentRevision getSubjective();
-      bool                commitSubjective(Writer&                writer,
-                                           IndependentRevision&   original,
-                                           IndependentRevision    updated,
-                                           IndependentChangeSet&& changes,
-                                           SocketChangeSet&&      socketChanges,
-                                           Sockets&               sockets,
-                                           SocketAutoCloseSet&    closing,
-                                           const std::function<void()>& afterPublish = {});
+      // The write lock of the node-local databases, for a section
+      // (Database::checkoutSubjective ... commitSubjective), and, with the
+      // lock held, publication of what the section built: the roots are
+      // replaced and the socket changes applied (false if they cannot be
+      // applied; nothing is published then).
+      void lockSubjective();
+      void unlockSubjective();
+      bool publishSubjective(Writer&             writer,
+                             IndependentRevision updated,
+                             SocketChangeSet&&   socketChanges,
+                             Sockets&            sockets,
+                             SocketAutoCloseSet& closing);
 
       std::optional<bool>                isSlow() const;
       std::filesystem::path             directory() const;
@@ -229,6 +234,9 @@ namespace psibase
 
       // Manage access to subjective database
       void checkoutEmptySubjective();
+      // A section on the node-local databases: the way to write them. It
+      // holds their write lock from here to its commit or abort. Reading
+      // needs no section: outside one, a read is of what was published last.
       void checkoutSubjective();
       bool commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing);
       void abortSubjective();

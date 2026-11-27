@@ -11,14 +11,46 @@
 
 #include <psibase/ExecutionContext.hpp>
 
+#include <algorithm>
+#include <chrono>
+#include <cstddef>
+#include <deque>
 #include <filesystem>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
 
+namespace psibase
+{
+   class NativeAotCache;
+}
+
 namespace psibase::vm
 {
+   // The code an engine's cache has found its compiler to refuse: what
+   // Cache::refused answers from. Bounded, oldest first out. Not
+   // synchronized: used under the cache's own mutex.
+   template <typename Key>
+   struct RefusedCode
+   {
+      static constexpr std::size_t maxKeys = 1024;
+      std::deque<Key>              keys;
+
+      bool contains(const Key& key) const { return std::ranges::find(keys, key) != keys.end(); }
+      void record(const Key& key)
+      {
+         if (contains(key))
+            return;
+         keys.push_back(key);
+         if (keys.size() > maxKeys)
+            keys.pop_front();
+      }
+      void erase(const Key& key) { std::erase(keys, key); }
+   };
+
    // Compiled services, shared by the transactions of one SystemContext.
    struct Cache
    {
@@ -31,6 +63,91 @@ namespace psibase::vm
       // Returns once every compile compileAhead started has finished. An
       // engine that compiles nothing in the background has nothing to wait for.
       virtual void finishCompiles() {}
+      // See WasmCache.
+      virtual bool contains(const Checksum256&, const VMOptions&, std::uint8_t) const
+      {
+         return false;
+      }
+      virtual WasmCacheStats stats() const { return {}; }
+      // Whether a compile of this code that compileAhead ran or started has
+      // ended without a module, and none has been made since: this node's
+      // compiler refuses the code (or its compile threads leave it to the
+      // first execution), so waiting for another compile would never end.
+      // The engine records this where the compile ends; it is never
+      // inferred from the module being absent, which is also true of a
+      // module that was compiled and has since been evicted
+      // (WasmCache::mustDefer).
+      virtual bool refused(const Checksum256&, const VMOptions&, std::uint8_t) const
+      {
+         return false;
+      }
+
+      // What WasmCache needs to apply the node's rule for when code is
+      // compiled (WasmCache::compileInBackground, gofractally/psibase#2256).
+      // The rule itself is not the engine's.
+      //
+      // Whether compileAhead returns before the code is compiled, because
+      // the engine compiles on threads of its own. If it does not, WasmCache
+      // runs compileAhead on its compile threads where the rule says the
+      // caller must not wait.
+      virtual bool compilesInBackground() const { return false; }
+      // For an engine that compiles in the background: returns true once no
+      // compile of this code is queued or running, false if one still is
+      // after `limit`. Without a limit it waits as long as it takes.
+      virtual bool awaitCompile(const Checksum256&,
+                                const VMOptions&,
+                                std::uint8_t,
+                                std::optional<std::chrono::nanoseconds> limit)
+      {
+         (void)limit;
+         return true;
+      }
+      // For an engine that compiles in the background: compiles queued or
+      // running.
+      virtual std::size_t compilesInFlight() const { return 0; }
+
+      // Abandoning a compile (gofractally/psibase#2267). Only a speculative
+      // run's compile is ever abandoned, and only by WasmCache: when the
+      // node's bound on it passes, or when the node stops. Whatever a block
+      // needs is compiled without a handle, to completion.
+      //
+      // One handle is for one compile. Once set it stays set.
+      struct CompileCancel
+      {
+         virtual ~CompileCancel() = default;
+         // From any thread, any number of times.
+         virtual void cancel() = 0;
+      };
+      // A handle for a compile that compileCancellable is about to be given,
+      // or null if nothing can stop this engine's compiler once it has
+      // started. With null the node behaves as before there were handles:
+      // the run stops waiting and the compile runs to its end.
+      virtual std::unique_ptr<CompileCancel> makeCompileCancel() const { return nullptr; }
+      enum class CompileEnd
+      {
+         finished,   ///< as compileAhead: a module, or a refusal that is recorded
+         abandoned,  ///< the handle was set: no module, and nothing recorded
+      };
+      // compileAhead, for a compile that `cancel` (from makeCompileCancel of
+      // this cache) can abandon. An abandoned compile says nothing about the
+      // code: it must leave no module, no stored artifact and no refusal
+      // (refused() stays false), so that the same code is compiled again
+      // whenever it is next asked for.
+      virtual CompileEnd compileCancellable(const Checksum256&    hash,
+                                            std::span<const char> code,
+                                            const VMOptions&      options,
+                                            std::uint8_t          vmVersion,
+                                            CompileCancel&        cancel)
+      {
+         (void)cancel;
+         compileAhead(hash, code, options, vmVersion);
+         return CompileEnd::finished;
+      }
+
+      // Tests only: called on the thread that is about to compile a module
+      // from wasm, by engines that report compiles (wasmtime). Set before the
+      // cache is used.
+      std::function<void(const Checksum256&)> compileHook;
    };
 
    // What one running service needs for its linear memory, if the engine
@@ -60,8 +177,10 @@ namespace psibase::vm
    {
       std::string_view name;
       void (*registerHostFunctions)();
-      std::shared_ptr<Cache> (*makeCache)(std::uint32_t                cacheSize,
-                                          const std::filesystem::path& nativeArtifactPath);
+      // artifacts: where compiled modules are kept between runs; if null,
+      // the cache a process that configures none uses.
+      std::shared_ptr<Cache> (*makeCache)(std::uint32_t                   cacheSize,
+                                          std::shared_ptr<NativeAotCache> artifacts);
       std::unique_ptr<Memory> (*makeMemory)();
       // memory and cache are ones this engine made.
       std::unique_ptr<Context> (*makeContext)(TransactionContext& transactionContext,

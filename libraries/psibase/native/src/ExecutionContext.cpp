@@ -7,7 +7,10 @@
 #include <condition_variable>
 #include <deque>
 #include <future>
+#include <chrono>
 #include <map>
+#include <optional>
+#include <set>
 #include <thread>
 #include <boost/multi_index/key.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -17,6 +20,7 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/PsizamPolicy.hpp>
 #include <psibase/NativeAotCache.hpp>
+#include <psibase/NativeHostFunctions.hpp>
 #include <psibase/db.hpp>
 #include <psibase/finally.hpp>
 #include <psibase/NativeVM.hpp>
@@ -80,6 +84,10 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
       std::uint8_t               vmVersion = 0;
       std::unique_ptr<backend_t>                    backend;
       std::shared_ptr<dwarf::debugger_registration> debug;
+      // The module's entry points, checked to have their fixed signatures
+      // when the backend was made: the service is entered by these function
+      // indices (gofractally/psibase#2261).
+      NativeEntryPoints                             entryPoints;
 
       auto byHash() const { return std::tie(hash, vmOptions, vmVersion); }
    };
@@ -99,10 +107,11 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
       BackendContainer   backends;
       std::shared_ptr<NativeAotCache> nativeArtifacts;
 
-      WasmCacheImpl(uint32_t cacheSize, const std::filesystem::path& path)
+      WasmCacheImpl(uint32_t cacheSize, std::shared_ptr<NativeAotCache> artifacts)
           : cacheSize{cacheSize},
-            nativeArtifacts(path.empty() ? nativeAotCacheFromEnvironment()
-                                         : std::make_shared<NativeAotCache>(path)) {}
+            nativeArtifacts(artifacts ? std::move(artifacts) : nativeAotCacheFromEnvironment())
+      {
+      }
 
       // Compiling a service to native code takes seconds. It starts when the
       // code is stored, on these threads, so it overlaps the rest of the
@@ -146,6 +155,73 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
          compilesIdle.wait(lock, [&] { return pending.empty(); });
       }
 
+      // What WasmCache needs for the node's rule of when code is compiled
+      // (VmEngine.hpp, gofractally/psibase#2256). Added for that rule and
+      // NOT RUN: LLVM AOT is not built where this was written.
+      //
+      // Code this cache has made a backend for since the process started.
+      // A backend is checked out of `backends` while a transaction runs it,
+      // so `backends` alone would report popular code as missing.
+      std::set<PendingKey> known;
+      // Code a compile thread took and made no backend for: the compiler
+      // threw, or the code carries debug information, which only the first
+      // execution compiles. Recorded by the thread when the job ends, under
+      // `mutex`; removed where a backend of the code is added. This is what
+      // keeps a producer from deferring such code until its transaction
+      // expires (vm::Cache::refused). NOT RUN, as above.
+      vm::RefusedCode<PendingKey> refusedCode;
+#if defined(PSIBASE_VM_LLVM_AOT)
+      bool compilesInBackground() const override { return true; }
+      bool refused(const Checksum256& hash,
+                   const VMOptions&   options,
+                   std::uint8_t       vmVersion) const override
+      {
+         std::lock_guard lock{mutex};
+         return refusedCode.contains(PendingKey{hash, options, vmVersion});
+      }
+      bool contains(const Checksum256& hash,
+                    const VMOptions&   options,
+                    std::uint8_t       vmVersion) const override
+      {
+         std::lock_guard lock{mutex};
+         return known.contains(PendingKey{hash, options, vmVersion});
+      }
+      // The timed form of awaitCompile below. It never takes a queued
+      // compile over: the caller is not going to compile.
+      bool awaitCompile(const Checksum256&                      hash,
+                        const VMOptions&                        options,
+                        std::uint8_t                            vmVersion,
+                        std::optional<std::chrono::nanoseconds> limit) override
+      {
+         if (!limit)
+         {
+            awaitCompile(hash, options, vmVersion);
+            return true;
+         }
+         std::shared_future<void> done;
+         {
+            std::lock_guard lock{mutex};
+            auto            it = pending.find(PendingKey{hash, options, vmVersion});
+            if (it == pending.end())
+               return true;
+            done = it->second;
+         }
+         return done.wait_for(*limit) == std::future_status::ready;
+      }
+      std::size_t compilesInFlight() const override
+      {
+         std::lock_guard lock{mutex};
+         return pending.size();
+      }
+#else
+      // The JITs compile in milliseconds where the code is first executed:
+      // there is never a compile to wait for or to keep a producer from.
+      bool contains(const Checksum256&, const VMOptions&, std::uint8_t) const override
+      {
+         return true;
+      }
+#endif
+
       // Blocks until a compile started for this code, if any, has finished.
       void awaitCompile(const Checksum256& hash, const VMOptions& options, std::uint8_t vmVersion)
       {
@@ -177,6 +253,8 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
       {
          std::lock_guard<std::mutex> lock{mutex};
          auto&                       ind = backends.get<ByAge>();
+         if (entry.backend)
+            refusedCode.erase(PendingKey{entry.hash, entry.vmOptions, entry.vmVersion});
          ind.push_back(std::move(entry));
          while (ind.size() > cacheSize)
             ind.pop_front();
@@ -250,6 +328,7 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
          Job job = std::move(jobs.front());
          jobs.pop_front();
          lock.unlock();
+         bool made = false;
          try
          {
             // Code that fails here fails the same way, with its error
@@ -263,14 +342,22 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
             {
                BackendEntry entry{hash, limits, vmVersion};
                entry.backend = std::make_unique<backend_t>(job.code, nullptr, options);
+               entry.entryPoints = nativeEntryPoints(entry.backend->get_module());
                entry.debug   = dwarf::register_with_debugger(entry.backend->get_module());
                add(std::move(entry));
+               std::lock_guard known_lock{mutex};
+               known.insert(job.key);
+               made = true;
             }
          }
          catch (...)
          {
          }
          lock.lock();
+         // Before the key leaves `pending`: whoever then finds no compile
+         // in flight finds the outcome.
+         if (!made)
+            refusedCode.record(job.key);
          pending.erase(job.key);
          lock.unlock();
          job.done.set_value();
@@ -322,8 +409,6 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
             vmOptions{vmOptions, wasmCache.nativeArtifacts},
             wa{memory.wa}
       {
-         database.checkoutSubjective();
-         psibase::finally _{[&] { database.abortSubjective(); }};
          auto [ca, db] = getCode(service);
 
          code   = std::move(ca);
@@ -379,6 +464,17 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
                 if (!backend.backend)
                 {
                    unbilled.emplace(transactionContext);
+                   // The node's rule for a module that is missing, the same
+                   // on every engine: a producer's queued transaction is
+                   // deferred here, a speculative run waits up to its bound.
+                   transactionContext.codeNotCompiled(
+                       code.codeHash, code.vmVersion,
+                       [&]
+                       {
+                          loadCode();
+                          return std::span<const char>(
+                              reinterpret_cast<const char*>(c->code.data()), c->code.size());
+                       });
                    cache.awaitCompile(code.codeHash, vmOptions, code.vmVersion);
                    backend = cache.get(code.codeHash, vmOptions, code.vmVersion);
                 }
@@ -403,6 +499,11 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
                           std::make_unique<backend_t>(c->code, nullptr, this->vmOptions);
                       backend.debug = dwarf::register_with_debugger(backend.backend->get_module());
                    }
+                   // The same rule as when the code was stored.
+                   backend.entryPoints = nativeEntryPoints(backend.backend->get_module());
+                   std::lock_guard known_lock{cache.mutex};
+                   cache.known.insert(
+                       WasmCacheImpl::PendingKey{code.codeHash, vmOptions, code.vmVersion});
                 }
              });
       }
@@ -443,8 +544,8 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
                 // auto startTime = std::chrono::steady_clock::now();
                 backend.backend->set_wasm_allocator(&wa);
                 backend.backend->initialize(getAltStack(), this);
-                (*backend.backend)(getAltStack(), *this, "env", "start",
-                                   currentActContext->action.service.value);
+                enter(backend.entryPoints.start, "start",
+                      currentActContext->action.service.value);
                 initialized = true;
                 // auto us     = std::chrono::duration_cast<std::chrono::microseconds>(
                 //     std::chrono::steady_clock::now() - startTime);
@@ -465,6 +566,20 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
          ActionContext&                        actionContext;
          std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
       };
+
+      // Enters the service through one of its entry points. Where the
+      // module exports it, admission recorded its function index and checked
+      // its signature (NativeEntryPoints), so the call goes by index and the
+      // export list is not scanned for the name. Where it does not, the call
+      // by name reports that, as it always did.
+      template <typename... Args>
+      void enter(const std::optional<std::uint32_t>& index, std::string_view name, Args... args)
+      {
+         if (index)
+            backend.backend->call_by_index(getAltStack(), *this, *index, args...);
+         else
+            (*backend.backend)(getAltStack(), *this, "env", name, args...);
+      }
 
       template <typename F>
       void run(ActionContext& actionContext, F f)
@@ -517,38 +632,19 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
 
    static void registerHostFunctions()
    {
-      // TODO: enable linking to disabled functions below after we finalize
-      //       their interfaces. Disabling now simplifies future upgrades.
-
-      rhf_t::add<&ExecutionContextImpl::getResult>("env", "getResult");
-      rhf_t::add<&ExecutionContextImpl::getKey>("env", "getKey");
-      rhf_t::add<&ExecutionContextImpl::writeConsole>("env", "writeConsole");
-      rhf_t::add<&ExecutionContextImpl::abortMessage>("env", "abortMessage");
-      rhf_t::add<&ExecutionContextImpl::clockTimeGet>("env", "clockTimeGet");
-      rhf_t::add<&ExecutionContextImpl::getRandom>("env", "getRandom");
-      rhf_t::add<&ExecutionContextImpl::setMaxCpuTime>("env", "setMaxCpuTime");
-      rhf_t::add<&ExecutionContextImpl::getCurrentAction>("env", "getCurrentAction");
-      rhf_t::add<&ExecutionContextImpl::call>("env", "call");
-      rhf_t::add<&ExecutionContextImpl::setRetval>("env", "setRetval");
-      rhf_t::add<&ExecutionContextImpl::kvOpen>("env", "kvOpen");
-      rhf_t::add<&ExecutionContextImpl::kvOpenAt>("env", "kvOpenAt");
-      rhf_t::add<&ExecutionContextImpl::kvClose>("env", "kvClose");
-      rhf_t::add<&ExecutionContextImpl::exportHandles>("env", "exportHandles");
-      rhf_t::add<&ExecutionContextImpl::importHandles>("env", "importHandles");
-      rhf_t::add<&ExecutionContextImpl::kvPut>("env", "kvPut");
-      rhf_t::add<&ExecutionContextImpl::kvRemove>("env", "kvRemove");
-      rhf_t::add<&ExecutionContextImpl::kvGet>("env", "kvGet");
-      rhf_t::add<&ExecutionContextImpl::kvGreaterEqual>("env", "kvGreaterEqual");
-      rhf_t::add<&ExecutionContextImpl::kvLessThan>("env", "kvLessThan");
-      rhf_t::add<&ExecutionContextImpl::kvMax>("env", "kvMax");
-      // rhf_t::add<&ExecutionContextImpl::kvGetTransactionUsage>("env", "kvGetTransactionUsage");
-      rhf_t::add<&ExecutionContextImpl::checkoutSubjective>("env", "checkoutSubjective");
-      rhf_t::add<&ExecutionContextImpl::commitSubjective>("env", "commitSubjective");
-      rhf_t::add<&ExecutionContextImpl::abortSubjective>("env", "abortSubjective");
-      rhf_t::add<&ExecutionContextImpl::socketOpen>("env", "socketOpen");
-      rhf_t::add<&ExecutionContextImpl::socketSend>("env", "socketSend");
-      rhf_t::add<&ExecutionContextImpl::socketSetFlags>("env", "socketSetFlags");
-      rhf_t::add<&ExecutionContextImpl::readFile>("env", "readFile");
+      // The list every engine registers and admission checks imports
+      // against (NativeHostFunctions.hpp).
+#define PSIBASE_HOST_FUNCTION(name) rhf_t::add<&ExecutionContextImpl::name>("env", #name);
+      PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+#undef PSIBASE_HOST_FUNCTION
+      // What was registered is exactly the admission table, or the node
+      // does not start.
+      auto& registered = rhf_t::mappings::get();
+      for (const auto& [import, index] : registered.named_mapping)
+         checkNativeHostFunction(PSIBASE_VM_ENGINE_NAME, import.second,
+                                 registered.host_functions[index].params,
+                                 registered.host_functions[index].ret);
+      checkNativeHostFunctionCount(PSIBASE_VM_ENGINE_NAME, registered.named_mapping.size());
    }
 
    std::uint32_t ExecutionContextImpl::remainingStack() const
@@ -559,7 +655,7 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
    void ExecutionContextImpl::execProcessTransaction(ActionContext& actionContext)
    {
       run(actionContext, [&] {  //
-         (*backend.backend)(getAltStack(), *this, "env", "processTransaction");
+         enter(backend.entryPoints.processTransaction, "processTransaction");
       });
    }
 
@@ -577,16 +673,15 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
       }
 
       run(actionContext, [&] {  //
-         (*backend.backend)(getAltStack(), *this, "env", "called",
-                                  actionContext.action.service.value,
-                                  actionContext.action.sender.value);
+         enter(backend.entryPoints.called, "called", actionContext.action.service.value,
+               actionContext.action.sender.value);
       });
    }
 
    void ExecutionContextImpl::execServe(ActionContext& actionContext)
    {
       run(actionContext, [&] {  //
-         (*backend.backend)(getAltStack(), *this, "env", "serve");
+         enter(backend.entryPoints.serve, "serve");
       });
    }
 
@@ -608,8 +703,9 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
       static const vm::Engine result{
           PSIBASE_VM_ENGINE_NAME,
           &registerHostFunctions,
-          +[](std::uint32_t cacheSize, const std::filesystem::path& path) -> std::shared_ptr<vm::Cache>
-          { return std::make_shared<WasmCacheImpl>(cacheSize, path); },
+          +[](std::uint32_t                   cacheSize,
+              std::shared_ptr<NativeAotCache> artifacts) -> std::shared_ptr<vm::Cache>
+          { return std::make_shared<WasmCacheImpl>(cacheSize, std::move(artifacts)); },
           +[]() -> std::unique_ptr<vm::Memory> { return std::make_unique<ExecutionMemoryImpl>(); },
           +[](TransactionContext& transactionContext, const VMOptions& vmOptions,
               vm::Memory& memory, vm::Cache& cache,

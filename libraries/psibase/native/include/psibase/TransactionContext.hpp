@@ -1,6 +1,8 @@
 #pragma once
 
 #include <boost/container/flat_map.hpp>
+#include <chrono>
+#include <functional>
 #include <psibase/BlockContext.hpp>
 #include <psibase/BucketSet.hpp>
 #include <psibase/Socket.hpp>
@@ -78,6 +80,41 @@ namespace psibase
          TransactionContext& context;
       };
 
+      // Service code is about to be stored (a CodeByHashRow with vmType 0).
+      // Runs the chain's admission rule (admitNativeWasm) under this
+      // context's VM limits and throws its error if the code is not
+      // admissible, which aborts the transaction. That part is billed: every
+      // node does it at every such write, with or without a compiled module.
+      // Then hands the code to the engine to compile ahead, with billing
+      // paused: a node that already holds the module and one that compiles
+      // it here bill the same and reach the same limit decision.
+      //
+      // When the compile happens is the node's rule (WasmCache): here if
+      // nothing else applies; in the background when a block is applied;
+      // waited for, up to a bound, in a speculative run; and never while a
+      // producer runs a transaction from its queue, which is deferred
+      // instead (BlockContext::deferUncompiledCode).
+      void admitCode(const Checksum256& hash, std::span<const char> code, std::uint8_t vmVersion);
+
+      // For an engine adapter, with billing paused: this context is about to
+      // execute code the engine has not compiled, in memory or stored.
+      // `code` returns the wasm. Applies the same rule as admitCode. If it
+      // returns, the adapter looks for the module again and compiles it
+      // itself if it is still missing; if this run must not go on it throws.
+      void codeNotCompiled(const Checksum256&                            hash,
+                           std::uint8_t                                  vmVersion,
+                           const std::function<std::span<const char>()>& code);
+
+      // Set for the speculative run a node gives a transaction it receives
+      // (BlockContext::callRun). The tester's speculative runs are known by
+      // their DbMode.
+      bool speculativeRun = false;
+      // How long this run has waited, unbilled, for compiles that it started
+      // itself. Never part of a trace or of what the transaction is billed:
+      // it is what a node could charge whoever submitted the transaction
+      // (BlockContext::callRun reports it).
+      std::chrono::nanoseconds startedCompileTime{0};
+
       // Set watchdog timer; it will expire at startTime + serviceLoadTime + watchdogLimit.
       // This may be called multiple times with different limits; the most-recent limit applies.
       /// The VM limits this context executes services under.
@@ -99,6 +136,10 @@ namespace psibase
       }
 
      private:
+      void prepareCode(const Checksum256&                            hash,
+                       std::uint8_t                                  vmVersion,
+                       const std::function<std::span<const char>()>& code,
+                       bool                                          written);
       std::unique_ptr<TransactionContextImpl> impl;
    };  // TransactionContext
 

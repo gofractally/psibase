@@ -143,8 +143,18 @@ class TestShutdown(unittest.TestCase):
 
 class TestExceptionExit(TestShutdown):
     def do_shutdown(self, node):
+        # Break the chain: replace transact with code that cannot process a
+        # transaction. Code is checked when it is stored and must export
+        # start: (i64) -> () and called: (i64, i64) -> (), so this is the
+        # smallest thing that is admitted and still fails whenever the node
+        # calls it: both functions are a single `unreachable`.
+        broken = (bytes.fromhex('0061736d01000000')
+                  + bytes.fromhex('010a0260017e0060027e7e00')  # the two function types
+                  + bytes.fromhex('0303020001')                # two functions
+                  + bytes.fromhex('07120205') + b'start' + bytes.fromhex('000006') + b'called' + bytes.fromhex('0001')
+                  + bytes.fromhex('0a09020300000b0300000b'))   # each body: unreachable
         try:
-            node.push_action('transact', 'setcode', 'setcode', {"service":"transact","vmType":0, "vmVersion":0, "code": "DEADBEEF"})
+            node.push_action('transact', 'setcode', 'setcode', {"service":"transact","vmType":0, "vmVersion":0, "code": broken.hex().upper()})
         except ConnectionError:
             pass
 

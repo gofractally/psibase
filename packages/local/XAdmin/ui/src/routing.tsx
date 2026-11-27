@@ -1,4 +1,5 @@
 import {
+    Activity,
     FileText,
     Key,
     LayoutDashboard,
@@ -19,6 +20,7 @@ import { JoinPage } from "./pages/join-page";
 import { KeysPage } from "./pages/keys-page";
 import { NodeLocalPage } from "./pages/node-local-page";
 import { SetupPage } from "./pages/setup-page";
+import { UsagePage } from "./pages/usage-page";
 import { PeersPage } from "./peers/peers-page";
 
 export const routes = [
@@ -45,6 +47,12 @@ export const routes = [
         icon: FileText,
         path: "logs",
         element: <LogsPage />,
+    },
+    {
+        name: "Usage",
+        icon: Activity,
+        path: "usage",
+        element: <UsagePage />,
     },
     {
         name: "Packages",

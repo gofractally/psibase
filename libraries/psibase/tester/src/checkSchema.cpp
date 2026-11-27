@@ -16,7 +16,8 @@ namespace psibase
       // names, variant alternative labels, custom ids, argument list
       // forms). The comparison is the same whichever language built the
       // package: a declaration and its twin in the other language are one
-      // contract (doc/flip-interop.md section 0.1).
+      // contract (doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md
+      // section 0.1).
       std::string why;
       auto        same = [&](const psio::schema_types::AnyType& l,
                              const psio::schema_types::AnyType& r)

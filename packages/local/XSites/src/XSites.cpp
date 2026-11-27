@@ -55,19 +55,17 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
    }
    else
    {
-      std::optional<ContentRow> row;
       if (target.starts_with(XHttp::commonPrefix))
       {
          service = XHttp::commonService;
       }
-      PSIBASE_SUBJECTIVE_TX
+      // Lookups, without a section: the second row is an alternative to
+      // the first, not something that has to agree with it.
+      auto row = table.get(std::tuple(service, target));
+      if (!row)
       {
-         row = table.get(std::tuple(service, target));
-         if (!row)
-         {
-            row = table.get(std::tuple(
-                service, target + (target.ends_with('/') ? "index.html" : "/index.html")));
-         }
+         row = table.get(
+             std::tuple(service, target + (target.ends_with('/') ? "index.html" : "/index.html")));
       }
       if (row)
       {

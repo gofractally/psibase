@@ -12,12 +12,7 @@ using namespace LocalService;
 void XBasic::startSession()
 {
    auto envTable = Native::session(KvMode::read).open<EnvTable>();
-
-   std::optional<EnvRow> env;
-   PSIBASE_SUBJECTIVE_TX
-   {
-      env = envTable.get(std::string("PSIBASE_PASSWD_FILE"));
-   }
+   auto env      = envTable.get(std::string("PSIBASE_PASSWD_FILE"));
    if (!env)
       return;
    if (auto htpasswd = readFile(env->value))
@@ -51,11 +46,8 @@ AuthResult XBasic::checkAuth(const HttpRequest& request, std::optional<std::int3
    {
       if (auto auth = parseBasicAuth(*header))
       {
-         std::optional<PasswordRow> row;
-         PSIBASE_SUBJECTIVE_TX
-         {
-            row = passwords.get(std::string(auth->username()));
-         }
+         // A lookup: no section
+         auto row = passwords.get(std::string(auth->username()));
          if (row)
          {
             if (row->password)
@@ -78,11 +70,7 @@ AuthResult XBasic::checkAuth(const HttpRequest& request, std::optional<std::int3
          }
       }
    }
-   bool hasAnyPassword;
-   PSIBASE_SUBJECTIVE_TX
-   {
-      hasAnyPassword = !passwords.getIndex<0>().empty();
-   }
+   bool hasAnyPassword = !passwords.getIndex<0>().empty();
    if (hasAnyPassword)
       return Auth::Unauthenticated{{"Basic realm=\"psibase\", charset=\"UTF-8\""}};
    else

@@ -82,10 +82,10 @@ void load_local_packages(TransactionContext&           tc,
              .flags    = serviceInfo.parseFlags(),
              .codeHash = codeHash,
          };
+         // A local service is admitted like any other stored code; one that
+         // is not admissible stops the load with the reason.
+         tc.admitCode(codeHash, {reinterpret_cast<const char*>(code.data()), code.size()}, 0);
          tc.blockContext.db.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);
-         tc.blockContext.systemContext.wasmCache.compileAhead(
-             codeHash, {reinterpret_cast<const char*>(code.data()), code.size()}, tc.vmOptions(),
-             0);
          CodeByHashRow codeByHashRow{
              .codeHash = codeHash,
              .code     = std::move(code),

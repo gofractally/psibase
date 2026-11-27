@@ -11,11 +11,13 @@
 #include <memory>
 #include <optional>
 #include <psibase/http.hpp>
+#include <psibase/UsageMeter.hpp>
 #include <psibase/log.hpp>
 #include <tuple>
 #include <vector>
 
 #include "server_state.hpp"
+
 
 namespace psibase::http
 {
@@ -45,6 +47,8 @@ namespace psibase::http
       {
          virtual ~work()           = default;
          virtual void operator()() = 0;
+         // Usage metering: who the bytes of this response are charged to
+         std::shared_ptr<UsageRecord> usage;
       };
       // This queue is used for HTTP pipelining.
       std::vector<std::unique_ptr<work>> items;
@@ -80,6 +84,19 @@ namespace psibase::http
 
      public:
       bool pause_read = false;
+
+      // Usage metering (gofractally/psibase#2270).
+      //
+      // The meter (kept so that a request does not copy a shared pointer
+      // every thread shares), the identity of this connection, resolved
+      // once (UsageConnection), the record of the request being handled,
+      // which handle_request sets, and the record a response is charged to
+      // if it is not that one (a request whose identity changed while it
+      // was served).
+      std::shared_ptr<UsageMeter>  usage_meter;
+      UsageConnection              usage_connection;
+      std::shared_ptr<UsageRecord> usage;
+      std::shared_ptr<UsageRecord> reply_usage;
 
       // Returns `true` if we have reached the queue limit
       bool is_full() const { return items.size() >= limit; }

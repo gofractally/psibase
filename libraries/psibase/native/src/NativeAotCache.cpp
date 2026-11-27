@@ -59,7 +59,7 @@ namespace psibase
       {
          return S_ISREG(st.st_mode) && st.st_uid == ::getuid() && (st.st_mode & 07777) == 0600 &&
                 st.st_nlink == 1 && st.st_size > 0 &&
-                static_cast<std::uintmax_t>(st.st_size) <= NativeAotCache::maxArtifactSize;
+                static_cast<std::uintmax_t>(st.st_size) <= NativeAotDirectory::maxRecordSize;
       }
 
       bool unchanged(const struct stat& first, const struct stat& last) noexcept
@@ -80,7 +80,7 @@ namespace psibase
 #endif
       }
 
-      void filename(const NativeAotCache::Key& key, char (&name)[70]) noexcept
+      void filename(const NativeArtifactStore::Key& key, char (&name)[70]) noexcept
       {
          constexpr char hex[] = "0123456789abcdef";
          for (std::size_t i = 0; i < key.size(); ++i)
@@ -112,7 +112,7 @@ namespace psibase
       }
    }  // namespace
 
-   NativeAotCache::NativeAotCache(const std::filesystem::path& requested) noexcept
+   NativeAotDirectory::NativeAotDirectory(const std::filesystem::path& requested) noexcept
    {
       try
       {
@@ -164,18 +164,18 @@ namespace psibase
       }
    }
 
-   NativeAotCache::~NativeAotCache()
+   NativeAotDirectory::~NativeAotDirectory()
    {
       if (directory != -1)
          ::close(directory);
    }
 
-   bool NativeAotCache::usable() const noexcept
+   bool NativeAotDirectory::usable() const noexcept
    {
       return privateDirectory(directory);
    }
 
-   std::optional<std::vector<char>> NativeAotCache::load(const Key& key) const noexcept
+   std::optional<std::vector<char>> NativeAotDirectory::read(const Key& key) noexcept
    {
       try
       {
@@ -216,11 +216,11 @@ namespace psibase
       }
    }
 
-   void NativeAotCache::store(const Key& key, std::span<const char> artifact) const noexcept
+   void NativeAotDirectory::write(const Key& key, std::span<const char> artifact) noexcept
    {
       try
       {
-         if (!usable() || artifact.empty() || artifact.size() > maxArtifactSize)
+         if (!usable() || artifact.empty() || artifact.size() > maxRecordSize)
             return;
          char name[70];
          filename(key, name);
@@ -273,5 +273,14 @@ namespace psibase
       catch (...)
       {
       }
+   }
+
+   void NativeAotDirectory::erase(const Key& key) noexcept
+   {
+      if (!usable())
+         return;
+      char name[70];
+      filename(key, name);
+      ::unlinkat(directory, name, 0);
    }
 }  // namespace psibase

@@ -55,7 +55,10 @@ namespace
    void secondaryTableRejected(const psizam::wasm_code& code)
    {
       const psibase::NativeVMOptions options(psibase::VMOptions{1024, 2, 3, 65536});
-      CHECK_THROWS_WITH(Runtime<Profile>(code, options), Catch::Matchers::ContainsSubstring("one table"));
+      // Refused under the node's policy, whichever check reaches it first:
+      // the limit on declared tables (max_table_section_elements) or the
+      // engine's own one-table rule. Both name the table.
+      CHECK_THROWS_WITH(Runtime<Profile>(code, options), Catch::Matchers::ContainsSubstring("table"));
    }
 }
 

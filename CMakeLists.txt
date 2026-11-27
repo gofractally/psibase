@@ -386,6 +386,7 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(packages/:Plugins 
     accounts
+    x-usage
     accounts-query
     aes
     auth-any
@@ -1448,21 +1449,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XSignup.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XSignup-schema.json
         SERVER x-signup
-    PACKAGE_DEPENDS XHttp XAdmin XKeys XUsage
-    DEPENDS wasm
-)
-
-psibase_package(
-    OUTPUT ${SERVICE_DIR}/XUsage.psi
-    NAME XUsage
-    VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "Counts what each account, guest and visitor uses of this node. Logging only."
-    LOCAL
-    SERVICE x-usage
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/XUsage.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XUsage-schema.json
-        SERVER x-usage
-    PACKAGE_DEPENDS XHttp XAdmin
+    PACKAGE_DEPENDS XHttp XAdmin XKeys
     DEPENDS wasm
 )
 
@@ -1570,6 +1557,21 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Packages used in the tester"
     PACKAGE_DEPENDS AuthSig BrotliCodec BrotliSvc Db Events Minimal Nft Sites StagedTx Supervisor Symbol Tokens
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/XUsage.psi
+    NAME XUsage
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Reports what each connection identity used of this node"
+    LOCAL
+    SERVICE x-usage
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XUsage.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XUsage-schema.json
+        SERVER x-usage
+        FLAGS isPrivileged
+        DATA ${Plugins_OUTPUT_FILE_x_usage} /plugin.wasm
+    DEPENDS wasm ${Plugins_DEP}
 )
 
 psibase_package(
@@ -1705,10 +1707,10 @@ install(
           ${SERVICE_DIR}/XProxy.psi
           ${SERVICE_DIR}/XRun.psi
           ${SERVICE_DIR}/XSignup.psi
-          ${SERVICE_DIR}/XUsage.psi
           ${SERVICE_DIR}/XSites.psi
           ${SERVICE_DIR}/XTimer.psi
           ${SERVICE_DIR}/XTransact.psi
+          ${SERVICE_DIR}/XUsage.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
 

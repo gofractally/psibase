@@ -23,6 +23,24 @@ mod service {
         pub result: i32,
     }
 
+    /// A row with a declared member: a memo is UTF-8 of at most 80 bytes.
+    #[table(name = "NoteTable", index = 1)]
+    #[derive(psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+    pub struct Note {
+        #[primary_key]
+        pub id: u32,
+        pub memo: Memo,
+    }
+
+    /// A row that holds a list.
+    #[table(name = "TagsTable", index = 2)]
+    #[derive(psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+    pub struct Tags {
+        #[primary_key]
+        pub id: u32,
+        pub tags: Vec<String>,
+    }
+
     #[derive(SimpleObject, Deserialize)]
     pub struct AddEvent {
         #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -84,6 +102,60 @@ mod service {
             value,
             message,
         });
+    }
+
+    /// The memo is declared: the dispatcher refuses an argument list that
+    /// holds a longer one.
+    #[action]
+    pub fn note(id: u32, memo: Memo) {
+        NoteTable::new().put(&Note { id, memo }).unwrap();
+    }
+
+    /// Writes row `id` of this service's own `NoteTable` with a memo of
+    /// `80 + extra` bytes: the bytes a fast write leaves for a row that is
+    /// outside its declaration (the memo is the last member, so the longer
+    /// text still has a frame).
+    #[action]
+    pub fn store_raw(id: u32, extra: u32) {
+        let table = NoteTable::new();
+        let mut row = psio::to_pssz(&Note {
+            id,
+            memo: Memo::new("a".repeat(80)).unwrap(),
+        });
+        row.extend(std::iter::repeat(b'a').take(extra as usize));
+        let key = table.serialize_key(0, &id);
+        kv_put_bytes(table.handle(), &psio::to_key(&key), &row);
+    }
+
+    /// Stores `row` as the bytes of row `id` of this service's own
+    /// `NoteTable`, whatever they are.
+    #[action]
+    pub fn store_bytes(id: u32, row: Vec<u8>) {
+        let table = NoteTable::new();
+        let key = table.serialize_key(0, &id);
+        kv_put_bytes(table.handle(), &psio::to_key(&key), &row);
+    }
+
+    /// The same for row `id` of `TagsTable`.
+    #[action]
+    pub fn store_tag_bytes(id: u32, row: Vec<u8>) {
+        let table = TagsTable::new();
+        let key = table.serialize_key(0, &id);
+        kv_put_bytes(table.handle(), &psio::to_key(&key), &row);
+    }
+
+    /// The number of tags of row `id` of `TagsTable`.
+    #[action]
+    pub fn tag_count(id: u32) -> u32 {
+        TagsTable::new().get_index_pk().get(&id).unwrap().tags.len() as u32
+    }
+
+    /// The length of the memo of row `id`, read as a service reads its own
+    /// table: trusted.
+    #[action]
+    pub fn note_len(id: u32) -> u32 {
+        let note = NoteTable::new().get_index_pk().get(&id).unwrap();
+        note.memo.to_string().len() as u32
     }
 
     #[event(history)]
@@ -194,6 +266,12 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
             "multiply": {"a": 0, "b": 0},
             "init": {},
             "create_record": {"count": 0, "value": 0, "message": ""},
+            "note": {"id": 0, "memo": ""},
+            "store_raw": {"id": 0, "extra": 0},
+            "note_len": {"id": 0},
+            "store_bytes": {"id": 0, "row": ""},
+            "store_tag_bytes": {"id": 0, "row": ""},
+            "tag_count": {"id": 0},
             "serveSys": {
                 "request": {
                     "body": "",
@@ -208,6 +286,116 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
     );
 
     println!("{}", chain.get(SERVICE, "/schema")?.text()?);
+
+    Ok(())
+}
+
+/// Where PSIO's read and write modes meet a Rust service
+/// (gofractally/psibase#2281): an action argument is validated at dispatch;
+/// a row of the service's own table is read trusted.
+#[psibase::test_case(packages("TestContract2"))]
+fn test_two_modes(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    use psibase::{
+        method_raw, Action, Memo, MethodNumber, Push, SignedTransaction, Transaction,
+    };
+
+    let longest = Memo::new("a".repeat(80)).unwrap();
+    Wrapper::push(&chain).note(1, longest.clone()).get()?;
+    assert_eq!(Wrapper::push(&chain).note_len(1).get()?, 80);
+
+    // An argument list that holds a memo of 81 bytes. No `Memo` is that
+    // long, so these are the bytes of the longest valid call and one more
+    // byte of text. The dispatcher refuses them before the action runs.
+    let mut args = psio::to_pssz(&(2u32, longest));
+    assert!(psio::from_pssz::<(u32, Memo)>(&args).is_ok());
+    args.push(b'a');
+    assert!(psio::from_pssz::<(u32, Memo)>(&args).is_err());
+    let mut trx = Transaction {
+        tapos: Default::default(),
+        actions: vec![Action {
+            sender: SERVICE,
+            service: SERVICE,
+            method: MethodNumber::new(method_raw!("note")),
+            rawData: args.into(),
+        }],
+        claims: vec![],
+    };
+    chain.fill_tapos(&mut trx, 2);
+    let trace = chain.push(&SignedTransaction {
+        transaction: psio::pssz::Nested::new(&trx).unwrap(),
+        proofs: Default::default(),
+        subjectiveData: None,
+    });
+    let error = trace.error_text().expect("an 81-byte memo is refused at dispatch");
+    println!("refused: {error}");
+    chain.start_block();
+
+    // The same 81 bytes in a row of the service's own table: the service
+    // reads its row back as it was written.
+    Wrapper::push(&chain).store_raw(3, 1).get()?;
+    assert_eq!(Wrapper::push(&chain).note_len(3).get()?, 81);
+    Wrapper::push(&chain).store_raw(4, 0).get()?;
+    assert_eq!(Wrapper::push(&chain).note_len(4).get()?, 80);
+
+    // A trusted read stays inside the row. Bytes that are not a frame of
+    // the row's type (what a wrong change of the type would leave in the
+    // table) end the action with PSIO's message (gofractally/psio#15).
+    let row = psio::to_pssz(&service::Note {
+        id: 5,
+        memo: Memo::new("abcdefgh".to_string()).unwrap(),
+    });
+    // header (size of the fixed part), id, offset of the memo, memo
+    assert_eq!(row.len(), 14);
+    Wrapper::push(&chain).store_bytes(5, row.clone()).get()?;
+    assert_eq!(Wrapper::push(&chain).note_len(5).get()?, 8);
+    let not_a_frame = "the bytes are not a frame of";
+    let refused = |id: u32, bytes: Vec<u8>| -> String {
+        Wrapper::push(&chain).store_bytes(id, bytes).get().unwrap();
+        let error = Wrapper::push(&chain)
+            .note_len(id)
+            .get()
+            .expect_err("a row that is not a frame of its type ends the action")
+            .to_string();
+        println!("row {id}: {error}");
+        error
+    };
+    // Cut inside the fixed part
+    assert!(refused(6, row[..3].to_vec()).contains(not_a_frame));
+    // No bytes at all
+    assert!(refused(7, vec![]).contains(not_a_frame));
+    // The offset of the memo points past the end of the row
+    let mut past = row.clone();
+    past[5] = 200;
+    assert!(refused(8, past).contains(not_a_frame));
+    // The header claims a fixed part larger than the row
+    let mut header = row.clone();
+    header[0] = 200;
+    assert!(refused(9, header).contains(not_a_frame));
+    // A row of an older layout of the type, from before it had its memo
+    assert!(refused(10, psio::to_pssz(&(10u32,))).contains(not_a_frame));
+
+    // A list whose count is corrupted: the count of a list of strings is
+    // its first offset, and one byte makes it claim more elements than the
+    // row holds.
+    let tags = psio::to_pssz(&service::Tags {
+        id: 7,
+        tags: vec!["ab".to_string(), "cde".to_string()],
+    });
+    assert_eq!(tags.len(), 25);
+    Wrapper::push(&chain).store_tag_bytes(7, tags.clone()).get()?;
+    assert_eq!(Wrapper::push(&chain).tag_count(7).get()?, 2);
+    for (id, at, byte) in [(8u32, 12usize, 0xffu8), (9, 15, 0x7f)] {
+        let mut count = tags.clone();
+        count[at] = byte;
+        Wrapper::push(&chain).store_tag_bytes(id, count).get()?;
+        let error = Wrapper::push(&chain)
+            .tag_count(id)
+            .get()
+            .expect_err("a corrupted list count ends the action")
+            .to_string();
+        println!("tags {id}: {error}");
+        assert!(error.contains(not_a_frame));
+    }
 
     Ok(())
 }

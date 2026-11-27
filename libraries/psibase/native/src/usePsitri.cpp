@@ -1,3 +1,5 @@
+#include <thread>
+#include <condition_variable>
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
@@ -32,65 +34,6 @@ namespace psibase
 
    namespace
    {
-      void prepare(DbChangeSet& changes)
-      {
-         std::ranges::sort(changes.ranges, {}, &DbChangeSet::Range::lower);
-         // merge adjacent and overlapping ranges
-         auto pos = changes.ranges.begin();
-         auto end = changes.ranges.end();
-         if (pos != end)
-         {
-            auto out = pos;
-            ++pos;
-            for (; pos != end; ++pos)
-            {
-               if (out->upper.empty())
-               {
-                  out->write = out->write || std::any_of(pos, end, [](auto& r) { return r.write; });
-                  break;
-               }
-               else if (pos->lower <= out->upper)
-               {
-                  out->write |= pos->write;
-                  if (out->upper < pos->upper || pos->upper.empty())
-                     out->upper = std::move(pos->upper);
-               }
-               else
-               {
-                  ++out;
-                  *out = std::move(*pos);
-               }
-            }
-            ++out;
-            changes.ranges.erase(out, changes.ranges.end());
-         }
-      }
-      std::vector<unsigned char> keyExact(std::span<const char> key)
-      {
-         return {key.begin(), key.end()};
-      }
-      std::vector<unsigned char> keyNext(std::span<const char> key)
-      {
-         std::vector<unsigned char> result;
-         result.reserve(key.size() + 1);
-         result.insert(result.end(), key.begin(), key.end());
-         result.push_back(0);
-         return result;
-      }
-      std::vector<unsigned char> keyNextPrefix(std::span<const char> key)
-      {
-         auto result = keyExact(key);
-         while (!result.empty() && result.back() == 0xffu)
-            result.pop_back();
-         if (!result.empty())
-            ++result.back();
-         return result;
-      }
-      std::span<const char> dbKey(const std::vector<unsigned char>& v)
-      {
-         return {reinterpret_cast<const char*>(v.data()), v.size()};
-      }
-
       bool isIndependent(DbId db)
       {
          return db >= DbId::beginIndependent && db < DbId::endIndependent;
@@ -102,34 +45,6 @@ namespace psibase
       }
 
    }  // namespace
-   void DbChangeSet::onRead(std::span<const char> key)
-   {
-      ranges.push_back({.lower = keyExact(key), .upper = keyNext(key)});
-   }
-   void DbChangeSet::onGreaterEqual(std::span<const char> key,
-                                    std::size_t           prefixLen,
-                                    bool                  found,
-                                    std::span<const char> result)
-   {
-      ranges.push_back(
-          {keyExact(key), found ? keyNext(result) : keyNextPrefix(key.subspan(0, prefixLen))});
-   }
-   void DbChangeSet::onLessThan(std::span<const char> key,
-                                std::size_t           prefixLen,
-                                bool                  found,
-                                std::span<const char> result)
-   {
-      ranges.push_back(
-          {found ? keyExact(result) : keyExact(key.subspan(0, prefixLen)), keyExact(key)});
-   }
-   void DbChangeSet::onMax(std::span<const char> key, bool found, std::span<const char> result)
-   {
-      ranges.push_back({found ? keyExact(result) : keyExact(key), keyNextPrefix(key)});
-   }
-   void DbChangeSet::onWrite(std::span<const char> key)
-   {
-      ranges.push_back({.lower = keyExact(key), .upper = keyNext(key), .write = true});
-   }
 
       struct Revision
    {
@@ -183,9 +98,61 @@ namespace psibase
       mutable std::mutex              headMutex;
       std::shared_ptr<const Revision> head;
 
-      mutable std::mutex  subjectiveMutex;
-      // Guards only the value of `subjective`. A subjective writer holds
-      // subjectiveMutex for its whole comparison, splice and publication;
+      // The write lock of the node-local (subjective) databases
+      // (gofractally/psibase#2276). Whoever may change them holds it for as
+      // long as it works on them: a section of a service from its start to
+      // its commit or abort, native code for the one row it puts or
+      // removes. So there is one writer at a time, what it publishes is
+      // built on what was published last, nothing is compared or merged,
+      // and a section never has to be run a second time. Reading never takes
+      // it: a read made outside a section is a read of what was published
+      // last, as a query reads the head block.
+      //
+      // Not a std::mutex: a section runs service code while it holds the
+      // lock, and native code reached from that service code on the same
+      // thread that tried to write the databases directly would wait for
+      // itself for ever. That is refused with an error instead.
+      class WriteLock
+      {
+         std::mutex              mutex;
+         std::condition_variable released;
+         bool                    held = false;
+         std::thread::id         owner;
+
+        public:
+         void lock()
+         {
+            std::unique_lock l{mutex};
+            if (held && owner == std::this_thread::get_id())
+               throw std::runtime_error(
+                   "the node-local database was written directly inside a section that is "
+                   "writing it");
+            released.wait(l, [&] { return !held; });
+            held  = true;
+            owner = std::this_thread::get_id();
+         }
+         bool try_lock()
+         {
+            std::lock_guard l{mutex};
+            if (held)
+               return false;
+            held  = true;
+            owner = std::this_thread::get_id();
+            return true;
+         }
+         void unlock()
+         {
+            {
+               std::lock_guard l{mutex};
+               held  = false;
+               owner = {};
+            }
+            released.notify_one();
+         }
+      };
+      mutable WriteLock subjectiveMutex;
+      // Guards only the value of `subjective`. A writer
+      // holds subjectiveMutex for as long as it is writing;
       // readers that only need the current roots must not wait behind that.
       // Every execution context takes those roots when it is created, and on
       // a producer verifying signatures a sixth of the main thread's time
@@ -340,6 +307,11 @@ namespace psibase
       return result;
    }
 
+   storage::cache_root SharedDatabase::cacheRoot() const
+   {
+      return impl->trie->get_cache_root();
+   }
+
    ConstRevisionPtr SharedDatabase::getHead()
    {
       return impl->getHead();
@@ -369,9 +341,8 @@ namespace psibase
       void SharedDatabase::removeRevisions(Writer& writer, const Checksum256& irreversible)
    {
       check(impl->trie->owns(writer), "writer belongs to another database view");
-      // TODO: Reduce critical section
-      std::scoped_lock lock{impl->subjectiveMutex, impl->topMutex};
-      auto nativeSubjective = impl->subjective[independentIndex(DbId::nativeSubjective)];
+      auto nativeSubjective = impl->getNativeSubjective();
+      std::lock_guard lock{impl->topMutex};
       auto proposed         = impl->topRoot;
       std::vector<char> key{revisionByIdPrefix};
       std::vector<char> tmpKey;
@@ -465,85 +436,100 @@ namespace psibase
       return reader.get(root, key);
    }
 
+   void SharedDatabase::kvWriteSubjective(Writer&                          writer,
+                                          DbId                             db,
+                                          std::span<const SubjectiveWrite> writes)
+   {
+      check(impl->trie->owns(writer), "writer belongs to another database view");
+      if (writes.empty())
+         return;
+      std::lock_guard l{impl->subjectiveMutex};
+      auto            proposedSubjective = impl->subjective;
+      auto&           root               = proposedSubjective[independentIndex(db)];
+      for (const auto& w : writes)
+      {
+         if (w.value)
+            writer.upsert(root, w.key, *w.value);
+         else
+            writer.remove(root, w.key);
+      }
+      accounting::Publication publication;
+      impl->publishSubjective(writer, proposedSubjective);
+      impl->setSubjective(std::move(proposedSubjective));
+      publication.finish();
+   }
+
+   void SharedDatabase::kvScanSubjective(
+       Writer&               reader,
+       DbId                  db,
+       std::span<const char> prefix,
+       const std::function<void(std::span<const char> key, std::span<const char> value)>& f)
+   {
+      check(impl->trie->owns(reader), "writer belongs to another database view");
+      auto              root = impl->getNativeSubjective(db);
+      std::vector<char> key(prefix.begin(), prefix.end());
+      std::vector<char> value;
+      while (reader.get_greater_equal(root, key, &key, &value))
+      {
+         if (key.size() < prefix.size() || !std::equal(prefix.begin(), prefix.end(), key.begin()))
+            break;
+         f(key, value);
+         // The next key in order
+         key.push_back(0);
+      }
+   }
+
    IndependentRevision SharedDatabase::getSubjective()
    {
       std::lock_guard l{impl->subjectiveSnapshotMutex};
       return impl->subjective;
    }
 
-   bool SharedDatabase::commitSubjective(Writer&                      writer,
-                                         IndependentRevision&         original,
-                                         IndependentRevision          updated,
-                                         IndependentChangeSet&&       changes,
-                                         SocketChangeSet&&            socketChanges,
-                                         Sockets&                     sockets,
-                                         SocketAutoCloseSet&          closing,
-                                         const std::function<void()>& afterPublish)
+   void SharedDatabase::lockSubjective()
+   {
+      impl->subjectiveMutex.lock();
+   }
+
+   void SharedDatabase::unlockSubjective()
+   {
+      impl->subjectiveMutex.unlock();
+   }
+
+   // The caller holds the write lock and built `updated` on what was
+   // published last, so publishing is replacing the roots. Nothing the
+   // caller's callbacks need is called from here: no lock of these
+   // databases may be held when they run.
+   bool SharedDatabase::publishSubjective(Writer&              writer,
+                                          IndependentRevision  updated,
+                                          SocketChangeSet&&    socketChanges,
+                                          Sockets&             sockets,
+                                          SocketAutoCloseSet&  closing)
    {
       check(impl->trie->owns(writer), "writer belongs to another database view");
-      bool hasChange = !socketChanges.empty();
-      for (std::size_t i = 0; i < numIndependentDatabases; ++i)
+      // Only the irreversible effects are accepted/uncancellable.
+      accounting::Publication publication;
+      // Applying socket changes can start delivery on a socket (the recv
+      // flag), and the action that handles the first message runs on
+      // another thread and takes the current subjective roots. It must
+      // see the rows this commit writes for that socket, so when there
+      // are socket changes readers of the roots are held from the moment
+      // the changes apply until the new roots are in place. A proxy lost
+      // the first message of a connection through that window. Commits
+      // without socket changes, the common case, do not hold readers.
+      std::unique_lock snapshot{impl->subjectiveSnapshotMutex, std::defer_lock};
+      if (!socketChanges.empty())
+         snapshot.lock();
+      if (!sockets.applyChanges(std::move(socketChanges), &closing, impl->callbacks))
       {
-         prepare(changes[i]);
-         hasChange =
-             hasChange || std::ranges::any_of(changes[i].ranges, [](auto& r) { return r.write; });
+         publication.finish();
+         return false;
       }
-      std::optional<accounting::Publication> publication;
-      if (hasChange)
-      {
-         std::lock_guard l{impl->subjectiveMutex};
-         for (std::size_t i = 0; i < numIndependentDatabases; ++i)
-         {
-            for (const auto& r : changes[i].ranges)
-            {
-               if (!writer.is_equal_weak(original[i], impl->subjective[i], dbKey(r.lower),
-                                         dbKey(r.upper)))
-               {
-                  original = impl->subjective;
-                  return false;
-               }
-            }
-         }
-         auto proposedSubjective = impl->subjective;
-         for (std::size_t i = 0; i < numIndependentDatabases; ++i)
-         {
-            for (const auto& r : changes[i].ranges)
-            {
-               if (r.write)
-                  writer.splice(proposedSubjective[i], updated[i], dbKey(r.lower), dbKey(r.upper));
-            }
-         }
-         // Only the irreversible effects are accepted/uncancellable. Large
-         // comparisons and COW splice construction above remain cancellable.
-         publication.emplace();
-         // Applying socket changes can start delivery on a socket (the recv
-         // flag), and the action that handles the first message runs on
-         // another thread and takes the current subjective roots. It must
-         // see the rows this commit writes for that socket, so when there
-         // are socket changes readers of the roots are held from the moment
-         // the changes apply until the new roots are in place. A proxy lost
-         // the first message of a connection through that window. Commits
-         // without socket changes, the common case, do not hold readers.
-         std::unique_lock snapshot{impl->subjectiveSnapshotMutex, std::defer_lock};
-         if (!socketChanges.empty())
-            snapshot.lock();
-         if (!sockets.applyChanges(std::move(socketChanges), &closing, impl->callbacks))
-         {
-            original = impl->subjective;
-            publication->finish();
-            return false;
-         }
-         impl->publishSubjective(writer, proposedSubjective);
-         if (snapshot.owns_lock())
-            impl->subjective = std::move(proposedSubjective);
-         else
-            impl->setSubjective(std::move(proposedSubjective));
-      }
+      impl->publishSubjective(writer, updated);
+      if (snapshot.owns_lock())
+         impl->subjective = std::move(updated);
       else
-         publication.emplace();
-      if (afterPublish)
-         afterPublish();
-      publication->finish();
+         impl->setSubjective(std::move(updated));
+      publication.finish();
       return true;
    }
 
@@ -569,22 +555,10 @@ namespace psibase
 
    struct SubjectiveRevision
    {
-      std::array<std::size_t, numIndependentDatabases> changeSetPos;
       std::size_t                                      socketChangePos;
       IndependentRevision                              db;
       DbPtr                                            temporaryDb;
    };
-
-   std::array<std::size_t, numIndependentDatabases> getChangeSetPos(
-       std::span<const DbChangeSet, numIndependentDatabases> changes)
-   {
-      std::array<std::size_t, numIndependentDatabases> result;
-      for (std::size_t i = 0; i < numIndependentDatabases; ++i)
-      {
-         result[i] = changes[i].ranges.size();
-      }
-      return result;
-   }
 
 
    // Prints the per-database write counts and returns their sum.
@@ -627,7 +601,43 @@ namespace psibase
       std::vector<char>                       valueBuffer;
 
       DbPtr                           temporaryDb;
-      IndependentChangeSet            subjectiveChanges;
+      // A section's hold on the write lock of the node-local databases
+      // (SharedDatabaseImpl::subjectiveMutex). A section is how these
+      // databases are written: it takes the lock when it starts and keeps
+      // it until it has committed or is abandoned, so it works on the
+      // published state, nobody else can publish meanwhile, and it is never
+      // run a second time because of another writer. Reading needs no
+      // section: outside one, every read is of what was published last
+      // and takes no lock. (Reads inside a section see the section's own
+      // changes.)
+      //
+      // The lock is held while the section's service code runs. If that
+      // code has to wait for another service to be compiled, the other
+      // writers wait with it. Giving the lock up and running the section
+      // again in that case is possible, but it is rare and was judged not
+      // worth the complexity.
+      bool subjectiveLocked   = false;
+      // The published roots, for reads outside a section.
+      IndependentRevision subjectiveHead;
+      // Something was written, so there is something to publish.
+      bool subjectiveDirty    = false;
+      // checkoutEmptySubjective: a section on empty databases that is never
+      // published (a speculative run). It takes no lock.
+      bool subjectiveIsolated = false;
+      void subjectiveWrite()
+      {
+         check(!subjectiveRevisions.empty(),
+               "subjectiveCheckout is required to write the subjective database");
+         subjectiveDirty = true;
+      }
+      void releaseSubjective()
+      {
+         if (subjectiveLocked)
+            shared.unlockSubjective();
+         subjectiveLocked   = false;
+         subjectiveDirty    = false;
+         subjectiveIsolated = false;
+      }
       std::vector<SocketChange>       socketChanges;
       std::vector<SubjectiveRevision> subjectiveRevisions;
       std::size_t                     subjectiveLimit;
@@ -637,8 +647,13 @@ namespace psibase
       {
          if (isIndependent(db))
          {
-            check(!subjectiveRevisions.empty(),
-                  "subjectiveCheckout is required to access the subjective database");
+            if (subjectiveRevisions.empty())
+            {
+               // Not in a section: what is published now. (A write is
+               // refused before it gets here, see subjectiveWrite.)
+               subjectiveHead = shared.getSubjective();
+               return subjectiveHead[independentIndex(db)];
+            }
             return subjectiveRevisions.back().db[independentIndex(db)];
          }
          else if (db == DbId::temporary)
@@ -735,13 +750,6 @@ namespace psibase
             root.reset();
       }
 
-      DbChangeSet* getChangeSet(DbId db)
-      {
-         if (isIndependent(db))
-            return &subjectiveChanges[independentIndex(db)];
-         else
-            return nullptr;
-      }
 
       template <typename F>
       auto read(F f)
@@ -865,7 +873,8 @@ namespace psibase
          check(subjectiveRevisions.empty(),
                "Checking out specific subjective content is only possible at the top level");
          subjectiveRevisions.resize(2);
-         callbackFlags = 0;
+         subjectiveIsolated = true;
+         callbackFlags      = 0;
       }
 
       void checkoutSubjective()
@@ -874,11 +883,16 @@ namespace psibase
                "checkoutSubjective nesting exceeded limit");
          if (subjectiveRevisions.empty())
          {
-            subjectiveRevisions.push_back({{}, 0, shared.getSubjective(), temporaryDb});
+            // Without a write session nothing can be published.
+            if (writeSession)
+            {
+               shared.lockSubjective();
+               subjectiveLocked = true;
+            }
+            subjectiveRevisions.push_back({0, shared.getSubjective(), temporaryDb});
             callbackFlags = 0;
          }
-         subjectiveRevisions.push_back({getChangeSetPos(subjectiveChanges), socketChanges.size(),
-                                        subjectiveRevisions.back().db,
+         subjectiveRevisions.push_back({socketChanges.size(), subjectiveRevisions.back().db,
                                         subjectiveRevisions.back().temporaryDb});
       }
 
@@ -893,55 +907,43 @@ namespace psibase
             subjectiveRevisions[subjectiveRevisions.size() - 2].temporaryDb =
                 std::move(subjectiveRevisions.back().temporaryDb);
             subjectiveRevisions.pop_back();
+            return true;
          }
-         else
+         assert(subjectiveRevisions.size() == 2);
+         DatabaseCallbacks::Flags flags = {};
+         if (writeSession && !subjectiveIsolated)
          {
-            assert(subjectiveRevisions.size() == 2);
-            if (writeSession)
+            if (subjectiveLocked && (subjectiveDirty || !socketChanges.empty()))
             {
-               // With PSIBASE_CALL_PROFILE set: how often a top-level subjective
-               // commit loses to a concurrent one and its caller has to run again.
-               static const bool             countCommits = std::getenv("PSIBASE_CALL_PROFILE") != nullptr;
-               static std::atomic<std::uint64_t> attempts{0}, conflicts{0};
-               bool                          counted = false;
-               if (countCommits)
+               if (!shared.publishSubjective(*writeSession, subjectiveRevisions.back().db,
+                                             std::move(socketChanges), sockets, closing))
                {
-                  auto n = ++attempts;
-                  if (n % 2000 == 0)
-                     std::fprintf(stderr, "SUBJECTIVE commits=%llu conflicts=%llu writes=%llu\n",
-                                  (unsigned long long)n, (unsigned long long)conflicts.load(),
-                                  (unsigned long long)psibaseWriteCountsHook());
-                  counted = true;
-               }
-               (void)counted;
-               if (!shared.commitSubjective(
-                       *writeSession, subjectiveRevisions.front().db, subjectiveRevisions.back().db,
-                       std::move(subjectiveChanges), std::move(socketChanges), sockets, closing,
-                       [&]
-                       {
-                          temporaryDb = std::move(subjectiveRevisions.back().temporaryDb);
-                          if (callbackFlags && shared.impl->callbacks)
-                             shared.impl->callbacks->run(callbackFlags);
-                       }))
-               {
-                  if (countCommits)
-                     ++conflicts;
+                  // The socket changes could not be applied (a socket went
+                  // away meanwhile). Nothing was published; the caller runs
+                  // the section again on what is published, which is what
+                  // it started from: the lock is still held.
                   subjectiveRevisions[1].db              = subjectiveRevisions[0].db;
                   subjectiveRevisions[1].temporaryDb     = subjectiveRevisions[0].temporaryDb;
-                  subjectiveRevisions[0].changeSetPos    = {};
                   subjectiveRevisions[0].socketChangePos = 0;
-                  subjectiveRevisions[1].changeSetPos    = {};
                   subjectiveRevisions[1].socketChangePos = 0;
-                  for (auto& change : subjectiveChanges)
-                     change.ranges.clear();
                   socketChanges.clear();
                   return false;
                }
             }
-            subjectiveRevisions.clear();
-            for (auto& change : subjectiveChanges)
-               change.ranges.clear();
-            socketChanges.clear();
+            temporaryDb = std::move(subjectiveRevisions.back().temporaryDb);
+            flags       = callbackFlags;
+         }
+         subjectiveRevisions.clear();
+         socketChanges.clear();
+         releaseSubjective();
+         // After the lock is released: a callback takes locks of its own
+         // (the run queue's), and a thread that holds one of those may be
+         // starting a section.
+         if (flags && shared.impl->callbacks)
+         {
+            accounting::Publication publication;
+            shared.impl->callbacks->run(flags);
+            publication.finish();
          }
          return true;
       }
@@ -951,12 +953,7 @@ namespace psibase
                "abortSubjective requires checkoutSubjective");
          if (subjectiveRevisions.size() > 2)
          {
-            for (std::size_t i = 0; i < numIndependentDatabases; ++i)
-               assert(subjectiveRevisions.back().changeSetPos[i] <=
-                      subjectiveChanges[i].ranges.size());
             assert(subjectiveRevisions.back().socketChangePos <= socketChanges.size());
-            for (std::size_t i = 0; i < numIndependentDatabases; ++i)
-               subjectiveChanges[i].ranges.resize(subjectiveRevisions.back().changeSetPos[i]);
             socketChanges.resize(subjectiveRevisions.back().socketChangePos);
             subjectiveRevisions.pop_back();
          }
@@ -964,9 +961,8 @@ namespace psibase
          {
             assert(subjectiveRevisions.size() == 2);
             subjectiveRevisions.clear();
-            for (auto& change : subjectiveChanges)
-               change.ranges.clear();
             socketChanges.clear();
+            releaseSubjective();
          }
       }
       std::int32_t socketSetFlags(std::int32_t        socket,
@@ -1001,15 +997,11 @@ namespace psibase
          if (subjectiveLimit == 0)
          {
             subjectiveRevisions.clear();
-            for (auto& change : subjectiveChanges)
-               change.ranges.clear();
             socketChanges.clear();
+            releaseSubjective();
          }
          else if (subjectiveLimit < subjectiveRevisions.size())
          {
-            for (std::size_t i = 0; i < numIndependentDatabases; ++i)
-               subjectiveChanges[i].ranges.resize(
-                   subjectiveRevisions[subjectiveLimit].changeSetPos[i]);
             socketChanges.resize(subjectiveRevisions[subjectiveLimit].socketChangePos);
             subjectiveRevisions.resize(subjectiveLimit);
          }
@@ -1031,7 +1023,11 @@ namespace psibase
       impl = std::make_unique<DatabaseImpl>(DatabaseImpl{std::move(shared), std::move(revision)});
    }
 
-   Database::~Database() {}
+   Database::~Database()
+   {
+      if (impl)
+         impl->releaseSubjective();
+   }
 
    void Database::setRevision(ConstRevisionPtr revision)
    {
@@ -1207,10 +1203,8 @@ namespace psibase
       impl->write(
           [&](auto& session, auto& revision)
           {
-             if (auto* changes = impl->getChangeSet(db))
-             {
-                changes->onWrite(std::string_view{key.data(), key.size()});
-             }
+             if (isIndependent(db))
+                impl->subjectiveWrite();
              if (impl->keptAside(db))
                 impl->put(session, db, std::string_view{key.data(), key.size()}, std::string_view{value.data(), value.size()});
              else
@@ -1225,10 +1219,8 @@ namespace psibase
       impl->write(
           [&](auto& session, auto& revision)
           {
-             if (auto* changes = impl->getChangeSet(db))
-             {
-                changes->onWrite(std::string_view{key.data(), key.size()});
-             }
+             if (isIndependent(db))
+                impl->subjectiveWrite();
              if (impl->keptAside(db))
                 impl->erase(session, db, std::string_view{key.data(), key.size()});
              else
@@ -1241,11 +1233,6 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<std::span<const char>>
           {
-             if (auto* changes = impl->getChangeSet(db))
-             {
-                changes->onRead(std::string_view{key.data(), key.size()});
-             }
-
              const auto* pending = impl->pendingFor(db);
              if (!(pending ? session.get(impl->db(revision, db), *pending, std::string_view{key.data(), key.size()},
                                          &impl->valueBuffer)
@@ -1264,10 +1251,6 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> bool
           {
-             if (auto* changes = impl->getChangeSet(db))
-             {
-                changes->onRead(std::string_view{key.data(), key.size()});
-             }
              if (const auto* pending = impl->pendingFor(db))
                 return session.get(impl->db(revision, db), *pending, std::string_view{key.data(), key.size()}, nullptr);
              return session.get(impl->db(revision, db), std::string_view{key.data(), key.size()}, nullptr, nullptr);
@@ -1290,11 +1273,6 @@ namespace psibase
              if (found && (impl->keyBuffer.size() < matchKeySize ||
                            (matchKeySize && memcmp(impl->keyBuffer.data(), key.data(), matchKeySize))))
                 found = false;
-
-             if (auto* changes = impl->getChangeSet(db))
-             {
-                changes->onGreaterEqual(std::string_view{key.data(), key.size()}, matchKeySize, found, impl->keyBuffer);
-             }
 
              if (!found)
              {
@@ -1322,11 +1300,6 @@ namespace psibase
                            (matchKeySize && memcmp(impl->keyBuffer.data(), key.data(), matchKeySize))))
                 found = false;
 
-             if (auto* changes = impl->getChangeSet(db))
-             {
-                changes->onLessThan(std::string_view{key.data(), key.size()}, matchKeySize, found, impl->keyBuffer);
-             }
-
              if (!found)
              {
                 return {};
@@ -1347,11 +1320,6 @@ namespace psibase
                                            &impl->keyBuffer, &impl->valueBuffer)
                          : session.get_max(impl->db(revision, db), std::string_view{key.data(), key.size()},
                                            &impl->keyBuffer, &impl->valueBuffer, nullptr);
-
-             if (auto* changes = impl->getChangeSet(db))
-             {
-                changes->onMax(std::string_view{key.data(), key.size()}, found, impl->keyBuffer);
-             }
 
              if (!found)
              {

@@ -19,8 +19,10 @@
 #include <optional>
 #include <psibase/ActionContext.hpp>
 #include <psibase/NativeAotCache.hpp>
+#include <psibase/NativeHostFunctions.hpp>
 #include <psibase/PsizamPolicy.hpp>
 #include <psibase/VmEngine.hpp>
+#include <psibase/WasmtimeHost.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/db.hpp>
 #include <psibase/finally.hpp>
@@ -29,22 +31,6 @@
 #include <psizam/wasmtime_backend.hpp>
 
 namespace wt = psizam::wasmtime;
-
-// Pointer arguments the host ABI takes through psizam's unaligned proxy: one
-// i32 offset into linear memory, checked for sizeof(T) bytes.
-template <typename T>
-struct wt::detail::value_traits<psizam::detail::argument_proxy<T*>>
-{
-   static constexpr std::array<uint8_t, 1> types{type_i32};
-   static constexpr bool                   reads_memory = true;
-   static psizam::detail::argument_proxy<T*> load(const abi::PzwtValue* v, memory_view m)
-   {
-      std::uint64_t ptr = static_cast<std::uint32_t>(v->i32);
-      if (ptr > m.size || sizeof(T) > m.size - ptr)
-         throw host_memory_error("host pointer is outside linear memory");
-      return {m.base + ptr};
-   }
-};
 
 namespace psibase::vm_wasmtime
 {
@@ -57,7 +43,7 @@ namespace psibase::vm_wasmtime
       // measured at up to 1.72 native bytes per budget byte (psizam's
       // "byte budget ends recursion before the native stack can" test), and
       // each nested service call adds host frames on top.
-      constexpr std::uint64_t nativeStackBytes     = std::uint64_t(256) << 20;
+      constexpr std::uint64_t nativeStackBytes     = serviceNativeStackBytes;
       constexpr std::uint64_t nativeBytesPerBudget = 16;
 
       // Instance slots kept by each pooled engine. A transfer runs about
@@ -88,10 +74,7 @@ namespace psibase::vm_wasmtime
       {
          wt::engine_options o;
          // Mirrors NativeVMOptions; psizam's validator has the final word.
-         o.features = wt::feature::simd | wt::feature::relaxed_simd | wt::feature::bulk_memory |
-                      wt::feature::sign_extension | wt::feature::saturating_float_to_int |
-                      wt::feature::reference_types | wt::feature::multi_value |
-                      wt::feature::threads;
+         o.features           = wasmFeatures;
          o.fp                 = profile == psizam::float_profile::strict
                                     ? wt::float_profile::strict
                                     : wt::float_profile::performance;
@@ -156,20 +139,6 @@ namespace psibase::vm_wasmtime
 
       // Made at first use, so a node that never debugs has no debugging engines.
       Runtimes& runtimes(bool debug);
-
-      // psizam reports the reason separately from the kind of error.
-      template <typename F>
-      decltype(auto) withDetail(F f)
-      {
-         try
-         {
-            return f();
-         }
-         catch (const psizam::exception& e)
-         {
-            throw std::runtime_error(std::string(e.what()) + ": " + e.detail());
-         }
-      }
    }  // namespace
 
    // Compiled modules, most recently used last. A wasmtime module is shared:
@@ -182,26 +151,58 @@ namespace psibase::vm_wasmtime
       struct Entry
       {
          Key        key;
+         // The compiled module. It carries where its entry points are: the
+         // engine finds them, and checks their signatures, when a module is
+         // compiled or loaded.
          wt::module module;
+         // Set if the module belongs to the engine without an instance pool
+         // because it does not fit a pool slot at all (see Compiled).
+         bool       poolless = false;
          // The module loaded into the engine without an instance pool, once
          // an instance of it could not be taken from the pool.
          std::optional<wt::module> unpooled;
       };
-      std::mutex                                   mutex;
+      // A compiled module and the engine it belongs to. wasmtime checks a
+      // module against the instance pool's slot size when the pooled engine
+      // compiles or loads it, so a module that is too large for a slot (its
+      // table, or the instance itself) cannot exist there. Such a module is
+      // compiled on the engine without a pool and always instantiated there:
+      // the pool's slot size is this node's tuning and never decides whether
+      // a service can run (gofractally/psibase#2272).
+      struct Compiled
+      {
+         wt::module module;
+         bool       poolless = false;
+      };
+      static bool exceedsPool(const std::exception& e)
+      {
+         return std::string_view(e.what()).find("pooling allocator") != std::string_view::npos;
+      }
+      mutable std::mutex                           mutex;
       std::uint32_t                                cacheSize;
       std::list<Entry>                             entries;
       std::map<Key, std::list<Entry>::iterator>    index;
-      // Compiled modules kept between runs. The directory is private to the
-      // user: wasmtime executes what it loads from here without checking it.
+      // Code compileAhead could not compile (vm::Cache::refused): recorded
+      // there, removed where a module of it is added.
+      vm::RefusedCode<Key>                         refusedCode;
+      // Compiled modules kept between runs. wasmtime executes what it loads
+      // from here as it is; the cache returns only what it has verified
+      // (NativeAotCache.hpp).
       std::shared_ptr<NativeAotCache>              artifacts;
+      std::atomic<std::uint64_t>                   compiled{0};
+      std::atomic<std::uint64_t>                   loaded{0};
+      // Of those, the modules that went to the engine without a pool.
+      std::atomic<std::uint64_t>                   compiledPoolless{0};
+      std::atomic<std::uint64_t>                   loadedPoolless{0};
+      // Compiles given up through their handle (compileCancellable).
+      std::atomic<std::uint64_t>                   compilesAbandoned{0};
       // Whether the services of this cache run with debugging support. Fixed
       // for the cache's lifetime: its modules belong to that mode's engines.
       const bool                                   debug = vm::serviceDebugging();
 
-      WasmCacheImpl(std::uint32_t cacheSize, const std::filesystem::path& path)
+      WasmCacheImpl(std::uint32_t cacheSize, std::shared_ptr<NativeAotCache> store)
           : cacheSize{cacheSize},
-            artifacts(path.empty() ? nativeAotCacheFromEnvironment()
-                                   : std::make_shared<NativeAotCache>(path))
+            artifacts(store ? std::move(store) : nativeAotCacheFromEnvironment())
       {
       }
 
@@ -216,7 +217,7 @@ namespace psibase::vm_wasmtime
       {
          auto options = engineOptions(profile, debug);
          auto digest  = sha256(std::tuple{
-             std::string("psibase-wasmtime-artifact-v4"), hash, vmOptions, vmVersion,
+             std::string("psibase-wasmtime-artifact-v5"), hash, vmOptions, vmVersion,
              options.features, std::uint32_t(options.fp),
              // Service debugging: the two debugging options an artifact is
              // tied to. A runtime only loads artifacts made with the same.
@@ -227,16 +228,120 @@ namespace psibase::vm_wasmtime
          return key;
       }
 
-      std::optional<wt::module> get(const Checksum256& hash,
-                                    const VMOptions&   vmOptions,
-                                    std::uint8_t       vmVersion)
+      // The module for stored code that is not in memory: from the artifact
+      // store, or compiled now and stored. `code()` is called, for the wasm,
+      // only if it has to be compiled. Throws the admission error, or the
+      // compiler's.
+      //
+      // Called on the thread that needs the module, with no lock held: two
+      // threads that need the same new module both compile it and store the
+      // same artifact, and different modules compile side by side.
+      //
+      // With a `cancel`, a compile from wasm that is abandoned through it
+      // throws wt::compile_cancelled: nothing was compiled, counted or
+      // stored.
+      template <typename Code>
+      Compiled obtain(const Checksum256&        hash,
+                      const VMOptions&          vmOptions,
+                      std::uint8_t              vmVersion,
+                      psizam::float_profile     profile,
+                      Code&&                    code,
+                      const wt::compile_cancel* cancel = nullptr)
+      {
+         // An artifact stored under this key was admitted and compiled from
+         // this exact service under these exact limits by this build, and
+         // the store returns it only if it is what was stored.
+         const auto key = artifactKey(hash, vmOptions, vmVersion, profile);
+         if (artifacts)
+            if (auto stored = artifacts->load(key))
+               try
+               {
+                  const std::span artifact(reinterpret_cast<const std::uint8_t*>(stored->data()),
+                                           stored->size());
+                  Compiled        module = [&]
+                  {
+                     try
+                     {
+                        return Compiled{runtimes(debug).pooled(profile).load(artifact)};
+                     }
+                     catch (const std::exception& e)
+                     {
+                        if (!exceedsPool(e))
+                           throw;
+                        return Compiled{runtimes(debug).unpooled(profile).load(artifact), true};
+                     }
+                  }();
+                  ++loaded;
+                  if (module.poolless)
+                     ++loadedPoolless;
+                  PSIBASE_LOG(loggers::generic::get(), debug)
+                      << "Service code " << loggers::to_string(hash) << " (vmVersion "
+                      << unsigned(vmVersion) << ") loaded from the compiled-module cache";
+                  return module;
+               }
+               catch (const std::exception&)
+               {
+                  // Intact, but this engine will not take it: compile again.
+               }
+         // Admission is psizam's: the same checks, in the same order, as
+         // the psizam engines apply before they compile.
+         const std::span<const std::uint8_t> wasm     = code();
+         // `code` may have waited for a compile of this module on another
+         // thread (TransactionContext::codeNotCompiled).
+         if (auto ready = get(hash, vmOptions, vmVersion))
+            return *ready;
+         if (compileHook)
+            compileHook(hash);
+         const auto                          admitted = admitNativeWasm(wasm, vmOptions, vmVersion);
+         Compiled result = [&]
+         {
+            try
+            {
+               return Compiled{
+                   runtimes(debug).pooled(profile).compile_metered(wasm, admitted.costs, cancel)};
+            }
+            catch (const wt::compile_cancelled&)
+            {
+               throw;
+            }
+            catch (const std::exception& e)
+            {
+               if (!exceedsPool(e))
+                  throw;
+               return Compiled{
+                   runtimes(debug).unpooled(profile).compile_metered(wasm, admitted.costs, cancel),
+                   true};
+            }
+         }();
+         auto& module = result.module;
+         ++compiled;
+         if (result.poolless)
+            ++compiledPoolless;
+         std::size_t stored = 0;
+         if (artifacts)
+         {
+            auto artifact = module.serialize();
+            stored        = artifact.size();
+            artifacts->store(
+                key, std::span(reinterpret_cast<const char*>(artifact.data()), artifact.size()));
+         }
+         PSIBASE_LOG(loggers::generic::get(), debug)
+             << "Service code " << loggers::to_string(hash) << " (vmVersion " << unsigned(vmVersion)
+             << ") compiled: " << wasm.size() << " bytes of wasm, " << stored
+             << " bytes of native code";
+         return result;
+      }
+
+      std::optional<Compiled> get(const Checksum256& hash,
+                                  const VMOptions&   vmOptions,
+                                  std::uint8_t       vmVersion)
       {
          std::lock_guard lock{mutex};
          auto            it = index.find(Key{hash, vmOptions, vmVersion});
          if (it == index.end())
             return std::nullopt;
          entries.splice(entries.end(), entries, it->second);
-         return it->second->module;
+         return Compiled{it->second->module, it->second->poolless};
       }
 
       // The module as the engine without an instance pool holds it.
@@ -265,25 +370,128 @@ namespace psibase::vm_wasmtime
       // wasmtime owns its code and memory mappings.
       std::vector<std::span<const char>> span() const override { return {}; }
 
-      // Nothing to do ahead of time: Cranelift compiles a service in tens of
-      // milliseconds, at its first use, and the result is kept on disk.
-      void compileAhead(const Checksum256&,
-                        std::span<const char>,
-                        const VMOptions&,
-                        std::uint8_t) override
+      // Cranelift compiles a service in tens of milliseconds, so there is no
+      // queue and no second tier: the code is compiled here, on the thread
+      // that stored it, and is in memory and in the artifact store when this
+      // returns. The caller has admitted it (TransactionContext::admitCode).
+      // If the compiler still refuses it, that is this node's fault, not the
+      // transaction's: it is logged, the code stays stored, and whatever
+      // executes it first tries again and reports the error.
+      void compileAhead(const Checksum256&    hash,
+                        std::span<const char> code,
+                        const VMOptions&      vmOptions,
+                        std::uint8_t          vmVersion) override
       {
+         compile(hash, code, vmOptions, vmVersion, nullptr);
+      }
+
+      // Cranelift can be stopped: between the functions of a module, between
+      // the passes over a function and inside register allocation. What it
+      // does not interrupt is short (psizam's wasmtime/README.md).
+      struct Cancel : CompileCancel
+      {
+         wt::compile_cancel handle;
+         void               cancel() override { handle.cancel(); }
+      };
+      std::unique_ptr<CompileCancel> makeCompileCancel() const override
+      {
+         return std::make_unique<Cancel>();
+      }
+      CompileEnd compileCancellable(const Checksum256&    hash,
+                                    std::span<const char> code,
+                                    const VMOptions&      vmOptions,
+                                    std::uint8_t          vmVersion,
+                                    CompileCancel&        cancel) override
+      {
+         return compile(hash, code, vmOptions, vmVersion, &static_cast<Cancel&>(cancel).handle);
+      }
+
+      CompileEnd compile(const Checksum256&        hash,
+                         std::span<const char>     code,
+                         const VMOptions&          vmOptions,
+                         std::uint8_t              vmVersion,
+                         const wt::compile_cancel* cancel)
+      {
+         try
+         {
+            auto profile = nativeFloatProfile(vmVersion);
+            if (!profile)
+            {
+               // Nothing here compiles it, now or later.
+               std::lock_guard lock{mutex};
+               refusedCode.record(Key{hash, vmOptions, vmVersion});
+               return CompileEnd::finished;
+            }
+            if (contains(hash, vmOptions, vmVersion))
+               return CompileEnd::finished;
+            add(hash, vmOptions, vmVersion,
+                obtain(
+                    hash, vmOptions, vmVersion, *profile,
+                    [&]
+                    {
+                       return std::span(reinterpret_cast<const std::uint8_t*>(code.data()),
+                                        code.size());
+                    },
+                    cancel));
+         }
+         catch (const wt::compile_cancelled&)
+         {
+            // Not a refusal and not a failure: the node stopped waiting.
+            // Nothing is recorded, so the code is compiled again when it is
+            // next asked for.
+            ++compilesAbandoned;
+            PSIBASE_LOG(loggers::generic::get(), info)
+                << "Service code " << loggers::to_string(hash) << " (vmVersion "
+                << unsigned(vmVersion) << "): the compile was abandoned";
+            return CompileEnd::abandoned;
+         }
+         catch (const std::exception& e)
+         {
+            PSIBASE_LOG(loggers::generic::get(), error)
+                << "Service code " << loggers::to_string(hash) << " (vmVersion "
+                << unsigned(vmVersion) << ") was not compiled when it was stored: " << e.what()
+                << ". It stays stored and is compiled again when it is first executed.";
+            // The explicit record a producer's deferral asks for: without
+            // it the code would be deferred until its transaction expired.
+            std::lock_guard lock{mutex};
+            refusedCode.record(Key{hash, vmOptions, vmVersion});
+         }
+         return CompileEnd::finished;
+      }
+
+      bool refused(const Checksum256& hash,
+                   const VMOptions&   vmOptions,
+                   std::uint8_t       vmVersion) const override
+      {
+         std::lock_guard lock{mutex};
+         return refusedCode.contains(Key{hash, vmOptions, vmVersion});
+      }
+
+      bool contains(const Checksum256& hash,
+                    const VMOptions&   vmOptions,
+                    std::uint8_t       vmVersion) const override
+      {
+         std::lock_guard lock{mutex};
+         return index.count(Key{hash, vmOptions, vmVersion}) != 0;
+      }
+
+      WasmCacheStats stats() const override
+      {
+         return {compiled.load(), loaded.load(), artifacts ? artifacts->discarded() : 0,
+                 compiledPoolless.load(), loadedPoolless.load(), compilesAbandoned.load()};
       }
 
       void add(const Checksum256& hash,
                const VMOptions&   vmOptions,
                std::uint8_t       vmVersion,
-               const wt::module&  module)
+               const Compiled&    compiled)
       {
          std::lock_guard lock{mutex};
          Key             key{hash, vmOptions, vmVersion};
+         refusedCode.erase(key);
          if (index.count(key))
             return;
-         entries.push_back(Entry{key, module});
+         entries.push_back(Entry{key, compiled.module, compiled.poolless});
          index[key] = std::prev(entries.end());
          while (entries.size() > cacheSize)
          {
@@ -306,6 +514,8 @@ namespace psibase::vm_wasmtime
       WasmCacheImpl&                                         cache;
       psizam::float_profile floatProfile = psizam::float_profile::strict;
       std::optional<wt::module>                              module;
+      // The module belongs to the engine without an instance pool.
+      bool                                                   poolless = false;
       // Reading the stack counter goes through the store, which is not const.
       mutable std::optional<wt::instance<ExecutionContextImpl>> instance;
       // Guards the interrupter, which another thread fires on timeout.
@@ -323,8 +533,6 @@ namespace psibase::vm_wasmtime
             vmOptions{vmOptions},
             cache{cache}
       {
-         database.checkoutSubjective();
-         psibase::finally _{[&] { database.abortSubjective(); }};
          auto [ca, db] = getCode(service);
 
          code   = std::move(ca);
@@ -363,52 +571,38 @@ namespace psibase::vm_wasmtime
          check(std::uint64_t(vmOptions.max_stack_bytes) * nativeBytesPerBudget <= nativeStackBytes,
                "max_stack_bytes is larger than the wasmtime engine's native stack allows");
 
-         module      = cache.get(code.codeHash, vmOptions, code.vmVersion);
+         auto compiled = cache.get(code.codeHash, vmOptions, code.vmVersion);
          // Loading or compiling the code is not billed to the transaction.
          std::optional<TransactionContext::BillingPause> unbilled;
-         if (!module)
+         if (!compiled)
             unbilled.emplace(transactionContext);
-         if (!module)
+         if (!compiled)
          {
-            // An artifact stored under this key was admitted and compiled from
-            // this exact service under these exact limits by this build.
-            const auto key =
-                cache.artifactKey(code.codeHash, vmOptions, code.vmVersion, floatProfile);
-            if (cache.artifacts)
-               if (auto stored = cache.artifacts->load(key))
-                  try
-                  {
-                     module = runtimes(cache.debug).pooled(floatProfile).load(std::span(
-                         reinterpret_cast<const std::uint8_t*>(stored->data()), stored->size()));
-                  }
-                  catch (const std::exception&)
-                  {
-                     // Unreadable or from an incompatible build: compile again.
-                  }
+            // The limits may have changed since the code was stored: it is
+            // admitted again before it is compiled here.
+            compiled = cache.obtain(code.codeHash, vmOptions, code.vmVersion, floatProfile,
+                                  [&]
+                                  {
+                                     loadCode();
+                                     // Not in memory and not stored: it has
+                                     // to be compiled. Whether this run
+                                     // compiles it here, waits for a compile
+                                     // or does not go on is the node's rule,
+                                     // the same on every engine.
+                                     transactionContext.codeNotCompiled(
+                                         code.codeHash, code.vmVersion,
+                                         [&]
+                                         {
+                                            return std::span<const char>(
+                                                reinterpret_cast<const char*>(c->code.data()),
+                                                c->code.size());
+                                         });
+                                     return std::span<const std::uint8_t>(c->code);
+                                  });
+            cache.add(code.codeHash, vmOptions, code.vmVersion, *compiled);
          }
-         if (!module)
-         {
-            // Admission is psizam's: the same checks, in the same order, as
-            // the psizam engines apply before they compile.
-            loadCode();
-            NativeVMOptions policy{vmOptions, {}, code.vmVersion};
-            auto            costs = withDetail(
-                [&]
-                {
-                   validateNativeWasm(c->code, policy);
-                   return wt::validate_and_cost(c->code, policy);
-                });
-            module = runtimes(cache.debug).pooled(floatProfile).compile_metered(c->code, costs);
-            if (cache.artifacts)
-            {
-               auto artifact = module->serialize();
-               cache.artifacts->store(
-                   cache.artifactKey(code.codeHash, vmOptions, code.vmVersion, floatProfile),
-                   std::span(reinterpret_cast<const char*>(artifact.data()), artifact.size()));
-            }
-         }
-         if (!cache.get(code.codeHash, vmOptions, code.vmVersion))
-            cache.add(code.codeHash, vmOptions, code.vmVersion, *module);
+         module   = compiled->module;
+         poolless = compiled->poolless;
       }
 
       std::pair<CodeRow, DbId> getCode(AccountNumber service)
@@ -441,12 +635,16 @@ namespace psibase::vm_wasmtime
              .max_memory_bytes   = std::uint64_t(vmOptions.max_pages) * 65536,
              .max_table_elements = vmOptions.max_table_elements,
          };
-         try
-         {
-            instance.emplace(runtimes(cache.debug).pooled(floatProfile), *module, *this, limits);
-         }
-         catch (const wt::instantiation_error&)
-         {
+         if (poolless)
+            instance.emplace(runtimes(cache.debug).unpooled(floatProfile), *module, *this, limits);
+         else
+            try
+            {
+               instance.emplace(runtimes(cache.debug).pooled(floatProfile), *module, *this,
+                                limits);
+            }
+            catch (const wt::instantiation_error&)
+            {
 
             // No slot is free, or this module does not fit one. Nothing has
             // run; the engine without a pool creates the same instance, or
@@ -592,39 +790,41 @@ namespace psibase::vm_wasmtime
             unpooledStrict{engineOptions(psizam::float_profile::strict, debug)},
             unpooledPerformance{engineOptions(psizam::float_profile::performance, debug)}
       {
+         // The list every engine registers and admission checks imports
+         // against (NativeHostFunctions.hpp). The signature wasmtime derives
+         // for each must be the admission table's, or the node does not
+         // start.
+         auto check = [](const wt::abi::PzwtImport& import)
+         {
+            auto encoded = [](const std::uint8_t* types, std::size_t count)
+            {
+               // wasmtime_backend.hpp numbers i32, i64, f32, f64 from 0; a
+               // module encodes them as 0x7f down to 0x7c.
+               std::vector<std::uint8_t> result;
+               for (std::size_t i = 0; i < count; ++i)
+                  result.push_back(static_cast<std::uint8_t>(0x7f - types[i]));
+               return result;
+            };
+            checkNativeHostFunction("wasmtime", {import.name, import.name_len},
+                                    encoded(import.params, import.params_len),
+                                    encoded(import.results, import.results_len));
+         };
+         std::size_t count = 0;
+#define PSIBASE_HOST_FUNCTION(name)                                                  \
+   check(wt::detail::make_import<ExecutionContextImpl, &ExecutionContextImpl::name>( \
+       &ExecutionContextImpl::name, "env", #name));                                  \
+   ++count;
+         PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+#undef PSIBASE_HOST_FUNCTION
+         checkNativeHostFunctionCount("wasmtime", count);
          // Both engines of a profile import the same host functions.
          for (auto* runtime :
               {&pooledStrict, &pooledPerformance, &unpooledStrict, &unpooledPerformance})
          {
             auto& rt = *runtime;
-            rt.add<&ExecutionContextImpl::getResult>("env", "getResult");
-            rt.add<&ExecutionContextImpl::getKey>("env", "getKey");
-            rt.add<&ExecutionContextImpl::writeConsole>("env", "writeConsole");
-            rt.add<&ExecutionContextImpl::abortMessage>("env", "abortMessage");
-            rt.add<&ExecutionContextImpl::clockTimeGet>("env", "clockTimeGet");
-            rt.add<&ExecutionContextImpl::getRandom>("env", "getRandom");
-            rt.add<&ExecutionContextImpl::setMaxCpuTime>("env", "setMaxCpuTime");
-            rt.add<&ExecutionContextImpl::getCurrentAction>("env", "getCurrentAction");
-            rt.add<&ExecutionContextImpl::call>("env", "call");
-            rt.add<&ExecutionContextImpl::setRetval>("env", "setRetval");
-            rt.add<&ExecutionContextImpl::kvOpen>("env", "kvOpen");
-            rt.add<&ExecutionContextImpl::kvOpenAt>("env", "kvOpenAt");
-            rt.add<&ExecutionContextImpl::kvClose>("env", "kvClose");
-            rt.add<&ExecutionContextImpl::exportHandles>("env", "exportHandles");
-            rt.add<&ExecutionContextImpl::importHandles>("env", "importHandles");
-            rt.add<&ExecutionContextImpl::kvPut>("env", "kvPut");
-            rt.add<&ExecutionContextImpl::kvRemove>("env", "kvRemove");
-            rt.add<&ExecutionContextImpl::kvGet>("env", "kvGet");
-            rt.add<&ExecutionContextImpl::kvGreaterEqual>("env", "kvGreaterEqual");
-            rt.add<&ExecutionContextImpl::kvLessThan>("env", "kvLessThan");
-            rt.add<&ExecutionContextImpl::kvMax>("env", "kvMax");
-            rt.add<&ExecutionContextImpl::checkoutSubjective>("env", "checkoutSubjective");
-            rt.add<&ExecutionContextImpl::commitSubjective>("env", "commitSubjective");
-            rt.add<&ExecutionContextImpl::abortSubjective>("env", "abortSubjective");
-            rt.add<&ExecutionContextImpl::socketOpen>("env", "socketOpen");
-            rt.add<&ExecutionContextImpl::socketSend>("env", "socketSend");
-            rt.add<&ExecutionContextImpl::socketSetFlags>("env", "socketSetFlags");
-            rt.add<&ExecutionContextImpl::readFile>("env", "readFile");
+#define PSIBASE_HOST_FUNCTION(name) rt.add<&ExecutionContextImpl::name>("env", #name);
+            PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+#undef PSIBASE_HOST_FUNCTION
             rt.link();
          }
       }
@@ -710,8 +910,9 @@ namespace psibase::vm_wasmtime
       static const vm::Engine result{
           "wasmtime",
           &registerHostFunctions,
-          +[](std::uint32_t cacheSize, const std::filesystem::path& path) -> std::shared_ptr<vm::Cache>
-          { return std::make_shared<WasmCacheImpl>(cacheSize, path); },
+          +[](std::uint32_t                   cacheSize,
+              std::shared_ptr<NativeAotCache> artifacts) -> std::shared_ptr<vm::Cache>
+          { return std::make_shared<WasmCacheImpl>(cacheSize, std::move(artifacts)); },
           +[]() -> std::unique_ptr<vm::Memory> { return std::make_unique<ExecutionMemoryImpl>(); },
           +[](TransactionContext& transactionContext, const VMOptions& vmOptions, vm::Memory&,
               vm::Cache& cache, AccountNumber service) -> std::unique_ptr<vm::Context>

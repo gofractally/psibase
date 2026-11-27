@@ -55,6 +55,26 @@ TEST_CASE("A blocked thread reaches its limit")
    CHECK(w.watchdog.elapsed() >= 20ms);
 }
 
+TEST_CASE("A run that outlives its limit is cancelled again until its watchdog is gone")
+{
+   // gofractally/psibase#2263: one delivery can be lost by the engine that
+   // receives it, so the worker keeps delivering on every look.
+   WatchdogManager       manager;
+   std::atomic<unsigned> deliveries{0};
+   {
+      Watchdog watchdog(manager, [&] { ++deliveries; });
+      watchdog.setLimit(5ms);
+      const auto giveUp = std::chrono::steady_clock::now() + 5000ms;
+      while (deliveries < 4 && std::chrono::steady_clock::now() < giveUp)
+         std::this_thread::sleep_for(1ms);
+      CHECK(deliveries >= 4);
+   }
+   // Removing the watchdog waits for a delivery in progress; none follows.
+   const unsigned after = deliveries;
+   std::this_thread::sleep_for(3 * WatchdogManager::idlePeriod);
+   CHECK(deliveries == after);
+}
+
 TEST_CASE("Watchdog zero limit")
 {
    Watched w;

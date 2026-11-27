@@ -29,6 +29,12 @@ target_link_directories(SecretsTests PRIVATE ${ICU_LIBRARY_DIR})
 target_link_libraries(SecretsTests psibase Catch2::Catch2WithMain Threads::Threads)
 add_test(NAME SecrestsTests COMMAND SecretsTests)
 
+add_executable(UsageMeterTests UsageMeterTests.cpp)
+target_link_directories(UsageMeterTests PRIVATE ${ICU_LIBRARY_DIR})
+target_link_libraries(UsageMeterTests PRIVATE psibase Catch2::Catch2WithMain Threads::Threads)
+add_test(NAME UsageMeterTests COMMAND UsageMeterTests)
+set_tests_properties(UsageMeterTests PROPERTIES TIMEOUT 60)
+
 add_executable(PsitriDatabaseTests PsitriDatabaseTests.cpp)
 target_compile_definitions(PsitriDatabaseTests PRIVATE PSIBASE_STORAGE_TEST_ROOT="${ROOT_BINARY_DIR}/storage-contract-databases")
 target_link_directories(PsitriDatabaseTests PRIVATE ${ICU_LIBRARY_DIR})
@@ -68,8 +74,12 @@ target_compile_definitions(PsizamTests PRIVATE
     PSIBASE_PSIZAM_SERVICE_WASM="${PSIZAM_SERVICE_WASM}")
 target_link_directories(PsizamTests PRIVATE ${ICU_LIBRARY_DIR})
 target_link_libraries(PsizamTests psibase Catch2::Catch2WithMain Threads::Threads)
-add_test(NAME PsizamTests COMMAND PsizamTests)
+add_test(NAME PsizamTests COMMAND PsizamTests "~[limits]")
 set_tests_properties(PsizamTests PROPERTIES TIMEOUT 30)
+# The wasm limits (VmLimitsTests.inc): modules at the ceilings take seconds
+# to build and compile, and up to a few GB while they do.
+add_test(NAME VmLimitsTests COMMAND PsizamTests "[limits]")
+set_tests_properties(VmLimitsTests PROPERTIES TIMEOUT 600 PROCESSORS 4)
 
 # Service debugging (psinode --debug-services) is the default engine's to
 # provide, and that engine is wasmtime. The test links the debugger interface
@@ -129,6 +139,33 @@ if(PSIBASE_VM_BACKEND STREQUAL "WASMTIME")
     add_executable(VmAdmissionFuzz VmAdmissionFuzz.cpp)
     target_link_directories(VmAdmissionFuzz PRIVATE ${ICU_LIBRARY_DIR})
     target_link_libraries(VmAdmissionFuzz PRIVATE psibase Threads::Threads)
+    # psizam's structured corpus (about 8,200 modules, written at test time
+    # by its generator) through the chain's admission and wasmtime's compiler:
+    # none may be admitted and refused. See run_vm_admission_corpus.py.
+    # The psizam this build compiles, wherever it was acquired from.
+    include(FetchContent)
+    FetchContent_GetProperties(psizam SOURCE_DIR vm_admission_psizam)
+    if(NOT EXISTS "${vm_admission_psizam}/wasmtime/tests/gen_admission_corpus.py")
+        message(FATAL_ERROR "psizam at \"${vm_admission_psizam}\" has no admission corpus generator")
+    endif()
+    add_test(NAME VmAdmissionCorpus
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/run_vm_admission_corpus.py"
+            --tool "$<TARGET_FILE:VmAdmissionFuzz>"
+            --psizam "${vm_admission_psizam}"
+            --dir "${CMAKE_CURRENT_BINARY_DIR}/vm-admission-corpus")
+    set_tests_properties(VmAdmissionCorpus PROPERTIES TIMEOUT 300 PROCESSORS 2)
+    # What max_branch_local_pairs limits, as admission computes it from
+    # psizam's parser, against the same definition written independently
+    # (branch_local_pairs.py), for every function of every module admission
+    # admits of psizam's corpus and of the compile-cost family
+    # (gen_compile_cost_modules.py). Compiles nothing.
+    add_test(NAME VmBranchLocalPairs
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/branch_local_pairs.py"
+            --compare "$<TARGET_FILE:VmAdmissionFuzz>"
+            --cost-modules "${CMAKE_CURRENT_SOURCE_DIR}/gen_compile_cost_modules.py"
+            --corpus "${vm_admission_psizam}/wasmtime/tests/gen_admission_corpus.py"
+            --dir "${CMAKE_CURRENT_BINARY_DIR}/vm-branch-local-pairs")
+    set_tests_properties(VmBranchLocalPairs PROPERTIES TIMEOUT 300)
 endif()
 
 add_executable(NativeAotCacheTests NativeAotCacheTests.cpp ../src/NativeAotCache.cpp)
@@ -137,6 +174,12 @@ target_compile_definitions(NativeAotCacheTests PRIVATE PSIBASE_NATIVE_AOT_CACHE_
 target_link_libraries(NativeAotCacheTests PRIVATE Threads::Threads)
 add_test(NAME NativeAotCacheTests COMMAND NativeAotCacheTests)
 set_tests_properties(NativeAotCacheTests PROPERTIES TIMEOUT 30 PROCESSORS 2)
+
+add_executable(NativeAotDatabaseTests NativeAotDatabaseTests.cpp)
+target_link_directories(NativeAotDatabaseTests PRIVATE ${ICU_LIBRARY_DIR})
+target_link_libraries(NativeAotDatabaseTests PRIVATE psibase Catch2::Catch2WithMain Threads::Threads)
+add_test(NAME NativeAotDatabaseTests COMMAND NativeAotDatabaseTests)
+set_tests_properties(NativeAotDatabaseTests PROPERTIES TIMEOUT 120 PROCESSORS 4)
 
 if(PSIBASE_VM_BACKEND STREQUAL "LLVM_AOT")
     add_executable(VmSdkConstructorDiagnostic VmSdkConstructorDiagnostic.cpp)

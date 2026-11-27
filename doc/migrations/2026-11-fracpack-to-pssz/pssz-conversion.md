@@ -20,7 +20,7 @@ Schema IR for schemas. No chain data is migrated (fresh genesis).
 
 | | |
 |---|---|
-| Legacy library | `libraries/psio1`: include prefix `<psio1/…>`, namespace `psio1`, macros `PSIO1_…`, CMake target `psio1`, archive `libpsio1.a`. It is deleted at the end of the conversion. **After the flip (section 1.25): deleted; `git grep psio1` finds only this document and `doc/flip-interop.md`.** |
+| Legacy library | `libraries/psio1`: include prefix `<psio1/…>`, namespace `psio1`, macros `PSIO1_…`, CMake target `psio1`, archive `libpsio1.a`. It is deleted at the end of the conversion. **After the flip (section 1.25): deleted; `git grep psio1` finds only this document and `doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md`.** |
 | PSIO | **Now `fdb5de259f5059861a80a99b10a75d156a63d5eb` (section 7, "Merge"; the two halves met on `f811c6f9`, sections 1.25, 6.26).** Before: `gofractally/psio` at `c6d9940441463c7ba3b6087595770a765f5fffac` (section 1.16; before that `415ea1a6`), pinned in `cmake/PsibaseDependencies.cmake`, fetched to `external/psio`. (Slices 1–4a were built on `e6901feb`; slices 2b and 4b on `86cf8c0f` / `868e37bb`, whose `cpp/`, `cmake/` and `CMakeLists.txt` are identical; the follow-up of section 1.13 on `dfd0db17`, a topic branch; the pin moved to `main` in section 1.14, `224f80de`, and along it in section 1.15.) |
 | Since (sections 1.16, 6.16–6.20) | The integration head `44c57f739` is merged and the pin is `c6d99404`; ctest's baseline is 93. Rust: `Hex<T>` is `transparent` (D29 revised) and 44 of the 78 core records are declared; the stale Rust mirrors of D36 are corrected; the service macro can declare a service's actions as a PSIO interface (`psio = true`, three services); the C++ ↔ Rust fixture has 50 types, 115 values, legacy bytes for each, two service interfaces and 18 calls. |
 | Rust | The `psio` crate is a path dependency into the pinned checkout (`external/psio/rust/psio`). Declared with the official PSIO derives beside the legacy ones, which still write every byte: `AccountNumber`, `MethodNumber` (R1, 6.10); `Memo`, `tokens::Precision`, `Quantity`, `Decimal` (R2, 6.13); 20 core records of `rust/psibase/src` (R3, 6.14). 26 types are proved equal to their C++ twins through one fixture (6.15). Waiting, each for a stated reason: the time types and `Hex<T>` / `Checksum256` and every record that holds one (the JSON flip), 56 core records in all. Two behaviour changes: the name parsers no longer panic on malformed text (D30), and `Quantity::from_str` rejects a quantity over 2^64 − 1 (D17) and a fraction of 256 or more digits (D38). |
@@ -715,7 +715,7 @@ Branch `claude/pssz-flip-cpp` (worktree `~/psibase-flip-cpp`, build
 `bc71f6bb0`. Its purpose is the C++ flip: every byte, key, JSON text,
 schema and GraphQL answer produced by PSIO, and `libraries/psio1` deleted.
 The Rust side is flipped in parallel in `~/psibase-pssz`. What crosses
-between the two is specified in `doc/flip-interop.md`.
+between the two is specified in `doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md`.
 
 **Pin.** `b5cea0d44613740f75fd5c3a428e406908ea9afc`, `main` of
 gofractally/psio (the same three files state it). No psibase source
@@ -753,7 +753,7 @@ The 36 that pass are the native unit tests, the consensus and network
 tests, the Python codec tests, four `psinode_test_*` that do not boot
 through the CLI, the two psio test binaries in the guest and five `t-*`
 tests whose chains do not meet such a name. The eight C++ names whose
-number changed are listed in `doc/flip-interop.md` section 0. **Needed
+number changed are listed in `doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md` section 0. **Needed
 from the Rust side: `psibase_names` computes method numbers with PSIO's
 coder.** Until that is in this worktree, no C++ change can be checked by
 the service tests here.
@@ -869,7 +869,7 @@ branch) and on the generic `kvPut` / `kvGet` / … of `api.hpp` and
 **no hit** in any service, test or tool. The native keys are tuples of `u16`,
 `u8`, `u32`, `u64`, `i32`, `AccountNumber`, `Checksum256`, a one-byte enum and
 `std::string`. So no C++ key changed its bytes with this commit; the list of
-differing shapes stands for the Rust side (`doc/flip-interop.md`, "Table
+differing shapes stands for the Rust side (`doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md`, "Table
 keys").
 
 **Checked.** Full build exit 0 after each commit (`build-a1.log`,
@@ -891,7 +891,7 @@ Three commits on the flip branch ("S1 part 1/3 … 3/3"). Everything psibase's
 C++ packs, unpacks, views and hashes is PSSZ through PSIO; the legacy
 library is left with JSON, schemas, GraphQL, the `bin` format and plain
 byte-range parameter types (`psio1::input_stream`). What crosses to Rust is
-in `doc/flip-interop.md` section 1, which is definitive now.
+in `doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md` section 1, which is definitive now.
 
 **What changed, by area** (occurrences outside `libraries/psio1`, `doc`,
 `rust`, `external`; before → after):
@@ -1308,7 +1308,7 @@ Schema IR", `597441828`, and "S2 part 2"). No psibase code outside
 schema is a PSIO Schema IR document, and everything that packs, prints,
 validates, indexes or compares through a schema runs on `psio::pssz_ir`.
 The record and every format that crosses to Rust are in
-`doc/flip-interop.md` sections 2, 2.2, 3 and 4, which are definitive for
+`doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md` sections 2, 2.2, 3 and 4, which are definitive for
 schemas now. The record was implemented **without deviation** from its
 section 2.
 
@@ -1535,7 +1535,7 @@ psinode, package files, configuration, traces, logs, test fixtures — is
 PSIO's I-JSON (`psio::to_ijson`, `psio::from_ijson`,
 `psio::decode_json_checked`, `psio::json_value`, `psio::json_reader`). The
 conventions and every format that crosses to Rust or to a client are in
-`doc/flip-interop.md` sections 3, 4, 5 and 5.1, which are definitive for
+`doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md` sections 3, 4, 5 and 5.1, which are definitive for
 JSON now. GraphQL answers are still written by the legacy library (S5).
 
 **What changed, by area** (occurrences outside `libraries/psio1`, `doc`,
@@ -2360,7 +2360,7 @@ fracpack, the legacy schema or the legacy JSON forms, for the team:
 `development/services/rust-service/tables.md`, `SUMMARY.md` (the entry).
 
 **Acceptance.** `git grep -n psio1` returns lines in
-`doc/pssz-conversion.md` and `doc/flip-interop.md` only;
+`doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md` and `doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md` only;
 `git grep -nE "PSIO1_|<psio1/"` likewise (both documents quote the names
 as history).
 
@@ -4596,7 +4596,7 @@ event type takes its serde impls from `psio::Serde`, so what an HTTP
 handler, an async-graphql scalar, a plugin or the CLI writes and accepts
 through serde is what `psio::to_ijson` / `from_ijson` do. The C++ of this
 tree is still on the legacy formats (as below): the two halves meet at the
-merge, for which `doc/merge-checklist.md` is written. The older handover
+merge, for which `doc/migrations/2026-11-fracpack-to-pssz/merge-checklist.md` is written. The older handover
 (R-B … R-D) follows this one and still describes the wire, the schemas and
 the keys.
 
@@ -4627,7 +4627,7 @@ the keys.
   arguments with `#[arg(value_parser = AccountNumber::from_exact)]`.
   `FromStr` stays the lenient conversion services use (text that names no
   account is the null account), as in C++.
-* **Text forms that follow C++** (`doc/flip-interop.md` 5; C++ is the
+* **Text forms that follow C++** (`doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md` 5; C++ is the
   authority for these mirrors; texts pinned from
   `libraries/psibase/common/tests/json.cpp` of the C++ branch):
   `SubjectPublicKeyInfo` is its PEM armor (custom id
@@ -4726,7 +4726,7 @@ difference from C++'s `Bytes` today.
    serialized it).
 
 *Temporary items that MUST be removed at the merge with the C++ flip:*
-`doc/merge-checklist.md` section 1 (three pass-throughs in
+`doc/migrations/2026-11-fracpack-to-pssz/merge-checklist.md` section 1 (three pass-throughs in
 `psio_twins.rs`: the custom ids `Action` and `ServiceMethod`, and
 `NewAccountMode` as an enum; the fixture's `"frac"` members; the
 `RawInCpp` readings).
@@ -4780,7 +4780,7 @@ hand) and `demo/` are not built.
 `StagedTx/service/src/db.rs`, `Exchange/service/src/math.rs`, two `.wit`
 files, `doc/src`); redundant `.into()` calls where `ExactAccountNumber`
 and `Hex` were converted (`cargo clippy` lists them as
-`useless_conversion`). **The merge** (`doc/merge-checklist.md`). Then the
+`useless_conversion`). **The merge** (`doc/migrations/2026-11-fracpack-to-pssz/merge-checklist.md`). Then the
 trust refinement and the caps (the team).
 
 **HANDOVER: the state after the sweep R-B + R-C + R-D (+ the Rust part
@@ -5087,13 +5087,13 @@ The two halves of the flip in one tree: `claude/pssz-flip-cpp` (`7739b4bd1`,
 sections 1.17–1.25) merged into `claude/pssz` (`32237614e`, section 6.26)
 by the merge commit `9e6fc2e29`. This section is the handover of the merge:
 state, what passes, every failure met and its class, and how to repeat
-each check. `doc/merge-checklist.md` is the plan this followed.
+each check. `doc/migrations/2026-11-fracpack-to-pssz/merge-checklist.md` is the plan this followed.
 
 ### 7.1 The merge commit
 
 Recomputed overlap (22 paths, checklist section 2). Conflicts and their
 resolution: `Nft.hpp`, `Tokens.hpp` and `rust-twins.json` take the C++
-branch (the fixture was regenerated next); `doc/pssz-conversion.md` keeps
+branch (the fixture was regenerated next); `doc/migrations/2026-11-fracpack-to-pssz/pssz-conversion.md` keeps
 both halves (the two header rows merged). Git merged the rest by itself:
 `rust_twins.cpp` (the C++ branch's version with the `names` addition),
 `Symbol.hpp`, `rust/Cargo.toml`, `rust/CMakeLists.txt`, `rust/Cargo.lock`,
@@ -5108,7 +5108,7 @@ run.
 ### 7.2 Failures met, classified
 
 Classes: **Rust** bug, **C++** bug, **interop** (a side deviates from
-`doc/flip-interop.md`, or the document is silent), **PSIO** (bug or gap:
+`doc/migrations/2026-11-fracpack-to-pssz/flip-interop.md`, or the document is silent), **PSIO** (bug or gap:
 not worked around, reproduction given), **engine** (VM, storage), **test**
 (an expectation that pinned the old format; updated, not weakened).
 
@@ -5401,7 +5401,7 @@ build against this one); front ends and plugins, as in 7.6.
    `specifications/blockchain/entry-points.md`.
 2. `name.py` (`ed11f71b9`), as above; `py_test_name` gets the PSIO
    `PYTHONPATH` in CMake.
-3. `doc/team-review.md` is the coordinator's copy (`943610c47`).
+3. `doc/migrations/2026-11-fracpack-to-pssz/team-review.md` is the coordinator's copy (`943610c47`).
 
 Names that still say fracpack, not renamed (a rename is a public change):
 

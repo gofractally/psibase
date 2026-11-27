@@ -1,14 +1,16 @@
 #include <services/local/XUsage.hpp>
 
+#include <psibase/HttpHeaders.hpp>
+#include <psibase/dispatch.hpp>
+#include <psibase/nativeTables.hpp>
+#include <services/local/XAdmin.hpp>
+#include <services/local/XDb.hpp>
+#include <services/local/XHttp.hpp>
+#include <services/system/RTransact.hpp>
+
 #include <algorithm>
 #include <charconv>
 #include <chrono>
-#include <psibase/dispatch.hpp>
-#include <services/local/XAdmin.hpp>
-#include <services/local/XHttp.hpp>
-#include <services/local/XSignup.hpp>
-#include <services/system/HttpServer.hpp>
-#include <services/system/RTransact.hpp>
 
 using namespace psibase;
 using namespace LocalService;
@@ -16,320 +18,554 @@ using namespace SystemService;
 
 namespace
 {
-   using Temporary = TemporaryTables<UsageRequestTable>;
+   constexpr UsageKind baseKinds[] = {UsageKind::local, UsageKind::ip, UsageKind::account,
+                                      UsageKind::peer};
+   constexpr std::size_t defaultLimit = 20;
+   constexpr std::size_t maxLimit     = 1000;
 
-   constexpr auto        supervisor = AccountNumber{"supervisor"};
-   constexpr std::size_t maxPage    = 200;
-
-   std::int64_t wallSeconds()
-   {
-      return std::chrono::duration_cast<std::chrono::seconds>(
-                 std::chrono::system_clock::now().time_since_epoch())
-          .count();
-   }
-
-   // One read and one write of one row. Must be called in a subjective transaction.
-   void add(UsageTable&        table,
-            const std::string& identity,
-            UsageKind          kind,
-            std::uint64_t      requests,
-            std::uint64_t      elapsedUs,
-            std::uint64_t      requestBytes,
-            std::uint64_t      responseBytes,
-            std::int64_t       now)
-   {
-      auto row = table.get(std::tuple{identity, kind})
-                     .value_or(UsageRow{.identity = identity, .kind = kind, .first_seen = now});
-      row.requests += requests;
-      row.elapsed_us += elapsedUs;
-      row.request_bytes += requestBytes;
-      row.response_bytes += responseBytes;
-      row.last_seen = now;
-      table.put(row);
-   }
-
-   // -------------------------------------------------------------- http
-
-   // What a caller is shown of a row
-   struct Totals
+   // What a record looks like in a reply
+   struct UsageRecord
    {
       std::string   identity;
-      UsageKind     kind;
-      std::uint64_t requests       = 0;
-      std::uint64_t elapsed_us     = 0;
-      std::uint64_t request_bytes  = 0;
-      std::uint64_t response_bytes = 0;
-      std::int64_t  first_seen     = 0;
-      std::int64_t  last_seen      = 0;
-      PSIO_REFLECT(Totals,
-                   attr(identity, utf8),
+      std::string   kind;
+      std::string   id;
+      std::uint64_t firstSeen = 0;
+      std::uint64_t lastSeen  = 0;
+      // 0 for an aggregate, which is never dropped
+      std::uint64_t keepUntil = 0;
+      // psibase::usageUnits(total)
+      std::uint64_t units = 0;
+      UsageCounters total;
+      // Use in the current usage window and the one before it
+      UsageCounters recent;
+      // The stored quota that applies (not enforced)
+      std::optional<UsageCounters> quota;
+      PSIO_REFLECT(UsageRecord,
+                   identity,
                    kind,
-                   requests,
-                   elapsed_us,
-                   request_bytes,
-                   response_bytes,
-                   first_seen,
-                   last_seen)
+                   id,
+                   firstSeen,
+                   lastSeen,
+                   keepUntil,
+                   units,
+                   total,
+                   recent,
+                   quota)
    };
 
-   Totals totals(const UsageRow& row)
+   struct KindTotal
    {
-      return Totals{row.identity,      row.kind,           row.requests,   row.elapsed_us,
-                    row.request_bytes, row.response_bytes, row.first_seen, row.last_seen};
+      std::string kind;
+      // Identities with a record of their own
+      std::uint64_t records = 0;
+      // Everything charged to the kind, and the recent part of it
+      UsageCounters total;
+      UsageCounters recent;
+      // The parts of `total` that no longer have a record of their own:
+      // dropped by retention, and evicted because the kind was full
+      UsageCounters expired;
+      UsageCounters overflow;
+      PSIO_REFLECT(KindTotal, kind, records, total, recent, expired, overflow)
+   };
+
+   struct Settings
+   {
+      bool                     enabled = false;
+      std::uint64_t            maxRecords = 0;
+      std::uint64_t            windowSeconds = 0;
+      std::uint64_t            flushSeconds = 0;
+      std::uint64_t            retentionBase = 0;
+      std::uint64_t            retentionPerUnit = 0;
+      std::uint64_t            retentionMax = 0;
+      std::vector<std::string> trustedProxies;
+      PSIO_REFLECT(Settings,
+                   enabled,
+                   maxRecords,
+                   windowSeconds,
+                   flushSeconds,
+                   retentionBase,
+                   retentionPerUnit,
+                   retentionMax,
+                   trustedProxies)
+   };
+
+   struct Report
+   {
+      // Seconds since the Unix epoch. Rows are at most flushSeconds old.
+      std::uint64_t            now = 0;
+      Settings                 settings;
+      std::vector<KindTotal>   totals;
+      UsageCounters            total;
+      std::string              order;
+      bool                     recent = false;
+      std::vector<UsageRecord> top;
+      PSIO_REFLECT(Report, now, settings, totals, total, order, recent, top)
+   };
+
+   struct Me
+   {
+      std::uint64_t now     = 0;
+      bool          enabled = false;
+      std::string   identity;
+      // Absent if nothing is recorded (yet): rows are written every
+      // flushSeconds.
+      std::optional<UsageRecord> usage;
+      PSIO_REFLECT(Me, now, enabled, identity, usage)
+   };
+
+   struct Quota
+   {
+      // `kind:id`, or `kind:*` for the default of a kind
+      std::string   identity;
+      UsageCounters perWindow;
+      PSIO_REFLECT(Quota, identity, perWindow)
+   };
+
+   struct ReportQuery
+   {
+      std::string kind;
+      std::string order;
+      std::string recent;
+      std::string limit;
+      PSIO_REFLECT(ReportQuery, kind, order, recent, limit)
+   };
+
+   struct IdentityQuery
+   {
+      std::string id;
+      PSIO_REFLECT(IdentityQuery, id)
+   };
+
+   std::uint64_t now()
+   {
+      return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
+                                            std::chrono::system_clock::now().time_since_epoch())
+                                            .count());
    }
 
-   // What an administrator is shown of a row: also where a guest's totals went
-   struct AdminTotals
+   // Who may read `/me` from a web page. A user's usage is personal data,
+   // so no origin but the supervisor's: another app reaches it through the
+   // supervisor and this service's plugin, which checks that the user
+   // trusts the caller (gofractally/psibase#2270). The service's own origin
+   // and clients that are not browsers need no header.
+   std::vector<HttpHeader> allowSupervisor(const HttpRequest& request)
    {
-      std::string                  identity;
-      UsageKind                    kind;
-      std::uint64_t                requests       = 0;
-      std::uint64_t                elapsed_us     = 0;
-      std::uint64_t                request_bytes  = 0;
-      std::uint64_t                response_bytes = 0;
-      std::int64_t                 first_seen     = 0;
-      std::int64_t                 last_seen      = 0;
-      std::optional<AccountNumber> carried_to;
-      PSIO_REFLECT(AdminTotals,
-                   attr(identity, utf8),
-                   kind,
-                   requests,
-                   elapsed_us,
-                   request_bytes,
-                   response_bytes,
-                   first_seen,
-                   last_seen,
-                   carried_to)
-   };
-
-   struct Page
-   {
-      std::vector<AdminTotals> rows;
-      bool                more = false;
-      PSIO_REFLECT(Page, rows, more)
-   };
-
-   struct ErrorBody
-   {
-      std::string error;
-      PSIO_REFLECT(ErrorBody, attr(error, utf8))
-   };
-
-   template <typename T>
-   HttpReply json(const T& value, std::vector<HttpHeader> headers, HttpStatus status = HttpStatus::ok)
-   {
-      headers.push_back({"Cache-Control", "no-store"});
-      HttpReply reply{.status = status, .contentType = "application/json", .headers = std::move(headers)};
-      psio::to_ijson(value, reply.body);
-      return reply;
-   }
-
-   // A page of any app of this node may read its own totals, with the
-   // browser's credentials; nobody else's page may read the reply.
-   std::vector<HttpHeader> meCors(const HttpRequest& req)
-   {
-      auto headers = allowCorsSubdomains(req);
-      if (std::ranges::any_of(headers, [](const auto& h)
-                              { return h.name == "Access-Control-Allow-Origin" && h.value != "*"; }))
-         headers.push_back({"Access-Control-Allow-Credentials", "true"});
-      if (auto requested = req.getHeader("access-control-request-headers"))
-         for (auto& h : headers)
-            if (h.name == "Access-Control-Allow-Headers")
-               h.value = std::string{*requested};
-      headers.push_back({"Vary", "Origin"});
+      auto headers = allowCors(request, AccountNumber{"supervisor"});
+      for (auto& h : headers)
+      {
+         if (h.matches("Access-Control-Allow-Headers"))
+            h.value = "Accept, Authorization, Content-Type";
+         else if (h.matches("Access-Control-Allow-Methods"))
+            h.value = "GET, OPTIONS";
+      }
+      if (!headers.empty())
+         headers.push_back({"Vary", "Origin"});
       return headers;
    }
 
-   HttpReply serveMe(const HttpRequest& req)
+   HttpReply json(const HttpRequest& request, std::string body, bool admin)
    {
-      auto headers = meCors(req);
-      auto session = to<RTransact>().getSession(req);
-      // The same order as for counting
-      std::string identity;
-      UsageKind   kind = UsageKind::node;
-      if (session.user)
+      HttpReply reply{.contentType = "application/json", .body{body.begin(), body.end()}};
+      if (!admin)
+         reply.headers = allowSupervisor(request);
+      if (admin)
       {
-         identity = session.user->str();
-         kind     = UsageKind::account;
+         // The admin UI is served from x-admin
+         reply.headers = allowCors(request, XAdmin::service);
+         reply.headers.push_back({"Access-Control-Allow-Credentials", "true"});
       }
-      else if (!session.guest.empty())
-      {
-         identity = session.guest;
-         kind     = UsageKind::guest;
-      }
-      else if (!session.visitor.empty())
-      {
-         identity = session.visitor;
-         kind     = UsageKind::visitor;
-      }
-      else
-         return json(ErrorBody{"no session"}, std::move(headers), HttpStatus::unauthorized);
-
-      // Only ever the caller's own row: the key comes from the session alone.
-      std::optional<UsageRow> row;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         row = XUsage{}.open<UsageTable>().get(std::tuple{identity, kind});
-      }
-      return json(totals(row.value_or(UsageRow{.identity = identity, .kind = kind})),
-                  std::move(headers));
+      return reply;
    }
 
-   struct AllQuery
+   HttpReply error(HttpStatus status, std::string_view msg)
    {
-      std::string after;
-      std::string limit;
-      PSIO_REFLECT(AllQuery, attr(after, utf8), attr(limit, utf8))
-   };
+      return HttpReply{
+          .status = status, .contentType = "text/plain", .body{msg.begin(), msg.end()}};
+   }
 
-   HttpReply serveAll(const HttpRequest& req)
+   bool chainIsBooted()
    {
-      auto        query = req.query<AllQuery>();
-      std::size_t limit = maxPage;
-      if (!query.limit.empty())
+      auto mode   = KvMode::read;
+      auto prefix = std::span<const char>();
+      auto native = Native::Tables{to<XDb>().open(DbId::native, prefix, mode), mode};
+      auto row    = native.open<StatusTable>().get({});
+      return row && row->head;
+   }
+
+   std::optional<UsageConfigRow> readConfig()
+   {
+      std::optional<UsageConfigRow> result;
+      auto table = Native::sessionDirect(KvMode::read).open<UsageConfigTable>();
+      result = table.get({});
+      return result;
+   }
+
+   Settings toSettings(const std::optional<UsageConfigRow>& config)
+   {
+      Settings result;
+      if (config)
       {
-         std::size_t requested = 0;
-         auto [end, ec] = std::from_chars(query.limit.data(),
-                                          query.limit.data() + query.limit.size(), requested);
-         if (ec != std::errc{} || end != query.limit.data() + query.limit.size() || requested == 0)
-            return json(ErrorBody{"limit must be a number from 1 to 200"},
-                        allowCors(req, XAdmin::service), HttpStatus::badRequest);
-         limit = std::min(requested, maxPage);
+         result.enabled          = true;
+         result.maxRecords       = config->maxRecords;
+         result.windowSeconds    = config->windowSeconds;
+         result.flushSeconds     = config->flushSeconds;
+         result.retentionBase    = config->retentionBase;
+         result.retentionPerUnit = config->retentionPerUnit;
+         result.retentionMax     = config->retentionMax;
+         result.trustedProxies   = config->trustedProxies;
       }
-      Page        page;
-      PSIBASE_SUBJECTIVE_TX
+      return result;
+   }
+
+   // What a row used in the current window and the one before it. A row is
+   // rewritten only when its identity is seen, so its window can be old.
+   UsageCounters recentUse(const UsageRow& row, std::uint64_t currentWindow)
+   {
+      UsageCounters result;
+      if (row.window == currentWindow)
       {
-         page       = Page{};
-         auto index = XUsage{}.open<UsageTable>().getIndex<0>();
-         // Every row of an identity is after (identity, the largest kind).
-         auto it = query.after.empty()
-                       ? index.begin()
-                       : index.upper_bound(std::tuple{query.after, UsageKind::node});
-         for (auto end = index.end(); it != end; ++it)
+         result = row.current;
+         result += row.previous;
+      }
+      else if (row.window + 1 == currentWindow)
+         result = row.current;
+      return result;
+   }
+
+   std::optional<UsageCounters> quotaFor(const UsageIdentity& identity)
+   {
+      auto                         table = XUsage{}.open<UsageQuotaTable>();
+      std::optional<UsageQuotaRow> row;
+      auto                         kind = static_cast<std::uint8_t>(identity.kind);
+      row = table.get(std::tuple(kind, identity.id));
+      if (!row)
+         row = table.get(std::tuple(kind, std::string()));
+      if (row)
+         return row->perWindow;
+      return {};
+   }
+
+   UsageRecord toRecord(const UsageRow& row, std::uint64_t currentWindow, bool withQuota)
+   {
+      auto        identity = row.identity();
+      UsageRecord result;
+      result.identity  = to_string(identity);
+      result.kind      = std::string{to_string(identity.kind)};
+      result.id        = identity.id;
+      result.firstSeen = row.firstSeen;
+      result.lastSeen  = row.lastSeen;
+      result.keepUntil = row.keepUntil;
+      result.units     = usageUnits(row.total);
+      result.total     = row.total;
+      result.recent    = recentUse(row, currentWindow);
+      if (withQuota && !isAggregate(identity.kind))
+         result.quota = quotaFor(identity);
+      return result;
+   }
+
+   std::vector<UsageRow> readRows()
+   {
+      std::vector<UsageRow> result;
+      auto table = Native::subjectiveDirect(KvMode::read).open<UsageTable>();
+      for (auto row : table.getIndex<0>())
+         result.push_back(std::move(row));
+      return result;
+   }
+
+   std::optional<UsageRow> readRow(const UsageIdentity& identity)
+   {
+      std::optional<UsageRow> result;
+      auto table = Native::subjectiveDirect(KvMode::read).open<UsageTable>();
+      result = table.get(std::tuple(static_cast<std::uint8_t>(identity.kind), identity.id));
+      return result;
+   }
+
+   // Who is asking: the account named by a valid login token, otherwise
+   // the client's address, resolved exactly as native code resolves it for
+   // metering (psibase::UsageIdentity::resolve with the node's trusted
+   // proxies).
+   UsageIdentity callerIdentity(const HttpRequest&                   request,
+                                std::optional<std::int32_t>          socket,
+                                const std::optional<UsageConfigRow>& config)
+   {
+      HttpRequest credentials{.host        = request.host,
+                              .method      = request.method,
+                              .target      = request.target,
+                              .contentType = request.contentType,
+                              .headers     = request.headers};
+      if (chainIsBooted())
+      {
+         if (auto user = to<RTransact>().getUser(credentials))
+            return UsageIdentity::account(*user);
+      }
+      std::optional<SocketEndpoint> endpoint;
+      if (socket)
+      {
+         std::optional<SocketRow> row;
+         auto table = Native::sessionDirect(KvMode::read).open<SocketTable>();
+         row = table.get(*socket);
+         if (row)
          {
-            auto row = *it;
-            // The rows of one identity (one per kind) stay on one page, so
-            // that `after` = the last identity never skips any.
-            if (page.rows.size() >= limit && row.identity != page.rows.back().identity)
-            {
-               page.more = true;
-               break;
-            }
-            page.rows.push_back(AdminTotals{row.identity, row.kind, row.requests, row.elapsed_us,
-                                            row.request_bytes, row.response_bytes,
-                                            row.first_seen, row.last_seen, row.carried_to});
+            if (auto info = std::get_if<HttpSocketInfo>(&row->info))
+               endpoint = info->endpoint;
          }
       }
-      return json(page, allowCors(req, XAdmin::service));
+      std::vector<IPAddressPrefix> proxies;
+      if (config)
+      {
+         for (const auto& text : config->trustedProxies)
+            if (auto prefix = parseIPAddressPrefix(text))
+               proxies.push_back(std::move(*prefix));
+      }
+      std::vector<std::optional<IPAddress>> forwarded;
+      if (endpoint && isTrustedUsageProxy(*endpoint, proxies))
+         forwarded = forwardedFor(credentials);
+      return UsageIdentity::resolve(endpoint, forwarded, proxies);
+   }
+
+   std::optional<std::size_t> fieldIndex(std::string_view name)
+   {
+      for (std::size_t i = 0; i < numUsageFields; ++i)
+         if (usageFieldNames[i] == name)
+            return i;
+      return {};
+   }
+
+   HttpReply serveMe(const HttpRequest& request, std::optional<std::int32_t> socket)
+   {
+      auto config   = readConfig();
+      auto identity = callerIdentity(request, socket, config);
+      Me   result;
+      result.now      = now();
+      result.enabled  = config.has_value();
+      result.identity = to_string(identity);
+      if (config)
+      {
+         if (auto row = readRow(identity))
+            result.usage = toRecord(
+                *row, result.now / std::max<std::uint64_t>(config->windowSeconds, 1), true);
+      }
+      return json(request, psio::to_ijson(result), false);
+   }
+
+   HttpReply serveReport(const HttpRequest& request)
+   {
+      auto query  = request.query<ReportQuery>();
+      auto config = readConfig();
+      Report result;
+      result.now      = now();
+      result.settings = toSettings(config);
+      result.order    = query.order.empty() ? "units" : query.order;
+      result.recent   = query.recent == "1" || query.recent == "true";
+
+      std::optional<std::size_t> field;
+      if (result.order != "units")
+      {
+         field = fieldIndex(result.order);
+         if (!field)
+            return error(HttpStatus::badRequest, "order: not a counter");
+      }
+      std::optional<UsageKind> kind;
+      if (!query.kind.empty())
+      {
+         kind = parseUsageKind(query.kind);
+         if (!kind || isAggregate(*kind))
+            return error(HttpStatus::badRequest, "kind: not a kind of identity");
+      }
+      std::size_t limit = defaultLimit;
+      if (!query.limit.empty())
+      {
+         auto res = std::from_chars(query.limit.data(), query.limit.data() + query.limit.size(),
+                                    limit);
+         if (res.ec != std::errc{} || res.ptr != query.limit.data() + query.limit.size())
+            return error(HttpStatus::badRequest, "limit: not a number");
+         limit = std::min(limit, maxLimit);
+      }
+
+      auto window = result.now / std::max<std::uint64_t>(result.settings.windowSeconds, 1);
+      for (auto k : baseKinds)
+         result.totals.push_back({std::string{to_string(k)}});
+      auto totalOf = [&](UsageKind k) -> KindTotal&
+      {
+         for (std::size_t i = 0; i < std::size(baseKinds); ++i)
+            if (baseKinds[i] == k)
+               return result.totals[i];
+         return result.totals[0];
+      };
+
+      auto rows = readRows();
+      struct Candidate
+      {
+         std::uint64_t   value;
+         const UsageRow* row;
+      };
+      std::vector<Candidate> candidates;
+      for (const auto& row : rows)
+      {
+         auto identity = row.identity();
+         if (!isValid(identity))
+            continue;
+         auto recent = recentUse(row, window);
+         if (isAggregate(identity.kind))
+         {
+            auto& item = totalOf(*parseUsageKind(identity.id));
+            item.total += row.total;
+            item.recent += recent;
+            (identity.kind == UsageKind::expired ? item.expired : item.overflow) += row.total;
+         }
+         else
+         {
+            auto& item = totalOf(identity.kind);
+            item.records += 1;
+            item.total += row.total;
+            item.recent += recent;
+            if (!kind || *kind == identity.kind)
+            {
+               const auto& counters = result.recent ? recent : row.total;
+               candidates.push_back(
+                   {field ? counters.*usageFieldMembers[*field] : usageUnits(counters), &row});
+            }
+         }
+         result.total += row.total;
+      }
+      limit = std::min(limit, candidates.size());
+      std::partial_sort(candidates.begin(), candidates.begin() + limit, candidates.end(),
+                        [](const Candidate& a, const Candidate& b)
+                        {
+                           if (a.value != b.value)
+                              return a.value > b.value;
+                           return a.row->identity() < b.row->identity();
+                        });
+      for (std::size_t i = 0; i < limit; ++i)
+         result.top.push_back(toRecord(*candidates[i].row, window, true));
+      return json(request, psio::to_ijson(result), true);
+   }
+
+   HttpReply serveIdentity(const HttpRequest& request)
+   {
+      auto query    = request.query<IdentityQuery>();
+      auto identity = parseUsageIdentity(query.id);
+      if (!identity)
+         return error(HttpStatus::badRequest, "id: not an identity (kind:id)");
+      auto config = readConfig();
+      auto row    = readRow(*identity);
+      if (!row)
+         return error(HttpStatus::notFound, "No usage is recorded for this identity");
+      auto window =
+          now() / std::max<std::uint64_t>(config ? config->windowSeconds : 0, 1);
+      return json(request, psio::to_ijson(toRecord(*row, window, true)), true);
+   }
+
+   // `kind:id` or `kind:*`
+   std::optional<UsageQuotaRow> parseQuotaTarget(std::string_view text)
+   {
+      if (text.size() > 16 + maxUsageIdLength)
+         return {};
+      auto pos = text.find(':');
+      if (pos == std::string_view::npos)
+         return {};
+      auto kind = parseUsageKind(text.substr(0, pos));
+      if (!kind || isAggregate(*kind))
+         return {};
+      UsageQuotaRow row{.kind = static_cast<std::uint8_t>(*kind)};
+      if (text.substr(pos + 1) != "*")
+      {
+         auto identity = parseUsageIdentity(text);
+         if (!identity)
+            return {};
+         row.id = identity->id;
+      }
+      return row;
+   }
+
+   HttpReply serveQuotas(const HttpRequest& request)
+   {
+      std::vector<Quota> result;
+      auto               table = XUsage{}.open<UsageQuotaTable>();
+      for (auto row : table.getIndex<0>())
+      {
+         std::string identity{to_string(static_cast<UsageKind>(row.kind))};
+         identity += ':';
+         identity += row.id.empty() ? std::string("*") : row.id;
+         result.push_back({std::move(identity), row.perWindow});
+      }
+      return json(request, psio::to_ijson(result), true);
+   }
+
+   // Stores a quota. All limits zero: removes it.
+   HttpReply setQuota(const HttpRequest& request)
+   {
+      if (request.contentType != "application/json")
+         return error(HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
+      auto body = psio::from_ijson<Quota>(request.body);
+      auto row  = parseQuotaTarget(body.identity);
+      if (!row)
+         return error(HttpStatus::badRequest,
+                      "identity: expected kind:id, or kind:* for the default of a kind");
+      row->perWindow = body.perWindow;
+      auto table     = XUsage{}.open<UsageQuotaTable>();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         if (isZero(row->perWindow))
+            table.erase(std::tuple(row->kind, row->id));
+         else
+            table.put(*row);
+      }
+      return json(request, "{}", true);
    }
 }  // namespace
 
-void XUsage::identify(std::int32_t socket, UsageKind kind, std::string identity)
-{
-   check(getSender() == HttpServer::service, "Wrong sender");
-   Temporary{getReceiver(), KvMode::readWrite}.open<UsageRequestTable>().put(
-       UsageRequestRow{.socket = socket, .identity = std::move(identity), .kind = kind});
-}
-
-void XUsage::reply(std::int32_t socket, std::uint64_t responseBytes)
-{
-   check(getSender() == XHttp::service, "Wrong sender");
-   auto current = Temporary{getReceiver(), KvMode::readWrite}.open<UsageRequestTable>();
-   if (auto row = current.get(socket))
-   {
-      // The request is still being handled: `request` writes it all at once.
-      row->replied        = true;
-      row->response_bytes = responseBytes;
-      current.put(*row);
-      return;
-   }
-   // A deferred reply: the request itself was counted when its handler returned.
-   PSIBASE_SUBJECTIVE_TX
-   {
-      auto deferred = open<UsageDeferredTable>();
-      if (auto row = deferred.get(socket))
-      {
-         deferred.remove(*row);
-         auto table = open<UsageTable>();
-         add(table, row->identity, row->kind, 0, 0, 0, responseBytes, wallSeconds());
-      }
-   }
-}
-
-void XUsage::request(std::int32_t socket, std::uint64_t elapsedUs, std::uint64_t requestBytes)
-{
-   check(getSender() == XHttp::service, "Wrong sender");
-   auto current = Temporary{getReceiver(), KvMode::readWrite}.open<UsageRequestTable>();
-   // A request the chain's HTTP service did not identify is nobody's.
-   auto row = current.get(socket).value_or(
-       UsageRequestRow{.socket = socket, .identity = nodeIdentity, .kind = UsageKind::node});
-   current.erase(socket);
-   PSIBASE_SUBJECTIVE_TX
-   {
-      auto table = open<UsageTable>();
-      add(table, row.identity, row.kind, 1, elapsedUs, requestBytes, row.response_bytes,
-          wallSeconds());
-      auto deferred = open<UsageDeferredTable>();
-      if (!row.replied)
-         // The reply comes later, on this socket. Until then the socket is
-         // not reused, so this also replaces whatever an earlier request
-         // on a socket of the same number left behind unanswered.
-         deferred.put(UsageDeferredRow{socket, row.identity, row.kind});
-      else
-         deferred.erase(socket);
-   }
-}
-
-void XUsage::carryOver(std::string guest, psibase::AccountNumber account)
-{
-   check(getSender() == XSignup::service, "Wrong sender");
-   PSIBASE_SUBJECTIVE_TX
-   {
-      auto table = open<UsageTable>();
-      auto from  = table.get(std::tuple{guest, UsageKind::guest});
-      if (from && !from->carried_to)
-      {
-         auto to = table.get(std::tuple{account.str(), UsageKind::account})
-                       .value_or(UsageRow{.identity   = account.str(),
-                                          .kind       = UsageKind::account,
-                                          .first_seen = from->first_seen});
-         to.requests += from->requests;
-         to.elapsed_us += from->elapsed_us;
-         to.request_bytes += from->request_bytes;
-         to.response_bytes += from->response_bytes;
-         to.first_seen = std::min(to.first_seen, from->first_seen);
-         to.last_seen  = std::max(to.last_seen, from->last_seen);
-         table.put(to);
-         // Noted on the guest's row, so that it is not added a second time.
-         from->carried_to = account;
-         table.put(*from);
-      }
-   }
-}
-
-auto XUsage::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
+auto XUsage::serveSys(const HttpRequest& request, std::optional<std::int32_t> socket)
     -> std::optional<HttpReply>
 {
    check(getSender() == XHttp::service, "Wrong sender");
+
    auto target = request.path();
 
-   if (target == "/all")
-   {
-      if (auto denied = to<XAdmin>().checkAuth(request, socket))
-         return denied;
-      if (request.method != "GET")
-         return HttpReply::methodNotAllowed(request);
-      return serveAll(request);
-   }
    if (target == "/me")
    {
+      // The preflight of the supervisor's request; any other origin gets no
+      // allow header and the browser stops there.
       if (request.method == "OPTIONS")
-         return HttpReply{.headers = meCors(request)};
+         return HttpReply{.headers = allowSupervisor(request)};
       if (request.method != "GET")
          return HttpReply::methodNotAllowed(request);
-      return serveMe(request);
+      return serveMe(request, socket);
    }
-   return std::nullopt;
+
+   if (target != "/report" && target != "/identity" && target != "/quotas" && target != "/quota")
+      return {};
+
+   if (request.method == "OPTIONS")
+   {
+      HttpReply result{.headers = allowCors(request, XAdmin::service)};
+      result.headers.push_back({"Access-Control-Allow-Credentials", "true"});
+      for (auto& h : result.headers)
+      {
+         if (h.matches("Access-Control-Allow-Headers"))
+            h.value = "Content-Type, Authorization";
+      }
+      result.headers.push_back({"Allow", "GET, POST, OPTIONS"});
+      return result;
+   }
+
+   // Everything below shows other identities' usage: the operator only.
+   if (auto reply = to<XAdmin>().checkAuth(request, socket))
+      return reply;
+
+   if (target == "/quota")
+   {
+      if (request.method != "POST")
+         return HttpReply::methodNotAllowed(request);
+      return setQuota(request);
+   }
+   if (request.method != "GET")
+      return HttpReply::methodNotAllowed(request);
+   if (target == "/report")
+      return serveReport(request);
+   if (target == "/identity")
+      return serveIdentity(request);
+   return serveQuotas(request);
 }
 
 PSIBASE_DISPATCH(XUsage)

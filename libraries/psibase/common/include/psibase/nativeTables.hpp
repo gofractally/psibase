@@ -5,6 +5,7 @@
 #include <psibase/Table.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
+#include <psibase/usage.hpp>
 
 namespace psibase
 {
@@ -29,6 +30,9 @@ namespace psibase
    static constexpr NativeTableNum hostConfigTable            = 17;  // subjective
    static constexpr NativeTableNum pendingShutdownTable       = 18;  // subjective
    static constexpr NativeTableNum timerTable                 = 19;  // subjective
+   static constexpr NativeTableNum usageTable                 = 20;  // subjective
+   static constexpr NativeTableNum usageConfigTable           = 21;  // subjective
+   static constexpr NativeTableNum socketIdentityTable        = 22;  // subjective
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -489,6 +493,103 @@ namespace psibase
    };
    using TimerTable = Table<TimerRow, SingletonKey{}>;
 
+   // Usage metering (gofractally/psibase#2270): what each identity used of
+   // this node. Node-local, never part of consensus. Native code measures
+   // and is the only writer; local services read. See psibase/usage.hpp for
+   // the identity model and the counters.
+   using UsageKeyType = std::tuple<std::uint16_t, std::uint8_t, std::uint8_t, std::string>;
+   auto usagePrefix() -> KeyPrefixType;
+   auto usageKindPrefix(UsageKind kind)
+       -> std::tuple<std::uint16_t, std::uint8_t, std::uint8_t>;
+   auto usageKey(const UsageIdentity& identity) -> UsageKeyType;
+   struct UsageRow
+   {
+      // The identity: static_cast<UsageKind>(kind) and its id.
+      std::uint8_t kind = 0;
+      std::string  id;
+      // Seconds since the Unix epoch (the node's wall clock).
+      std::uint64_t firstSeen = 0;
+      std::uint64_t lastSeen  = 0;
+      // The record is dropped when it has not been seen until this time
+      // (lastSeen + UsageRetention::seconds(total)). Zero: never (aggregates).
+      std::uint64_t keepUntil = 0;
+      // Everything since firstSeen.
+      UsageCounters total;
+      // Recent use: `current` is what was used in the window numbered
+      // `window` (wall clock / UsageConfigRow::windowSeconds), `previous`
+      // in the one before it.
+      std::uint64_t window = 0;
+      UsageCounters current;
+      UsageCounters previous;
+
+      UsageIdentity identity() const { return {static_cast<UsageKind>(kind), id}; }
+
+      static const auto db = psibase::DbId::nativeSubjective;
+      auto              key() const -> UsageKeyType;
+      PSIO_REFLECT(UsageRow,
+                   kind,
+                   attr(id, utf8),
+                   firstSeen,
+                   lastSeen,
+                   keepUntil,
+                   total,
+                   window,
+                   current,
+                   previous)
+   };
+   using UsageTable = Table<UsageRow, CompositeKey<&UsageRow::kind, &UsageRow::id>{}>;
+
+   // The settings the meter runs with, published by native code when the
+   // node starts so that the reporting service resolves identities and
+   // computes retention the way native does. Absent: metering is off.
+   struct UsageConfigRow
+   {
+      // usage-max-records: live records per kind.
+      std::uint64_t maxRecords = 0;
+      // usage-window: seconds per window of UsageRow::current / previous.
+      std::uint64_t windowSeconds = 0;
+      // usage-flush-interval: rows are at most this many seconds old.
+      std::uint64_t flushSeconds = 0;
+      // usage-retention-base, usage-retention-per-unit, usage-retention-max
+      std::uint64_t retentionBase    = 0;
+      std::uint64_t retentionPerUnit = 0;
+      std::uint64_t retentionMax     = 0;
+      // usage-trusted-proxy: address prefixes in text form ("10.0.0.0/8")
+      std::vector<std::string> trustedProxies;
+
+      static const auto db = psibase::DbId::nativeSession;
+      auto              key() const -> KeyPrefixType;
+      PSIO_REFLECT(UsageConfigRow,
+                   maxRecords,
+                   windowSeconds,
+                   flushSeconds,
+                   retentionBase,
+                   retentionPerUnit,
+                   retentionMax,
+                   trustedProxies)
+   };
+   using UsageConfigTable = Table<UsageConfigRow, SingletonKey{}>;
+   auto usageConfigKey() -> KeyPrefixType;
+
+   // A message to native code, not a stored row: writing it tells the meter
+   // that the request on socket `fd` is authenticated as `account`, and
+   // from then on that request's usage is charged to the account instead of
+   // the client's address. Native consumes the write; nothing is stored and
+   // nothing can be read back. Only a local service can write it
+   // (nativeSession); x-http does, after the login token has been verified.
+   using SocketIdentityKeyType = std::tuple<std::uint16_t, std::uint8_t, std::int32_t>;
+   auto socketIdentityKey(std::int32_t fd) -> SocketIdentityKeyType;
+   struct SocketIdentityRow
+   {
+      std::int32_t  fd;
+      AccountNumber account;
+
+      static const auto db = psibase::DbId::nativeSession;
+      auto              key() const -> SocketIdentityKeyType;
+      PSIO_REFLECT(SocketIdentityRow, fd, account)
+   };
+   using SocketIdentityTable = Table<SocketIdentityRow, &SocketIdentityRow::fd>;
+
    struct Native
    {
       using Tables = ExternTables<void,
@@ -510,7 +611,10 @@ namespace psibase
                                   EnvTable,
                                   HostConfigTable,
                                   PendingShutdownTable,
-                                  TimerTable>;
+                                  TimerTable,
+                                  UsageTable,
+                                  UsageConfigTable,
+                                  SocketIdentityTable>;
       static Tables tables(KvMode mode = KvMode::readWrite)
       {
          return Tables{proxyKvOpen(DbId::native, {}, mode), mode};
@@ -530,6 +634,10 @@ namespace psibase
       static Tables session(KvMode mode = KvMode::readWrite)
       {
          return Tables{proxyKvOpen(DbId::nativeSession, {}, mode), mode};
+      }
+      static Tables sessionDirect(KvMode mode = KvMode::readWrite)
+      {
+         return Tables{UniqueKvHandle{kvOpen(DbId::nativeSession, {}, mode)}, mode};
       }
    };
 

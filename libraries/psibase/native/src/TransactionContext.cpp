@@ -4,6 +4,7 @@
 #include <mutex>
 #include <optional>
 #include <psibase/ActionContext.hpp>
+#include <psibase/PsizamPolicy.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/finally.hpp>
@@ -13,6 +14,7 @@
 #include <cstdio>
 #include <csignal>
 #include <cstdlib>
+#include <ctime>
 #include <map>
 
 // Optional call profile: with PSIBASE_CALL_PROFILE set, the time spent in each
@@ -264,13 +266,13 @@ namespace psibase
             {
                self.blockContext.modifiedAuthAccounts.insert(service.service);
             }
-            setCode(db, service.service, service.vmType, service.vmVersion,
-                    {service.code.data(), service.code.size()});
             if (service.vmType == 0)
-               self.blockContext.systemContext.wasmCache.compileAhead(
+               self.admitCode(
                    sha256(service.code.data(), service.code.size()),
                    {reinterpret_cast<const char*>(service.code.data()), service.code.size()},
-                   self.vmOptions(), service.vmVersion);
+                   service.vmVersion);
+            setCode(db, service.service, service.vmType, service.vmVersion,
+                    {service.code.data(), service.code.size()});
          }
       }
       catch (const std::exception& e)
@@ -647,6 +649,11 @@ namespace psibase
       std::lock_guard<std::mutex> guard{mutex};
       timedOut   = true;
       vmTimedOut = true;
+      // Each context is told once. On wasmtime that is enough even though
+      // telling one context makes the stores of the others look (they share
+      // an engine): the engine does not let a store miss a tick that arrives
+      // while it is answering another (gofractally/wasmtime e1d9508,
+      // gofractally/psibase#2263).
       for (auto& [_, ec] : executionContexts)
          ec.asyncTimeout();
       for (auto& [_, ec] : altExecContexts)
@@ -660,6 +667,115 @@ namespace psibase
    TransactionContext::BillingPause::~BillingPause()
    {
       context.impl->watchdog->resume();
+   }
+
+   void TransactionContext::admitCode(const Checksum256&    hash,
+                                      std::span<const char> code,
+                                      std::uint8_t          vmVersion)
+   {
+      admitNativeWasm({reinterpret_cast<const std::uint8_t*>(code.data()), code.size()},
+                      impl->wasmConfig.vmOptions, vmVersion);
+      BillingPause unbilled{*this};
+      prepareCode(hash, vmVersion, [&] { return code; }, true);
+   }
+
+   void TransactionContext::codeNotCompiled(const Checksum256&                            hash,
+                                            std::uint8_t                                  vmVersion,
+                                            const std::function<std::span<const char>()>& code)
+   {
+      prepareCode(hash, vmVersion, code, false);
+   }
+
+   // Called with billing paused. `written`: the code row is being written;
+   // otherwise the code is about to be executed and the engine has no module.
+   void TransactionContext::prepareCode(const Checksum256&                            hash,
+                                        std::uint8_t                                  vmVersion,
+                                        const std::function<std::span<const char>()>& code,
+                                        bool                                          written)
+   {
+      auto&       cache   = blockContext.systemContext.wasmCache;
+      const auto& options = impl->wasmConfig.vmOptions;
+      // A transaction of a block, as opposed to a callback, a query or a
+      // signature check.
+      const bool inBlock = !dbMode.isSubjective && dbMode.isSync && dbMode.sockets;
+      const bool speculative =
+          speculativeRun ||
+          (!dbMode.isSubjective && dbMode.isSync && !dbMode.sockets && !dbMode.verifyOnly);
+      if (speculative)
+      {
+         // The run waits for the compile, but not on its own thread: the
+         // compile has a bound of its own, after which it is abandoned
+         // (WasmCache). A run that finds the module being compiled waits
+         // like the one that started the compile, but only that one caused
+         // it.
+         const auto begin   = RunClock::now();
+         const auto compile = cache.compileForSpeculativeRun(hash, code(), options, vmVersion);
+         if (compile.start == WasmCache::CompileStart::ready)
+            return;
+         if (compile.start == WasmCache::CompileStart::full)
+            throw std::runtime_error(
+                "this node is compiling as many services as it does at once; try again "
+                "shortly");
+         if (compile.start == WasmCache::CompileStart::notRetried)
+         {
+            // Nothing was compiled for this run, and nothing is charged.
+            auto utc = [](std::chrono::system_clock::time_point time)
+            {
+               const std::time_t seconds = std::chrono::system_clock::to_time_t(time);
+               std::tm           parts{};
+               gmtime_r(&seconds, &parts);
+               char text[32];
+               std::strftime(text, sizeof(text), "%Y-%m-%dT%H:%M:%SZ", &parts);
+               return std::string(text);
+            };
+            const auto& given = *compile.notRetried;
+            throw std::runtime_error(
+                "service code did not compile within " +
+                std::to_string(
+                    std::chrono::duration_cast<std::chrono::milliseconds>(given.bound).count()) +
+                " ms on this node at " + utc(given.at) + " and is not being retried until " +
+                utc(given.until));
+         }
+         if (compile.start == WasmCache::CompileStart::started)
+            startedCompileTime += RunClock::now() - begin;
+         if (compile.wait == WasmCache::CompileWait::inFlight)
+            throw std::runtime_error(
+                "service code is still being compiled on this node; try again shortly");
+         // The same outcome for the run. The compile is not going on: a
+         // retry starts it again, under the same bound.
+         if (compile.wait == WasmCache::CompileWait::abandoned)
+            throw std::runtime_error(
+                "service code took too long to compile on this node and the compile was "
+                "stopped");
+      }
+      else if (inBlock && blockContext.deferUncompiledCode)
+      {
+         if (cache.mustDefer(hash, code, options, vmVersion))
+         {
+            blockContext.deferral = "service code " + loggers::to_string(hash) +
+                                    " is not compiled on this node yet";
+            // Code that is only being stored does not stop the run: the
+            // transaction goes on, so that every module it stores is
+            // being compiled by the time it is offered again, and
+            // BlockContext::exec discards it at the end. Code that has to
+            // be executed stops it here.
+            if (!written)
+               throw TransactionDeferred{*blockContext.deferral};
+         }
+      }
+      else if (inBlock && !blockContext.isProducing)
+      {
+         // Applying a block: nothing here waits for a compile except the
+         // first execution of the code.
+         if (written)
+            cache.compileInBackground(hash, code(), options, vmVersion);
+         else
+            cache.awaitCompile(hash, options, vmVersion);
+      }
+      else if (written)
+         cache.compileAhead(hash, code(), options, vmVersion);
+      else
+         cache.awaitCompile(hash, options, vmVersion);
    }
 
    std::chrono::nanoseconds TransactionContext::getBillableTime()
