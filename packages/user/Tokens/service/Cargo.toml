@@ -11,6 +11,8 @@ plugins = ["tokens-plugin"]
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "tokens", service = "tokens", method = "init", data = {} },
+    # The transfer confirmation is shown by the supervisor, in a frame.
+    { sender = "tokens", service = "sites", method = "setcsp", data = { path = "/plugin/web/prompt/transfer/index.html", csp = "default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline';img-src 'self' data:;font-src 'self';connect-src 'self';frame-src supervisor.{{root}};frame-ancestors 'self' supervisor.{{root}};base-uri 'none';form-action 'self';object-src 'none';" } },
 ]
 
 [dependencies]

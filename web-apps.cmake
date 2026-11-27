@@ -91,3 +91,15 @@ ExternalProject_Add(Favor_js
     BUILD_ALWAYS 1
 )
 set(Favor_js_DEP Favor_js ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Favor/ui/dist/index.html)
+
+# The Tokens transfer confirmation: plain files and the built common-lib.
+ExternalProject_Add(Tokens_js
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Tokens/ui
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND node ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Tokens/ui/build.mjs
+    BUILD_BYPRODUCTS ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Tokens/ui/dist/plugin/web/prompt/transfer/index.html
+    DEPENDS CommonApiCommonLib_js
+    INSTALL_COMMAND ""
+    BUILD_ALWAYS 1
+)
+set(Tokens_js_DEP Tokens_js ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Tokens/ui/dist/plugin/web/prompt/transfer/index.html)

@@ -175,6 +175,15 @@ fn add_files<'a>(
     dest: &str,
     out: &mut Vec<(AccountNumber, String, PathBuf)>,
 ) -> Result<(), anyhow::Error> {
+    if !src.exists() {
+        // A declared source that is not there is a UI that was not built (or
+        // a declaration left behind); a package without it installs and then
+        // fails in the browser.
+        return Err(anyhow!(
+            "package data source does not exist: {}",
+            src.display()
+        ));
+    }
     if src.is_file() {
         out.push((service, dest.to_string(), src.to_path_buf()));
     } else if src.is_dir() {

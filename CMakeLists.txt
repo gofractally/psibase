@@ -686,6 +686,7 @@ cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Tokens.psi
     PATH packages/user/Tokens
     TARGET_DIR ${USER_WORKSPACE_TARGET}
+    DEPENDS ${Tokens_js_DEP}
 )
 
 

@@ -125,6 +125,22 @@ class TestSites(unittest.TestCase):
             self.assertEqual(reply.status_code, 404)
             self.assertNotEqual(reply.headers.get('Cache-Control'), FOREVER)
 
+    @testutil.psinode_test
+    def test_tokens_transfer_prompt(self, cluster):
+        # An app's transfer is confirmed on a page of the tokens site, shown by the supervisor
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['DevDefault'])
+        a.wait(new_block())
+        for path in ['/plugin/web/prompt/transfer', '/plugin/web/prompt/transfer/index.html']:
+            with a.get(path, 'tokens') as reply:
+                reply.raise_for_status()
+                self.assertIn('wallet-assets/transfer.mjs', reply.text)
+                policy = reply.headers['Content-Security-Policy']
+                self.assertRegex(policy, r"frame-ancestors 'self' supervisor\.[^;{]+;", path)
+        for path in ['/wallet-assets/transfer.mjs', '/wallet-assets/transfer.css', '/wallet-assets/common-lib.js']:
+            with a.get(path, 'tokens') as reply:
+                reply.raise_for_status()
+
     def assertResponse(self, response, expected):
         response.raise_for_status()
         self.assertEqual(response.text, expected)
