@@ -91,6 +91,12 @@ function(target_mapped_include_directories target type)
     endforeach()
 endfunction()
 
+if(DEFINED PSIBASE_DEP_PREFIX AND NOT PSIBASE_DEP_PREFIX STREQUAL "")
+    set(DEP_PREFIX ${PSIBASE_DEP_PREFIX})
+else()
+    set(DEP_PREFIX ${CMAKE_BINARY_DIR}/deps)
+endif()
+
 set(DEP_URL https://github.com/gofractally/psibase/releases/download/deps)
 set(GMP_ARCHIVE gmp-6.2.1.tar.zst)
 set(GMP_EXTRACTED gmp-6.2.1)
@@ -101,7 +107,6 @@ set(OPENSSL_SHA256 83049d042a260e696f62406ac5c08bf706fd84383f945cf21bd61e9ed95c3
 set(ZLIB_ARCHIVE zlib-1.2.13.tar.gz)
 set(ZLIB_EXTRACTED zlib-1.2.13)
 set(ZLIB_SHA256 b3a24de97a8fdbc835b9833169501030b8977031bcb54b3b3ac13740f846ab30)
-set(DEP_PREFIX ${CMAKE_BINARY_DIR}/deps)
 
 function(download url archive hash)
     if(NOT EXISTS ${archive})
@@ -121,7 +126,7 @@ function(download url archive hash)
 endfunction()
 
 # These builds are done at generation time so cmake's find_* commands can find them
-if(NOT EXISTS ${DEP_PREFIX}/lib/libz.a)
+if(NOT PSIBASE_DEP_PREFIX AND NOT EXISTS ${DEP_PREFIX}/lib/libz.a)
     download(${DEP_URL}/${ZLIB_ARCHIVE} ${DEP_PREFIX}/${ZLIB_ARCHIVE} ${ZLIB_SHA256})
     message("building zlib")
     execute_process(
@@ -142,7 +147,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libz.a)
     )
 endif()
 
-if(NOT EXISTS ${DEP_PREFIX}/lib/libgmp.a)
+if(NOT PSIBASE_DEP_PREFIX AND NOT EXISTS ${DEP_PREFIX}/lib/libgmp.a)
     download(${DEP_URL}/${GMP_ARCHIVE} ${DEP_PREFIX}/${GMP_ARCHIVE} ${GMP_SHA256})
     message("building gmp")
     execute_process(
@@ -164,7 +169,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libgmp.a)
     )
 endif()
 
-if(NOT EXISTS ${DEP_PREFIX}/lib/libssl.a)
+if(NOT PSIBASE_DEP_PREFIX AND NOT EXISTS ${DEP_PREFIX}/lib/libssl.a)
     download(${DEP_URL}/${OPENSSL_ARCHIVE} ${DEP_PREFIX}/${OPENSSL_ARCHIVE} ${OPENSSL_SHA256})
     message("building openssl")
     set(OPENSSL_BUILD_FLAGS "--sysroot=${CMAKE_SYSROOT} --target=wasm32-wasip1 -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS -DNO_SYSLOG -DOPENSSL_NO_SECURE_MEMORY -Wno-error=implicit-function-declaration")

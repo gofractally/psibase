@@ -109,6 +109,19 @@ nix develop
 
 - `flake.nix` / `flake.lock` — Nix flake at repo root
 - `nix/rust-toolchain.toml` — Rust version and targets
+- `nix/release.nix` — layered `nix build` of the SDK
+
+# Building the chain
+
+```bash
+nix build .#psibase --max-jobs 1
+```
+
+`--max-jobs 1` keeps the machine to one heavy derivation at a time. Cargo and CMake builders inside those derivations use 2 jobs.
+
+The result has `bin/psinode`, `bin/psibase`, and `share/psibase/packages` (`Minimal.psi`, `ProdDefault.psi`, `index.json`).
+
+Layers, in the order they have to be built: `wasm-sysroot`, `native`, `rust-host`, `plugins`, `component-parser`, `cpp-wasm`, `ui`, `user-services`, `system-services`, `book`, `pack`. `.#psibase` joins `native`, `rust-host`, and `pack`. `.#pkg-ProdDefault` is just that one `.psi`.
 
 # Relationship to Docker
 

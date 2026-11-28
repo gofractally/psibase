@@ -28,18 +28,32 @@ file(WRITE ${CMAKE_BINARY_DIR}/CTestTestfile.cmake)
 
 option(BUILD_STATIC "Build static binaries" OFF)
 option(ENABLE_SSL "Build psinode with TLS support" ON)
+option(PSIBASE_BUILD_NATIVE_ONLY "Build host binaries only" OFF)
+# Package from artifacts built elsewhere; see nix/prebuilt-packages.cmake
+option(PSIBASE_PREBUILT_PACKAGES "Package prebuilt artifacts instead of building them" OFF)
 
-set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
-set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
+if(NOT USER_WORKSPACE_TARGET)
+    set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
+endif()
+if(NOT SYSTEM_WORKSPACE_TARGET)
+    set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
+endif()
 
-add_subdirectory(native)
-add_subdirectory(rust)
+if(NOT PSIBASE_PREBUILT_PACKAGES)
+    add_subdirectory(native)
+    add_subdirectory(rust)
+endif()
+
+if(PSIBASE_BUILD_NATIVE_ONLY)
+    return()
+endif()
 file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\" \"rust\")\n")
 
 option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 
 include(GNUInstallDirs)
 
+if(NOT PSIBASE_PREBUILT_PACKAGES)
 if(DEFINED WASI_SDK_PREFIX)
     install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI EXCLUDE_FROM_ALL)
 elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
@@ -273,6 +287,10 @@ file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/packages
 include(libraries/psibase/sdk/rs-components.cmake)
 add_rs_component(packages/user/CommonApi/common/packages/component-parser:ComponentParser component_parser.wasm wasm32-unknown-unknown)
 add_dependencies(CommonApiCommonLib_js ComponentParser)
+
+else()
+    include(${CMAKE_CURRENT_SOURCE_DIR}/nix/prebuilt-packages.cmake)
+endif()
 
 add_rs_component_workspace(packages/:Plugins 
     accounts
@@ -1665,6 +1683,7 @@ psibase_package(
 
 write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages 0 PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XSocketList WSEcho XDelay XWithServer)
 
+if(NOT PSIBASE_PREBUILT_PACKAGES)
 ExternalProject_Add(
     reserved-names
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
@@ -1684,6 +1703,7 @@ ExternalProject_Add(
     BUILD_ALWAYS 1
     INSTALL_COMMAND ""
 )
+endif()
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase TYPE BIN COMPONENT Client)
 
 option(BUILD_EXAMPLES "Build examples" ON)

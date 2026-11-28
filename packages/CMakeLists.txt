@@ -15,6 +15,10 @@ function(add_usr_cargo_psibase_test name)
 endfunction()
 
 function(downloadThirdParty depName depUrl)
+    get_filename_component(depFile "${depUrl}" NAME)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/common/resources/thirdParty/src/${depFile}")
+        return()
+    endif()
     ExternalProject_Add(
         ${depName}
         PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/common/resources/thirdParty

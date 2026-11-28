@@ -4,7 +4,7 @@
 # - wasm-opt does not handle debug info, so RelWithDebInfo doesn't work
 # - clang doesn't pass any feature control options to wasm-opt, so it
 #   generates code that won't run on psibase.
-if which wasm-opt >/dev/null 2>&1
+if command -v wasm-opt >/dev/null 2>&1
 then
     wasm-opt --enable-sign-ext --enable-nontrapping-float-to-int --enable-simd --enable-bulk-memory "$@"
 fi

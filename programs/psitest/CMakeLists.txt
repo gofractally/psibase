@@ -13,9 +13,11 @@ elseif(UNIX)
         psibase
         debug_eos_vm
         ${Boost_LIBRARIES}
-        -static-libgcc
-        -static-libstdc++
     )
+    option(PSIBASE_STATIC_LIBCXX "Link psitest against static libstdc++" ON)
+    if(PSIBASE_STATIC_LIBCXX)
+        target_link_libraries(psitest -static-libgcc -static-libstdc++)
+    endif()
 endif()
 
 target_link_directories(psitest PUBLIC ${ICU_LIBRARY_DIR} )
