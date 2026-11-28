@@ -302,6 +302,38 @@ pub fn serve(path: &str, query: &str) -> Option<HttpReply> {
                 };
                 Ok(page(rows, limit, |r| cursor(r.height, &r.id)))
             }
+            // Requests that left objective state (cancelled), from the event log: newest first.
+            // A node may prune its events; this returns what the node still has.
+            "/explorer/retired" => {
+                let before = after
+                    .map(|s| s.parse::<u64>())
+                    .transpose()
+                    .map_err(|_| "Invalid cursor")?;
+                let mut sql =
+                    String::from("SELECT ROWID, * FROM \"history.btcbridge.withdrawalRetired\"");
+                let mut filters = vec![];
+                let mut params: Vec<psio::pssz::RawString> = vec![];
+                if let Some(owner) = owner {
+                    filters.push("owner = ?".to_string());
+                    params.push(owner.to_string().as_str().into());
+                }
+                if let Some(before) = before {
+                    filters.push(format!("ROWID < {before}"));
+                }
+                if !filters.is_empty() {
+                    sql += " WHERE ";
+                    sql += &filters.join(" AND ");
+                }
+                sql += &format!(" ORDER BY ROWID DESC LIMIT {}", limit + 1);
+                let json = psibase::services::r_events::Wrapper::call().sqlQuery(sql, params);
+                let rows: Vec<Value> =
+                    serde_json::from_slice(&json).map_err(|_| "Event history unavailable")?;
+                Ok(page(rows, limit, |r| {
+                    let id = &r["rowid"];
+                    let id = if id.is_null() { &r["ROWID"] } else { id };
+                    id.as_str().map(str::to_string).unwrap_or_else(|| id.to_string())
+                }))
+            }
             "/explorer/withdrawals" => {
                 let end = after
                     .map(|s| s.parse::<u64>())

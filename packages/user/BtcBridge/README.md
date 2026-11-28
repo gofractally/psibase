@@ -194,9 +194,35 @@ more or different outputs than admission assumed and the fee share exceeds the
 allowance (state 4). A request admitted before this rule existed can be in
 either state as well.
 
-Request states: 0 queued, 1 in a batch, 2 complete, 3 cancelled, 4 fee
-allowance too low, 5 waiting for the reserve. The owner can cancel in states 0,
-4 and 5.
+Request states: 0 queued, 1 in a batch, 2 complete, 4 fee allowance too low, 5
+waiting for the reserve. The owner can cancel in states 0, 4 and 5. A cancelled
+request has no state: it is no longer a row (state 3 exists only on rows
+cancelled before that, until they are retired).
+
+### What leaves objective state
+
+Chain state holds what an objective action will read again. A cancelled
+withdrawal is refunded and then read by nothing, and it guards nothing, so
+`cancel` emits the history event `withdrawalRetired` (id, owner, address,
+amount, fee allowance, service fee, created, retired, reason, prior state) and
+erases the row. Request ids come from a counter that only increases, so an id
+is never issued again. `retireCancelled(limit)` does the same, a bounded number
+at a time and for anyone who calls it, for rows cancelled before this; it moves
+no value. A bridge initialized before it emitted events registers the event's
+indexes once with `indexEvents` (its own authority); `init` does it otherwise.
+
+History of cancelled requests is served from the node's event log
+(`/explorer/retired?owner=…&limit=…&cursor=…`, newest first). A node may prune
+its events; the page then shows less, or says the node does not serve that
+history. Nothing objective depends on it.
+
+What stays, however old, is what guards against a double spend or double
+credit: every processed custody output including spent ones (`UtxoTable`), the
+record of every authorized bridge transaction (`TxTable`), completed batch
+rows (they refuse a second completion), scripts and addresses, custody keys
+and the counters. Paid requests, the revisions and signatures of completed
+batches and deposit receipts guard nothing and are candidates for the same
+treatment; they are still rows today.
 
 What can still stop `makeBatch` for everyone is not a request: sixteen open
 batches (`Open batch limit`), a paused bridge, or a stale or paused relay.
@@ -427,6 +453,8 @@ Public JSON endpoints (GET, no authentication):
 - `/explorer/deposits?limit=25&cursor=...&owner=alice`: descending confirmed
   deposit history. `/explorer/deposit?outpoint=TXID-VOUT_HEX` reads one receipt;
   VOUT_HEX is eight hexadecimal digits.
+- `/explorer/retired?limit=25&cursor=...&owner=alice`: cancelled requests, from
+  the event log (prunable per node), newest first.
 - `/explorer/withdrawals?limit=25&cursor=...&owner=alice`: descending requests
   including queued, committed, complete, cancelled, fee-deferred and
   waiting-for-reserve states.

@@ -8,7 +8,8 @@ local port that answers queries for the chain's hosts), BTCBRIDGE_RPC_PORT, BTCB
 BTCBRIDGE_CHECKPOINT_EPOCH, BTCBRIDGE_TREASURY (an existing account), BTCBRIDGE_RELAYER_ACCOUNT,
 BTCBRIDGE_DAEMON_CLI (what the signing daemons run to push), BTCBRIDGE_PACKAGE_DIR (holds
 Signing.psi and BtcBridge.psi), BTCBRIDGE_MIN_DEPOSIT and BTCBRIDGE_MIN_WITHDRAWAL (default 1000 each).
-`deploy_live.py minimums` applies those two to a bridge that is already initialized (setTestMins). STATE/account-keys/psibase.pem is the key that signs for the
+`deploy_live.py minimums` applies those two to a bridge that is already initialized (setTestMins).
+`deploy_live.py retire` registers the bridge's event indexes and retires already-cancelled requests. STATE/account-keys/psibase.pem is the key that signs for the
 chain's service accounts; the treasury's key is STATE/account-keys/<treasury>.pem.
 """
 import shutil,sys,time
@@ -77,4 +78,12 @@ def minimums():
  """`deploy_live.py minimums`: set the running bridge's smallest deposit and withdrawal to common.TEST_MINIMUMS."""
  before,after=set_test_minimums()
  print(json.dumps({k:{'before':before[k],'now':after[k]} for k in TEST_MINIMUMS},indent=2))
-if __name__=='__main__':minimums() if sys.argv[1:]==['minimums'] else main()
+def retire():
+ """`deploy_live.py retire`: after an upgrade to a bridge that emits events, register its event
+ indexes once and retire the withdrawal requests that were cancelled before cancellation erased them."""
+ call('btcbridge','btcbridge','indexEvents');total=0
+ while True:
+  count=call(RELAYER,'btcbridge','retireCancelled',limit=100);total+=count
+  if not count:break
+ print(json.dumps({'retired':total,'history':http('/explorer/retired?limit=50')['rows']},indent=2))
+if __name__=='__main__':{'minimums':minimums,'retire':retire}.get(' '.join(sys.argv[1:]),main)()

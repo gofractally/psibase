@@ -11,6 +11,7 @@ services = ["btcrelay", "btcbridge"]
 
 [package.metadata.psibase.dependencies]
 Signing = "0.29.0"
+Events = "0.29.0"
 Host = "0.29.0"
 Accounts = "0.29.0"
 Supervisor = "0.29.0"

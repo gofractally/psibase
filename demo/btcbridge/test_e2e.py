@@ -86,7 +86,15 @@ class BridgeTests(unittest.TestCase):
   self.unchanged_failure(lambda:call('bob','btcbridge','cancel',request=request))
   self.unchanged_failure(lambda:call('alice','btcbridge','makeBatch'))
   call('alice','btcbridge','cancel',request=request)
-  row=next(r for r in snapshot()['requests'] if r['id']==request);self.assertEqual(row['status'],3)
+  # A cancelled request leaves chain state: the row is erased and an event carries its history.
+  self.assertFalse([r for r in snapshot('alice')['requests'] if r['id']==request])
+  retired=control.wait(lambda:next(r for r in http('/explorer/retired?owner=alice&limit=10')['rows'] if int(r['id'])==request))
+  self.assertEqual((retired['owner'],retired['reason'],int(retired['amount']),int(retired['max_fee']),int(retired['prior_status'])),('alice','cancelled',100000,10000,0))
+  # Its id is not issued again, it cannot be cancelled twice, and nothing is left to sweep.
+  self.unchanged_failure(lambda:call('alice','btcbridge','cancel',request=request))
+  self.assertEqual(call('bob','btcbridge','retireCancelled',limit=100),0)
+  self.assertGreater(self.withdraw()[0],request);call('alice','btcbridge','cancel',request=snapshot()['config']['next_request']-1)
+  self.assertEqual(snapshot()['config']['escrow'],0)
  def test_05_two_of_three_blind_signers_pay_once(self):
   # Make the third provider unavailable. Bitcoin must still accept the other two signatures.
   pidfile=STATE/'signer-2.pid';os.kill(int(pidfile.read_text()),signal.SIGTERM);pidfile.unlink()
@@ -156,7 +164,9 @@ class BridgeTests(unittest.TestCase):
    self.fail('Pagination failed to terminate')
   withdrawals=pages('/explorer/withdrawals');ids=[r['withdrawal']['id'] for r in withdrawals]
   self.assertEqual(len(set(ids)),len(ids));self.assertEqual(ids,sorted(ids,reverse=True))
-  self.assertEqual(len(ids),snapshot()['config']['next_request']-1)
+  # Every id ever issued is either a live row or a retired (cancelled) request in the event log.
+  gone=[int(r['id']) for r in pages('/explorer/retired')];self.assertFalse(set(gone)&set(ids))
+  self.assertEqual(sorted(ids+gone),list(range(1,snapshot()['config']['next_request'])))
   deposits=pages('/explorer/deposits');self.assertGreaterEqual(len(deposits),5)
   self.assertEqual(len({d['id'] for d in deposits}),len(deposits))
   bob=pages('/explorer/deposits?owner=bob');self.assertTrue(bob);self.assertTrue(all(d['owner']=='bob' for d in bob))

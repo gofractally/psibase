@@ -61,6 +61,15 @@ export function createExplorer(c:ExplorerContext){
    el('explorer-error').hidden=true;lastRefresh=Date.now();
   }catch(error){el('explorer-error').textContent=(error as Error).message;el('explorer-error').hidden=false;}finally{loading=false;if(seq!==generation&&detail===null&&!el('explorer-view').hidden)void fetchList();}
  }
+ // Cancelled withdrawals are not in chain state: the bridge emits an event and erases them. They
+ // are read from the node's event log, which a node may prune; then there is simply less to show.
+ function retiredRows(rows:any[]){return rows.map(r=>`<tr><td>#${esc(r.id)}<small>@${esc(r.owner)}</small></td><td>${btc(Number(r.amount))}<small>Fee allowance ${btc(Number(r.max_fee))} · bridge fee ${btc(Number(r.service_fee))}, all returned</small></td><td class="wrap">${pill('Cancelled')}</td><td class="mono wrap">${esc(r.address)}</td><td>${when(Number(r.retired))}</td></tr>`).join('');}
+ async function fetchRetired(account:string,seq:number){
+  const target=el('history-retired');if(historyView!=='withdrawals'||historyStack.length){target.innerHTML='';return;}
+  try{const result=await c.request(`/explorer/retired?${new URLSearchParams({owner:account,limit:'10'})}`);if(account!==c.account()||seq!==historyGeneration)return;
+   target.innerHTML=result.rows.length?`<h3>Cancelled</h3>${table(['Withdrawal','Amount','','Bitcoin destination','Cancelled'],retiredRows(result.rows))}<p class="fine">Cancelled withdrawals are kept as history events, not in chain state. A node may prune old events.${result.next?' Older ones exist.':''}</p>`:'';
+  }catch{if(account===c.account()&&seq===historyGeneration)target.innerHTML='<p class="fine">This node does not serve the history of cancelled withdrawals. Balances and open requests above are unaffected.</p>';}
+ }
  async function fetchHistory(force=false){
   if(historyLoading||!c.state())return;const account=c.account();
   if(account!==historyOwner){historyOwner=account;historyCursor=null;historyStack=[];historyFetched=0;}
@@ -72,6 +81,7 @@ export function createExplorer(c:ExplorerContext){
    if(historyView==='withdrawals')await observe(result.rows.filter((r:any)=>r.batch?.batch.status===0).flatMap((r:any)=>(r.batch.revisions||[r.batch.transaction]).map((v:any)=>v.txid)));
    if(account!==c.account()||seq!==historyGeneration)return;
    historyNext=result.next;el('history-results').innerHTML=historyView==='deposits'?table(['Transaction','Recipient','Amount','Fee / bounty','Proof publisher'],depositRows(result.rows)):table(['Withdrawal','Amount received','Waiting for','Bitcoin destination','Transaction',''],withdrawalRows(result.rows));
+   void fetchRetired(account,seq);
    el<HTMLButtonElement>('history-prev').disabled=historyStack.length===0;el<HTMLButtonElement>('history-next').disabled=!historyNext;
    el('history-page').textContent=`Page ${historyStack.length+1}`;historyFetched=Date.now();
   }catch(error){el('history-results').textContent=(error as Error).message;}finally{historyLoading=false;}

@@ -128,6 +128,39 @@ fn store_revision(c: &Config, batch: u32, rev: u32, plan: &btc::Plan, p: &btc::P
     }
     let _ = c;
 }
+/// A withdrawal request leaves objective state: everything a reader of its history needs goes
+/// into the event, and the row is erased. Nothing reads a cancelled request again, and it guards
+/// nothing: its funds were returned, and its id is never issued again (`Config.next_request`).
+fn retire(r: &Withdrawal, reason: &str, prior_status: u8) {
+    Wrapper::emit().history().withdrawalRetired(
+        r.id,
+        r.owner,
+        r.address.clone(),
+        r.amount,
+        r.max_fee,
+        r.service_fee,
+        r.created,
+        now(),
+        reason.to_string(),
+        prior_status,
+        r.batch,
+        r.paid_fee,
+        r.txid.clone(),
+    );
+    RequestTable::read_write().remove(r);
+}
+/// The columns history is asked for: the request id and its owner.
+fn index_events() {
+    use psibase::services::events;
+    for column in [0, 1] {
+        events::Wrapper::call().addIndex(
+            events::EventDb::HistoryEvent,
+            Wrapper::SERVICE,
+            MethodNumber::from("withdrawalRetired"),
+            column,
+        );
+    }
+}
 #[psibase::service(name = "btcbridge", tables = "tables::tables")]
 #[allow(non_snake_case)]
 pub mod service {
@@ -216,6 +249,7 @@ pub mod service {
         t.setTokenConf(token, 1, true);
         t.setUserConf(0, false);
         t.createSub("withdrawals".into());
+        index_events();
         ConfigTable::read_write()
             .put(&Config {
                 policy: serde_json::to_string(&p).unwrap(),
@@ -525,7 +559,7 @@ pub mod service {
         // Cancellation before commitment remains available if relay data is stale or paused.
         let mut c = config();
         audit(&c);
-        let mut r = RequestTable::read()
+        let r = RequestTable::read()
             .get_index_pk()
             .get(&request)
             .expect("Unknown request");
@@ -538,9 +572,54 @@ pub mod service {
         c.escrow -= locked;
         Tokens::call().fromSub(c.token, "withdrawals".into(), locked.into());
         credit(c.token, r.owner, locked, "Cancelled Bitcoin withdrawal");
-        r.status = 3;
-        RequestTable::read_write().put(&r).unwrap();
+        // The row is erased as stored, so that its index entries go with it.
+        retire(&r, "cancelled", r.status);
         save(&c);
+    }
+    /// Requests cancelled before cancellation erased them are still rows in state 3. Anyone may
+    /// retire a bounded number: each emits the event `cancel` now emits and is erased. No value
+    /// moves. Returns how many were retired; 0 means none are left.
+    #[action]
+    fn retireCancelled(limit: u32) -> u32 {
+        assert!((1..=100).contains(&limit), "Retirement page limit");
+        let rows: Vec<_> = RequestTable::read()
+            .get_index_by_status()
+            .range((3, 0)..=(3, u64::MAX))
+            .take(limit as usize)
+            .collect();
+        for r in &rows {
+            // The state it was cancelled from was not recorded.
+            retire(r, "cancelled", 3);
+        }
+        rows.len() as u32
+    }
+    /// Registers the indexes of this service's events. `init` does it for a new bridge; a bridge
+    /// initialized before it emitted events calls this once, under its own authority.
+    #[action]
+    fn indexEvents() {
+        assert_eq!(get_sender(), Wrapper::SERVICE, "Bridge administration authority");
+        index_events();
+    }
+    /// A withdrawal request that left objective state. `reason` is "cancelled"; `prior_status` is
+    /// the state it was in (0 queued, 4 fee allowance too low, 5 waiting for the reserve; 3 for a
+    /// row cancelled before this event existed). `batch`, `paid_fee` and `txid` are empty for a
+    /// cancelled request.
+    #[event(history)]
+    pub fn withdrawalRetired(
+        id: u64,
+        owner: AccountNumber,
+        address: String,
+        amount: u64,
+        max_fee: u64,
+        service_fee: u64,
+        created: u64,
+        retired: u64,
+        reason: String,
+        prior_status: u8,
+        batch: u32,
+        paid_fee: u64,
+        txid: String,
+    ) {
     }
     #[action]
     fn makeBatch() -> u32 {
