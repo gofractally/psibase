@@ -131,45 +131,21 @@ fn store_revision(c: &Config, batch: u32, rev: u32, plan: &btc::Plan, p: &btc::P
 /// A withdrawal request leaves objective state: everything a reader of its history needs goes
 /// into the event, and the row is erased. Nothing reads a cancelled request again, and it guards
 /// nothing: its funds were returned, and its id is never issued again (`Config.next_request`).
-fn retire(r: &Withdrawal, reason: &str, prior_status: u8) {
-    Wrapper::emit().history().withdrawalRetired(
-        r.id,
-        r.owner,
-        r.address.clone(),
-        r.amount,
-        r.max_fee,
-        r.service_fee,
-        r.created,
-        now(),
-        reason.to_string(),
-        prior_status,
-        r.batch,
-        r.paid_fee,
-        r.txid.clone(),
-    );
+fn retire(r: &Withdrawal, reason: &str) {
+    // An event, like an action, carries at most twelve arguments: what history is asked by
+    // (id, owner) is at the top, the request itself is one record. Its `status` is the state it
+    // was in when it was retired.
+    Wrapper::emit()
+        .history()
+        .withdrawalRetired(r.id, r.owner, reason.to_string(), now(), r.clone());
     RequestTable::read_write().remove(r);
 }
 /// A deposit's receipt is history: nothing objective reads it (the processed output in
 /// `UtxoTable` is the guard), so it is an event.
 fn emit_deposit(d: &Deposit) {
-    Wrapper::emit().history().depositCredited(
-        d.id.clone(),
-        d.txid.clone(),
-        d.vout,
-        d.owner,
-        d.address_index,
-        d.value,
-        d.credited,
-        d.fee,
-        d.bounty,
-        d.publisher.map(|p| p.to_string()).unwrap_or_default(),
-        d.fee_bps,
-        d.publisher_bps,
-        d.height,
-        d.block.clone(),
-        d.credited_at,
-        d.legacy,
-    );
+    Wrapper::emit()
+        .history()
+        .depositCredited(d.id.clone(), d.owner, d.txid.clone(), d.clone());
 }
 /// The reporting window's closed frontier under the relay's canonical tip as this action sees
 /// it. Stored, and only ever raised, so closing is final.
@@ -202,8 +178,7 @@ fn tidy() {
         .collect();
     left -= cancelled.len();
     for r in &cancelled {
-        // The state it was cancelled from was not recorded.
-        retire(r, "cancelled", 3);
+        retire(r, "cancelled");
     }
     // Deposit receipts written before a receipt was an event.
     let receipts: Vec<_> = DepositTable::read()
@@ -223,7 +198,7 @@ fn index_events() {
         ("withdrawalRetired", 0),
         ("withdrawalRetired", 1),
         ("depositCredited", 0),
-        ("depositCredited", 3),
+        ("depositCredited", 1),
     ] {
         events::Wrapper::call().addIndex(
             events::EventDb::HistoryEvent,
@@ -620,7 +595,7 @@ pub mod service {
         Tokens::call().fromSub(c.token, "withdrawals".into(), locked.into());
         credit(c.token, r.owner, locked, "Cancelled Bitcoin withdrawal");
         // The row is erased as stored, so that its index entries go with it.
-        retire(&r, "cancelled", r.status);
+        retire(&r, "cancelled");
         save(&c);
     }
     /// Registers the indexes of this service's events. `init` does it for a new bridge; a bridge
@@ -630,46 +605,18 @@ pub mod service {
         assert_eq!(get_sender(), Wrapper::SERVICE, "Bridge administration authority");
         index_events();
     }
-    /// A withdrawal request that left objective state. `reason` is "cancelled"; `prior_status` is
-    /// the state it was in (0 queued, 4 fee allowance too low, 5 waiting for the reserve; 3 for a
-    /// row cancelled before this event existed). `batch`, `paid_fee` and `txid` are empty for a
-    /// cancelled request.
     #[event(history)]
-    pub fn depositCredited(
-        id: String,
-        txid: String,
-        vout: u32,
-        owner: AccountNumber,
-        address_index: u32,
-        value: u64,
-        credited: u64,
-        fee: u64,
-        bounty: u64,
-        publisher: String,
-        fee_bps: u16,
-        publisher_bps: u16,
-        height: u32,
-        block: String,
-        credited_at: u64,
-        legacy: bool,
-    ) {
-    }
-    /// A withdrawal request that left objective state. See `retire`.
+    pub fn depositCredited(id: String, owner: AccountNumber, txid: String, deposit: Deposit) {}
+    /// A withdrawal request left objective state. `reason` is "cancelled"; `request` is the row
+    /// as it was (its `status`: 0 queued, 4 fee allowance too low, 5 waiting for the reserve, 3
+    /// for a row cancelled before this event existed); `retired` is the chain time.
     #[event(history)]
     pub fn withdrawalRetired(
         id: u64,
         owner: AccountNumber,
-        address: String,
-        amount: u64,
-        max_fee: u64,
-        service_fee: u64,
-        created: u64,
-        retired: u64,
         reason: String,
-        prior_status: u8,
-        batch: u32,
-        paid_fee: u64,
-        txid: String,
+        retired: u64,
+        request: Withdrawal,
     ) {
     }
     #[action]

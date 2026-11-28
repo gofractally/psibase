@@ -205,13 +205,15 @@ Chain state holds what an objective action will read again. A record that is
 final, read by no action and guards nothing is retired: an event carries what a
 reader of its history needs and the row is erased.
 
-- **Cancelled withdrawals.** `cancel` refunds, emits `withdrawalRetired` (id,
-  owner, address, amount, fee allowance, service fee, created, retired, reason,
-  prior state) and erases the request. Ids come from a counter that only
+- **Cancelled withdrawals.** `cancel` refunds, emits
+  `withdrawalRetired(id, owner, reason, retired, request)` and erases the
+  request. `request` is the row as it was (address, amount, fee allowance,
+  service fee, created, and the state it was in). Ids come from a counter that only
   increases, so an id is never issued again.
-- **Deposit receipts.** `deposit` emits `depositCredited` (outpoint, recipient,
-  value, credit, fee, bounty, publisher, block, time) and writes no receipt
-  row. The processed output in `UtxoTable` is the guard; the receipt was only
+- **Deposit receipts.** `deposit` emits
+  `depositCredited(id, owner, txid, deposit)` and writes no receipt row.
+  `deposit` is the receipt (value, credit, fee, bounty, publisher, block,
+  time); `id` is the outpoint. The processed output in `UtxoTable` is the guard; the receipt was only
   ever listed.
 
 **No maintenance action.** Rows that were final before their action erased
@@ -222,6 +224,10 @@ bounded: one index read per kind and at most four events and four erasures.
 Nobody is asked to sweep. A bridge initialized before it emitted events
 registers the events' indexes once with `indexEvents` (its own authority);
 `init` does it otherwise.
+
+An event, like an action, carries at most twelve arguments, so each event has
+what history is asked by at the top (id, owner) and the detail as one record,
+which the event log returns as a nested object and cannot filter on.
 
 History is served from the node's event log: `/explorer/retired` (cancelled
 requests), `/explorer/deposits` and `/explorer/deposit` (receipts). A node may

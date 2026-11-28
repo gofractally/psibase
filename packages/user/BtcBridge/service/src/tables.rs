@@ -78,7 +78,8 @@ pub mod tables {
         }
     }
     #[table(name = "RequestTable", index = 4)]
-    #[derive(Clone, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+    // Also the detail record of this service's history events, which GraphQL event queries expose.
+    #[derive(Clone, Debug, async_graphql::SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Withdrawal {
         #[primary_key]
         pub id: u64,
@@ -208,7 +209,8 @@ pub mod tables {
         fn pk(&self) {}
     }
     #[table(name = "DepositTable", index = 12)]
-    #[derive(Clone, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+    // Also the detail record of this service's history events, which GraphQL event queries expose.
+    #[derive(Clone, Debug, async_graphql::SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Deposit {
         #[primary_key]
         pub id: String,

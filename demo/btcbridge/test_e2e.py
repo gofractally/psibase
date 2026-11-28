@@ -94,7 +94,7 @@ class BridgeTests(unittest.TestCase):
   # A cancelled request leaves chain state: the row is erased and an event carries its history.
   self.assertFalse([r for r in snapshot('alice')['requests'] if r['id']==request])
   retired=control.wait(lambda:next(r for r in http('/explorer/retired?owner=alice&limit=10')['rows'] if int(r['id'])==request))
-  self.assertEqual((retired['owner'],retired['reason'],int(retired['amount']),int(retired['max_fee']),int(retired['prior_status'])),('alice','cancelled',100000,10000,0))
+  self.assertEqual((retired['owner'],retired['reason'],retired['amount'],retired['max_fee'],retired['status']),('alice','cancelled',100000,10000,0))
   # Its id is not issued again and it cannot be cancelled twice.
   self.unchanged_failure(lambda:call('alice','btcbridge','cancel',request=request))
   self.assertGreater(self.withdraw()[0],request);call('alice','btcbridge','cancel',request=snapshot()['config']['next_request']-1)

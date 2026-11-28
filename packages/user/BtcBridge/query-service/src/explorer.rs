@@ -81,15 +81,14 @@ fn page<T: Serialize>(mut rows: Vec<T>, limit: usize, next: impl FnOnce(&T) -> S
     let next = if more { rows.last().map(next) } else { None };
     json!({"rows":rows,"next":next})
 }
-/// History from the node's event log: rows of one of this service's events, newest first.
-/// A node may prune its events; this returns what the node still has. Numbers the event log
-/// returns as text are made numbers again, so rows read like the table rows they replace.
+/// History from the node's event log: rows of one of this service's events, newest first, as
+/// `r-events` returns them: `rowid`, the event's top-level arguments, and its record argument as
+/// a nested object. A node may prune its events; this returns what the node still has.
 fn events(
     event: &str,
     filter: Option<(&str, String)>,
     before: Option<u64>,
     limit: usize,
-    numbers: &[&str],
 ) -> Result<Vec<Value>, String> {
     let mut sql = format!("SELECT ROWID, * FROM \"history.btcbridge.{event}\"");
     let mut filters = vec![];
@@ -107,34 +106,29 @@ fn events(
     }
     sql += &format!(" ORDER BY ROWID DESC LIMIT {limit}");
     let json = psibase::services::r_events::Wrapper::call().sqlQuery(sql, params);
-    let mut rows: Vec<Value> =
-        serde_json::from_slice(&json).map_err(|_| "Event history unavailable")?;
-    for row in &mut rows {
-        for name in numbers {
-            if let Some(n) = row[*name].as_str().and_then(|s| s.parse::<u64>().ok()) {
-                row[*name] = json!(n);
-            }
-        }
-        if let Some(flag) = row["legacy"].as_str().map(|s| s == "true" || s == "1") {
-            row["legacy"] = json!(flag);
-        } else if let Some(n) = row["legacy"].as_u64() {
-            row["legacy"] = json!(n != 0);
-        }
-    }
-    Ok(rows)
+    serde_json::from_slice(&json).map_err(|_| "Event history unavailable".to_string())
 }
-fn event_cursor(row: &Value) -> String {
-    let id = &row["rowid"];
-    id.as_str().map(str::to_string).unwrap_or_else(|| id.to_string())
+/// A page of event rows, each shown as `show` makes it; the cursor is the last row's `rowid`.
+fn event_page(mut rows: Vec<Value>, limit: usize, show: impl Fn(&Value) -> Value) -> Value {
+    let more = rows.len() > limit;
+    rows.truncate(limit);
+    let next = if more {
+        rows.last().map(|row| {
+            let id = &row["rowid"];
+            id.as_str().map(str::to_string).unwrap_or_else(|| id.to_string())
+        })
+    } else {
+        None
+    };
+    json!({"rows":rows.iter().map(show).collect::<Vec<_>>(),"next":next})
 }
-const DEPOSIT_NUMBERS: &[&str] = &[
-    "vout", "address_index", "value", "credited", "fee", "bounty", "fee_bps", "publisher_bps",
-    "height", "credited_at",
-];
-const REQUEST_NUMBERS: &[&str] = &[
-    "id", "amount", "max_fee", "service_fee", "created", "retired", "prior_status", "batch",
-    "paid_fee",
-];
+/// A retired request as the page lists it: the request row as it was, with why and when.
+fn retired_request(row: &Value) -> Value {
+    let mut request = row["request"].clone();
+    request["reason"] = row["reason"].clone();
+    request["retired"] = row["retired"].clone();
+    request
+}
 fn revision_summary(r: &Revision) -> Value {
     let plan: btcbridge_core::Plan = serde_json::from_str(&r.plan).unwrap();
     let gathered: Vec<_> = (0..3u8)
@@ -322,15 +316,15 @@ pub fn serve(path: &str, query: &str) -> Option<HttpReply> {
                 Ok(json!({"rows":rows,"next":next}))
             }
             // A deposit's receipt is an event; `null` if this node no longer has it.
-            "/explorer/deposit" => Ok(json!(events(
+            "/explorer/deposit" => Ok(events(
                 "depositCredited",
                 Some(("id", key_cursor(q.get("outpoint").ok_or("Missing outpoint")?)?)),
                 None,
                 1,
-                DEPOSIT_NUMBERS,
             )?
-            .into_iter()
-            .next())),
+            .first()
+            .map(|row| row["deposit"].clone())
+            .unwrap_or(Value::Null)),
             "/explorer/transaction" => {
                 let txid = q.get("txid").ok_or("Missing transaction ID")?;
                 if txid.len() != 64 || !txid.bytes().all(|b| b.is_ascii_hexdigit()) {
@@ -350,9 +344,8 @@ pub fn serve(path: &str, query: &str) -> Option<HttpReply> {
                     owner.map(|o| ("owner", o.to_string())),
                     before,
                     limit + 1,
-                    DEPOSIT_NUMBERS,
                 )?;
-                Ok(page(rows, limit, event_cursor))
+                Ok(event_page(rows, limit, |row| row["deposit"].clone()))
             }
             // Requests that left objective state (cancelled), from the event log: newest first.
             // A node may prune its events; this returns what the node still has.
@@ -367,9 +360,8 @@ pub fn serve(path: &str, query: &str) -> Option<HttpReply> {
                     owner.map(|o| ("owner", o.to_string())),
                     before,
                     limit + 1,
-                    REQUEST_NUMBERS,
                 )?;
-                Ok(page(rows, limit, event_cursor))
+                Ok(event_page(rows, limit, retired_request))
             }
             "/explorer/withdrawals" => {
                 let end = after
