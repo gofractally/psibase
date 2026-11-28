@@ -209,9 +209,11 @@ class BridgeTests(unittest.TestCase):
   self.withdraw('alice',10000);self.withdraw('bob',10000)
   fee=2*-(-(4*(10+31+43)+2+420*len(outputs))//4)
   big,_=self.withdraw('liquidity',amount=sum(outputs)-fee-1000-5000)
+  # A later small request, admitted while outputs are still free: it keeps the queue due once the
+  # older two are batched. (After that batch there may be no free output left to admit one.)
+  self.withdraw('carol',10000)
   # The batch of the two older requests reserves an output the large one needed.
   self.assertGreater(call('carol','btcbridge','makeBatch'),0)
-  self.withdraw('carol',10000)
   # It heads the queue now. makeBatch does not fail: the request waits for the reserve (5).
   call('alice','btcbridge','makeBatch')
   self.assertEqual(status('liquidity',big),5)
