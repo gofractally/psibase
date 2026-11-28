@@ -39,5 +39,21 @@ if [ -z "$HOST_IP" ]; then
 fi
 
 
+PSINODE=psinode
+if [ -x "$PROJECT_ROOT/result/bin/psinode" ]; then
+    # The binaries find share/psibase from their resolved path, which for
+    # result/bin symlinks is one Nix layer without the packages. Run copies
+    # beside a share/psibase that points at result.
+    PREFIX="$PROJECT_ROOT/result-prefix"
+    mkdir -p "$PREFIX/bin" "$PREFIX/share"
+    for bin in psinode psibase; do
+        cp --remove-destination "$(readlink -f "$PROJECT_ROOT/result/bin/$bin")" "$PREFIX/bin/$bin"
+    done
+    ln -sfn "$PROJECT_ROOT/result/share/psibase" "$PREFIX/share/psibase"
+    PSINODE="$PREFIX/bin/psinode"
+    echo "Boot with: $PREFIX/bin/psibase boot -p $PRODUCER" >&2
+fi
+echo "Using $PSINODE" >&2
+
 rm -rf "$PROJECT_ROOT/db"
-PSIBASE_ADMIN_IP=$HOST_IP exec psinode "$PROJECT_ROOT/db" -p "$PRODUCER" -l "$PORT"
+PSIBASE_ADMIN_IP=$HOST_IP exec "$PSINODE" "$PROJECT_ROOT/db" -p "$PRODUCER" -l "$PORT"
