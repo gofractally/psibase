@@ -192,25 +192,63 @@ pub fn validate_next_header(
     Ok(h)
 }
 
-/// A deposit must be proven within this many blocks of its own block, counted below the relay's
-/// canonical tip: 72 hours at ten minutes a block. Depth, not time: header timestamps are
-/// miner-chosen and not monotonic, depth is exact, and it advances only as the relay learns blocks.
-pub const DEPOSIT_WINDOW: u32 = 432;
-/// A guard record may be retired only this much deeper than the window. The relay never follows
-/// a reorganization deeper than 128 blocks (it pauses for good), so its tip height can fall by
-/// at most that; the margin exceeds it.
-pub const RETIRE_MARGIN: u32 = 144;
-/// Whether a deposit proof for a canonical block at `height` is still acceptable under tip `tip`.
-pub fn deposit_in_window(tip: u32, height: u32) -> bool {
-    height <= tip && tip - height < DEPOSIT_WINDOW
+/// The reporting window. A deposit must be reported while its block's window is open. A window
+/// closes only when BOTH hold: this much chain time has passed since deposits in the block
+/// became reportable, AND this many deposits have been reported since. The time is the chance to
+/// report by hand if automatic reporting fails; the count is proof that reporting is alive.
+pub const WINDOW_SECONDS: u64 = 72 * 3600;
+pub const WINDOW_DEPOSITS: u64 = 1000;
+/// Nothing within this many blocks of the relay's tip is ever closed. The relay follows no
+/// reorganization deeper than 128 blocks (it pauses for good), so its tip height can fall by at
+/// most that, and nothing at or below a closed height can be reorganized.
+pub const REORG_MARGIN: u32 = 144;
+/// The bridge notes the relay's progress at most once per this many blocks, and keeps at most
+/// `MAX_MARKS` notes; when full, none is added until old ones close (uncovered blocks stay open).
+pub const MARK_SPACING: u32 = 6;
+pub const MAX_MARKS: u32 = 512;
+/// What the bridge saw: at chain time `time` the relay's canonical tip was at `height`, and
+/// `deposits` deposits had been credited so far. Every block at or below `height - required + 1`
+/// was reportable no later than `time`. The clock of a block starts at the first mark covering
+/// it: the same moment as the truth or later, so imprecision only lengthens a window.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Mark {
+    pub height: u32,
+    pub time: u64,
+    pub deposits: u64,
 }
-/// Whether the record guarding a block at `height` may be retired under tip `tip`. One measure
-/// with `deposit_in_window`: once this holds, no tip the relay can ever show again accepts a
-/// proof at that height.
-pub fn guard_retirable(tip: u32, height: u32) -> bool {
-    height
-        .checked_add(DEPOSIT_WINDOW + RETIRE_MARGIN)
-        .is_some_and(|limit| limit <= tip)
+/// The highest block a mark covers under the relay's confirmation depth.
+pub fn mark_covers(mark: &Mark, required: u32) -> u32 {
+    mark.height.saturating_sub(required.saturating_sub(1))
+}
+/// Whether the windows a mark started have closed: the time has passed and the deposits have
+/// been reported, whichever comes later.
+pub fn mark_closed(mark: &Mark, now: u64, deposits: u64) -> bool {
+    now >= mark.time.saturating_add(WINDOW_SECONDS)
+        && deposits >= mark.deposits.saturating_add(WINDOW_DEPOSITS)
+}
+/// The closed frontier after looking at the oldest mark: every block at or below it has a closed
+/// window, for good. It never falls, and it never comes within `REORG_MARGIN` of the tip.
+pub fn closed_frontier(
+    frontier: u32,
+    oldest: &Mark,
+    required: u32,
+    tip: u32,
+    now: u64,
+    deposits: u64,
+) -> u32 {
+    if !mark_closed(oldest, now, deposits) {
+        return frontier;
+    }
+    frontier.max(mark_covers(oldest, required).min(tip.saturating_sub(REORG_MARGIN)))
+}
+/// THE predicate, for admitting a deposit proof and for retiring a guard record alike: a block's
+/// window is open while its height is above the closed frontier.
+pub fn window_open(frontier: u32, height: u32) -> bool {
+    height > frontier
+}
+/// Whether the relay's progress is worth a new mark.
+pub fn mark_due(last_mark: Option<u32>, marks: u32, tip: u32) -> bool {
+    marks < MAX_MARKS && last_mark.is_none_or(|last| tip >= last.saturating_add(MARK_SPACING))
 }
 /// The smallest payment a batch may carry, whatever the policy: above every standard script's
 /// dust threshold. A policy's `min_withdrawal` (the admission rule for new requests) is at least this.

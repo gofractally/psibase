@@ -228,30 +228,47 @@ requests), `/explorer/deposits` and `/explorer/deposit` (receipts). A node may
 prune its events; the page then shows less, or says the node does not serve
 that history. Nothing objective depends on it.
 
-### Deposits are proven within 432 blocks
+### The reporting window: 72 hours and 1,000 deposits
 
-`deposit` accepts a proof only while its block is within 432 blocks (72 hours
-at ten minutes) of the relay's canonical tip. Depth is the measure, not time:
-header timestamps are miner-chosen and not monotonic, depth is exact, and it
-advances only as the relay learns of blocks. **A deposit not proven within the
-window is not credited; the coins stay in the custody script. There is no
-recovery path yet** (the proposal, crediting only when the bridge itself has
-spent the output, is on the issue).
+A deposit is credited when it is reported (`deposit`, with its proof). The
+reporting window of a Bitcoin block closes only when **both** hold: 72 hours
+have passed since deposits in it became reportable, **and** 1,000 deposits have
+been reported since. After that a proof for that block is refused and there is
+no recovery. The time is the chance to report by hand if automatic reporting
+fails; the count is proof that reporting is alive.
 
-The same measure decides when a guard record may be retired: only 576 blocks
-under the tip (the window plus 144). The relay never follows a reorganization
-deeper than 128 blocks, so its tip height can fall by at most that, and no tip
-it can ever show again accepts a proof for a block whose record was retired
-(`deposit_in_window`, `guard_retirable` in the core library, tested together).
+What can go wrong is a late report, not a late payment: a payment to an old
+address confirms in a new block and has that block's whole window.
+
+- **The 72 hours are chain time from when the bridge saw the relay's tip reach
+  the block**, not Bitcoin time and not depth: header timestamps are chosen by
+  miners, and a relay that was down accepts old headers late. No miner or
+  relayer can shorten it. The bridge notes the relay's progress in *marks*
+  (tip height, chain time, deposits so far), at most one per six blocks and
+  512 in all, taken inside its ordinary actions; a block's clock starts at the
+  first mark that covers it, which is the true moment or later.
+- **The count** is one bridge-wide counter; each mark carries its value.
+- **One predicate.** A stored frontier height that only rises:
+  `window_open(block) = height > frontier` (core library). `deposit` asks it,
+  and retirement of a guard record asks the same. The frontier advances when
+  the oldest mark has had its 72 hours and its 1,000 deposits, and never comes
+  within 144 blocks of the relay's tip: the relay follows no reorganization
+  deeper than 128, so nothing at or below the frontier can change. Closing is
+  final.
+- **A quiet chain closes nothing.** With fewer than 1,000 deposits after a
+  block its window stays open and nothing guarding it is retired.
+
+The state is two small tables (`WindowTable`, one row; `MarkTable`, at most 512
+rows, deleted as they close). No other row changed.
 
 What stays today, however old: every processed custody output including spent
 ones (`UtxoTable`), the record of every authorized bridge transaction
 (`TxTable`), completed batches with their revisions and signatures, paid
 requests, scripts and addresses, custody keys and the counters. Unspent
 outputs always stay: they are the reserve. Retiring a finished batch as a unit
-once its completion is 576 blocks deep (spent inputs, transaction records,
-revisions, signatures, paid requests) is designed on the issue and not
-implemented.
+once its completion block is at or below the frontier (spent inputs,
+transaction records, revisions, signatures, paid requests) is designed on the
+issue and not implemented.
 
 ## Batches and fee replacements
 

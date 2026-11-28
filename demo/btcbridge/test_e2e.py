@@ -237,23 +237,12 @@ class BridgeTests(unittest.TestCase):
   self.withdraw('carol',10000)
   self.assertGreater(call('alice','btcbridge','makeBatch'),0)
   self.assertEqual(status('liquidity',big),1)
- def test_11_deposit_must_be_proven_within_the_window(self):
-  # A deposit 431 blocks under the relay's tip is credited; one block later it is refused for good.
-  address=call('bob','btcbridge','newAddress');late=rpc('sendtoaddress',address['address'],0.01,wallet='faucet');mine(1)
-  timely=rpc('sendtoaddress',address['address'],0.01,wallet='faucet');mine(1);mine(431);relay_headers()
-  vout=lambda p:next(v['n'] for v in rpc('decoderawtransaction',p['raw'])['vout'] if v['scriptPubKey'].get('address')==address['address'])
-  p=proof(late)
-  with self.assertRaisesRegex(ValueError,'older than the 432-block'):call('alice','btcbridge','deposit',**p,vout=vout(p))
-  p=proof(timely);before=snapshot()['config']['reserve'];call('alice','btcbridge','deposit',**p,vout=vout(p))
-  self.assertEqual(snapshot()['config']['reserve']-before,1000000)
-  def receipt_of():
-   found=http('/explorer/deposit?outpoint='+timely+'-'+format(vout(p),'08x'))
-   if not found:raise ValueError('Receipt not yet in the event log')
-   return found
-  receipt=control.wait(receipt_of)
-  self.assertEqual((receipt['owner'],receipt['value'],receipt['legacy']),('bob',1000000,False))
-  mine(1);relay_headers()
-  with self.assertRaisesRegex(ValueError,'older than the 432-block|already processed'):call('alice','btcbridge','deposit',**p,vout=vout(p))
+ def test_11_reporting_window_state_is_kept_and_nothing_closes_without_proof_of_life(self):
+  # 72 hours and 1,000 deposits cannot be produced here; the rule is tested in the core library.
+  # What can be seen: the counter follows deposits, marks stay bounded, and nothing has closed.
+  before=snapshot()['window'];address=call('bob','btcbridge','newAddress');txid=rpc('sendtoaddress',address['address'],0.01,wallet='faucet');mine(7);relay_headers();prove_deposit(txid)
+  after=snapshot()['window']
+  self.assertEqual(after['deposits'],before['deposits']+1);self.assertEqual(after['frontier'],0);self.assertLessEqual(after['marks'],512)
  def test_99_deep_reorg_freezes_accepted_state(self):
   protected=snapshot()['relay']['protected_height'];old_height=rpc('getblockcount');rpc('invalidateblock',rpc('getblockhash',protected));mine(old_height-protected+2)
   relay_headers();self.assertTrue(snapshot()['relay']['paused'])

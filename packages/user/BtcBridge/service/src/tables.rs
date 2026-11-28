@@ -238,4 +238,28 @@ pub mod tables {
             (self.owner, self.height, self.id.clone())
         }
     }
+    /// The reporting window (see the core library): the closed frontier, which only rises, the
+    /// count of deposits credited, and where the last mark was taken.
+    #[table(name = "WindowTable", index = 13)]
+    #[derive(Clone, Debug, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+    pub struct Window {
+        pub frontier: u32,
+        pub deposits: u64,
+        pub last_mark: Option<u32>,
+        pub marks: u32,
+    }
+    impl Window {
+        #[primary_key]
+        fn pk(&self) {}
+    }
+    /// What the bridge saw of the relay's progress: at most `MAX_MARKS` rows, deleted as their
+    /// windows close.
+    #[table(name = "MarkTable", index = 14)]
+    #[derive(Clone, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+    pub struct MarkRow {
+        #[primary_key]
+        pub height: u32,
+        pub time: u64,
+        pub deposits: u64,
+    }
 }
