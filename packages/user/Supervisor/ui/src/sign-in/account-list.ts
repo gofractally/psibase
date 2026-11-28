@@ -10,7 +10,8 @@
 //   plaintext = u32le(length) || utf8(JSON) || zero padding
 //
 // The fixed size hides how many accounts there are. Writes are signed by the
-// guest key, which the node binds to the locator on the first write.
+// guest key and sent with the guest session's token: the node binds the
+// locator to that passkey identity on the first write. Reads need neither.
 import { bytesToHex, hexToBytes, sha256Hex, signText } from "./account-keys";
 
 export interface ListedAccount {
@@ -93,6 +94,8 @@ export interface ListStore {
     origin: string;
     locator: Uint8Array;
     key: Uint8Array;
+    /** The guest session token: the node takes writes from a signed-in passkey only. */
+    token: string;
 }
 
 export const fetchList = async (store: ListStore): Promise<AccountList> => {
@@ -124,7 +127,10 @@ export const updateList = async (
         const version = current.version + 1;
         const res = await fetch(`${store.origin}/list/${locatorHex}`, {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${store.token}`,
+            },
             body: JSON.stringify({
                 blob: bytesToHex(blob),
                 key: guest.publicKey,

@@ -437,12 +437,15 @@ TEST_CASE("x-signup: encrypted account lists")
       return std::format("psibase account list\n{}\n{}\n{}", loc, version,
                          hex({reinterpret_cast<const char*>(hash.data()), hash.size()}));
    };
+   // A write as a browser makes it: in `session`'s guest session, naming
+   // `claimed`'s key, signed by `signer`. All three are one guest unless a
+   // case says otherwise.
    auto write = [&](const Guest& signer, std::uint64_t version, const std::vector<char>& blob,
-                    const Guest* claimed = nullptr)
+                    const Guest* claimed = nullptr, const Guest* session = nullptr)
    {
-      return client().put<HttpReply>(
-          path, ListWrite{blob, (claimed ? *claimed : signer).keyBytes(), version,
-                          signer.sign(message(locator, version, blob))});
+      return f.as(session ? *session : signer)
+          .put<HttpReply>(path, ListWrite{blob, (claimed ? *claimed : signer).keyBytes(), version,
+                                          signer.sign(message(locator, version, blob))});
    };
 
    // Nothing there yet. Reading needs no session.
@@ -451,45 +454,65 @@ TEST_CASE("x-signup: encrypted account lists")
    CHECK(client().get<HttpReply>("/list/" + std::string(64, 'A')).status ==
          HttpStatus::badRequest);
 
+   // Writing needs a passkey session, however well the write is signed.
+   {
+      ListWrite good{blobOf('x'), guest.keyBytes(), 1, guest.sign(message(locator, 1, blobOf('x')))};
+      CHECK(client().put<HttpReply>(path, good).status == HttpStatus::unauthorized);
+      CHECK(client().auth_bearer("not-a-token").put<HttpReply>(path, good).status ==
+            HttpStatus::unauthorized);
+      // And the session must be the one of the key that signs.
+      CHECK(f.as(other).put<HttpReply>(path, good).status == HttpStatus::forbidden);
+   }
+   CHECK(client().get<HttpReply>(path).status == HttpStatus::notFound);
+
    // The size is fixed.
    CHECK(write(guest, 1, std::vector<char>(4095, 'x')).status == HttpStatus::badRequest);
    CHECK(write(guest, 1, std::vector<char>(4097, 'x')).status == HttpStatus::badRequest);
    CHECK(write(guest, 1, {}).status == HttpStatus::badRequest);
+   // A body far past what a list takes is refused unread.
+   CHECK(write(guest, 1, std::vector<char>(8192, 'x')).status == HttpStatus::contentTooLarge);
+   CHECK(write(guest, 1, std::vector<char>(1 << 20, 'x')).status == HttpStatus::contentTooLarge);
    CHECK(client().get<HttpReply>(path).status == HttpStatus::notFound);
 
    // The signature must be the named key's, over this locator, version and blob.
-   CHECK(write(other, 1, blobOf('x'), &guest).status != HttpStatus::ok);
+   CHECK(write(other, 1, blobOf('x'), &guest, &guest).status != HttpStatus::ok);
    {
       // signed for another version
-      auto reply = client().put<HttpReply>(
+      auto reply = f.as(guest).put<HttpReply>(
           path, ListWrite{blobOf('x'), guest.keyBytes(), 2,
                           guest.sign(message(locator, 1, blobOf('x')))});
       CHECK(reply.status != HttpStatus::ok);
       // for another blob
-      reply = client().put<HttpReply>(
+      reply = f.as(guest).put<HttpReply>(
           path, ListWrite{blobOf('x'), guest.keyBytes(), 1,
                           guest.sign(message(locator, 1, blobOf('y')))});
       CHECK(reply.status != HttpStatus::ok);
       // for another locator
-      reply = client().put<HttpReply>(
+      reply = f.as(guest).put<HttpReply>(
           path, ListWrite{blobOf('x'), guest.keyBytes(), 1,
                           guest.sign(message(std::string(64, 'b'), 1, blobOf('x')))});
       CHECK(reply.status != HttpStatus::ok);
       // a signature of the wrong length
-      reply = client().put<HttpReply>(
+      reply = f.as(guest).put<HttpReply>(
           path, ListWrite{blobOf('x'), guest.keyBytes(), 1, std::vector<char>(63, 1)});
       CHECK(reply.status == HttpStatus::badRequest);
    }
    CHECK(client().get<HttpReply>(path).status == HttpStatus::notFound);
 
-   // The first write binds the locator to its key.
+   // The first write binds the locator to its passkey identity. Anyone who
+   // knows the locator reads it, with no session.
    REQUIRE(write(guest, 1, blobOf('x')).status == HttpStatus::ok);
    auto stored = client().get<ListReply>(path);
    CHECK(stored.version == 1);
    CHECK(stored.blob == blobOf('x'));
 
-   // Another key cannot replace it, whatever the version.
+   // Another identity cannot replace it, whatever the version.
    CHECK(write(other, 2, blobOf('z')).status == HttpStatus::forbidden);
+   // Nor with the owner's key named, in its own session or (without the
+   // owner's signature) in the owner's.
+   CHECK(write(other, 2, blobOf('z'), &guest).status == HttpStatus::forbidden);
+   CHECK(write(other, 2, blobOf('z'), &guest, &guest).status != HttpStatus::ok);
+   CHECK(client().get<ListReply>(path).blob == blobOf('x'));
    // The same key must raise the version.
    CHECK(write(guest, 1, blobOf('y')).status == HttpStatus::conflict);
    CHECK(write(guest, 0, blobOf('y')).status == HttpStatus::conflict);
@@ -524,6 +547,50 @@ TEST_CASE("x-signup: encrypted account lists")
                .header("Origin", "https://evil.psibase.io")
                .get<HttpReply>(path);
    CHECK(allowed(reply).empty());
+}
+
+TEST_CASE("x-signup: one passkey identity keeps few account lists and writes them slowly")
+{
+   Fixture f;
+   auto    hoarder = TestGuest::login(f.t);
+   auto    writer  = TestGuest::login(f.t);
+   auto    client  = [&] { return f.t.http(XSignup::service); };
+
+   auto locatorOf = [](int i) { return std::format("{:064x}", 0xd00 + i); };
+   auto write     = [&](const Guest& g, const std::string& locator, std::uint64_t version, char fill)
+   {
+      std::vector<char> blob(4096, fill);
+      auto              hash = sha256(blob.data(), blob.size());
+      auto              text =
+          std::format("psibase account list\n{}\n{}\n{}", locator, version,
+                      hex({reinterpret_cast<const char*>(hash.data()), hash.size()}));
+      return f.as(g).put<HttpReply>("/list/" + locator,
+                                    ListWrite{blob, g.keyBytes(), version, g.sign(text)});
+   };
+
+   // Four lists, and no fifth.
+   for (int i = 0; i < 4; ++i)
+      REQUIRE(write(hoarder, locatorOf(i), 1, 'h').status == HttpStatus::ok);
+   CHECK(write(hoarder, locatorOf(4), 1, 'h').status == HttpStatus::forbidden);
+   CHECK(client().get<HttpReply>("/list/" + locatorOf(4)).status == HttpStatus::notFound);
+   // The ones it has can still be replaced,
+   CHECK(write(hoarder, locatorOf(0), 2, 'i').status == HttpStatus::ok);
+   // and the limit is each identity's own.
+   CHECK(write(writer, locatorOf(4), 1, 'w').status == HttpStatus::ok);
+
+   // Twenty write attempts in a window (the writer has made one), and then
+   // none until it ends.
+   for (std::uint64_t version = 2; version <= 20; ++version)
+      REQUIRE(write(writer, locatorOf(4), version, 'w').status == HttpStatus::ok);
+   auto refused = write(writer, locatorOf(4), 21, 'x');
+   CHECK(refused.status == HttpStatus::serviceUnavailable);
+   CHECK(std::ranges::any_of(refused.headers,
+                             [](const auto& h) { return h.matches("retry-after"); }));
+   auto kept = client().get<ListReply>("/list/" + locatorOf(4));
+   CHECK(kept.version == 20);
+   CHECK(kept.blob == std::vector<char>(4096, 'w'));
+   // Reading is not counted, and neither is anyone else's writing.
+   CHECK(write(hoarder, locatorOf(1), 2, 'i').status == HttpStatus::ok);
 }
 
 TEST_CASE("x-signup: the sponsor acts as recovery partner for a user who signs in again")

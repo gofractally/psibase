@@ -164,8 +164,10 @@ namespace LocalService
 
    /// A passkey holder's encrypted list of accounts. The node cannot read
    /// it: `locator` and the encryption key both come from the passkey.
-   /// `key` is the guest key that first wrote it; only that key may replace
-   /// it, and only with a higher `version`.
+   /// `guest` is the passkey identity (the guest id of RTransact's
+   /// SessionInfo) whose session first wrote it, and `key` is that
+   /// identity's guest key; only they may replace it, and only with a
+   /// higher `version`.
    struct SignupAccountList
    {
       /// 32 bytes, lowercase hex
@@ -173,11 +175,37 @@ namespace LocalService
       std::vector<char>          blob;
       std::vector<unsigned char> key;
       std::uint64_t              version = 0;
-      PSIO_REFLECT(SignupAccountList, attr(locator, utf8), blob, key, version)
+      std::string                guest;
+      /// The lists of one identity, to bound how many it keeps
+      using ByGuest = psibase::CompositeKey<&SignupAccountList::guest,
+                                            &SignupAccountList::locator>;
+      PSIO_REFLECT(SignupAccountList,
+                   attr(locator, utf8),
+                   blob,
+                   key,
+                   version,
+                   attr(guest, utf8))
    };
-   using SignupAccountListTable =
-       psibase::Table<SignupAccountList, &SignupAccountList::locator>;
+   using SignupAccountListTable = psibase::Table<SignupAccountList,
+                                                 &SignupAccountList::locator,
+                                                 SignupAccountList::ByGuest{}>;
    PSIO_REFLECT_TYPENAME(SignupAccountListTable)
+
+   /// How many account-list writes a passkey identity has attempted in the
+   /// current window. A row is dropped once its window has ended.
+   struct SignupListWrites
+   {
+      std::string            guest;
+      psibase::TimePointUSec window_start;
+      std::uint32_t          writes = 0;
+      using ByStart = psibase::CompositeKey<&SignupListWrites::window_start,
+                                            &SignupListWrites::guest>;
+      PSIO_REFLECT(SignupListWrites, attr(guest, utf8), window_start, writes)
+   };
+   using SignupListWritesTable = psibase::Table<SignupListWrites,
+                                                &SignupListWrites::guest,
+                                                SignupListWrites::ByStart{}>;
+   PSIO_REFLECT_TYPENAME(SignupListWritesTable)
 
    /// A guest who has just proved, by signing in with the provider identity
    /// an account was created with, that they are its owner. It lets the
@@ -257,7 +285,10 @@ namespace LocalService
    ///   `{transaction, valid_seconds}`, the signed creation transaction.
    /// - `GET /list/<locator>`: `{blob, version}`, or 404. No session.
    /// - `PUT /list/<locator> {blob, key, version, sig}`: stores an account
-   ///   list. See `listMessage` in XSignup.cpp for what is signed.
+   ///   list. Needs the guest session of `key`. The first identity to write
+   ///   a locator owns it; an identity keeps a few lists at most and its
+   ///   writes are rate limited (503 with Retry-After). See `listMessage`
+   ///   in XSignup.cpp for what is signed.
    /// - `POST /partner/confirm|reject|end-pause {account}` and
    ///   `POST /partner/unfreeze {account, owner: {key, seq}, active: {key,
    ///   seq}}`: with a recovery grant for `account`, `{transaction,
@@ -273,7 +304,8 @@ namespace LocalService
                                                                 SignupAuthRequestTable,
                                                                 SignupLinkTable,
                                                                 SignupAccountListTable,
-                                                                SignupRecoveryGrantTable>;
+                                                                SignupRecoveryGrantTable,
+                                                                SignupListWritesTable>;
       using Session                 = psibase::SessionTables<SignupPendingRequestTable>;
 
       auto serveSys(psibase::HttpRequest        request,

@@ -35,6 +35,20 @@ namespace
    // An account list is exactly this long: the browser pads it, so that its
    // size does not show how many accounts it holds.
    constexpr std::size_t   accountListSize = 4096;
+   // The most a write of one may take: the list and a signature as hex, a
+   // public key of any supported kind, a version, and the JSON around them.
+   // Anything longer is refused before it is parsed.
+   constexpr std::size_t   maxListWriteBody = 2 * accountListSize + 1024;
+   // A passkey has one list (one locator comes from its root secret). A few
+   // more are allowed so that a change in how the locator is derived does not
+   // strand anyone; it caps what one identity can keep here at 16 KiB.
+   constexpr std::size_t   maxListsPerGuest = 4;
+   // A list is written when an account is added to or dropped from a passkey,
+   // with up to three tries when two devices write at once: a handful in a
+   // sitting. Twenty attempts in ten minutes is far above that, and keeps the
+   // signature checks one identity can ask for to one every thirty seconds.
+   constexpr std::uint32_t maxListWritesPerWindow = 20;
+   constexpr auto          listWriteWindow        = std::chrono::minutes(10);
    // Shorter names are sold by the name market; the accounts service
    // refuses them here (MIN_ALLOWED_ACCOUNT_LENGTH in Accounts.cpp).
    constexpr std::size_t minAccountNameLength = 8;
@@ -1008,6 +1022,53 @@ namespace
              });
    }
 
+   // The guest id RTransact gives the session of this guest key: see
+   // SessionInfo in RTransact.hpp.
+   std::string guestIdOf(std::span<const char> key)
+   {
+      return sha256Hex({key.data(), key.size()}).substr(0, 32);
+   }
+
+   // Counts a write attempt by `guest`. Returns nothing if it is within the
+   // limit, or else how many seconds remain until the next one is.
+   std::optional<std::int64_t> countListWrite(std::string_view guest)
+   {
+      std::optional<std::int64_t> wait;
+      auto                        now = wallNow();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         wait.reset();
+         auto table = XSignup{}.open<SignupListWritesTable>();
+         // Windows that have ended are forgotten, whoever they were for, so
+         // the table holds only identities that wrote recently.
+         std::vector<SignupListWrites> ended;
+         for (auto row : table.getIndex<1>())
+         {
+            if (row.window_start + listWriteWindow > now)
+               break;
+            ended.push_back(std::move(row));
+         }
+         for (const auto& row : ended)
+            table.remove(row);
+
+         auto row = table.get(std::string{guest});
+         if (!row)
+            table.put(SignupListWrites{std::string{guest}, now, 1});
+         else if (row->writes < maxListWritesPerWindow)
+         {
+            ++row->writes;
+            table.put(*row);
+         }
+         else
+         {
+            auto left = std::chrono::duration_cast<std::chrono::seconds>(
+                row->window_start + listWriteWindow - now);
+            wait = std::max<std::int64_t>(left.count(), 1);
+         }
+      }
+      return wait;
+   }
+
    HttpReply serveList(const HttpRequest& req, std::string_view locator)
    {
       if (!validLocator(locator))
@@ -1031,6 +1092,13 @@ namespace
       if (req.contentType != "application/json")
          return fail(req, HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
 
+      // Writing takes a passkey session: the node keeps what is written.
+      auto guest = to<RTransact>().getSession(req).guest;
+      if (guest.empty())
+         return fail(req, HttpStatus::unauthorized, "Sign in with your passkey first.");
+      if (req.body.size() > maxListWriteBody)
+         return fail(req, HttpStatus::contentTooLarge, "That is too long to be an account list.");
+
       auto body = psio::from_ijson<ListWrite>(req.body);
       if (body.blob.size() != accountListSize)
          return fail(req, HttpStatus::badRequest,
@@ -1040,22 +1108,36 @@ namespace
       auto verifier = verifierFor(body.key);
       if (!verifier)
          return fail(req, HttpStatus::badRequest, "Unsupported public key.");
+      // The key that signs the write is the one the session was opened with,
+      // so a list has one owner: a passkey identity.
+      if (guestIdOf(body.key) != guest)
+         return fail(req, HttpStatus::forbidden, "That key is not this session's.");
+
+      if (auto wait = countListWrite(guest))
+      {
+         // The status list has no 429.
+         auto reply = fail(req, HttpStatus::serviceUnavailable,
+                           "Too many changes to your account list. Try again later.");
+         reply.headers.push_back({"Retry-After", std::to_string(*wait)});
+         return reply;
+      }
 
       std::optional<SignupAccountList> existing;
       PSIBASE_SUBJECTIVE_TX
       {
          existing = table.get(std::string{locator});
       }
-      // The first writer's key owns the locator, and versions only go up.
-      auto sameKey = [&](const SignupAccountList& row)
+      // The first writer owns the locator, and versions only go up.
+      auto mine = [&](const SignupAccountList& row)
       {
-         return std::ranges::equal(row.key, body.key, {}, {},
+         return row.guest == guest &&
+                std::ranges::equal(row.key, body.key, {}, {},
                                    [](char c) { return static_cast<unsigned char>(c); });
       };
       if (existing)
       {
-         if (!sameKey(*existing))
-            return fail(req, HttpStatus::forbidden, "This list belongs to another key.");
+         if (!mine(*existing))
+            return fail(req, HttpStatus::forbidden, "This list belongs to another passkey.");
          if (body.version <= existing->version)
             return fail(req, HttpStatus::conflict,
                         "The list is already at version " + std::to_string(existing->version) + ".");
@@ -1066,19 +1148,35 @@ namespace
       Actor<VerifyInterface> verify(XSignup::service, *verifier);
       verify.verifySys(sha256(message.data(), message.size()), Claim{*verifier, body.key}, body.sig);
 
-      bool stored = false;
+      enum { stored, changed, full } result = stored;
       PSIBASE_SUBJECTIVE_TX
       {
          // Another write may have landed since the checks above.
-         auto current = table.get(std::string{locator});
-         stored = current ? sameKey(*current) && current->version < body.version : true;
-         if (stored)
+         result = stored;
+         if (auto current = table.get(std::string{locator}))
+         {
+            if (!mine(*current) || current->version >= body.version)
+               result = changed;
+         }
+         else
+         {
+            std::size_t held = 0;
+            for (auto row : table.getIndex<1>().subindex(guest))
+               if (++held >= maxListsPerGuest)
+                  break;
+            if (held >= maxListsPerGuest)
+               result = full;
+         }
+         if (result == stored)
             table.put(SignupAccountList{.locator = std::string{locator},
                                         .blob    = body.blob,
                                         .key     = {body.key.begin(), body.key.end()},
-                                        .version = body.version});
+                                        .version = body.version,
+                                        .guest   = guest});
       }
-      if (!stored)
+      if (result == full)
+         return fail(req, HttpStatus::forbidden, "This passkey already keeps as many lists as it may.");
+      if (result == changed)
          return fail(req, HttpStatus::conflict, "The list changed. Read it and try again.");
       return json(req, ListReply{{}, body.version});
    }

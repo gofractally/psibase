@@ -356,6 +356,7 @@ export const listStore = (net: Network, unlocked: Unlocked): ListStore => ({
     origin: net.siblingOrigin("x-signup"),
     locator: listLocator(unlocked.chainId, unlocked.root),
     key: listKey(unlocked.chainId, unlocked.root),
+    token: net.token,
 });
 
 /**
