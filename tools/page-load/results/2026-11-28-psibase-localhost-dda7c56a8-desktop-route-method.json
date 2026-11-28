@@ -1,0 +1,3307 @@
+{
+ "meta": {
+  "issue": "gofractally/psibase#2315",
+  "target": "https://psibase.localhost:8553",
+  "kind": "local node",
+  "nodeCommit": "dda7c56a8",
+  "scriptCommit": "edfdbae0e",
+  "date": "2026-11-28T10:16:29.253Z",
+  "machine": "Apple M5 Max, 18 cores, 128 GB, Darwin 25.3.0",
+  "repeats": 3,
+  "waveGapMs": 60,
+  "idleQuietMs": 500,
+  "cpuIdleBeforePct": 66,
+  "account": "plmx099ksr",
+  "browser": "Chromium 159.0.8154.6",
+  "cpuIdleDuringPct": 63,
+  "busy": false
+ },
+ "notMeasured": [
+  [
+   "Wallet transfer confirmation prompt",
+   "needs a token balance to reach; a new account on a freshly booted chain has none, and this script sends no transactions"
+  ],
+  [
+   "Exchange",
+   "not in the DevDefault package set"
+  ],
+  [
+   "Bitcoin bridge",
+   "not in the DevDefault package set"
+  ]
+ ],
+ "results": [
+  {
+   "profile": "desktop",
+   "label": "desktop, +150 ms per request (route), no CPU throttle",
+   "delayMs": 150,
+   "delayMethod": "route",
+   "cpuSlowdown": 1,
+   "network": null,
+   "rows": [
+    {
+     "id": "home",
+     "title": "Home / dashboard",
+     "url": "https://network.psibase.localhost:8553/",
+     "signedIn": true,
+     "primary": "content",
+     "marker": {
+      "selector": "h1[title]"
+     },
+     "what": "the account's name from its profile (the hero heading); the rest of the dashboard fills in later, see network idle",
+     "cold": {
+      "summary": {
+       "content": {
+        "median": 3209,
+        "min": 3206,
+        "max": 3209,
+        "n": 3,
+        "of": 3
+       },
+       "lcp": {
+        "median": 3001,
+        "min": 2997,
+        "max": 3010,
+        "n": 3,
+        "of": 3
+       },
+       "idle": {
+        "median": 10515,
+        "min": 10487,
+        "max": 10516,
+        "n": 3,
+        "of": 3
+       },
+       "requests": {
+        "median": 230,
+        "min": 230,
+        "max": 230,
+        "n": 3,
+        "of": 3
+       },
+       "preflights": {
+        "median": 103,
+        "min": 103,
+        "max": 103,
+        "n": 3,
+        "of": 3
+       },
+       "cached": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "n": 3,
+        "of": 3
+       },
+       "bytes": {
+        "median": 6927454,
+        "min": 6927454,
+        "max": 6927454,
+        "n": 3,
+        "of": 3
+       },
+       "waves": {
+        "median": 18,
+        "min": 18,
+        "max": 18,
+        "n": 3,
+        "of": 3
+       },
+       "requestsBeforeContent": {
+        "median": 110,
+        "min": 110,
+        "max": 110,
+        "n": 3,
+        "of": 3
+       },
+       "wasm": {
+        "median": 41,
+        "min": 41,
+        "max": 41,
+        "n": 3,
+        "of": 3
+       }
+      },
+      "loads": [
+       {
+        "content": 3209,
+        "lcp": 3001,
+        "lcpElement": "p: Hold, send and receive tokens; accept or cancel pending tran",
+        "idle": 10487,
+        "requests": 230,
+        "cached": 0,
+        "bytes": 6927454,
+        "preflights": 103,
+        "wasm": 41,
+        "requestsBeforeContent": 110,
+        "waves": 18,
+        "waveList": [
+         {
+          "at": 1,
+          "items": [
+           "network@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 160,
+          "items": [
+           "index-DMcc7uIB.js@network",
+           "vendor-oFIhCgHA.js@network",
+           "style-AgyV-iFx.css@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 333,
+          "items": [
+           "common-lib.js@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 553,
+          "items": [
+           "supervisor@supervisor",
+           "network_logo@branding",
+           "favicon.ico@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 709,
+          "items": [
+           "main-KZoMYqyk.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "vendor-CEx8xWzB.js@supervisor",
+           "jsx-runtime-B3ozOfRH.js@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 7
+         },
+         {
+          "at": 866,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1027,
+          "items": [
+           "preflight:branding",
+           "wasm:supervisor\u00d73",
+           "chainid@supervisor",
+           "gql:branding"
+          ],
+          "count": 6
+         },
+         {
+          "at": 1184,
+          "items": [
+           "gql:dyn-ld\u00d75",
+           "wasm:accounts\u00d72",
+           "wasm:host\u00d73",
+           "wasm:transact\u00d72",
+           "wasm:clientdata",
+           "wasm:webcrypto",
+           "preflight:dyn-ld\u00d75",
+           "preflight:accounts\u00d72",
+           "preflight:host\u00d73",
+           "preflight:transact\u00d72",
+           "preflight:clientdata",
+           "preflight:webcrypto"
+          ],
+          "count": 28
+         },
+         {
+          "at": 1487,
+          "items": [
+           "preflight:dyn-ld\u00d73",
+           "preflight:host\u00d75",
+           "preflight:perms",
+           "gql:dyn-ld\u00d73",
+           "wasm:host\u00d75",
+           "wasm:perms",
+           "wasm:auth-sig",
+           "wasm:vserver",
+           "preflight:auth-sig",
+           "preflight:vserver"
+          ],
+          "count": 22
+         },
+         {
+          "at": 1747,
+          "items": [
+           "preflight:dyn-ld\u00d72",
+           "preflight:aes",
+           "gql:dyn-ld\u00d72",
+           "wasm:aes",
+           "wasm:tokens",
+           "preflight:tokens"
+          ],
+          "count": 8
+         },
+         {
+          "at": 1932,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:kdf",
+           "preflight:kdf"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2126,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:branding",
+           "preflight:branding"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2289,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:sites",
+           "preflight:sites"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2475,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2639,
+          "items": [
+           "gql:branding",
+           "preflight:branding"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2806,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2971,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:packages",
+           "preflight:packages",
+           "preflight:profiles",
+           "chainid@network",
+           "gql:profiles"
+          ],
+          "count": 7
+         },
+         {
+          "at": 3193,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:setcode",
+           "preflight:setcode",
+           "plmx099ksr@profiles"
+          ],
+          "count": 5
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [
+         "GET https://network.psibase.localhost:8553/favicon.ico after 0 ms: net::ERR_ABORTED"
+        ],
+        "errors": [
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "undelayed": [
+         "Other 204 https://branding.psibase.localhost:8553/graphql 0 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 6 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 5 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 5 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 8 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 8 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/plugin.wasm 8 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/query.wasm 8 ms"
+        ]
+       },
+       {
+        "content": 3209,
+        "lcp": 2997,
+        "lcpElement": "p: Hold, send and receive tokens; accept or cancel pending tran",
+        "idle": 10515,
+        "requests": 230,
+        "cached": 0,
+        "bytes": 6927454,
+        "preflights": 103,
+        "wasm": 41,
+        "requestsBeforeContent": 110,
+        "waves": 18,
+        "waveList": [
+         {
+          "at": 1,
+          "items": [
+           "network@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 158,
+          "items": [
+           "index-DMcc7uIB.js@network",
+           "vendor-oFIhCgHA.js@network",
+           "style-AgyV-iFx.css@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 331,
+          "items": [
+           "common-lib.js@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 549,
+          "items": [
+           "supervisor@supervisor",
+           "network_logo@branding",
+           "favicon.ico@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 713,
+          "items": [
+           "main-KZoMYqyk.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "vendor-CEx8xWzB.js@supervisor",
+           "jsx-runtime-B3ozOfRH.js@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 7
+         },
+         {
+          "at": 871,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1032,
+          "items": [
+           "preflight:branding",
+           "wasm:supervisor\u00d73",
+           "chainid@supervisor",
+           "gql:branding"
+          ],
+          "count": 6
+         },
+         {
+          "at": 1190,
+          "items": [
+           "gql:dyn-ld\u00d75",
+           "wasm:accounts\u00d72",
+           "wasm:host\u00d73",
+           "wasm:transact\u00d72",
+           "wasm:clientdata",
+           "wasm:webcrypto",
+           "preflight:dyn-ld\u00d75",
+           "preflight:accounts\u00d72",
+           "preflight:host\u00d73",
+           "preflight:transact\u00d72",
+           "preflight:clientdata",
+           "preflight:webcrypto"
+          ],
+          "count": 28
+         },
+         {
+          "at": 1493,
+          "items": [
+           "preflight:dyn-ld\u00d73",
+           "gql:dyn-ld\u00d73",
+           "wasm:host\u00d75",
+           "wasm:perms",
+           "wasm:auth-sig",
+           "wasm:vserver",
+           "preflight:host\u00d75",
+           "preflight:perms",
+           "preflight:auth-sig",
+           "preflight:vserver"
+          ],
+          "count": 22
+         },
+         {
+          "at": 1754,
+          "items": [
+           "preflight:dyn-ld\u00d72",
+           "gql:dyn-ld\u00d72",
+           "wasm:aes",
+           "wasm:tokens",
+           "preflight:aes",
+           "preflight:tokens"
+          ],
+          "count": 8
+         },
+         {
+          "at": 1938,
+          "items": [
+           "gql:dyn-ld",
+           "wasm:kdf",
+           "preflight:dyn-ld",
+           "preflight:kdf"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2131,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:branding",
+           "preflight:branding"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2294,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:sites",
+           "preflight:sites"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2479,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2641,
+          "items": [
+           "gql:branding",
+           "preflight:branding"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2808,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2972,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:packages",
+           "preflight:packages",
+           "preflight:profiles",
+           "chainid@network",
+           "gql:profiles"
+          ],
+          "count": 7
+         },
+         {
+          "at": 3197,
+          "items": [
+           "gql:dyn-ld",
+           "wasm:setcode",
+           "preflight:dyn-ld",
+           "preflight:setcode",
+           "plmx099ksr@profiles"
+          ],
+          "count": 5
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [
+         "GET https://network.psibase.localhost:8553/favicon.ico after 1 ms: net::ERR_ABORTED"
+        ],
+        "errors": [
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "undelayed": [
+         "Other 204 https://branding.psibase.localhost:8553/graphql 1 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 6 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 6 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 6 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 6 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 6 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/plugin.wasm 5 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/query.wasm 5 ms"
+        ]
+       },
+       {
+        "content": 3206,
+        "lcp": 3010,
+        "lcpElement": "p: Hold, send and receive tokens; accept or cancel pending tran",
+        "idle": 10516,
+        "requests": 230,
+        "cached": 0,
+        "bytes": 6927454,
+        "preflights": 103,
+        "wasm": 41,
+        "requestsBeforeContent": 110,
+        "waves": 18,
+        "waveList": [
+         {
+          "at": 1,
+          "items": [
+           "network@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 159,
+          "items": [
+           "index-DMcc7uIB.js@network",
+           "vendor-oFIhCgHA.js@network",
+           "style-AgyV-iFx.css@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 332,
+          "items": [
+           "common-lib.js@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 553,
+          "items": [
+           "supervisor@supervisor",
+           "network_logo@branding",
+           "favicon.ico@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 710,
+          "items": [
+           "main-KZoMYqyk.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "vendor-CEx8xWzB.js@supervisor",
+           "jsx-runtime-B3ozOfRH.js@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 7
+         },
+         {
+          "at": 868,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1030,
+          "items": [
+           "preflight:branding",
+           "wasm:supervisor\u00d73",
+           "chainid@supervisor",
+           "gql:branding"
+          ],
+          "count": 6
+         },
+         {
+          "at": 1186,
+          "items": [
+           "gql:dyn-ld\u00d75",
+           "wasm:accounts\u00d72",
+           "wasm:host\u00d73",
+           "wasm:transact\u00d72",
+           "wasm:clientdata",
+           "wasm:webcrypto",
+           "preflight:dyn-ld\u00d75",
+           "preflight:accounts\u00d72",
+           "preflight:host\u00d73",
+           "preflight:transact\u00d72",
+           "preflight:clientdata",
+           "preflight:webcrypto"
+          ],
+          "count": 28
+         },
+         {
+          "at": 1488,
+          "items": [
+           "preflight:dyn-ld\u00d73",
+           "preflight:host\u00d75",
+           "gql:dyn-ld\u00d73",
+           "wasm:host\u00d75",
+           "wasm:perms",
+           "wasm:auth-sig",
+           "wasm:vserver",
+           "preflight:perms",
+           "preflight:auth-sig",
+           "preflight:vserver"
+          ],
+          "count": 22
+         },
+         {
+          "at": 1750,
+          "items": [
+           "preflight:dyn-ld\u00d72",
+           "preflight:aes",
+           "preflight:tokens",
+           "gql:dyn-ld\u00d72",
+           "wasm:aes",
+           "wasm:tokens"
+          ],
+          "count": 8
+         },
+         {
+          "at": 1936,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:kdf",
+           "preflight:kdf"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2130,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:branding",
+           "preflight:branding"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2294,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:sites",
+           "preflight:sites"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2480,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2642,
+          "items": [
+           "gql:branding",
+           "preflight:branding"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2808,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2972,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:packages",
+           "preflight:packages",
+           "preflight:profiles",
+           "chainid@network",
+           "gql:profiles"
+          ],
+          "count": 7
+         },
+         {
+          "at": 3194,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:setcode",
+           "preflight:setcode",
+           "plmx099ksr@profiles"
+          ],
+          "count": 5
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [
+         "GET https://network.psibase.localhost:8553/favicon.ico after 1 ms: net::ERR_ABORTED"
+        ],
+        "errors": [
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "undelayed": [
+         "Other 204 https://branding.psibase.localhost:8553/graphql 1 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 6 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 6 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 6 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 3 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 3 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/plugin.wasm 3 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/query.wasm 4 ms"
+        ]
+       }
+      ]
+     },
+     "warm": {
+      "summary": {
+       "content": {
+        "median": 2898,
+        "min": 2897,
+        "max": 2900,
+        "n": 3,
+        "of": 3
+       },
+       "lcp": {
+        "median": 2470,
+        "min": 2306,
+        "max": 2474,
+        "n": 3,
+        "of": 3
+       },
+       "idle": {
+        "median": 8396,
+        "min": 8374,
+        "max": 8400,
+        "n": 3,
+        "of": 3
+       },
+       "requests": {
+        "median": 230,
+        "min": 230,
+        "max": 230,
+        "n": 3,
+        "of": 3
+       },
+       "preflights": {
+        "median": 103,
+        "min": 103,
+        "max": 103,
+        "n": 3,
+        "of": 3
+       },
+       "cached": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "n": 3,
+        "of": 3
+       },
+       "bytes": {
+        "median": 6927454,
+        "min": 6927454,
+        "max": 6927454,
+        "n": 3,
+        "of": 3
+       },
+       "waves": {
+        "median": 14,
+        "min": 14,
+        "max": 14,
+        "n": 3,
+        "of": 3
+       },
+       "requestsBeforeContent": {
+        "median": 170,
+        "min": 170,
+        "max": 170,
+        "n": 3,
+        "of": 3
+       },
+       "wasm": {
+        "median": 41,
+        "min": 41,
+        "max": 41,
+        "n": 3,
+        "of": 3
+       }
+      },
+      "loads": [
+       {
+        "content": 2897,
+        "lcp": 2306,
+        "lcpElement": "p: Hold, send and receive tokens; accept or cancel pending tran",
+        "idle": 8374,
+        "requests": 230,
+        "cached": 0,
+        "bytes": 6927454,
+        "preflights": 103,
+        "wasm": 41,
+        "requestsBeforeContent": 170,
+        "waves": 14,
+        "waveList": [
+         {
+          "at": 2,
+          "items": [
+           "network@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 158,
+          "items": [
+           "index-DMcc7uIB.js@network",
+           "vendor-oFIhCgHA.js@network",
+           "style-AgyV-iFx.css@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 330,
+          "items": [
+           "common-lib.js@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 550,
+          "items": [
+           "supervisor@supervisor",
+           "network_logo@branding",
+           "favicon.ico@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 706,
+          "items": [
+           "main-KZoMYqyk.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "vendor-CEx8xWzB.js@supervisor",
+           "jsx-runtime-B3ozOfRH.js@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 7
+         },
+         {
+          "at": 863,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1024,
+          "items": [
+           "preflight:branding",
+           "wasm:supervisor\u00d73",
+           "chainid@supervisor",
+           "gql:branding"
+          ],
+          "count": 6
+         },
+         {
+          "at": 1180,
+          "items": [
+           "preflight:accounts\u00d72",
+           "preflight:host\u00d78",
+           "wasm:accounts\u00d72",
+           "wasm:host\u00d78",
+           "wasm:transact\u00d72",
+           "wasm:clientdata",
+           "wasm:webcrypto",
+           "wasm:perms",
+           "wasm:auth-sig",
+           "wasm:vserver",
+           "wasm:aes",
+           "wasm:tokens",
+           "wasm:kdf",
+           "wasm:branding",
+           "wasm:sites",
+           "wasm:packages",
+           "wasm:setcode",
+           "wasm:network\u00d72",
+           "wasm:profiles",
+           "wasm:namemarket",
+           "wasm:chainmail",
+           "wasm:invite",
+           "wasm:token-swap",
+           "wasm:credential",
+           "wasm:base64",
+           "wasm:producers",
+           "wasm:explorer",
+           "wasm:auth-delg",
+           "wasm:auth-dyn",
+           "wasm:registry",
+           "gql:dyn-ld\u00d728",
+           "preflight:transact\u00d72",
+           "preflight:clientdata",
+           "preflight:webcrypto",
+           "preflight:perms",
+           "preflight:auth-sig",
+           "preflight:vserver",
+           "preflight:aes",
+           "preflight:tokens",
+           "preflight:kdf",
+           "preflight:branding",
+           "preflight:sites",
+           "preflight:packages",
+           "preflight:setcode",
+           "preflight:network\u00d72",
+           "preflight:profiles",
+           "preflight:namemarket",
+           "preflight:chainmail",
+           "preflight:invite",
+           "preflight:token-swap",
+           "preflight:credential",
+           "preflight:base64",
+           "preflight:producers",
+           "preflight:explorer",
+           "preflight:auth-delg",
+           "preflight:auth-dyn",
+           "preflight:registry",
+           "preflight:dyn-ld\u00d728"
+          ],
+          "count": 132
+         },
+         {
+          "at": 1718,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 1882,
+          "items": [
+           "gql:branding",
+           "preflight:branding"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2049,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2286,
+          "items": [
+           "preflight:profiles",
+           "chainid@network",
+           "gql:profiles",
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 5
+         },
+         {
+          "at": 2454,
+          "items": [
+           "gql:packages",
+           "preflight:packages"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2721,
+          "items": [
+           "plmx099ksr@profiles",
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 3
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [
+         "GET https://network.psibase.localhost:8553/favicon.ico after 0 ms: net::ERR_ABORTED"
+        ],
+        "errors": [
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "undelayed": [
+         "Other 204 https://branding.psibase.localhost:8553/graphql 0 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/plugin.wasm 8 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/query.wasm 9 ms",
+         "Other 204 https://host.psibase.localhost:8553/accounts.wasm 9 ms",
+         "Other 204 https://host.psibase.localhost:8553/auth.wasm 10 ms",
+         "Other 204 https://host.psibase.localhost:8553/prompt.wasm 10 ms",
+         "Other 204 https://transact.psibase.localhost:8553/plugin.wasm 9 ms",
+         "Other 204 https://transact.psibase.localhost:8553/admin.wasm 6 ms"
+        ]
+       },
+       {
+        "content": 2898,
+        "lcp": 2470,
+        "lcpElement": "p: Hold, send and receive tokens; accept or cancel pending tran",
+        "idle": 8396,
+        "requests": 230,
+        "cached": 0,
+        "bytes": 6927454,
+        "preflights": 103,
+        "wasm": 41,
+        "requestsBeforeContent": 170,
+        "waves": 14,
+        "waveList": [
+         {
+          "at": 1,
+          "items": [
+           "network@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 158,
+          "items": [
+           "index-DMcc7uIB.js@network",
+           "vendor-oFIhCgHA.js@network",
+           "style-AgyV-iFx.css@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 331,
+          "items": [
+           "common-lib.js@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 550,
+          "items": [
+           "supervisor@supervisor",
+           "network_logo@branding",
+           "favicon.ico@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 706,
+          "items": [
+           "main-KZoMYqyk.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "vendor-CEx8xWzB.js@supervisor",
+           "jsx-runtime-B3ozOfRH.js@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 7
+         },
+         {
+          "at": 864,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1025,
+          "items": [
+           "preflight:branding",
+           "wasm:supervisor\u00d73",
+           "chainid@supervisor",
+           "gql:branding"
+          ],
+          "count": 6
+         },
+         {
+          "at": 1184,
+          "items": [
+           "preflight:accounts\u00d72",
+           "preflight:host\u00d78",
+           "preflight:transact\u00d72",
+           "preflight:clientdata",
+           "preflight:webcrypto",
+           "wasm:accounts\u00d72",
+           "wasm:host\u00d78",
+           "wasm:transact\u00d72",
+           "wasm:clientdata",
+           "wasm:webcrypto",
+           "wasm:perms",
+           "wasm:auth-sig",
+           "wasm:vserver",
+           "wasm:aes",
+           "wasm:tokens",
+           "wasm:kdf",
+           "wasm:branding",
+           "wasm:sites",
+           "wasm:packages",
+           "wasm:setcode",
+           "wasm:network\u00d72",
+           "wasm:profiles",
+           "wasm:namemarket",
+           "wasm:chainmail",
+           "wasm:invite",
+           "wasm:token-swap",
+           "wasm:credential",
+           "wasm:base64",
+           "wasm:producers",
+           "wasm:explorer",
+           "wasm:auth-delg",
+           "wasm:auth-dyn",
+           "wasm:registry",
+           "gql:dyn-ld\u00d728",
+           "preflight:perms",
+           "preflight:auth-sig",
+           "preflight:vserver",
+           "preflight:aes",
+           "preflight:tokens",
+           "preflight:kdf",
+           "preflight:branding",
+           "preflight:sites",
+           "preflight:packages",
+           "preflight:setcode",
+           "preflight:network\u00d72",
+           "preflight:profiles",
+           "preflight:namemarket",
+           "preflight:chainmail",
+           "preflight:invite",
+           "preflight:token-swap",
+           "preflight:credential",
+           "preflight:base64",
+           "preflight:producers",
+           "preflight:explorer",
+           "preflight:auth-delg",
+           "preflight:auth-dyn",
+           "preflight:registry",
+           "preflight:dyn-ld\u00d728"
+          ],
+          "count": 132
+         },
+         {
+          "at": 1725,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 1887,
+          "items": [
+           "gql:branding",
+           "preflight:branding"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2053,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2288,
+          "items": [
+           "preflight:profiles",
+           "chainid@network",
+           "gql:profiles",
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 5
+         },
+         {
+          "at": 2456,
+          "items": [
+           "gql:packages",
+           "preflight:packages"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2724,
+          "items": [
+           "plmx099ksr@profiles",
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 3
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [
+         "GET https://network.psibase.localhost:8553/favicon.ico after 1 ms: net::ERR_ABORTED"
+        ],
+        "errors": [
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "undelayed": [
+         "Other 204 https://branding.psibase.localhost:8553/graphql 1 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/plugin.wasm 6 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/query.wasm 7 ms",
+         "Other 204 https://host.psibase.localhost:8553/accounts.wasm 7 ms",
+         "Other 204 https://host.psibase.localhost:8553/auth.wasm 8 ms",
+         "Other 204 https://host.psibase.localhost:8553/prompt.wasm 8 ms",
+         "Other 204 https://transact.psibase.localhost:8553/plugin.wasm 11 ms",
+         "Other 204 https://transact.psibase.localhost:8553/admin.wasm 11 ms"
+        ]
+       },
+       {
+        "content": 2900,
+        "lcp": 2474,
+        "lcpElement": "p: Hold, send and receive tokens; accept or cancel pending tran",
+        "idle": 8400,
+        "requests": 230,
+        "cached": 0,
+        "bytes": 6927454,
+        "preflights": 103,
+        "wasm": 41,
+        "requestsBeforeContent": 170,
+        "waves": 14,
+        "waveList": [
+         {
+          "at": 2,
+          "items": [
+           "network@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 158,
+          "items": [
+           "index-DMcc7uIB.js@network",
+           "vendor-oFIhCgHA.js@network",
+           "style-AgyV-iFx.css@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 331,
+          "items": [
+           "common-lib.js@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 550,
+          "items": [
+           "supervisor@supervisor",
+           "network_logo@branding",
+           "favicon.ico@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 707,
+          "items": [
+           "main-KZoMYqyk.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "vendor-CEx8xWzB.js@supervisor",
+           "jsx-runtime-B3ozOfRH.js@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 7
+         },
+         {
+          "at": 865,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1027,
+          "items": [
+           "preflight:branding",
+           "wasm:supervisor\u00d73",
+           "chainid@supervisor",
+           "gql:branding"
+          ],
+          "count": 6
+         },
+         {
+          "at": 1185,
+          "items": [
+           "preflight:accounts\u00d72",
+           "preflight:host\u00d78",
+           "preflight:transact\u00d72",
+           "preflight:clientdata",
+           "preflight:webcrypto",
+           "preflight:perms",
+           "preflight:auth-sig",
+           "wasm:accounts\u00d72",
+           "wasm:host\u00d78",
+           "wasm:transact\u00d72",
+           "wasm:clientdata",
+           "wasm:webcrypto",
+           "wasm:perms",
+           "wasm:auth-sig",
+           "wasm:vserver",
+           "wasm:aes",
+           "wasm:tokens",
+           "wasm:kdf",
+           "wasm:branding",
+           "wasm:sites",
+           "wasm:packages",
+           "wasm:setcode",
+           "wasm:network\u00d72",
+           "wasm:profiles",
+           "wasm:namemarket",
+           "wasm:chainmail",
+           "wasm:invite",
+           "wasm:token-swap",
+           "wasm:credential",
+           "wasm:base64",
+           "wasm:producers",
+           "wasm:explorer",
+           "wasm:auth-delg",
+           "wasm:auth-dyn",
+           "wasm:registry",
+           "gql:dyn-ld\u00d728",
+           "preflight:vserver",
+           "preflight:aes",
+           "preflight:tokens",
+           "preflight:kdf",
+           "preflight:branding",
+           "preflight:sites",
+           "preflight:packages",
+           "preflight:setcode",
+           "preflight:network\u00d72",
+           "preflight:profiles",
+           "preflight:namemarket",
+           "preflight:chainmail",
+           "preflight:invite",
+           "preflight:token-swap",
+           "preflight:credential",
+           "preflight:base64",
+           "preflight:producers",
+           "preflight:explorer",
+           "preflight:auth-delg",
+           "preflight:auth-dyn",
+           "preflight:registry",
+           "preflight:dyn-ld\u00d728"
+          ],
+          "count": 132
+         },
+         {
+          "at": 1726,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 1888,
+          "items": [
+           "gql:branding",
+           "preflight:branding"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2054,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2290,
+          "items": [
+           "preflight:profiles",
+           "chainid@network",
+           "gql:profiles",
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 5
+         },
+         {
+          "at": 2457,
+          "items": [
+           "gql:packages",
+           "preflight:packages"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2726,
+          "items": [
+           "plmx099ksr@profiles",
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 3
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [
+         "GET https://network.psibase.localhost:8553/favicon.ico after 1 ms: net::ERR_ABORTED"
+        ],
+        "errors": [
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "undelayed": [
+         "Other 204 https://branding.psibase.localhost:8553/graphql 0 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/plugin.wasm 7 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/query.wasm 9 ms",
+         "Other 204 https://host.psibase.localhost:8553/accounts.wasm 9 ms",
+         "Other 204 https://host.psibase.localhost:8553/auth.wasm 9 ms",
+         "Other 204 https://host.psibase.localhost:8553/prompt.wasm 10 ms",
+         "Other 204 https://transact.psibase.localhost:8553/plugin.wasm 11 ms",
+         "Other 204 https://transact.psibase.localhost:8553/admin.wasm 11 ms"
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "id": "wallet",
+     "title": "Wallet (tokens)",
+     "url": "https://network.psibase.localhost:8553/tokens",
+     "signedIn": true,
+     "primary": "content",
+     "marker": {
+      "text": "Available",
+      "flags": "i",
+      "absent": "Loading wallet"
+     },
+     "what": "the account's balances (or their empty state)",
+     "cold": {
+      "summary": {
+       "content": {
+        "median": 4871,
+        "min": 4853,
+        "max": 4980,
+        "n": 3,
+        "of": 3
+       },
+       "lcp": {
+        "median": 4898,
+        "min": 4878,
+        "max": 5003,
+        "n": 3,
+        "of": 3
+       },
+       "idle": {
+        "median": 6799,
+        "min": 6774,
+        "max": 6918,
+        "n": 3,
+        "of": 3
+       },
+       "requests": {
+        "median": 174,
+        "min": 174,
+        "max": 174,
+        "n": 3,
+        "of": 3
+       },
+       "preflights": {
+        "median": 76,
+        "min": 76,
+        "max": 76,
+        "n": 3,
+        "of": 3
+       },
+       "cached": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "n": 3,
+        "of": 3
+       },
+       "bytes": {
+        "median": 4903879,
+        "min": 4903879,
+        "max": 4903879,
+        "n": 3,
+        "of": 3
+       },
+       "waves": {
+        "median": 27,
+        "min": 27,
+        "max": 27,
+        "n": 3,
+        "of": 3
+       },
+       "requestsBeforeContent": {
+        "median": 150,
+        "min": 150,
+        "max": 150,
+        "n": 3,
+        "of": 3
+       },
+       "wasm": {
+        "median": 33,
+        "min": 33,
+        "max": 33,
+        "n": 3,
+        "of": 3
+       }
+      },
+      "loads": [
+       {
+        "content": 4871,
+        "lcp": 4898,
+        "lcpElement": "div: You currently have no token balances. Once another account s",
+        "idle": 6799,
+        "requests": 174,
+        "cached": 0,
+        "bytes": 4903879,
+        "preflights": 76,
+        "wasm": 33,
+        "requestsBeforeContent": 150,
+        "waves": 27,
+        "waveList": [
+         {
+          "at": 2,
+          "items": [
+           "tokens@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 159,
+          "items": [
+           "index-DMcc7uIB.js@network",
+           "vendor-oFIhCgHA.js@network",
+           "style-AgyV-iFx.css@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 332,
+          "items": [
+           "common-lib.js@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 550,
+          "items": [
+           "supervisor@supervisor",
+           "network_logo@branding",
+           "favicon.ico@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 706,
+          "items": [
+           "main-KZoMYqyk.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "vendor-CEx8xWzB.js@supervisor",
+           "jsx-runtime-B3ozOfRH.js@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 7
+         },
+         {
+          "at": 864,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1028,
+          "items": [
+           "preflight:branding",
+           "wasm:supervisor\u00d73",
+           "chainid@supervisor",
+           "gql:branding"
+          ],
+          "count": 6
+         },
+         {
+          "at": 1184,
+          "items": [
+           "gql:dyn-ld\u00d75",
+           "wasm:accounts\u00d72",
+           "wasm:host\u00d73",
+           "wasm:transact\u00d72",
+           "wasm:clientdata",
+           "wasm:webcrypto",
+           "preflight:dyn-ld\u00d75",
+           "preflight:accounts\u00d72",
+           "preflight:host\u00d73",
+           "preflight:transact\u00d72",
+           "preflight:clientdata",
+           "preflight:webcrypto"
+          ],
+          "count": 28
+         },
+         {
+          "at": 1484,
+          "items": [
+           "preflight:dyn-ld\u00d73",
+           "preflight:host\u00d75",
+           "gql:dyn-ld\u00d73",
+           "wasm:host\u00d75",
+           "wasm:perms",
+           "wasm:auth-sig",
+           "wasm:vserver",
+           "preflight:perms",
+           "preflight:auth-sig",
+           "preflight:vserver"
+          ],
+          "count": 22
+         },
+         {
+          "at": 1747,
+          "items": [
+           "preflight:dyn-ld\u00d72",
+           "gql:dyn-ld\u00d72",
+           "wasm:aes",
+           "wasm:tokens",
+           "preflight:aes",
+           "preflight:tokens"
+          ],
+          "count": 8
+         },
+         {
+          "at": 1933,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:kdf",
+           "preflight:kdf"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2129,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:branding",
+           "preflight:branding"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2297,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:sites",
+           "preflight:sites"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2483,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2645,
+          "items": [
+           "gql:branding",
+           "preflight:branding"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2812,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2980,
+          "items": [
+           "preflight:profiles",
+           "chainid@network",
+           "gql:profiles",
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:network",
+           "preflight:network"
+          ],
+          "count": 7
+         },
+         {
+          "at": 3136,
+          "items": [
+           "plmx099ksr@profiles",
+           "preflight:dyn-ld\u00d75",
+           "gql:dyn-ld\u00d75",
+           "wasm:profiles",
+           "wasm:namemarket",
+           "wasm:chainmail",
+           "wasm:invite",
+           "wasm:token-swap",
+           "preflight:profiles",
+           "preflight:namemarket",
+           "preflight:chainmail",
+           "preflight:invite",
+           "preflight:token-swap"
+          ],
+          "count": 21
+         },
+         {
+          "at": 3385,
+          "items": [
+           "preflight:dyn-ld\u00d72",
+           "gql:dyn-ld\u00d72",
+           "wasm:credential",
+           "wasm:base64",
+           "preflight:credential",
+           "preflight:base64"
+          ],
+          "count": 8
+         },
+         {
+          "at": 3561,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3731,
+          "items": [
+           "gql:tokens",
+           "preflight:tokens"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3899,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 4056,
+          "items": [
+           "gql:tokens",
+           "preflight:tokens"
+          ],
+          "count": 2
+         },
+         {
+          "at": 4234,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 4400,
+          "items": [
+           "messages@chainmail",
+           "preflight:chainmail"
+          ],
+          "count": 2
+         },
+         {
+          "at": 4555,
+          "items": [
+           "gql:chainmail",
+           "preflight:chainmail"
+          ],
+          "count": 2
+         },
+         {
+          "at": 4718,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [
+         "GET https://network.psibase.localhost:8553/favicon.ico after 0 ms: net::ERR_ABORTED"
+        ],
+        "errors": [
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "undelayed": [
+         "Other 204 https://branding.psibase.localhost:8553/graphql 1 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 7 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 7 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 6 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 2 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 2 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/plugin.wasm 2 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/query.wasm 2 ms"
+        ]
+       },
+       {
+        "content": 4980,
+        "lcp": 5003,
+        "lcpElement": "div: You currently have no token balances. Once another account s",
+        "idle": 6918,
+        "requests": 174,
+        "cached": 0,
+        "bytes": 4903879,
+        "preflights": 76,
+        "wasm": 33,
+        "requestsBeforeContent": 150,
+        "waves": 27,
+        "waveList": [
+         {
+          "at": 2,
+          "items": [
+           "tokens@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 162,
+          "items": [
+           "index-DMcc7uIB.js@network",
+           "vendor-oFIhCgHA.js@network",
+           "style-AgyV-iFx.css@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 334,
+          "items": [
+           "common-lib.js@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 553,
+          "items": [
+           "supervisor@supervisor",
+           "network_logo@branding",
+           "favicon.ico@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 708,
+          "items": [
+           "main-KZoMYqyk.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "vendor-CEx8xWzB.js@supervisor",
+           "jsx-runtime-B3ozOfRH.js@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 7
+         },
+         {
+          "at": 865,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1034,
+          "items": [
+           "preflight:branding",
+           "wasm:supervisor\u00d73",
+           "chainid@supervisor",
+           "gql:branding"
+          ],
+          "count": 6
+         },
+         {
+          "at": 1191,
+          "items": [
+           "gql:dyn-ld\u00d75",
+           "wasm:accounts\u00d72",
+           "wasm:host\u00d73",
+           "wasm:transact\u00d72",
+           "wasm:clientdata",
+           "wasm:webcrypto",
+           "preflight:dyn-ld\u00d75",
+           "preflight:accounts\u00d72",
+           "preflight:host\u00d73",
+           "preflight:transact\u00d72",
+           "preflight:clientdata",
+           "preflight:webcrypto"
+          ],
+          "count": 28
+         },
+         {
+          "at": 1491,
+          "items": [
+           "preflight:dyn-ld\u00d73",
+           "preflight:host\u00d75",
+           "preflight:perms",
+           "gql:dyn-ld\u00d73",
+           "wasm:host\u00d75",
+           "wasm:perms",
+           "wasm:auth-sig",
+           "wasm:vserver",
+           "preflight:auth-sig",
+           "preflight:vserver"
+          ],
+          "count": 22
+         },
+         {
+          "at": 1788,
+          "items": [
+           "preflight:dyn-ld\u00d72",
+           "gql:dyn-ld\u00d72",
+           "wasm:aes",
+           "wasm:tokens",
+           "preflight:aes",
+           "preflight:tokens"
+          ],
+          "count": 8
+         },
+         {
+          "at": 1973,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:kdf",
+           "preflight:kdf"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2167,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:branding",
+           "preflight:branding"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2331,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:sites",
+           "preflight:sites"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2518,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2684,
+          "items": [
+           "gql:branding",
+           "preflight:branding"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2850,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3016,
+          "items": [
+           "preflight:profiles",
+           "chainid@network",
+           "gql:profiles",
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:network",
+           "preflight:network"
+          ],
+          "count": 7
+         },
+         {
+          "at": 3172,
+          "items": [
+           "plmx099ksr@profiles",
+           "preflight:dyn-ld\u00d75",
+           "gql:dyn-ld\u00d75",
+           "wasm:profiles",
+           "wasm:namemarket",
+           "wasm:chainmail",
+           "wasm:invite",
+           "wasm:token-swap",
+           "preflight:profiles",
+           "preflight:namemarket",
+           "preflight:chainmail",
+           "preflight:invite",
+           "preflight:token-swap"
+          ],
+          "count": 21
+         },
+         {
+          "at": 3417,
+          "items": [
+           "preflight:dyn-ld\u00d72",
+           "gql:dyn-ld\u00d72",
+           "wasm:credential",
+           "preflight:credential",
+           "wasm:base64",
+           "preflight:base64"
+          ],
+          "count": 8
+         },
+         {
+          "at": 3594,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3764,
+          "items": [
+           "gql:tokens",
+           "preflight:tokens"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3954,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 4111,
+          "items": [
+           "gql:tokens",
+           "preflight:tokens"
+          ],
+          "count": 2
+         },
+         {
+          "at": 4288,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 4481,
+          "items": [
+           "messages@chainmail",
+           "preflight:chainmail"
+          ],
+          "count": 2
+         },
+         {
+          "at": 4637,
+          "items": [
+           "gql:chainmail",
+           "preflight:chainmail"
+          ],
+          "count": 2
+         },
+         {
+          "at": 4814,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [
+         "GET https://network.psibase.localhost:8553/favicon.ico after 1 ms: net::ERR_ABORTED"
+        ],
+        "errors": [
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "undelayed": [
+         "Other 204 https://branding.psibase.localhost:8553/graphql 1 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 6 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 5 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 5 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 5 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 5 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/plugin.wasm 5 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/query.wasm 6 ms"
+        ]
+       },
+       {
+        "content": 4853,
+        "lcp": 4878,
+        "lcpElement": "div: You currently have no token balances. Once another account s",
+        "idle": 6774,
+        "requests": 174,
+        "cached": 0,
+        "bytes": 4903879,
+        "preflights": 76,
+        "wasm": 33,
+        "requestsBeforeContent": 150,
+        "waves": 27,
+        "waveList": [
+         {
+          "at": 2,
+          "items": [
+           "tokens@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 161,
+          "items": [
+           "index-DMcc7uIB.js@network",
+           "vendor-oFIhCgHA.js@network",
+           "style-AgyV-iFx.css@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 333,
+          "items": [
+           "common-lib.js@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 554,
+          "items": [
+           "supervisor@supervisor",
+           "network_logo@branding",
+           "favicon.ico@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 710,
+          "items": [
+           "main-KZoMYqyk.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "vendor-CEx8xWzB.js@supervisor",
+           "jsx-runtime-B3ozOfRH.js@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 7
+         },
+         {
+          "at": 867,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1029,
+          "items": [
+           "preflight:branding",
+           "wasm:supervisor\u00d73",
+           "chainid@supervisor",
+           "gql:branding"
+          ],
+          "count": 6
+         },
+         {
+          "at": 1185,
+          "items": [
+           "preflight:dyn-ld\u00d75",
+           "gql:dyn-ld\u00d75",
+           "wasm:accounts\u00d72",
+           "wasm:host\u00d73",
+           "wasm:transact\u00d72",
+           "wasm:clientdata",
+           "wasm:webcrypto",
+           "preflight:accounts\u00d72",
+           "preflight:host\u00d73",
+           "preflight:transact\u00d72",
+           "preflight:clientdata",
+           "preflight:webcrypto"
+          ],
+          "count": 28
+         },
+         {
+          "at": 1486,
+          "items": [
+           "preflight:dyn-ld\u00d73",
+           "preflight:host\u00d75",
+           "gql:dyn-ld\u00d73",
+           "wasm:host\u00d75",
+           "wasm:perms",
+           "wasm:auth-sig",
+           "wasm:vserver",
+           "preflight:perms",
+           "preflight:auth-sig",
+           "preflight:vserver"
+          ],
+          "count": 22
+         },
+         {
+          "at": 1747,
+          "items": [
+           "preflight:dyn-ld\u00d72",
+           "gql:dyn-ld\u00d72",
+           "wasm:aes",
+           "wasm:tokens",
+           "preflight:aes",
+           "preflight:tokens"
+          ],
+          "count": 8
+         },
+         {
+          "at": 1934,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:kdf",
+           "preflight:kdf"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2129,
+          "items": [
+           "preflight:dyn-ld",
+           "preflight:branding",
+           "gql:dyn-ld",
+           "wasm:branding"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2293,
+          "items": [
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:sites",
+           "preflight:sites"
+          ],
+          "count": 4
+         },
+         {
+          "at": 2480,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2641,
+          "items": [
+           "gql:branding",
+           "preflight:branding"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2808,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2972,
+          "items": [
+           "preflight:profiles",
+           "chainid@network",
+           "gql:profiles",
+           "preflight:dyn-ld",
+           "gql:dyn-ld",
+           "wasm:network",
+           "preflight:network"
+          ],
+          "count": 7
+         },
+         {
+          "at": 3128,
+          "items": [
+           "plmx099ksr@profiles",
+           "preflight:dyn-ld\u00d75",
+           "gql:dyn-ld\u00d75",
+           "wasm:profiles",
+           "wasm:namemarket",
+           "wasm:chainmail",
+           "wasm:invite",
+           "wasm:token-swap",
+           "preflight:profiles",
+           "preflight:namemarket",
+           "preflight:chainmail",
+           "preflight:invite",
+           "preflight:token-swap"
+          ],
+          "count": 21
+         },
+         {
+          "at": 3373,
+          "items": [
+           "preflight:dyn-ld\u00d72",
+           "preflight:credential",
+           "gql:dyn-ld\u00d72",
+           "wasm:credential",
+           "wasm:base64",
+           "preflight:base64"
+          ],
+          "count": 8
+         },
+         {
+          "at": 3548,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3718,
+          "items": [
+           "gql:tokens",
+           "preflight:tokens"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3882,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 4040,
+          "items": [
+           "gql:tokens",
+           "preflight:tokens"
+          ],
+          "count": 2
+         },
+         {
+          "at": 4216,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 4383,
+          "items": [
+           "messages@chainmail",
+           "preflight:chainmail"
+          ],
+          "count": 2
+         },
+         {
+          "at": 4539,
+          "items": [
+           "gql:chainmail",
+           "preflight:chainmail"
+          ],
+          "count": 2
+         },
+         {
+          "at": 4699,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [
+         "GET https://network.psibase.localhost:8553/favicon.ico after 1 ms: net::ERR_ABORTED"
+        ],
+        "errors": [
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "undelayed": [
+         "Other 204 https://branding.psibase.localhost:8553/graphql 0 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 8 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 7 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 7 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 6 ms",
+         "Other 204 https://dyn-ld.psibase.localhost:8553/graphql 1 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/plugin.wasm 1 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/query.wasm 1 ms"
+        ]
+       }
+      ]
+     },
+     "warm": {
+      "summary": {
+       "content": {
+        "median": 3632,
+        "min": 3627,
+        "max": 3634,
+        "n": 3,
+        "of": 3
+       },
+       "lcp": {
+        "median": 3654,
+        "min": 3653,
+        "max": 3658,
+        "n": 3,
+        "of": 3
+       },
+       "idle": {
+        "median": 5558,
+        "min": 5554,
+        "max": 5564,
+        "n": 3,
+        "of": 3
+       },
+       "requests": {
+        "median": 174,
+        "min": 174,
+        "max": 174,
+        "n": 3,
+        "of": 3
+       },
+       "preflights": {
+        "median": 76,
+        "min": 76,
+        "max": 76,
+        "n": 3,
+        "of": 3
+       },
+       "cached": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "n": 3,
+        "of": 3
+       },
+       "bytes": {
+        "median": 4903879,
+        "min": 4903879,
+        "max": 4903879,
+        "n": 3,
+        "of": 3
+       },
+       "waves": {
+        "median": 20,
+        "min": 20,
+        "max": 20,
+        "n": 3,
+        "of": 3
+       },
+       "requestsBeforeContent": {
+        "median": 150,
+        "min": 150,
+        "max": 150,
+        "n": 3,
+        "of": 3
+       },
+       "wasm": {
+        "median": 33,
+        "min": 33,
+        "max": 33,
+        "n": 3,
+        "of": 3
+       }
+      },
+      "loads": [
+       {
+        "content": 3634,
+        "lcp": 3654,
+        "lcpElement": "div: You currently have no token balances. Once another account s",
+        "idle": 5558,
+        "requests": 174,
+        "cached": 0,
+        "bytes": 4903879,
+        "preflights": 76,
+        "wasm": 33,
+        "requestsBeforeContent": 150,
+        "waves": 20,
+        "waveList": [
+         {
+          "at": 2,
+          "items": [
+           "tokens@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 159,
+          "items": [
+           "index-DMcc7uIB.js@network",
+           "vendor-oFIhCgHA.js@network",
+           "style-AgyV-iFx.css@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 332,
+          "items": [
+           "common-lib.js@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 553,
+          "items": [
+           "supervisor@supervisor",
+           "network_logo@branding",
+           "favicon.ico@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 708,
+          "items": [
+           "main-KZoMYqyk.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "vendor-CEx8xWzB.js@supervisor",
+           "jsx-runtime-B3ozOfRH.js@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 7
+         },
+         {
+          "at": 867,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1029,
+          "items": [
+           "preflight:branding",
+           "wasm:supervisor\u00d73",
+           "chainid@supervisor",
+           "gql:branding"
+          ],
+          "count": 6
+         },
+         {
+          "at": 1188,
+          "items": [
+           "preflight:accounts\u00d72",
+           "wasm:accounts\u00d72",
+           "wasm:host\u00d78",
+           "wasm:transact\u00d72",
+           "wasm:clientdata",
+           "wasm:webcrypto",
+           "wasm:perms",
+           "wasm:auth-sig",
+           "wasm:vserver",
+           "wasm:aes",
+           "wasm:tokens",
+           "wasm:kdf",
+           "wasm:branding",
+           "wasm:sites",
+           "wasm:network",
+           "wasm:profiles",
+           "wasm:namemarket",
+           "wasm:chainmail",
+           "wasm:invite",
+           "wasm:token-swap",
+           "wasm:credential",
+           "wasm:base64",
+           "gql:dyn-ld\u00d721",
+           "preflight:host\u00d78",
+           "preflight:transact\u00d72",
+           "preflight:clientdata",
+           "preflight:webcrypto",
+           "preflight:perms",
+           "preflight:auth-sig",
+           "preflight:vserver",
+           "preflight:aes",
+           "preflight:tokens",
+           "preflight:kdf",
+           "preflight:branding",
+           "preflight:sites",
+           "preflight:network",
+           "preflight:profiles",
+           "preflight:namemarket",
+           "preflight:chainmail",
+           "preflight:invite",
+           "preflight:token-swap",
+           "preflight:credential",
+           "preflight:base64",
+           "preflight:dyn-ld\u00d721"
+          ],
+          "count": 102
+         },
+         {
+          "at": 1717,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 1882,
+          "items": [
+           "gql:branding",
+           "preflight:branding"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2047,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2211,
+          "items": [
+           "preflight:profiles",
+           "chainid@network",
+           "gql:profiles"
+          ],
+          "count": 3
+         },
+         {
+          "at": 2327,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2497,
+          "items": [
+           "gql:tokens",
+           "preflight:tokens"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2659,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2815,
+          "items": [
+           "plmx099ksr@profiles",
+           "gql:tokens",
+           "preflight:tokens"
+          ],
+          "count": 3
+         },
+         {
+          "at": 2994,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3162,
+          "items": [
+           "messages@chainmail",
+           "preflight:chainmail"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3318,
+          "items": [
+           "gql:chainmail",
+           "preflight:chainmail"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3480,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [
+         "GET https://network.psibase.localhost:8553/favicon.ico after 1 ms: net::ERR_ABORTED"
+        ],
+        "errors": [
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "undelayed": [
+         "Other 204 https://branding.psibase.localhost:8553/graphql 0 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/plugin.wasm 7 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/query.wasm 11 ms",
+         "Other 204 https://host.psibase.localhost:8553/accounts.wasm 10 ms",
+         "Other 204 https://host.psibase.localhost:8553/auth.wasm 10 ms",
+         "Other 204 https://host.psibase.localhost:8553/prompt.wasm 10 ms",
+         "Other 204 https://transact.psibase.localhost:8553/plugin.wasm 10 ms",
+         "Other 204 https://transact.psibase.localhost:8553/admin.wasm 10 ms"
+        ]
+       },
+       {
+        "content": 3632,
+        "lcp": 3658,
+        "lcpElement": "div: You currently have no token balances. Once another account s",
+        "idle": 5564,
+        "requests": 174,
+        "cached": 0,
+        "bytes": 4903879,
+        "preflights": 76,
+        "wasm": 33,
+        "requestsBeforeContent": 150,
+        "waves": 20,
+        "waveList": [
+         {
+          "at": 2,
+          "items": [
+           "tokens@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 160,
+          "items": [
+           "index-DMcc7uIB.js@network",
+           "vendor-oFIhCgHA.js@network",
+           "style-AgyV-iFx.css@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 333,
+          "items": [
+           "common-lib.js@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 556,
+          "items": [
+           "supervisor@supervisor",
+           "network_logo@branding",
+           "favicon.ico@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 712,
+          "items": [
+           "main-KZoMYqyk.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "vendor-CEx8xWzB.js@supervisor",
+           "jsx-runtime-B3ozOfRH.js@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 7
+         },
+         {
+          "at": 870,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1032,
+          "items": [
+           "preflight:branding",
+           "wasm:supervisor\u00d73",
+           "chainid@supervisor",
+           "gql:branding"
+          ],
+          "count": 6
+         },
+         {
+          "at": 1189,
+          "items": [
+           "preflight:accounts\u00d72",
+           "wasm:accounts\u00d72",
+           "wasm:host\u00d78",
+           "wasm:transact\u00d72",
+           "wasm:clientdata",
+           "wasm:webcrypto",
+           "wasm:perms",
+           "wasm:auth-sig",
+           "wasm:vserver",
+           "wasm:aes",
+           "wasm:tokens",
+           "wasm:kdf",
+           "wasm:branding",
+           "wasm:sites",
+           "wasm:network",
+           "wasm:profiles",
+           "wasm:namemarket",
+           "wasm:chainmail",
+           "wasm:invite",
+           "wasm:token-swap",
+           "wasm:credential",
+           "wasm:base64",
+           "gql:dyn-ld\u00d721",
+           "preflight:host\u00d78",
+           "preflight:transact\u00d72",
+           "preflight:clientdata",
+           "preflight:webcrypto",
+           "preflight:perms",
+           "preflight:auth-sig",
+           "preflight:vserver",
+           "preflight:aes",
+           "preflight:tokens",
+           "preflight:kdf",
+           "preflight:branding",
+           "preflight:sites",
+           "preflight:network",
+           "preflight:profiles",
+           "preflight:namemarket",
+           "preflight:chainmail",
+           "preflight:invite",
+           "preflight:token-swap",
+           "preflight:credential",
+           "preflight:base64",
+           "preflight:dyn-ld\u00d721"
+          ],
+          "count": 102
+         },
+         {
+          "at": 1717,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 1879,
+          "items": [
+           "gql:branding",
+           "preflight:branding"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2046,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2207,
+          "items": [
+           "preflight:profiles",
+           "chainid@network",
+           "gql:profiles"
+          ],
+          "count": 3
+         },
+         {
+          "at": 2322,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2493,
+          "items": [
+           "gql:tokens",
+           "preflight:tokens"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2657,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2813,
+          "items": [
+           "plmx099ksr@profiles",
+           "gql:tokens",
+           "preflight:tokens"
+          ],
+          "count": 3
+         },
+         {
+          "at": 2993,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3161,
+          "items": [
+           "messages@chainmail",
+           "preflight:chainmail"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3317,
+          "items": [
+           "gql:chainmail",
+           "preflight:chainmail"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3478,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [
+         "GET https://network.psibase.localhost:8553/favicon.ico after 1 ms: net::ERR_ABORTED"
+        ],
+        "errors": [
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "undelayed": [
+         "Other 204 https://branding.psibase.localhost:8553/graphql 1 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/plugin.wasm 5 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/query.wasm 5 ms",
+         "Other 204 https://host.psibase.localhost:8553/accounts.wasm 5 ms",
+         "Other 204 https://host.psibase.localhost:8553/auth.wasm 5 ms",
+         "Other 204 https://host.psibase.localhost:8553/prompt.wasm 5 ms",
+         "Other 204 https://transact.psibase.localhost:8553/plugin.wasm 5 ms",
+         "Other 204 https://transact.psibase.localhost:8553/admin.wasm 5 ms"
+        ]
+       },
+       {
+        "content": 3627,
+        "lcp": 3653,
+        "lcpElement": "div: You currently have no token balances. Once another account s",
+        "idle": 5554,
+        "requests": 174,
+        "cached": 0,
+        "bytes": 4903879,
+        "preflights": 76,
+        "wasm": 33,
+        "requestsBeforeContent": 150,
+        "waves": 20,
+        "waveList": [
+         {
+          "at": 1,
+          "items": [
+           "tokens@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 162,
+          "items": [
+           "index-DMcc7uIB.js@network",
+           "vendor-oFIhCgHA.js@network",
+           "style-AgyV-iFx.css@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 335,
+          "items": [
+           "common-lib.js@network"
+          ],
+          "count": 1
+         },
+         {
+          "at": 559,
+          "items": [
+           "supervisor@supervisor",
+           "network_logo@branding",
+           "favicon.ico@network"
+          ],
+          "count": 3
+         },
+         {
+          "at": 714,
+          "items": [
+           "main-KZoMYqyk.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "vendor-CEx8xWzB.js@supervisor",
+           "jsx-runtime-B3ozOfRH.js@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 7
+         },
+         {
+          "at": 872,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1033,
+          "items": [
+           "preflight:branding",
+           "wasm:supervisor\u00d73",
+           "chainid@supervisor",
+           "gql:branding"
+          ],
+          "count": 6
+         },
+         {
+          "at": 1190,
+          "items": [
+           "wasm:accounts\u00d72",
+           "wasm:host\u00d78",
+           "wasm:transact\u00d72",
+           "wasm:clientdata",
+           "wasm:webcrypto",
+           "wasm:perms",
+           "wasm:auth-sig",
+           "wasm:vserver",
+           "wasm:aes",
+           "wasm:tokens",
+           "wasm:kdf",
+           "wasm:branding",
+           "wasm:sites",
+           "wasm:network",
+           "wasm:profiles",
+           "wasm:namemarket",
+           "wasm:chainmail",
+           "wasm:invite",
+           "wasm:token-swap",
+           "wasm:credential",
+           "wasm:base64",
+           "gql:dyn-ld\u00d721",
+           "preflight:accounts\u00d72",
+           "preflight:host\u00d78",
+           "preflight:transact\u00d72",
+           "preflight:clientdata",
+           "preflight:webcrypto",
+           "preflight:perms",
+           "preflight:auth-sig",
+           "preflight:vserver",
+           "preflight:aes",
+           "preflight:tokens",
+           "preflight:kdf",
+           "preflight:branding",
+           "preflight:sites",
+           "preflight:network",
+           "preflight:profiles",
+           "preflight:namemarket",
+           "preflight:chainmail",
+           "preflight:invite",
+           "preflight:token-swap",
+           "preflight:credential",
+           "preflight:base64",
+           "preflight:dyn-ld\u00d721"
+          ],
+          "count": 102
+         },
+         {
+          "at": 1714,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 1875,
+          "items": [
+           "gql:branding",
+           "preflight:branding"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2040,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2202,
+          "items": [
+           "preflight:profiles",
+           "chainid@network",
+           "gql:profiles"
+          ],
+          "count": 3
+         },
+         {
+          "at": 2318,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2489,
+          "items": [
+           "gql:tokens",
+           "preflight:tokens"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2653,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 2808,
+          "items": [
+           "plmx099ksr@profiles",
+           "gql:tokens",
+           "preflight:tokens"
+          ],
+          "count": 3
+         },
+         {
+          "at": 2989,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3155,
+          "items": [
+           "messages@chainmail",
+           "preflight:chainmail"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3311,
+          "items": [
+           "gql:chainmail",
+           "preflight:chainmail"
+          ],
+          "count": 2
+         },
+         {
+          "at": 3473,
+          "items": [
+           "gql:accounts",
+           "preflight:accounts"
+          ],
+          "count": 2
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [
+         "GET https://network.psibase.localhost:8553/favicon.ico after 1 ms: net::ERR_ABORTED"
+        ],
+        "errors": [
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+         "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "undelayed": [
+         "Other 204 https://branding.psibase.localhost:8553/graphql 0 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/plugin.wasm 8 ms",
+         "Other 204 https://accounts.psibase.localhost:8553/query.wasm 8 ms",
+         "Other 204 https://host.psibase.localhost:8553/accounts.wasm 9 ms",
+         "Other 204 https://host.psibase.localhost:8553/auth.wasm 6 ms",
+         "Other 204 https://host.psibase.localhost:8553/prompt.wasm 6 ms",
+         "Other 204 https://transact.psibase.localhost:8553/plugin.wasm 6 ms",
+         "Other 204 https://transact.psibase.localhost:8553/admin.wasm 6 ms"
+        ]
+       }
+      ]
+     }
+    }
+   ]
+  }
+ ]
+}

@@ -25,7 +25,8 @@ kill <pid printed by boot-chain.sh>              # stop the node when done
 ```
 
 Output: a markdown table on stdout, and `results/<date>-<host>-<commit>-<profiles>.md`
-and `.json` (every single load, its waves and its request counts).
+and `.json` (every single load, its waves and its request counts). The files
+of the first baseline are committed in `results/`.
 
 | Option | Default | Meaning |
 |---|---|---|
@@ -39,6 +40,8 @@ and `.json` (every single load, its waves and its request counts).
 | `--account`, `--key-file` | — | remote target: an existing account and its key file |
 | `--home-app` | `network` locally | subdomain of the network's home app (required for a remote target, e.g. `psibernet`) |
 | `--out DIR`, `--tag T` | `results/` | where the files go; a suffix for their names |
+| `--timeout S` | 90 | how long to wait for a page's content before recording a failure |
+| `--force` | off | run although the machine is busy |
 
 ### Against a real deployment
 
@@ -80,11 +83,11 @@ Columns:
 | **first chain content** | the primary number (#2315): navigation start → the page's first content that came from the chain is on screen. Each page's condition is in the `PAGES` table in `page-load.mjs`, with a comment saying why it only becomes true after a query has answered. It is checked inside the page in the animation frame after every DOM change. No app is modified. |
 | LCP | Largest Contentful Paint of the final document, on the same clock. On these pages it is often static chrome painted before any data, which is why it is not the primary number. For a page with nothing from the chain (Docs) it is the primary number. |
 | network idle | the moment the last request finished, once nothing has been in flight for 500 ms, looked for from the content marker onwards. "—" if the page never goes quiet within 15 s (polling). |
-| requests | requests that reached the network up to network idle, **including CORS preflights** and 304 revalidations; taken from the DevTools protocol (Playwright's own request events omit preflights). Answers from the browser cache are not counted. |
+| requests | requests that reached the network up to network idle, **including CORS preflights** and revalidations (a file the browser holds but asks the node about again is a round trip, and is counted; the protocol reports it as a 200, so they are not counted separately); taken from the DevTools protocol (Playwright's own request events omit preflights). Answers from the browser cache are not counted. |
 | KB | bytes received over the network for those requests (headers and compressed bodies). |
 | waves | sequential round trips before the content: request starts more than 60 ms apart begin a new wave (the rule `profile-waves.mjs` used). With a fixed delay per request, content cannot appear before `waves × delay`. |
 
-The JSON also has, per load: preflights, 304s, cache hits, `.wasm` files,
+The JSON also has, per load: preflights, cache hits, `.wasm` files,
 requests before the content, every wave with what was in it, and
 `requestsSeenByProxy` (the delay proxy's own count, a cross-check of
 `requests`).
@@ -108,11 +111,45 @@ Host headers are the node's own. It needs the certificate the node serves
 (`--tls-cert`, `--tls-key`; default the developer CA in `~/.psibase-dev-ca`).
 
 The earlier profile scripts added the delay with Playwright's `context.route`.
-**Playwright switches the browser's HTTP cache off while a route is installed**,
-so with that method a "repeat load" re-downloads everything and cannot show
-what caching does. `--delay-method route` keeps that method available for
-comparing with numbers taken that way; for a cold load the two agree, since
-both delay every request by the same amount.
+While a route is installed Playwright **switches the browser's HTTP cache off**
+(a "repeat load" re-downloads everything) and **answers CORS preflights itself**
+(they cost nothing, where a browser pays a round trip for each). Numbers taken
+that way are therefore lower than a browser would see and blind to caching:
+on the baseline build the dashboard's cold first content is 3.21 s with
+`route` and 4.54 s through the proxy. `--delay-method route` keeps that method
+available only for comparing with figures taken that way.
+
+### The mobile profile needs a longer node timeout
+
+With psinode's default configuration (`http-timeout = 4s`) the node closes a
+response that is still being sent after roughly ten seconds. At Slow 4G the
+supervisor's 1 MB component file takes longer than that while it shares the
+line with the other downloads, the browser reports
+`ERR_CONTENT_LENGTH_MISMATCH`, and a cold signed-in page never loads.
+(`curl --limit-rate 60k` on that file shows the same cut without a browser.)
+To get mobile numbers at all, boot the chain with
+
+```sh
+PSINODE_ARGS="--http-timeout 120" ./boot-chain.sh ~/psibase-pssz-build 8553
+```
+
+and say so beside the figures. The desktop profile is not affected.
+
+### Keeping the numbers repeatable
+
+- The script refuses to start when less than half the CPU is idle (`--force`
+  overrides, and the output then says the machine was busy). Under another
+  job's load the same page took twice as long, erratically; on a quiet machine
+  five cold loads of the dashboard fell within 60 ms of each other.
+- Every load records `undelayed`: requests that finished sooner than the
+  profile's per-request latency. It should be empty or nearly so. Known
+  entries: Docs fetches MathJax from cdnjs.cloudflare.com, which the local
+  delay does not reach; under the mobile profile about 8 of 150 requests per
+  load (queries that follow a preflight) are reported in 2–3 ms.
+- `requestsSeenByProxy` should equal `requests` (it does to within one or two
+  cancelled fetches).
+- Run one profile at a time and nothing else heavy beside it. Stop the script
+  with `kill <pid>`; it closes its browser.
 
 ## Adding a page
 

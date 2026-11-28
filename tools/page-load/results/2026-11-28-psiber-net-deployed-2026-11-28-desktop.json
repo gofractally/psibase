@@ -1,0 +1,1163 @@
+{
+ "meta": {
+  "issue": "gofractally/psibase#2315",
+  "target": "https://psiber.net",
+  "kind": "REAL NETWORK (figures vary with the line that day)",
+  "nodeCommit": "deployed-2026-11-28",
+  "scriptCommit": "edfdbae0e",
+  "date": "2026-11-28T10:18:33.803Z",
+  "machine": "Apple M5 Max, 18 cores, 128 GB, Darwin 25.3.0",
+  "repeats": 3,
+  "waveGapMs": 60,
+  "idleQuietMs": 500,
+  "cpuIdleBeforePct": 77,
+  "browser": "Chromium 159.0.8154.6",
+  "cpuIdleDuringPct": 70,
+  "busy": false
+ },
+ "notMeasured": [],
+ "results": [
+  {
+   "profile": "desktop",
+   "label": "desktop, the line as it is (no delay added), no CPU throttle",
+   "delayMs": 0,
+   "delayMethod": null,
+   "cpuSlowdown": 1,
+   "network": null,
+   "rows": [
+    {
+     "id": "sign-in",
+     "title": "Sign-in page",
+     "url": "https://supervisor.psiber.net/sign-in.html?app=psibernet&path=/",
+     "signedIn": false,
+     "primary": "content",
+     "marker": {
+      "selector": "#view-welcome:not([hidden]) #start-name",
+      "visible": true,
+      "enabled": true
+     },
+     "what": "form usable (name field shown and enabled)",
+     "cold": {
+      "summary": {
+       "content": {
+        "median": 1341,
+        "min": 1310,
+        "max": 1473,
+        "n": 3,
+        "of": 3
+       },
+       "lcp": {
+        "median": 1351,
+        "min": 1326,
+        "max": 1489,
+        "n": 3,
+        "of": 3
+       },
+       "idle": {
+        "median": 1384,
+        "min": 1352,
+        "max": 1520,
+        "n": 3,
+        "of": 3
+       },
+       "requests": {
+        "median": 11,
+        "min": 11,
+        "max": 12,
+        "n": 3,
+        "of": 3
+       },
+       "preflights": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "n": 3,
+        "of": 3
+       },
+       "cached": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "n": 3,
+        "of": 3
+       },
+       "bytes": {
+        "median": 118413,
+        "min": 118413,
+        "max": 118461,
+        "n": 3,
+        "of": 3
+       },
+       "waves": {
+        "median": 7,
+        "min": 7,
+        "max": 7,
+        "n": 3,
+        "of": 3
+       },
+       "requestsBeforeContent": {
+        "median": 11,
+        "min": 11,
+        "max": 12,
+        "n": 3,
+        "of": 3
+       },
+       "wasm": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "n": 3,
+        "of": 3
+       }
+      },
+      "loads": [
+       {
+        "content": 1341,
+        "lcp": 1351,
+        "lcpElement": "p: Enter your username. New here? Pick one, and a passkey makes",
+        "idle": 1384,
+        "requests": 12,
+        "cached": 0,
+        "bytes": 118461,
+        "preflights": 0,
+        "wasm": 0,
+        "requestsBeforeContent": 12,
+        "waves": 7,
+        "waveList": [
+         {
+          "at": 4,
+          "items": [
+           "sign-in.html@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 383,
+          "items": [
+           "sign-in-tYu3-Mf-.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 5
+         },
+         {
+          "at": 515,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 641,
+          "items": [
+           "chainid@supervisor",
+           "favicon.ico@supervisor"
+          ],
+          "count": 2
+         },
+         {
+          "at": 706,
+          "items": [
+           "rootdomain@homepage"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1075,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1267,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [],
+        "errors": [
+         "console: Failed to load resource: the server responded with a status of 404 ()"
+        ],
+        "undelayed": []
+       },
+       {
+        "content": 1310,
+        "lcp": 1326,
+        "lcpElement": "p: Enter your username. New here? Pick one, and a passkey makes",
+        "idle": 1352,
+        "requests": 11,
+        "cached": 0,
+        "bytes": 118413,
+        "preflights": 0,
+        "wasm": 0,
+        "requestsBeforeContent": 11,
+        "waves": 7,
+        "waveList": [
+         {
+          "at": 2,
+          "items": [
+           "sign-in.html@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 336,
+          "items": [
+           "sign-in-tYu3-Mf-.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 5
+         },
+         {
+          "at": 472,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 605,
+          "items": [
+           "chainid@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 670,
+          "items": [
+           "rootdomain@homepage"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1041,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1222,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [],
+        "errors": [],
+        "undelayed": []
+       },
+       {
+        "content": 1473,
+        "lcp": 1489,
+        "lcpElement": "p: Enter your username. New here? Pick one, and a passkey makes",
+        "idle": 1520,
+        "requests": 11,
+        "cached": 0,
+        "bytes": 118413,
+        "preflights": 0,
+        "wasm": 0,
+        "requestsBeforeContent": 11,
+        "waves": 7,
+        "waveList": [
+         {
+          "at": 1,
+          "items": [
+           "sign-in.html@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 380,
+          "items": [
+           "sign-in-tYu3-Mf-.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 5
+         },
+         {
+          "at": 507,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 641,
+          "items": [
+           "chainid@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 706,
+          "items": [
+           "rootdomain@homepage"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1068,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1397,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [],
+        "errors": [],
+        "undelayed": []
+       }
+      ]
+     },
+     "warm": {
+      "summary": {
+       "content": {
+        "median": 374,
+        "min": 355,
+        "max": 374,
+        "n": 3,
+        "of": 3
+       },
+       "lcp": {
+        "median": 390,
+        "min": 374,
+        "max": 394,
+        "n": 3,
+        "of": 3
+       },
+       "idle": {
+        "median": 407,
+        "min": 400,
+        "max": 420,
+        "n": 3,
+        "of": 3
+       },
+       "requests": {
+        "median": 6,
+        "min": 6,
+        "max": 6,
+        "n": 3,
+        "of": 3
+       },
+       "preflights": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "n": 3,
+        "of": 3
+       },
+       "cached": {
+        "median": 5,
+        "min": 5,
+        "max": 5,
+        "n": 3,
+        "of": 3
+       },
+       "bytes": {
+        "median": 263,
+        "min": 263,
+        "max": 286,
+        "n": 3,
+        "of": 3
+       },
+       "waves": {
+        "median": 5,
+        "min": 5,
+        "max": 5,
+        "n": 3,
+        "of": 3
+       },
+       "requestsBeforeContent": {
+        "median": 6,
+        "min": 6,
+        "max": 6,
+        "n": 3,
+        "of": 3
+       },
+       "wasm": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "n": 3,
+        "of": 3
+       }
+      },
+      "loads": [
+       {
+        "content": 355,
+        "lcp": 374,
+        "lcpElement": "p: Enter your username. New here? Pick one, and a passkey makes",
+        "idle": 400,
+        "requests": 6,
+        "cached": 5,
+        "bytes": 263,
+        "preflights": 0,
+        "wasm": 0,
+        "requestsBeforeContent": 6,
+        "waves": 5,
+        "waveList": [
+         {
+          "at": 2,
+          "items": [
+           "sign-in.html@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 75,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 151,
+          "items": [
+           "chainid@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 214,
+          "items": [
+           "rootdomain@homepage",
+           "rootdomain@psibernet"
+          ],
+          "count": 2
+         },
+         {
+          "at": 278,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [],
+        "errors": [],
+        "undelayed": []
+       },
+       {
+        "content": 374,
+        "lcp": 394,
+        "lcpElement": "p: Enter your username. New here? Pick one, and a passkey makes",
+        "idle": 420,
+        "requests": 6,
+        "cached": 5,
+        "bytes": 286,
+        "preflights": 0,
+        "wasm": 0,
+        "requestsBeforeContent": 6,
+        "waves": 5,
+        "waveList": [
+         {
+          "at": 2,
+          "items": [
+           "sign-in.html@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 79,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 164,
+          "items": [
+           "chainid@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 229,
+          "items": [
+           "rootdomain@homepage",
+           "rootdomain@psibernet"
+          ],
+          "count": 2
+         },
+         {
+          "at": 299,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [],
+        "errors": [],
+        "undelayed": []
+       },
+       {
+        "content": 374,
+        "lcp": 390,
+        "lcpElement": "p: Enter your username. New here? Pick one, and a passkey makes",
+        "idle": 407,
+        "requests": 6,
+        "cached": 5,
+        "bytes": 263,
+        "preflights": 0,
+        "wasm": 0,
+        "requestsBeforeContent": 6,
+        "waves": 5,
+        "waveList": [
+         {
+          "at": 2,
+          "items": [
+           "sign-in.html@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 76,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 160,
+          "items": [
+           "chainid@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 221,
+          "items": [
+           "rootdomain@homepage",
+           "rootdomain@psibernet"
+          ],
+          "count": 2
+         },
+         {
+          "at": 285,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [],
+        "errors": [],
+        "undelayed": []
+       }
+      ]
+     }
+    },
+    {
+     "id": "redirect",
+     "title": "Signed-out app visit \u2192 sign-in",
+     "url": "https://psibernet.psiber.net/",
+     "signedIn": false,
+     "primary": "content",
+     "marker": {
+      "url": "/sign-in\\.html",
+      "selector": "#view-welcome:not([hidden]) #start-name",
+      "visible": true,
+      "enabled": true
+     },
+     "what": "redirected, sign-in form usable",
+     "cold": {
+      "summary": {
+       "content": {
+        "median": 1371,
+        "min": 1310,
+        "max": 1431,
+        "n": 3,
+        "of": 3
+       },
+       "lcp": {
+        "median": 1377,
+        "min": 1314,
+        "max": 1438,
+        "n": 3,
+        "of": 3
+       },
+       "idle": {
+        "median": 1417,
+        "min": 1351,
+        "max": 1480,
+        "n": 3,
+        "of": 3
+       },
+       "requests": {
+        "median": 12,
+        "min": 12,
+        "max": 12,
+        "n": 3,
+        "of": 3
+       },
+       "preflights": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "n": 3,
+        "of": 3
+       },
+       "cached": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "n": 3,
+        "of": 3
+       },
+       "bytes": {
+        "median": 118492,
+        "min": 118469,
+        "max": 118492,
+        "n": 3,
+        "of": 3
+       },
+       "waves": {
+        "median": 8,
+        "min": 8,
+        "max": 8,
+        "n": 3,
+        "of": 3
+       },
+       "requestsBeforeContent": {
+        "median": 12,
+        "min": 12,
+        "max": 12,
+        "n": 3,
+        "of": 3
+       },
+       "wasm": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "n": 3,
+        "of": 3
+       }
+      },
+      "loads": [
+       {
+        "content": 1310,
+        "lcp": 1314,
+        "lcpElement": "p: Enter your username. New here? Pick one, and a passkey makes",
+        "idle": 1351,
+        "requests": 12,
+        "cached": 0,
+        "bytes": 118492,
+        "preflights": 0,
+        "wasm": 0,
+        "requestsBeforeContent": 12,
+        "waves": 8,
+        "waveList": [
+         {
+          "at": 2,
+          "items": [
+           "psibernet@psibernet"
+          ],
+          "count": 1
+         },
+         {
+          "at": 328,
+          "items": [
+           "sign-in.html@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 491,
+          "items": [
+           "sign-in-tYu3-Mf-.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 5
+         },
+         {
+          "at": 632,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 759,
+          "items": [
+           "chainid@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 826,
+          "items": [
+           "rootdomain@homepage"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1157,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1234,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [],
+        "errors": [],
+        "undelayed": []
+       },
+       {
+        "content": 1371,
+        "lcp": 1377,
+        "lcpElement": "p: Enter your username. New here? Pick one, and a passkey makes",
+        "idle": 1417,
+        "requests": 12,
+        "cached": 0,
+        "bytes": 118469,
+        "preflights": 0,
+        "wasm": 0,
+        "requestsBeforeContent": 12,
+        "waves": 8,
+        "waveList": [
+         {
+          "at": 1,
+          "items": [
+           "psibernet@psibernet"
+          ],
+          "count": 1
+         },
+         {
+          "at": 387,
+          "items": [
+           "sign-in.html@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 533,
+          "items": [
+           "sign-in-tYu3-Mf-.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 5
+         },
+         {
+          "at": 680,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 817,
+          "items": [
+           "chainid@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 883,
+          "items": [
+           "rootdomain@homepage"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1221,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1299,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [],
+        "errors": [],
+        "undelayed": []
+       },
+       {
+        "content": 1431,
+        "lcp": 1438,
+        "lcpElement": "p: Enter your username. New here? Pick one, and a passkey makes",
+        "idle": 1480,
+        "requests": 12,
+        "cached": 0,
+        "bytes": 118492,
+        "preflights": 0,
+        "wasm": 0,
+        "requestsBeforeContent": 12,
+        "waves": 8,
+        "waveList": [
+         {
+          "at": 2,
+          "items": [
+           "psibernet@psibernet"
+          ],
+          "count": 1
+         },
+         {
+          "at": 349,
+          "items": [
+           "sign-in.html@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 518,
+          "items": [
+           "sign-in-tYu3-Mf-.js@supervisor",
+           "modulepreload-polyfill-B@supervisor",
+           "preload-helper-CLcXU_4U.@supervisor",
+           "guest-session-RAg7D1Lv.j@supervisor",
+           "style-B_TocjL2.css@supervisor"
+          ],
+          "count": 5
+         },
+         {
+          "at": 721,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 871,
+          "items": [
+           "chainid@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 939,
+          "items": [
+           "rootdomain@homepage"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1281,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         },
+         {
+          "at": 1359,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [],
+        "errors": [],
+        "undelayed": []
+       }
+      ]
+     },
+     "warm": {
+      "summary": {
+       "content": {
+        "median": 451,
+        "min": 440,
+        "max": 486,
+        "n": 3,
+        "of": 3
+       },
+       "lcp": {
+        "median": 477,
+        "min": 458,
+        "max": 503,
+        "n": 3,
+        "of": 3
+       },
+       "idle": {
+        "median": 492,
+        "min": 482,
+        "max": 530,
+        "n": 3,
+        "of": 3
+       },
+       "requests": {
+        "median": 7,
+        "min": 7,
+        "max": 7,
+        "n": 3,
+        "of": 3
+       },
+       "preflights": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "n": 3,
+        "of": 3
+       },
+       "cached": {
+        "median": 5,
+        "min": 5,
+        "max": 5,
+        "n": 3,
+        "of": 3
+       },
+       "bytes": {
+        "median": 281,
+        "min": 281,
+        "max": 304,
+        "n": 3,
+        "of": 3
+       },
+       "waves": {
+        "median": 6,
+        "min": 5,
+        "max": 6,
+        "n": 3,
+        "of": 3
+       },
+       "requestsBeforeContent": {
+        "median": 7,
+        "min": 7,
+        "max": 7,
+        "n": 3,
+        "of": 3
+       },
+       "wasm": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "n": 3,
+        "of": 3
+       }
+      },
+      "loads": [
+       {
+        "content": 451,
+        "lcp": 477,
+        "lcpElement": "p: Enter your username. New here? Pick one, and a passkey makes",
+        "idle": 492,
+        "requests": 7,
+        "cached": 5,
+        "bytes": 281,
+        "preflights": 0,
+        "wasm": 0,
+        "requestsBeforeContent": 7,
+        "waves": 6,
+        "waveList": [
+         {
+          "at": 1,
+          "items": [
+           "psibernet@psibernet"
+          ],
+          "count": 1
+         },
+         {
+          "at": 74,
+          "items": [
+           "sign-in.html@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 154,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 235,
+          "items": [
+           "chainid@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 300,
+          "items": [
+           "rootdomain@homepage",
+           "rootdomain@psibernet"
+          ],
+          "count": 2
+         },
+         {
+          "at": 370,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [],
+        "errors": [],
+        "undelayed": []
+       },
+       {
+        "content": 440,
+        "lcp": 458,
+        "lcpElement": "p: Enter your username. New here? Pick one, and a passkey makes",
+        "idle": 482,
+        "requests": 7,
+        "cached": 5,
+        "bytes": 281,
+        "preflights": 0,
+        "wasm": 0,
+        "requestsBeforeContent": 7,
+        "waves": 5,
+        "waveList": [
+         {
+          "at": 2,
+          "items": [
+           "psibernet@psibernet"
+          ],
+          "count": 1
+         },
+         {
+          "at": 66,
+          "items": [
+           "sign-in.html@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 143,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 225,
+          "items": [
+           "chainid@supervisor",
+           "rootdomain@homepage",
+           "rootdomain@psibernet"
+          ],
+          "count": 3
+         },
+         {
+          "at": 354,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [],
+        "errors": [],
+        "undelayed": []
+       },
+       {
+        "content": 486,
+        "lcp": 503,
+        "lcpElement": "p: Enter your username. New here? Pick one, and a passkey makes",
+        "idle": 530,
+        "requests": 7,
+        "cached": 5,
+        "bytes": 304,
+        "preflights": 0,
+        "wasm": 0,
+        "requestsBeforeContent": 7,
+        "waves": 6,
+        "waveList": [
+         {
+          "at": 3,
+          "items": [
+           "psibernet@psibernet"
+          ],
+          "count": 1
+         },
+         {
+          "at": 84,
+          "items": [
+           "sign-in.html@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 169,
+          "items": [
+           "common-lib.js@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 255,
+          "items": [
+           "chainid@supervisor"
+          ],
+          "count": 1
+         },
+         {
+          "at": 329,
+          "items": [
+           "rootdomain@homepage",
+           "rootdomain@psibernet"
+          ],
+          "count": 2
+         },
+         {
+          "at": 401,
+          "items": [
+           "rootdomain@psibernet"
+          ],
+          "count": 1
+         }
+        ],
+        "workers": 0,
+        "failedRequests": [],
+        "errors": [],
+        "undelayed": []
+       }
+      ]
+     }
+    }
+   ]
+  }
+ ]
+}

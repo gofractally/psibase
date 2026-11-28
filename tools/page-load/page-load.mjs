@@ -48,8 +48,10 @@ const ACCOUNT = opt("account", undefined);
 const KEY_FILE = opt("key-file", undefined);
 const HOME_APP = opt("home-app", LOCAL ? "network" : undefined);
 const TIMEOUT = Number(opt("timeout", 90)) * 1000;
+const NOTE = opt("note", ""); // anything about this run that the reader of the table must know
 const TLS_CERT = opt("tls-cert", path.join(os.homedir(), ".psibase-dev-ca/psibase.localhost.pem"));
 const TLS_KEY = opt("tls-key", path.join(os.homedir(), ".psibase-dev-ca/psibase.localhost.key"));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const WAVE_GAP = 60; // ms between request starts that begins a new wave (as profile-waves.mjs)
 const IDLE_QUIET = 500; // ms with nothing in flight that counts as network idle
 const IDLE_CAP = 15000; // ms after the content marker to wait for idle before giving up
@@ -67,7 +69,7 @@ const IDLE_CAP = 15000; // ms after the content marker to wait for idle before g
 //   the per-request latency.
 const PROFILE = {
     desktop: {
-        label: `desktop, +${DELAY} ms per request (${DELAY_METHOD}), no CPU throttle`,
+        label: DELAY > 0 ? `desktop, +${DELAY} ms per request (${DELAY_METHOD}), no CPU throttle` : "desktop, the line as it is (no delay added), no CPU throttle",
         context: { viewport: { width: 1280, height: 1000 } },
         delay: DELAY,
         cpu: 1,
@@ -342,7 +344,7 @@ const startProxy = async (delay, upstreamPort) => {
 // ---------------------------------------------------------------- helpers
 const appHost = (app) => `${app === "home" ? HOME_APP : app}.${ROOT}`;
 const pageUrl = (p) => `https://${appHost(p.app)}${p.path()}`;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 const AUTHENTICATOR = { protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: true, hasLargeBlob: true, automaticPresenceSimulation: true };
 const addAuthenticator = async (cdp, credentials = []) => {
     await cdp.send("WebAuthn.enable");
@@ -565,7 +567,6 @@ const load = async (context, p, profile, credentials, proxy) => {
         cached: counted.length - network.length,
         bytes: network.reduce((a, x) => a + (x.bytes || 0), 0),
         preflights: network.filter((x) => x.type === "Preflight" || x.method === "OPTIONS").length,
-        revalidated: network.filter((x) => x.status === 304).length,
         wasm: network.filter((x) => x.method === "GET" && x.url.split("?")[0].endsWith(".wasm")).length,
         requestsBeforeContent: before.length,
         waves: waves.length,
@@ -593,20 +594,31 @@ const meta = {
     scriptCommit: git("rev-parse", "--short", "HEAD"),
     date: new Date().toISOString(),
     machine: `${os.cpus()[0]?.model}, ${os.cpus().length} cores, ${Math.round(os.totalmem() / 2 ** 30)} GB, ${os.type()} ${os.release()}`,
-    loadAverageAtStart: os.loadavg().map((x) => +x.toFixed(1)),
     repeats: REPEATS,
+    note: NOTE,
     waveGapMs: WAVE_GAP,
     idleQuietMs: IDLE_QUIET,
 };
 
 // Stopping the script (kill <pid>) closes its browser and proxy with it.
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => process.exit(130));
-// These are wall-clock timings: a busy machine makes them longer and erratic.
-const BUSY = os.cpus().length / 2;
-if (os.loadavg()[0] > BUSY && !flag("force")) {
-    console.error(`load average is ${os.loadavg()[0].toFixed(1)} on ${os.cpus().length} cores: the machine is busy and the figures would not be repeatable. Wait, or pass --force (the output will say so).`);
+// These are wall-clock timings: a machine busy with other work makes them
+// longer and erratic. The share of CPU time that was idle is sampled for a
+// second before starting and again over the whole run (the run itself uses a
+// few cores' worth); below half, the figures are not a reference.
+const cpuTimes = () => os.cpus().reduce((a, c) => ({ idle: a.idle + c.times.idle, all: a.all + c.times.user + c.times.sys + c.times.idle + c.times.nice + c.times.irq }), { idle: 0, all: 0 });
+const idleSince = (t) => {
+    const n = cpuTimes();
+    return Math.round((100 * (n.idle - t.idle)) / Math.max(1, n.all - t.all));
+};
+const cpu0 = cpuTimes();
+await sleep(1000);
+meta.cpuIdleBeforePct = idleSince(cpu0);
+if (meta.cpuIdleBeforePct < 50 && !flag("force")) {
+    console.error(`only ${meta.cpuIdleBeforePct}% of the CPU is idle: the machine is busy and the figures would not be repeatable. Wait, or pass --force (the output will say so).`);
     process.exit(2);
 }
+const cpuRun = cpuTimes();
 
 let session = null;
 const needSignIn = pages.some((p) => p.signedIn);
@@ -667,7 +679,7 @@ for (const profileName of PROFILES) {
                 w = warm.at(-1);
             console.error(`${profileName} ${p.id} #${i + 1}: cold content ${c.content ?? "-"} lcp ${c.lcp ?? "-"} idle ${c.idle ?? "-"} req ${c.requests} (${(c.bytes / 1024) | 0} KB) waves ${c.waves} proxy ${c.requestsSeenByProxy ?? '-'} undelayed ${c.undelayed.length}${c.note ? " [" + c.note + "]" : ""} | warm content ${w.content ?? "-"} lcp ${w.lcp ?? "-"} idle ${w.idle ?? "-"} req ${w.requests} cached ${w.cached} waves ${w.waves} proxy ${w.requestsSeenByProxy ?? '-'}${w.note ? " [" + w.note + "]" : ""}`);
         }
-        const sum = (loads) => Object.fromEntries(["content", "lcp", "idle", "requests", "preflights", "revalidated", "cached", "bytes", "waves", "requestsBeforeContent", "wasm"].map((k) => [k, summary(loads, k)]));
+        const sum = (loads) => Object.fromEntries(["content", "lcp", "idle", "requests", "preflights", "cached", "bytes", "waves", "requestsBeforeContent", "wasm"].map((k) => [k, summary(loads, k)]));
         rows.push({ id: p.id, title: p.title, url: pageUrl(p), signedIn: p.signedIn, primary: p.marker ? "content" : "lcp", marker: p.marker, what: p.what, cold: { summary: sum(cold), loads: cold }, warm: { summary: sum(warm), loads: warm } });
     }
     await browser.close();
@@ -675,8 +687,8 @@ for (const profileName of PROFILES) {
     results.push({ profile: profileName, label: profile.label, delayMs: profile.delay, delayMethod: profile.delay ? DELAY_METHOD : null, cpuSlowdown: profile.cpu, network: profile.net, rows });
 }
 
-meta.loadAverageAtEnd = os.loadavg().map((x) => +x.toFixed(1));
-meta.busy = Math.max(meta.loadAverageAtStart[0], meta.loadAverageAtEnd[0]) > BUSY;
+meta.cpuIdleDuringPct = idleSince(cpuRun);
+meta.busy = meta.cpuIdleBeforePct < 50 || meta.cpuIdleDuringPct < 50;
 
 // ---------------------------------------------------------------- report
 const secs = (ms) => (ms == null ? "—" : (ms / 1000).toFixed(2));
@@ -685,8 +697,9 @@ const int = (x) => String(Math.round(x));
 const kb = (x) => String(Math.round(x / 1024));
 let md = `# Page load: ${meta.target} (${meta.kind})\n\n`;
 md += `- node commit: \`${meta.nodeCommit}\`; script commit: \`${meta.scriptCommit}\`; date: ${meta.date}\n`;
-md += `- machine: ${meta.machine}; load average ${meta.loadAverageAtStart[0]} at start, ${meta.loadAverageAtEnd[0]} at end; ${meta.browser}, headless\n`;
-if (meta.busy) md += `- **the machine was busy with other work during this run (load average above ${BUSY} on ${os.cpus().length} cores): treat these figures as upper bounds, not as a reference**\n`;
+md += `- machine: ${meta.machine}; CPU idle ${meta.cpuIdleBeforePct}% before the run and ${meta.cpuIdleDuringPct}% during it; ${meta.browser}, headless\n`;
+if (meta.busy) md += `- **the machine was busy with other work during this run: treat these figures as upper bounds, not as a reference**\n`;
+if (meta.note) md += `- note: ${meta.note}\n`;
 md += `- ${meta.repeats} cold and ${meta.repeats} warm loads per page; each cell is **median (min–max)**; times in seconds from the start of navigation\n`;
 md += `- cold = new browser context holding only the sign-in session; warm = the same page again in that context (README.md has the exact definition)\n\n`;
 for (const r of results) {
