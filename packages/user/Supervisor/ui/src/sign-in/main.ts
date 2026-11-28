@@ -23,6 +23,7 @@ import {
     type Network,
     choiceFor,
     clearDevice,
+    dropFromDevice,
     forgetAccount,
     heldAccounts,
     logoutFor,
@@ -148,20 +149,18 @@ const setBelow = (text?: string, ...links: (BelowLink | undefined)[]) => {
 
 const HAS_PASSKEY_KEY = "psibase.has-passkey.v1";
 
-// Who the remembered passkey belongs to, so that a browser whose session
-// has lapsed can say whom it is welcoming back. Names only; nothing secret.
-// Signing out removes it with the passkey hint: a browser that was signed
-// out knows nothing about who used it (gofractally/psibase#2316).
+// An earlier version of this page kept the holder's name here across a
+// sign-out. Nothing writes it now; it is removed wherever it is found.
 const WHO_KEY = "psibase.passkey-holder.v1";
 
 interface Holder {
     /** The account (or the name picked for one) this app would be entered as. */
     name?: string;
     displayName?: string;
-    /** How many accounts the passkey holds. */
-    accounts?: number;
 }
 
+// Who this browser's remembered passkey belongs to, from what the browser
+// holds for a session that lapsed without a sign-out.
 const currentHolder = (): Holder => {
     const device = loadDevice();
     // The account this app knows, or the only account there is. With
@@ -171,22 +170,15 @@ const currentHolder = (): Holder => {
         choiceFor(destination.app) ||
         (held.length === 1 ? held[0] : undefined) ||
         (held.length === 0 ? device.pendingName : undefined);
-    if (name || device.displayName || held.length) {
-        return { name, displayName: device.displayName, accounts: held.length };
-    }
-    try {
-        return JSON.parse(window.localStorage.getItem(WHO_KEY) ?? "{}") as Holder;
-    } catch {
-        return {};
-    }
+    return { name, displayName: device.displayName };
 };
 
-const rememberHolder = () => {
-    const holder = currentHolder();
-    if (holder.name || holder.displayName) {
-        window.localStorage.setItem(WHO_KEY, JSON.stringify(holder));
-    }
-};
+// What the first screen may say about who is here. Browser storage is not
+// evidence: it outlives a chain that was started again and accounts that no
+// longer exist. So nothing from it is shown or filled in until the chain
+// has confirmed it (gofractally/psibase#2316), and this stays empty until
+// `verifyRemembered` has done that.
+let verifiedHolder: Holder = {};
 
 const forgetPasskeyHint = () => {
     window.localStorage.removeItem(HAS_PASSKEY_KEY);
@@ -198,7 +190,7 @@ const renderWelcome = () => {
     document.title = `Welcome · ${rootName}`;
 
     const knownPasskey = !!window.localStorage.getItem(HAS_PASSKEY_KEY);
-    const holder = knownPasskey ? currentHolder() : {};
+    const holder = knownPasskey ? verifiedHolder : {};
     const greeting = holder.displayName ?? holder.name;
     $("headline").textContent = greeting ? `Welcome back, ${greeting}` : "Welcome";
     $("lede").textContent =
@@ -776,7 +768,6 @@ const signIn = async (mode: Mode) => {
         } catch (e) {
             console.warn("Could not bring accounts to this browser", e);
         }
-        rememberHolder();
         const held = heldAccounts();
 
         if (held.includes(name) || start.exists) unlocked.wipe();
@@ -965,14 +956,52 @@ const forgetOtherNetwork = async () => {
     // last signed in before this check existed; it starts clean too.
     networkChanged = known !== null && known !== id;
     if (known !== id) {
-        // The passkey itself (HAS_PASSKEY_KEY) is kept: it still works, and
-        // derives new keys for the new network.
+        // Everything this browser remembered is about another chain, the
+        // passkey hint included (`verifyRemembered` drops it with the
+        // accounts). The passkey still works and derives new keys here;
+        // its holder says so with "I already have a passkey for this site".
         clearDevice();
         clearGuestSession();
         window.localStorage.removeItem(WHO_KEY);
         window.localStorage.removeItem(APPS_KEY);
         window.localStorage.setItem(NETWORK_KEY, id);
     }
+};
+
+/**
+ * Checks what this browser remembers against the chain before any of it is
+ * shown, and forgets what the chain does not bear out.
+ *
+ * - A remembered account that no longer exists is dropped.
+ * - A remembered passkey with no account and no name picked for one is
+ *   what a sign-out leaves on a browser that last ran an older version of
+ *   this page (and what a chain started again leaves): forgotten, so the
+ *   next name typed is a new user.
+ * - If the chain cannot be asked, nothing remembered is shown.
+ */
+const verifyRemembered = async () => {
+    verifiedHolder = {};
+    window.localStorage.removeItem(WHO_KEY);
+    if (!window.localStorage.getItem(HAS_PASSKEY_KEY)) return;
+    const remembersSomeone = () => {
+        const device = loadDevice();
+        return device.accounts.length > 0 || !!device.pendingName;
+    };
+    if (remembersSomeone()) {
+        try {
+            for (const account of loadDevice().accounts) {
+                if (!(await lookUpName(account.name)).exists) dropFromDevice(account.name);
+            }
+        } catch {
+            return; // Not confirmed, so not shown.
+        }
+    }
+    if (!remembersSomeone()) {
+        clearDevice();
+        forgetPasskeyHint();
+        return;
+    }
+    verifiedHolder = currentHolder();
 };
 
 const start = async () => {
@@ -1024,6 +1053,7 @@ const start = async () => {
         $("foot-id").textContent = "";
         $<HTMLInputElement>("start-name").value = "";
         $<HTMLInputElement>("start-pass").value = "";
+        verifiedHolder = {};
         wanted = undefined;
         chosenLabel = undefined;
         nextMode = "auto";
@@ -1116,6 +1146,7 @@ const start = async () => {
         }
     }
 
+    await verifyRemembered();
     renderWelcome();
     if (networkChanged) {
         setNotice(
