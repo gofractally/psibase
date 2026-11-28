@@ -165,3 +165,47 @@ fn requests_queued_before_a_change_are_still_paid() {
     assert_eq!(MIN_PAYMENT, 1000);
     assert!(build_plan(&raised, 1, &reserve, &[pay(1, &p2wpkh(), 999, 1000)]).is_err());
 }
+
+#[test]
+fn one_window_for_accepting_a_deposit_and_for_retiring_its_guard() {
+    assert_eq!((DEPOSIT_WINDOW, RETIRE_MARGIN), (432, 144));
+    let tip = 333_000;
+    // Accepted through 431 blocks under the tip, refused at 432 and for blocks above the tip.
+    assert!(deposit_in_window(tip, tip));
+    assert!(deposit_in_window(tip, tip - 431));
+    assert!(!deposit_in_window(tip, tip - 432));
+    assert!(!deposit_in_window(tip, tip + 1));
+    assert!(deposit_in_window(100, 0) && deposit_in_window(431, 0) && !deposit_in_window(432, 0));
+    // Retired only 576 blocks under the tip.
+    assert!(!guard_retirable(tip, tip - 575));
+    assert!(guard_retirable(tip, tip - 576));
+    assert!(!guard_retirable(575, 0) && guard_retirable(576, 0));
+    assert!(!guard_retirable(u32::MAX, u32::MAX - 10));
+    // Between the two lies a band where a proof is refused and the record is still kept.
+    for depth in 432..576 {
+        assert!(!deposit_in_window(tip, tip - depth) && !guard_retirable(tip, tip - depth));
+    }
+    // No gap, whatever the relay does afterwards. Its tip height can fall by at most the 128
+    // blocks of its reorganization bound (a deeper fork pauses it), and otherwise only rises.
+    const RELAY_REORG_BOUND: u32 = 128;
+    assert!(RETIRE_MARGIN > RELAY_REORG_BOUND);
+    for height in [0u32, 1, 1000, 332_753] {
+        for tip in height..height + 800 {
+            if guard_retirable(tip, height) {
+                for later in tip - RELAY_REORG_BOUND..tip + 300 {
+                    assert!(!deposit_in_window(later, height), "{height} {tip} {later}");
+                }
+            }
+        }
+    }
+    // A reorganization that moves a deposit into a later block: the block it leaves is within
+    // the reorganization bound of the tip at that moment, and no earlier tip was more than the
+    // bound above that one, so the record of the old position was never retirable.
+    for old in [1000u32, 332_753] {
+        for tip_at_reorg in old..=old + RELAY_REORG_BOUND {
+            for earlier_tip in old..=tip_at_reorg + RELAY_REORG_BOUND {
+                assert!(!guard_retirable(earlier_tip, old));
+            }
+        }
+    }
+}

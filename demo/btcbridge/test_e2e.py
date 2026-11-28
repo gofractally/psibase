@@ -68,7 +68,12 @@ class BridgeTests(unittest.TestCase):
   balance=lambda state:state['wallet']['balance']+state['wallet']['incoming']
   self.assertEqual(balance(snapshot('alice'))-balance(publisher_before),1000)
   self.assertEqual(balance(snapshot('liquidity'))-balance(treasury_before),1000)
-  receipt=http('/explorer/deposit?outpoint='+txid+'-'+format(vout,'08x'))
+  # The receipt is a history event, read from the node's event log.
+  def receipt_of():
+   found=http('/explorer/deposit?outpoint='+txid+'-'+format(vout,'08x'))
+   if not found:raise ValueError('Receipt not yet in the event log')
+   return found
+  receipt=control.wait(receipt_of)
   self.assertEqual((receipt['owner'],receipt['publisher'],receipt['fee'],receipt['bounty']),('bob','alice',2000,1000))
   self.unchanged_failure(lambda:call('alice','btcbridge','deposit',**p,vout=vout))
  def test_03_wrong_difficulty_rejected_even_with_valid_pow(self):
@@ -90,9 +95,8 @@ class BridgeTests(unittest.TestCase):
   self.assertFalse([r for r in snapshot('alice')['requests'] if r['id']==request])
   retired=control.wait(lambda:next(r for r in http('/explorer/retired?owner=alice&limit=10')['rows'] if int(r['id'])==request))
   self.assertEqual((retired['owner'],retired['reason'],int(retired['amount']),int(retired['max_fee']),int(retired['prior_status'])),('alice','cancelled',100000,10000,0))
-  # Its id is not issued again, it cannot be cancelled twice, and nothing is left to sweep.
+  # Its id is not issued again and it cannot be cancelled twice.
   self.unchanged_failure(lambda:call('alice','btcbridge','cancel',request=request))
-  self.assertEqual(call('bob','btcbridge','retireCancelled',limit=100),0)
   self.assertGreater(self.withdraw()[0],request);call('alice','btcbridge','cancel',request=snapshot()['config']['next_request']-1)
   self.assertEqual(snapshot()['config']['escrow'],0)
  def test_05_two_of_three_blind_signers_pay_once(self):
@@ -180,8 +184,8 @@ class BridgeTests(unittest.TestCase):
   detail=http('/explorer/batch?id='+str(batches[0]['batch']['id']))
   self.assertEqual((detail['required'],detail['available']),(2,3));self.assertTrue(detail['raw'])
   self.assertEqual(len(detail['providers']),3);self.assertTrue(all(len(i['signatures'])>=2 for i in detail['inputs']))
-  count=len(deposits);call('carol','btcbridge','indexDeps',after='',limit=100)
-  self.assertEqual(len(pages('/explorer/deposits')),count)
+  # Receipts are events, not rows: listed newest first, and none is left in chain state to copy.
+  self.assertEqual([d['id'] for d in deposits],[d['id'] for d in pages('/explorer/deposits',limit=3)])
   for path in ['/explorer/utxos?limit=0','/explorer/utxos?limit=51','/explorer/utxos?status=9','/explorer/deposits?cursor=bad','/explorer/addresses?limit=1&limit=2','/explorer/batch?id=0']:
    with self.assertRaises(urllib.error.HTTPError) as error:http(path)
    self.assertEqual(error.exception.code,400);error.exception.close()
@@ -231,6 +235,23 @@ class BridgeTests(unittest.TestCase):
   self.withdraw('carol',10000)
   self.assertGreater(call('alice','btcbridge','makeBatch'),0)
   self.assertEqual(status('liquidity',big),1)
+ def test_11_deposit_must_be_proven_within_the_window(self):
+  # A deposit 431 blocks under the relay's tip is credited; one block later it is refused for good.
+  address=call('bob','btcbridge','newAddress');late=rpc('sendtoaddress',address['address'],0.01,wallet='faucet');mine(1)
+  timely=rpc('sendtoaddress',address['address'],0.01,wallet='faucet');mine(1);mine(431);relay_headers()
+  vout=lambda p:next(v['n'] for v in rpc('decoderawtransaction',p['raw'])['vout'] if v['scriptPubKey'].get('address')==address['address'])
+  p=proof(late)
+  with self.assertRaisesRegex(ValueError,'older than the 432-block'):call('alice','btcbridge','deposit',**p,vout=vout(p))
+  p=proof(timely);before=snapshot()['config']['reserve'];call('alice','btcbridge','deposit',**p,vout=vout(p))
+  self.assertEqual(snapshot()['config']['reserve']-before,1000000)
+  def receipt_of():
+   found=http('/explorer/deposit?outpoint='+timely+'-'+format(vout(p),'08x'))
+   if not found:raise ValueError('Receipt not yet in the event log')
+   return found
+  receipt=control.wait(receipt_of)
+  self.assertEqual((receipt['owner'],receipt['value'],receipt['legacy']),('bob',1000000,False))
+  mine(1);relay_headers()
+  with self.assertRaisesRegex(ValueError,'older than the 432-block|already processed'):call('alice','btcbridge','deposit',**p,vout=vout(p))
  def test_99_deep_reorg_freezes_accepted_state(self):
   protected=snapshot()['relay']['protected_height'];old_height=rpc('getblockcount');rpc('invalidateblock',rpc('getblockhash',protected));mine(old_height-protected+2)
   relay_headers();self.assertTrue(snapshot()['relay']['paused'])

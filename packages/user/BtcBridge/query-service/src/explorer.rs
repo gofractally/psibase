@@ -81,6 +81,60 @@ fn page<T: Serialize>(mut rows: Vec<T>, limit: usize, next: impl FnOnce(&T) -> S
     let next = if more { rows.last().map(next) } else { None };
     json!({"rows":rows,"next":next})
 }
+/// History from the node's event log: rows of one of this service's events, newest first.
+/// A node may prune its events; this returns what the node still has. Numbers the event log
+/// returns as text are made numbers again, so rows read like the table rows they replace.
+fn events(
+    event: &str,
+    filter: Option<(&str, String)>,
+    before: Option<u64>,
+    limit: usize,
+    numbers: &[&str],
+) -> Result<Vec<Value>, String> {
+    let mut sql = format!("SELECT ROWID, * FROM \"history.btcbridge.{event}\"");
+    let mut filters = vec![];
+    let mut params: Vec<psio::pssz::RawString> = vec![];
+    if let Some((column, value)) = filter {
+        filters.push(format!("{column} = ?"));
+        params.push(value.as_str().into());
+    }
+    if let Some(before) = before {
+        filters.push(format!("ROWID < {before}"));
+    }
+    if !filters.is_empty() {
+        sql += " WHERE ";
+        sql += &filters.join(" AND ");
+    }
+    sql += &format!(" ORDER BY ROWID DESC LIMIT {limit}");
+    let json = psibase::services::r_events::Wrapper::call().sqlQuery(sql, params);
+    let mut rows: Vec<Value> =
+        serde_json::from_slice(&json).map_err(|_| "Event history unavailable")?;
+    for row in &mut rows {
+        for name in numbers {
+            if let Some(n) = row[*name].as_str().and_then(|s| s.parse::<u64>().ok()) {
+                row[*name] = json!(n);
+            }
+        }
+        if let Some(flag) = row["legacy"].as_str().map(|s| s == "true" || s == "1") {
+            row["legacy"] = json!(flag);
+        } else if let Some(n) = row["legacy"].as_u64() {
+            row["legacy"] = json!(n != 0);
+        }
+    }
+    Ok(rows)
+}
+fn event_cursor(row: &Value) -> String {
+    let id = &row["rowid"];
+    id.as_str().map(str::to_string).unwrap_or_else(|| id.to_string())
+}
+const DEPOSIT_NUMBERS: &[&str] = &[
+    "vout", "address_index", "value", "credited", "fee", "bounty", "fee_bps", "publisher_bps",
+    "height", "credited_at",
+];
+const REQUEST_NUMBERS: &[&str] = &[
+    "id", "amount", "max_fee", "service_fee", "created", "retired", "prior_status", "batch",
+    "paid_fee",
+];
 fn revision_summary(r: &Revision) -> Value {
     let plan: btcbridge_core::Plan = serde_json::from_str(&r.plan).unwrap();
     let gathered: Vec<_> = (0..3u8)
@@ -263,13 +317,20 @@ pub fn serve(path: &str, query: &str) -> Option<HttpReply> {
                 };
                 let rows:Vec<_>=rows.into_iter().take(limit).map(|u| {
                     let address=if u.branch==0 {AddressTable::read().get_index_pk().get(&u.index)}else{None};
-                    json!({"utxo":u,"address":address,"deposit":DepositTable::read().get_index_pk().get(&u.id)})
+                    json!({"utxo":u,"address":address})
                 }).collect();
                 Ok(json!({"rows":rows,"next":next}))
             }
-            "/explorer/deposit" => Ok(json!(DepositTable::read()
-                .get_index_pk()
-                .get(&key_cursor(q.get("outpoint").ok_or("Missing outpoint")?)?))),
+            // A deposit's receipt is an event; `null` if this node no longer has it.
+            "/explorer/deposit" => Ok(json!(events(
+                "depositCredited",
+                Some(("id", key_cursor(q.get("outpoint").ok_or("Missing outpoint")?)?)),
+                None,
+                1,
+                DEPOSIT_NUMBERS,
+            )?
+            .into_iter()
+            .next())),
             "/explorer/transaction" => {
                 let txid = q.get("txid").ok_or("Missing transaction ID")?;
                 if txid.len() != 64 || !txid.bytes().all(|b| b.is_ascii_hexdigit()) {
@@ -280,59 +341,35 @@ pub fn serve(path: &str, query: &str) -> Option<HttpReply> {
                     .get(&txid.to_lowercase())))
             }
             "/explorer/deposits" => {
-                let end = after
-                    .map(|s| height_cursor(s))
-                    .transpose()?
-                    .unwrap_or((u32::MAX, "z".into()));
-                let rows = if let Some(owner) = owner {
-                    DepositTable::read()
-                        .get_index_by_owner()
-                        .range(..(owner, end.0, end.1))
-                        .rev()
-                        .take_while(|r| r.owner == owner)
-                        .take(limit + 1)
-                        .collect::<Vec<_>>()
-                } else {
-                    DepositTable::read()
-                        .get_index_by_height()
-                        .range(..end)
-                        .rev()
-                        .take(limit + 1)
-                        .collect::<Vec<_>>()
-                };
-                Ok(page(rows, limit, |r| cursor(r.height, &r.id)))
+                let before = after
+                    .map(|s| s.parse::<u64>())
+                    .transpose()
+                    .map_err(|_| "Invalid cursor")?;
+                let rows = events(
+                    "depositCredited",
+                    owner.map(|o| ("owner", o.to_string())),
+                    before,
+                    limit + 1,
+                    DEPOSIT_NUMBERS,
+                )?;
+                Ok(page(rows, limit, event_cursor))
             }
             // Requests that left objective state (cancelled), from the event log: newest first.
             // A node may prune its events; this returns what the node still has.
+            // Requests that left objective state (cancelled), from the event log.
             "/explorer/retired" => {
                 let before = after
                     .map(|s| s.parse::<u64>())
                     .transpose()
                     .map_err(|_| "Invalid cursor")?;
-                let mut sql =
-                    String::from("SELECT ROWID, * FROM \"history.btcbridge.withdrawalRetired\"");
-                let mut filters = vec![];
-                let mut params: Vec<psio::pssz::RawString> = vec![];
-                if let Some(owner) = owner {
-                    filters.push("owner = ?".to_string());
-                    params.push(owner.to_string().as_str().into());
-                }
-                if let Some(before) = before {
-                    filters.push(format!("ROWID < {before}"));
-                }
-                if !filters.is_empty() {
-                    sql += " WHERE ";
-                    sql += &filters.join(" AND ");
-                }
-                sql += &format!(" ORDER BY ROWID DESC LIMIT {}", limit + 1);
-                let json = psibase::services::r_events::Wrapper::call().sqlQuery(sql, params);
-                let rows: Vec<Value> =
-                    serde_json::from_slice(&json).map_err(|_| "Event history unavailable")?;
-                Ok(page(rows, limit, |r| {
-                    let id = &r["rowid"];
-                    let id = if id.is_null() { &r["ROWID"] } else { id };
-                    id.as_str().map(str::to_string).unwrap_or_else(|| id.to_string())
-                }))
+                let rows = events(
+                    "withdrawalRetired",
+                    owner.map(|o| ("owner", o.to_string())),
+                    before,
+                    limit + 1,
+                    REQUEST_NUMBERS,
+                )?;
+                Ok(page(rows, limit, event_cursor))
             }
             "/explorer/withdrawals" => {
                 let end = after

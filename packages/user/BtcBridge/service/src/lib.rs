@@ -149,14 +149,71 @@ fn retire(r: &Withdrawal, reason: &str, prior_status: u8) {
     );
     RequestTable::read_write().remove(r);
 }
-/// The columns history is asked for: the request id and its owner.
+/// A deposit's receipt is history: nothing objective reads it (the processed output in
+/// `UtxoTable` is the guard), so it is an event.
+fn emit_deposit(d: &Deposit) {
+    Wrapper::emit().history().depositCredited(
+        d.id.clone(),
+        d.txid.clone(),
+        d.vout,
+        d.owner,
+        d.address_index,
+        d.value,
+        d.credited,
+        d.fee,
+        d.bounty,
+        d.publisher.map(|p| p.to_string()).unwrap_or_default(),
+        d.fee_bps,
+        d.publisher_bps,
+        d.height,
+        d.block.clone(),
+        d.credited_at,
+        d.legacy,
+    );
+}
+/// At most this many rows are retired by one ordinary action.
+const TIDY_ROWS: usize = 4;
+/// Passive cleanup. Rows that reached a final state before their action erased them are retired
+/// here, a few at a time and oldest first, inside actions that run anyway: nobody has to call a
+/// maintenance action. Added cost per call is bounded: one index read per kind and, for at most
+/// `TIDY_ROWS` rows in total, one event and one erase. Later kinds join this list.
+fn tidy() {
+    let mut left = TIDY_ROWS;
+    // Requests cancelled before `cancel` erased them (state 3).
+    let cancelled: Vec<_> = RequestTable::read()
+        .get_index_by_status()
+        .range((3, 0)..=(3, u64::MAX))
+        .take(left)
+        .collect();
+    left -= cancelled.len();
+    for r in &cancelled {
+        // The state it was cancelled from was not recorded.
+        retire(r, "cancelled", 3);
+    }
+    // Deposit receipts written before a receipt was an event.
+    let receipts: Vec<_> = DepositTable::read()
+        .get_index_pk()
+        .iter()
+        .take(left)
+        .collect();
+    for d in &receipts {
+        emit_deposit(d);
+        DepositTable::read_write().remove(d);
+    }
+}
+/// The columns history is asked for: a request's id and owner, a deposit's outpoint and owner.
 fn index_events() {
     use psibase::services::events;
-    for column in [0, 1] {
+    for (event, column) in [
+        ("withdrawalRetired", 0),
+        ("withdrawalRetired", 1),
+        ("depositCredited", 0),
+        ("depositCredited", 3),
+    ] {
         events::Wrapper::call().addIndex(
             events::EventDb::HistoryEvent,
             Wrapper::SERVICE,
-            MethodNumber::from("withdrawalRetired"),
+            MethodNumber::from(event),
             column,
         );
     }
@@ -341,54 +398,18 @@ pub mod service {
         };
         DepositFeesTable::read_write().put(&row).unwrap();
     }
-    /// Bounded, permissionless history migration. It never mints or pays a bounty.
-    #[action]
-    fn indexDeps(after: String, limit: u32) -> String {
-        assert!((1..=100).contains(&limit), "History page limit");
-        assert!(after.len() <= 73, "History cursor limit");
-        let rows: Vec<_> = UtxoTable::read()
-            .get_index_pk()
-            .range(after.clone()..)
-            .filter(|u| u.id > after)
-            .take(limit as usize)
-            .collect();
-        let next = rows.last().map(|u| u.id.clone()).unwrap_or_default();
-        for u in rows {
-            if u.branch != 0 || DepositTable::read().get_index_pk().get(&u.id).is_some() {
-                continue;
-            }
-            let address = AddressTable::read()
-                .get_index_pk()
-                .get(&u.index)
-                .expect("Deposit binding missing");
-            DepositTable::read_write()
-                .put(&Deposit {
-                    id: u.id,
-                    txid: u.txid,
-                    vout: u.vout,
-                    owner: address.owner,
-                    address_index: u.index,
-                    value: u.value,
-                    credited: u.value,
-                    fee: 0,
-                    bounty: 0,
-                    publisher: None,
-                    fee_bps: 0,
-                    publisher_bps: 0,
-                    height: u.height,
-                    block: u.block,
-                    credited_at: 0,
-                    legacy: true,
-                })
-                .unwrap();
-        }
-        next
-    }
     #[action]
     fn deposit(raw: String, block: String, siblings: Vec<String>, position: u32, vout: u32) {
         let mut c = live();
+        tidy();
         let p = policy(&c);
         let (tx, h) = proof(&raw, &block, &siblings, position);
+        // A deposit is proven within the window, counted in blocks under the relay's tip. Guard
+        // records are retired by the same measure, so a late proof can never find its record gone.
+        assert!(
+            btc::deposit_in_window(btcrelay::Wrapper::call().getState().height, h.height),
+            "Deposit proof is older than the 432-block (72 hour) window"
+        );
         let txid = tx.compute_txid().to_string();
         let id = outpoint(&txid, vout);
         assert!(
@@ -467,8 +488,7 @@ pub mod service {
             bounty,
             "First valid Bitcoin deposit proof bounty",
         );
-        DepositTable::read_write()
-            .put(&Deposit {
+        emit_deposit(&Deposit {
                 id,
                 txid,
                 vout,
@@ -485,14 +505,14 @@ pub mod service {
                 block: block.clone(),
                 credited_at: now(),
                 legacy: false,
-            })
-            .unwrap();
+        });
         btcrelay::Wrapper::call().protect(block);
         save(&c);
     }
     #[action]
     fn withdraw(address: String, amount: u64, max_fee: u64) -> u64 {
         let mut c = live();
+        tidy();
         let p = policy(&c);
         let owner = get_sender();
         assert!(
@@ -559,6 +579,7 @@ pub mod service {
         // Cancellation before commitment remains available if relay data is stale or paused.
         let mut c = config();
         audit(&c);
+        tidy();
         let r = RequestTable::read()
             .get_index_pk()
             .get(&request)
@@ -576,23 +597,6 @@ pub mod service {
         retire(&r, "cancelled", r.status);
         save(&c);
     }
-    /// Requests cancelled before cancellation erased them are still rows in state 3. Anyone may
-    /// retire a bounded number: each emits the event `cancel` now emits and is erased. No value
-    /// moves. Returns how many were retired; 0 means none are left.
-    #[action]
-    fn retireCancelled(limit: u32) -> u32 {
-        assert!((1..=100).contains(&limit), "Retirement page limit");
-        let rows: Vec<_> = RequestTable::read()
-            .get_index_by_status()
-            .range((3, 0)..=(3, u64::MAX))
-            .take(limit as usize)
-            .collect();
-        for r in &rows {
-            // The state it was cancelled from was not recorded.
-            retire(r, "cancelled", 3);
-        }
-        rows.len() as u32
-    }
     /// Registers the indexes of this service's events. `init` does it for a new bridge; a bridge
     /// initialized before it emitted events calls this once, under its own authority.
     #[action]
@@ -604,6 +608,27 @@ pub mod service {
     /// the state it was in (0 queued, 4 fee allowance too low, 5 waiting for the reserve; 3 for a
     /// row cancelled before this event existed). `batch`, `paid_fee` and `txid` are empty for a
     /// cancelled request.
+    #[event(history)]
+    pub fn depositCredited(
+        id: String,
+        txid: String,
+        vout: u32,
+        owner: AccountNumber,
+        address_index: u32,
+        value: u64,
+        credited: u64,
+        fee: u64,
+        bounty: u64,
+        publisher: String,
+        fee_bps: u16,
+        publisher_bps: u16,
+        height: u32,
+        block: String,
+        credited_at: u64,
+        legacy: bool,
+    ) {
+    }
+    /// A withdrawal request that left objective state. See `retire`.
     #[event(history)]
     pub fn withdrawalRetired(
         id: u64,
@@ -624,6 +649,7 @@ pub mod service {
     #[action]
     fn makeBatch() -> u32 {
         let mut c = live();
+        tidy();
         let p = policy(&c);
         assert!(
             BatchTable::read()
@@ -893,6 +919,7 @@ pub mod service {
     #[action]
     fn complete(raw: String, block: String, siblings: Vec<String>, position: u32) {
         let mut c = live();
+        tidy();
         let (tx, h) = proof(&raw, &block, &siblings, position);
         let txid = tx.compute_txid().to_string();
         let reference = TxTable::read()

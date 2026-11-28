@@ -192,6 +192,26 @@ pub fn validate_next_header(
     Ok(h)
 }
 
+/// A deposit must be proven within this many blocks of its own block, counted below the relay's
+/// canonical tip: 72 hours at ten minutes a block. Depth, not time: header timestamps are
+/// miner-chosen and not monotonic, depth is exact, and it advances only as the relay learns blocks.
+pub const DEPOSIT_WINDOW: u32 = 432;
+/// A guard record may be retired only this much deeper than the window. The relay never follows
+/// a reorganization deeper than 128 blocks (it pauses for good), so its tip height can fall by
+/// at most that; the margin exceeds it.
+pub const RETIRE_MARGIN: u32 = 144;
+/// Whether a deposit proof for a canonical block at `height` is still acceptable under tip `tip`.
+pub fn deposit_in_window(tip: u32, height: u32) -> bool {
+    height <= tip && tip - height < DEPOSIT_WINDOW
+}
+/// Whether the record guarding a block at `height` may be retired under tip `tip`. One measure
+/// with `deposit_in_window`: once this holds, no tip the relay can ever show again accepts a
+/// proof at that height.
+pub fn guard_retirable(tip: u32, height: u32) -> bool {
+    height
+        .checked_add(DEPOSIT_WINDOW + RETIRE_MARGIN)
+        .is_some_and(|limit| limit <= tip)
+}
 /// The smallest payment a batch may carry, whatever the policy: above every standard script's
 /// dust threshold. A policy's `min_withdrawal` (the admission rule for new requests) is at least this.
 pub const MIN_PAYMENT: u64 = 1000;

@@ -132,9 +132,7 @@ impl Guest for Plugin {
                 complete,
                 deposit,
                 bump,
-                reportSpend,
-                indexDeps,
-                retireCancelled
+                reportSpend
             );
             add_action_to_transaction(&a.method, &packed)?;
         }

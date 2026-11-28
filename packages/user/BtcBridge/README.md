@@ -199,76 +199,59 @@ waiting for the reserve. The owner can cancel in states 0, 4 and 5. A cancelled
 request has no state: it is no longer a row (state 3 exists only on rows
 cancelled before that, until they are retired).
 
-### What leaves objective state
+### What leaves objective state, and how
 
-Chain state holds what an objective action will read again. A cancelled
-withdrawal is refunded and then read by nothing, and it guards nothing, so
-`cancel` emits the history event `withdrawalRetired` (id, owner, address,
-amount, fee allowance, service fee, created, retired, reason, prior state) and
-erases the row. Request ids come from a counter that only increases, so an id
-is never issued again. `retireCancelled(limit)` does the same, a bounded number
-at a time and for anyone who calls it, for rows cancelled before this; it moves
-no value. A bridge initialized before it emitted events registers the event's
-indexes once with `indexEvents` (its own authority); `init` does it otherwise.
+Chain state holds what an objective action will read again. A record that is
+final, read by no action and guards nothing is retired: an event carries what a
+reader of its history needs and the row is erased.
 
-History of cancelled requests is served from the node's event log
-(`/explorer/retired?owner=…&limit=…&cursor=…`, newest first). A node may prune
-its events; the page then shows less, or says the node does not serve that
-history. Nothing objective depends on it.
+- **Cancelled withdrawals.** `cancel` refunds, emits `withdrawalRetired` (id,
+  owner, address, amount, fee allowance, service fee, created, retired, reason,
+  prior state) and erases the request. Ids come from a counter that only
+  increases, so an id is never issued again.
+- **Deposit receipts.** `deposit` emits `depositCredited` (outpoint, recipient,
+  value, credit, fee, bounty, publisher, block, time) and writes no receipt
+  row. The processed output in `UtxoTable` is the guard; the receipt was only
+  ever listed.
 
-What stays, however old, is what guards against a double spend or double
-credit: every processed custody output including spent ones (`UtxoTable`), the
-record of every authorized bridge transaction (`TxTable`), completed batch
-rows (they refuse a second completion), scripts and addresses, custody keys
-and the counters. Paid requests, the revisions and signatures of completed
-batches and deposit receipts guard nothing and are candidates for the same
-treatment; they are still rows today.
+**No maintenance action.** Rows that were final before their action erased
+them (requests in state 3, receipt rows) are retired passively: `withdraw`,
+`cancel`, `makeBatch`, `deposit` and `complete` each retire at most four such
+rows, oldest first, before doing their own work. The added cost of an action is
+bounded: one index read per kind and at most four events and four erasures.
+Nobody is asked to sweep. A bridge initialized before it emitted events
+registers the events' indexes once with `indexEvents` (its own authority);
+`init` does it otherwise.
 
-What can still stop `makeBatch` for everyone is not a request: sixteen open
-batches (`Open batch limit`), a paused bridge, or a stale or paused relay.
-`requestSigs`, `gather` and `complete` act on one batch and one signer; a
-failure there concerns that batch only.
-Accepted transfers protect their Bitcoin history. A higher-work reorg removing
-that history, or exceeding the bounded update window, persistently freezes the
-relay. A stale tip stops new credit and withdrawal authorization. A pause cannot
-revoke a signature request that was already authorized and finalized.
+History is served from the node's event log: `/explorer/retired` (cancelled
+requests), `/explorer/deposits` and `/explorer/deposit` (receipts). A node may
+prune its events; the page then shows less, or says the node does not serve
+that history. Nothing objective depends on it.
 
-## Token and UTXO accounting
+### Deposits are proven within 432 blocks
 
-A deposit's raw transaction, selected output and Merkle branch must match a
-confirmed canonical header. Coinbase deposits and 64-byte stripped transactions
-are excluded; the latter avoids Bitcoin's leaf/internal-node Merkle ambiguity.
-Payload sizes and proof depth are bounded. Every accepted `(txid,vout)` remains
-recorded permanently, including after spending. Bridge-originated change and
-consolidation outputs cannot be credited as new deposits.
+`deposit` accepts a proof only while its block is within 432 blocks (72 hours
+at ten minutes) of the relay's canonical tip. Depth is the measure, not time:
+header timestamps are miner-chosen and not monotonic, depth is exact, and it
+advances only as the relay learns of blocks. **A deposit not proven within the
+window is not credited; the coins stay in the custody script. There is no
+recovery path yet** (the proposal, crediting only when the bridge itself has
+spent the output, is on the issue).
 
-The tracked reserve includes confirmed available and reserved bridge UTXOs.
-Inclusion alone does not prove an output is still unspent. Accounting assumes
-that custody keys spend through this protocol; anyone can prove an unexpected
-spend and freeze the bridge. Sparse proofs do not establish completeness of the
-Bitcoin UTXO set or a complete reserve audit.
+The same measure decides when a guard record may be retired: only 576 blocks
+under the tip (the window plus 144). The relay never follows a reorganization
+deeper than 128 blocks, so its tip height can fall by at most that, and no tip
+it can ever show again accepts a proof for a block whose record was retired
+(`deposit_in_window`, `guard_retirable` in the core library, tested together).
 
-A withdrawal locks `recipient amount + maximum miner fee + service fee` in a
-native token subaccount. Only the requester can cancel, and only before batch
-commitment. Inputs are reserved atomically when a deterministic batch is made.
-Once committed, withdrawals cannot be cancelled or refunded on a timeout.
-
-After confirmed payment, input rows become spent and confirmed change becomes a
-new available UTXO. The recipient amount and actual miner fee are burned. Unused
-network allowance is credited back, and the service fee is transferred as an
-existing backed token. This preserves:
-
-```
-tracked reserve = bridge-issued liability
-native withdrawal subaccount = sum of locked request allowances
-native token current supply <= bridge-issued liability
-```
-
-The supply inequality permits voluntary user burns. Mint administration remains
-owned by the bridge contract because new proven deposits must remain issuable.
-The token is unrecallable. The current exchange's immutable-admin requirement
-therefore admits it for **spot trading**, while excluding it from margin/lending.
-It is a separate token from the exchange demo's pre-issued mock BTC.
+What stays today, however old: every processed custody output including spent
+ones (`UtxoTable`), the record of every authorized bridge transaction
+(`TxTable`), completed batches with their revisions and signatures, paid
+requests, scripts and addresses, custody keys and the counters. Unspent
+outputs always stay: they are the reserve. Retiring a finished batch as a unit
+once its completion is 576 blocks deep (spent inputs, transaction records,
+revisions, signatures, paid requests) is designed on the issue and not
+implemented.
 
 ## Batches and fee replacements
 
@@ -436,11 +419,9 @@ announcement period. Deposit fees are capped at 1%; the publisher's share cannot
 exceed the collected fee. The snapshot exposes effective and announced terms.
 Each deposit stores its actual terms, credit, publisher, fee, and reward.
 
-Tables 11 and 12 add fee policy and deposit history without changing existing
-record layouts. `indexDeps(after, limit)` is a bounded, permissionless migration
-from permanent deposit UTXOs to earlier history. It never mints, moves tokens, or
-pays a reward. Earlier rows are explicitly marked legacy with zero deposit fees
-and unknown publisher/time. Already indexed records are unchanged.
+Table 11 holds the deposit fee policy. Table 12 (deposit receipts) is no longer
+written: a receipt is the `depositCredited` event, and rows written earlier
+are retired passively.
 
 Public JSON endpoints (GET, no authentication):
 
@@ -450,8 +431,8 @@ Public JSON endpoints (GET, no authentication):
 - `/explorer/addresses?limit=25&cursor=...&owner=alice`: ascending directory.
 - `/explorer/utxos?limit=25&cursor=...&status=all`: statuses 0 available,
   1 reserved, 2 spent. Outpoints, owner/address binding, and deposit receipt.
-- `/explorer/deposits?limit=25&cursor=...&owner=alice`: descending confirmed
-  deposit history. `/explorer/deposit?outpoint=TXID-VOUT_HEX` reads one receipt;
+- `/explorer/deposits?limit=25&cursor=...&owner=alice`: deposit receipts from
+  the event log (prunable per node), newest first. `/explorer/deposit?outpoint=TXID-VOUT_HEX` reads one receipt;
   VOUT_HEX is eight hexadecimal digits.
 - `/explorer/retired?limit=25&cursor=...&owner=alice`: cancelled requests, from
   the event log (prunable per node), newest first.
