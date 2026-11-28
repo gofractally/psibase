@@ -257,7 +257,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Transact VerifyBr1 VerifyK1 VerifyR1 XAdmin XBasic XDb XHttp XKeys XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XPackages XPeers XProxy XSignup XUsage XSocketListService WSEcho XDelay ServerId)
+        XPackages XPeers XProxy XSignup XUsage XIpfs XSocketListService WSEcho XDelay ServerId)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -1448,6 +1448,20 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/XIpfs.psi
+    NAME XIpfs
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "The node's store for public files, addressed by IPFS content id"
+    LOCAL
+    SERVICE x-ipfs
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XIpfs.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XIpfs-schema.json
+        SERVER x-ipfs
+    PACKAGE_DEPENDS XHttp XAdmin
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/XSignup.psi
     NAME XSignup
     VERSION ${PSIBASE_VERSION}.0
@@ -1588,7 +1602,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
     LOCAL
-    PACKAGE_DEPENDS XHttp XAdmin XDb XKeys XPackages XPeers XRun XSignup XSites XTimer XTransact XUsage
+    PACKAGE_DEPENDS XHttp XAdmin XDb XIpfs XKeys XPackages XPeers XRun XSignup XSites XTimer XTransact XUsage
 )
 
 function(write_package_index target dir reserve)
@@ -1618,7 +1632,7 @@ write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthNone AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG PrivDefault
     Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Favor Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VerifyBr1 VerifyK1 VerifyR1 VirtualServer WebCrypto Workshop WsAuth Config
-    XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSignup XSites XTimer XTransact XUsage)
+    XAdmin XBasic XCommonApi XDb XDefault XHttp XIpfs XKeys XPackages XPeers XProxy XRun XSignup XSites XTimer XTransact XUsage)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1709,6 +1723,7 @@ install(
           ${SERVICE_DIR}/XDb.psi
           ${SERVICE_DIR}/XDefault.psi
           ${SERVICE_DIR}/XHttp.psi
+          ${SERVICE_DIR}/XIpfs.psi
           ${SERVICE_DIR}/XKeys.psi
           ${SERVICE_DIR}/XPackages.psi
           ${SERVICE_DIR}/XPeers.psi

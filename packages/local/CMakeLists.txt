@@ -29,6 +29,7 @@ target_mapped_include_directories(services_local INTERFACE
     XBasic/include
     XDb/include
     XHttp/include
+    XIpfs/include
     XKeys/include
     XPackages/include
     XPeers/include
@@ -46,6 +47,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(XBasic)
     add_subdirectory(XDb)
     add_subdirectory(XHttp)
+    add_subdirectory(XIpfs)
     add_subdirectory(XKeys)
     add_subdirectory(XPackages)
     add_subdirectory(XPeers)
