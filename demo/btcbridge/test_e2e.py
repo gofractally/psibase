@@ -237,12 +237,23 @@ class BridgeTests(unittest.TestCase):
   self.withdraw('carol',10000)
   self.assertGreater(call('alice','btcbridge','makeBatch'),0)
   self.assertEqual(status('liquidity',big),1)
- def test_11_reporting_window_state_is_kept_and_nothing_closes_without_proof_of_life(self):
-  # 72 hours and 1,000 deposits cannot be produced here; the rule is tested in the core library.
-  # What can be seen: the counter follows deposits, marks stay bounded, and nothing has closed.
-  before=snapshot()['window'];address=call('bob','btcbridge','newAddress');txid=rpc('sendtoaddress',address['address'],0.01,wallet='faucet');mine(7);relay_headers();prove_deposit(txid)
-  after=snapshot()['window']
-  self.assertEqual(after['deposits'],before['deposits']+1);self.assertEqual(after['frontier'],0);self.assertLessEqual(after['marks'],512)
+ def test_11_deposit_must_be_reported_before_the_relay_passes_its_block_plus_x(self):
+  # Only the bridge's own account sets the window; 288 blocks is the shortest allowed.
+  self.unchanged_failure(lambda:call('alice','btcbridge','setReportBlocks',report_blocks=288))
+  self.unchanged_failure(lambda:call('btcbridge','btcbridge','setReportBlocks',report_blocks=287))
+  call('btcbridge','btcbridge','setReportBlocks',report_blocks=288);self.assertEqual(snapshot()['policy']['report_blocks'],288)
+  address=call('bob','btcbridge','newAddress');late=rpc('sendtoaddress',address['address'],0.01,wallet='faucet');mine(1)
+  timely=rpc('sendtoaddress',address['address'],0.01,wallet='faucet');mine(1);mine(287);relay_headers()
+  vout=lambda p:next(v['n'] for v in rpc('decoderawtransaction',p['raw'])['vout'] if v['scriptPubKey'].get('address')==address['address'])
+  # The relay's tip is exactly 288 above the first payment's block: closed. The second is 287 deep: open.
+  p=proof(late)
+  with self.assertRaisesRegex(ValueError,'reporting window of this deposit'):call('alice','btcbridge','deposit',**p,vout=vout(p))
+  p=proof(timely);before=snapshot()['config']['reserve'];call('alice','btcbridge','deposit',**p,vout=vout(p))
+  self.assertEqual(snapshot()['config']['reserve']-before,1000000)
+  self.assertEqual(snapshot()['window']['frontier'],rpc('getblockcount')-288)
+  # Lengthening the window afterwards reopens nothing.
+  call('btcbridge','btcbridge','setReportBlocks',report_blocks=1000);p=proof(late)
+  with self.assertRaisesRegex(ValueError,'reporting window of this deposit'):call('alice','btcbridge','deposit',**p,vout=vout(p))
  def test_99_deep_reorg_freezes_accepted_state(self):
   protected=snapshot()['relay']['protected_height'];old_height=rpc('getblockcount');rpc('invalidateblock',rpc('getblockhash',protected));mine(old_height-protected+2)
   relay_headers();self.assertTrue(snapshot()['relay']['paused'])

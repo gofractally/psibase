@@ -30,6 +30,7 @@ fn fixture() -> (Policy, Vec<Xpriv>, Vec<Input>, Vec<Payment>) {
         batch_seconds: 300,
         batch_size: 2,
         max_inputs: 64,
+        report_blocks: 1000,
     };
     let inputs = vec![
         Input {

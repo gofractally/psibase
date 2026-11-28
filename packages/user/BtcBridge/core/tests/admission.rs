@@ -23,6 +23,7 @@ fn live() -> Policy {
         batch_seconds: 300,
         batch_size: 2,
         max_inputs: 64,
+        report_blocks: 1000,
     }
 }
 fn input(n: u8, value: u64) -> Input {

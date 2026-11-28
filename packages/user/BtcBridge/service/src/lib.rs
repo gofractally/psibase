@@ -171,49 +171,20 @@ fn emit_deposit(d: &Deposit) {
         d.legacy,
     );
 }
-/// The reporting window, maintained passively by the actions that need a live relay: the closed
-/// frontier advances when the oldest mark has had its 72 hours and its 1,000 deposits, and a new
-/// mark is taken when the relay's tip has moved on. Bounded: at most two marks are examined.
-fn window_step() -> Window {
-    let relay = btcrelay::Wrapper::call().getState();
-    let mut w = WindowTable::read()
+/// The reporting window's closed frontier under the relay's canonical tip as this action sees
+/// it. Stored, and only ever raised, so closing is final.
+fn closed_frontier(p: &btc::Policy) -> u32 {
+    let tip = btcrelay::Wrapper::call().getState().height;
+    let stored = WindowTable::read()
         .get_index_pk()
         .get(&())
-        .unwrap_or_default();
-    let oldest: Vec<_> = MarkTable::read().get_index_pk().iter().take(2).collect();
-    for row in oldest {
-        let mark = btc::Mark {
-            height: row.height,
-            time: row.time,
-            deposits: row.deposits,
-        };
-        w.frontier = btc::closed_frontier(
-            w.frontier,
-            &mark,
-            relay.required,
-            relay.height,
-            now(),
-            w.deposits,
-        );
-        if w.frontier < btc::mark_covers(&mark, relay.required) {
-            break;
-        }
-        MarkTable::read_write().remove(&row);
-        w.marks -= 1;
+        .unwrap_or_default()
+        .frontier;
+    let frontier = btc::advance_frontier(stored, tip, p.report_blocks);
+    if frontier != stored {
+        WindowTable::read_write().put(&Window { frontier }).unwrap();
     }
-    if btc::mark_due(w.last_mark, w.marks, relay.height) {
-        MarkTable::read_write()
-            .put(&MarkRow {
-                height: relay.height,
-                time: now(),
-                deposits: w.deposits,
-            })
-            .unwrap();
-        w.last_mark = Some(relay.height);
-        w.marks += 1;
-    }
-    WindowTable::read_write().put(&w).unwrap();
-    w
+    frontier
 }
 /// At most this many rows are retired by one ordinary action.
 const TIDY_ROWS: usize = 4;
@@ -413,6 +384,16 @@ pub mod service {
         c.policy = serde_json::to_string(&p).unwrap();
         ConfigTable::read_write().put(&c).unwrap();
     }
+    /// The bridge's own account sets the reporting window, in Bitcoin blocks (288 to 52,560).
+    /// On mainnet it can be lengthened, never shortened. A block already closed stays closed.
+    #[action]
+    fn setReportBlocks(report_blocks: u32) {
+        assert_eq!(get_sender(), Wrapper::SERVICE, "Bridge policy authority");
+        let mut c = config();
+        let p = must(btc::with_report_blocks(&policy(&c), report_blocks));
+        c.policy = serde_json::to_string(&p).unwrap();
+        ConfigTable::read_write().put(&c).unwrap();
+    }
     /// Administration changes are announced a day before becoming effective.
     #[action]
     fn setDepFees(fee_bps: u16, publisher_bps: u16) {
@@ -446,14 +427,13 @@ pub mod service {
     fn deposit(raw: String, block: String, siblings: Vec<String>, position: u32, vout: u32) {
         let mut c = live();
         tidy();
-        let mut window = window_step();
         let p = policy(&c);
         let (tx, h) = proof(&raw, &block, &siblings, position);
-        // A deposit is reported while its block's window is open. Guard records may be retired
-        // only for closed blocks, by this same predicate, so a late report never finds its
-        // record gone.
+        // A deposit is reported before the relay's tip reaches its block plus the policy's
+        // `report_blocks`. A guard record is retired by the same frontier, a margin later, so a
+        // late report never finds its record gone.
         assert!(
-            btc::window_open(window.frontier, h.height),
+            btc::window_open(closed_frontier(&p), h.height),
             "The reporting window of this deposit's block has closed"
         );
         let txid = tx.compute_txid().to_string();
@@ -552,8 +532,6 @@ pub mod service {
                 credited_at: now(),
                 legacy: false,
         });
-        window.deposits += 1;
-        WindowTable::read_write().put(&window).unwrap();
         btcrelay::Wrapper::call().protect(block);
         save(&c);
     }
@@ -561,7 +539,6 @@ pub mod service {
     fn withdraw(address: String, amount: u64, max_fee: u64) -> u64 {
         let mut c = live();
         tidy();
-        window_step();
         let p = policy(&c);
         let owner = get_sender();
         assert!(
@@ -699,7 +676,6 @@ pub mod service {
     fn makeBatch() -> u32 {
         let mut c = live();
         tidy();
-        window_step();
         let p = policy(&c);
         assert!(
             BatchTable::read()
@@ -970,7 +946,6 @@ pub mod service {
     fn complete(raw: String, block: String, siblings: Vec<String>, position: u32) {
         let mut c = live();
         tidy();
-        window_step();
         let (tx, h) = proof(&raw, &block, &siblings, position);
         let txid = tx.compute_txid().to_string();
         let reference = TxTable::read()

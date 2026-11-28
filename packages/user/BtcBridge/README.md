@@ -228,45 +228,45 @@ requests), `/explorer/deposits` and `/explorer/deposit` (receipts). A node may
 prune its events; the page then shows less, or says the node does not serve
 that history. Nothing objective depends on it.
 
-### The reporting window: 72 hours and 1,000 deposits
+### The reporting window: X Bitcoin blocks
 
-A deposit is credited when it is reported (`deposit`, with its proof). The
-reporting window of a Bitcoin block closes only when **both** hold: 72 hours
-have passed since deposits in it became reportable, **and** 1,000 deposits have
-been reported since. After that a proof for that block is refused and there is
-no recovery. The time is the chance to report by hand if automatic reporting
-fails; the count is proof that reporting is alive.
+A deposit is credited when it is reported (`deposit`, with its proof). A
+deposit in Bitcoin block `h` must be reported before the relay's canonical tip
+reaches `h + X`, where `X` is the policy's `report_blocks` (default 1,000,
+about a week). After that the report is refused and there is no recovery. The
+relay's accepted blocks are both the clock and the proof of life: if the relay
+stops, no window closes.
 
 What can go wrong is a late report, not a late payment: a payment to an old
-address confirms in a new block and has that block's whole window.
+address confirms in a new block and has that block's whole window. Reporting is
+normally automatic (the relayer and any open page do it; the first reporter
+earns part of the fee).
 
-- **The 72 hours are chain time from when the bridge saw the relay's tip reach
-  the block**, not Bitcoin time and not depth: header timestamps are chosen by
-  miners, and a relay that was down accepts old headers late. No miner or
-  relayer can shorten it. The bridge notes the relay's progress in *marks*
-  (tip height, chain time, deposits so far), at most one per six blocks and
-  512 in all, taken inside its ordinary actions; a block's clock starts at the
-  first mark that covers it, which is the true moment or later.
-- **The count** is one bridge-wide counter; each mark carries its value.
-- **One predicate.** A stored frontier height that only rises:
-  `window_open(block) = height > frontier` (core library). `deposit` asks it,
-  and retirement of a guard record asks the same. The frontier advances when
-  the oldest mark has had its 72 hours and its 1,000 deposits, and never comes
-  within 144 blocks of the relay's tip: the relay follows no reorganization
-  deeper than 128, so nothing at or below the frontier can change. Closing is
-  final.
-- **A quiet chain closes nothing.** With fewer than 1,000 deposits after a
-  block its window stays open and nothing guarding it is retired.
+- **One measure.** The bridge stores a closed frontier `F` that only rises;
+  each `deposit` first sets `F = max(F, tip - X)` from the canonical tip it
+  sees. `window_open(h) = h > F` (core library): open at `tip = h + X - 1`,
+  closed at `tip = h + X`. A guard record may be retired only when
+  `h + 144 <= F`, that is once a tip of `h + X + 144` has been seen; 144
+  exceeds the relay's 128-block reorganization bound. There is no height at
+  which a proof is acceptable and its record gone.
+- **Closing is final.** Because the frontier is stored, a tip that falls back
+  in a reorganization and a later lengthening of `X` reopen nothing.
+- **`X`** is between 288 (the relay's largest confirmation depth plus the
+  margin) and 52,560. `setReportBlocks(blocks)`, the bridge's own account
+  only: any value in bounds on a test network; on mainnet it can be lengthened,
+  never shortened.
+- **Stored policies are unchanged.** A policy stored before the field existed
+  reads as 1,000, and the default is not written, so the stored JSON and the
+  policy id that batches carry are byte for byte what they were.
 
-The state is two small tables (`WindowTable`, one row; `MarkTable`, at most 512
-rows, deleted as they close). No other row changed.
+The state is one row with one number (`WindowTable`). No other row changed.
 
 What stays today, however old: every processed custody output including spent
 ones (`UtxoTable`), the record of every authorized bridge transaction
 (`TxTable`), completed batches with their revisions and signatures, paid
 requests, scripts and addresses, custody keys and the counters. Unspent
 outputs always stay: they are the reserve. Retiring a finished batch as a unit
-once its completion block is at or below the frontier (spent inputs,
+once its completion block is 144 or more below the frontier (spent inputs,
 transaction records, revisions, signatures, paid requests) is designed on the
 issue and not implemented.
 

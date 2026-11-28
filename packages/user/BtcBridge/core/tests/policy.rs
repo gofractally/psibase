@@ -22,6 +22,7 @@ fn policy(network: &str, kind: Network) -> Policy {
         batch_seconds: 300,
         batch_size: 2,
         max_inputs: 64,
+        report_blocks: 1000,
     }
 }
 fn signet() -> Policy {

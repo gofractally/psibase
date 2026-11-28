@@ -192,63 +192,40 @@ pub fn validate_next_header(
     Ok(h)
 }
 
-/// The reporting window. A deposit must be reported while its block's window is open. A window
-/// closes only when BOTH hold: this much chain time has passed since deposits in the block
-/// became reportable, AND this many deposits have been reported since. The time is the chance to
-/// report by hand if automatic reporting fails; the count is proof that reporting is alive.
-pub const WINDOW_SECONDS: u64 = 72 * 3600;
-pub const WINDOW_DEPOSITS: u64 = 1000;
-/// Nothing within this many blocks of the relay's tip is ever closed. The relay follows no
-/// reorganization deeper than 128 blocks (it pauses for good), so its tip height can fall by at
-/// most that, and nothing at or below a closed height can be reorganized.
+/// The reporting window, in Bitcoin blocks. A deposit in block `h` must be reported before the
+/// relay's canonical tip reaches `h + report_blocks`. The relay's accepted blocks are both the
+/// clock and the proof of life: if the relay stops, no window closes.
+pub const DEFAULT_REPORT_BLOCKS: u32 = 1000;
+/// A guard record is retired only this many blocks after its window closed. The relay follows
+/// no reorganization deeper than 128 blocks (it pauses for good), so its tip height can fall by
+/// at most that, and nothing retired can still be reorganized.
 pub const REORG_MARGIN: u32 = 144;
-/// The bridge notes the relay's progress at most once per this many blocks, and keeps at most
-/// `MAX_MARKS` notes; when full, none is added until old ones close (uncovered blocks stay open).
-pub const MARK_SPACING: u32 = 6;
-pub const MAX_MARKS: u32 = 512;
-/// What the bridge saw: at chain time `time` the relay's canonical tip was at `height`, and
-/// `deposits` deposits had been credited so far. Every block at or below `height - required + 1`
-/// was reportable no later than `time`. The clock of a block starts at the first mark covering
-/// it: the same moment as the truth or later, so imprecision only lengthens a window.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Mark {
-    pub height: u32,
-    pub time: u64,
-    pub deposits: u64,
+/// The window is never shorter than the relay's largest confirmation depth (144) plus the margin.
+pub const MIN_REPORT_BLOCKS: u32 = 144 + REORG_MARGIN;
+pub const MAX_REPORT_BLOCKS: u32 = 52_560;
+/// The closed frontier under the relay's canonical tip: every block at or below it has a closed
+/// window. It is stored and only rises, so that closing is final whatever happens to the tip
+/// (a reorganization) or to `report_blocks` (lengthened later).
+pub fn advance_frontier(frontier: u32, tip: u32, report_blocks: u32) -> u32 {
+    frontier.max(tip.saturating_sub(report_blocks))
 }
-/// The highest block a mark covers under the relay's confirmation depth.
-pub fn mark_covers(mark: &Mark, required: u32) -> u32 {
-    mark.height.saturating_sub(required.saturating_sub(1))
-}
-/// Whether the windows a mark started have closed: the time has passed and the deposits have
-/// been reported, whichever comes later.
-pub fn mark_closed(mark: &Mark, now: u64, deposits: u64) -> bool {
-    now >= mark.time.saturating_add(WINDOW_SECONDS)
-        && deposits >= mark.deposits.saturating_add(WINDOW_DEPOSITS)
-}
-/// The closed frontier after looking at the oldest mark: every block at or below it has a closed
-/// window, for good. It never falls, and it never comes within `REORG_MARGIN` of the tip.
-pub fn closed_frontier(
-    frontier: u32,
-    oldest: &Mark,
-    required: u32,
-    tip: u32,
-    now: u64,
-    deposits: u64,
-) -> u32 {
-    if !mark_closed(oldest, now, deposits) {
-        return frontier;
-    }
-    frontier.max(mark_covers(oldest, required).min(tip.saturating_sub(REORG_MARGIN)))
-}
-/// THE predicate, for admitting a deposit proof and for retiring a guard record alike: a block's
-/// window is open while its height is above the closed frontier.
+/// THE predicate for admitting a deposit proof: its block is above the closed frontier, which is
+/// `tip < height + report_blocks` for the highest tip the bridge has acted under.
 pub fn window_open(frontier: u32, height: u32) -> bool {
     height > frontier
 }
-/// Whether the relay's progress is worth a new mark.
-pub fn mark_due(last_mark: Option<u32>, marks: u32, tip: u32) -> bool {
-    marks < MAX_MARKS && last_mark.is_none_or(|last| tip >= last.saturating_add(MARK_SPACING))
+/// The same measure for retiring the record that guards a block: its window closed, and the
+/// margin beyond. There is no height at which a proof is acceptable and its record gone.
+pub fn guard_retirable(frontier: u32, height: u32) -> bool {
+    height
+        .checked_add(REORG_MARGIN)
+        .is_some_and(|limit| limit <= frontier)
+}
+fn default_report_blocks() -> u32 {
+    DEFAULT_REPORT_BLOCKS
+}
+fn is_default_report_blocks(blocks: &u32) -> bool {
+    *blocks == DEFAULT_REPORT_BLOCKS
 }
 /// The smallest payment a batch may carry, whatever the policy: above every standard script's
 /// dust threshold. A policy's `min_withdrawal` (the admission rule for new requests) is at least this.
@@ -274,6 +251,11 @@ pub struct Policy {
     pub batch_seconds: u32,
     pub batch_size: u32,
     pub max_inputs: u32,
+    /// The reporting window in Bitcoin blocks. A policy stored before this existed reads as the
+    /// default, and the default is not written: the stored JSON, and so the policy id that
+    /// batches carry, are byte for byte what they were.
+    #[serde(default = "default_report_blocks", skip_serializing_if = "is_default_report_blocks")]
+    pub report_blocks: u32,
 }
 impl Policy {
     pub fn validate(&self) -> Result<()> {
@@ -291,6 +273,7 @@ impl Policy {
             || self.max_inputs == 0
             || self.max_inputs > 64
             || !(1..=3600).contains(&self.batch_seconds)
+            || !(MIN_REPORT_BLOCKS..=MAX_REPORT_BLOCKS).contains(&self.report_blocks)
         {
             return Err("Unsafe bridge policy limits".into());
         }
@@ -336,6 +319,20 @@ pub fn with_test_minimums(current: &Policy, min_deposit: u64, min_withdrawal: u6
     if new.min_deposit < input_cost(new.fee_rate) {
         return Err("Minimum deposit does not cover the cost of spending it".into());
     }
+    Ok(new)
+}
+/// `setReportBlocks`: the policy with another reporting window. Within bounds everywhere; on
+/// mainnet it may be lengthened, never shortened. (Lengthening never reopens a closed block:
+/// the frontier is stored and only rises.)
+pub fn with_report_blocks(current: &Policy, report_blocks: u32) -> Result<Policy> {
+    if network(&current.network)? == Network::Bitcoin && report_blocks < current.report_blocks {
+        return Err("The reporting window cannot be shortened on mainnet".into());
+    }
+    let new = Policy {
+        report_blocks,
+        ..current.clone()
+    };
+    new.validate()?;
     Ok(new)
 }
 /// Weight units of a batch transaction as `build_plan` budgets it: `inputs` custody inputs,
