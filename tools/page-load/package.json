@@ -1,0 +1,9 @@
+{
+  "name": "psibase-page-load",
+  "private": true,
+  "type": "module",
+  "description": "Page-load baseline for gofractally/psibase#2315",
+  "dependencies": {
+    "playwright-core": "1.65.1"
+  }
+}
