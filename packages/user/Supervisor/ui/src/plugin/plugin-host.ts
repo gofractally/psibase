@@ -40,6 +40,68 @@ enum storageDuration {
 // This host interface is given to each serviceContext, but each is given a host interface
 //   that injects the service's identity into calls back to the supervisor. Therefore, caller
 //   identity is automatically managed and plugins may not self-report their identity.
+// The same question asked again within a moment gets the same answer.
+//
+// Chain state changes at most once per block, so an answer is good for about
+// a second by itself; and plugins ask the same thing over and over: a page
+// that makes fifteen plugin calls looks up the current account's record
+// fifteen times, one round trip each, one after another. Queries (GET, and
+// POST to a /graphql endpoint, which has no mutations here) are remembered
+// for a short time, per exact request including who is asking.
+//
+// Whatever this supervisor sends that is not a query (a transaction, a
+// login) empties the memory and pauses it, so that a page that acts and then
+// asks again is never shown what it saw before it acted.
+const ANSWER_GOOD_FOR_MS = 2000;
+const PAUSE_AFTER_WRITE_MS = 3000;
+
+const answers = new Map<string, { at: number; response: HttpResponse }>();
+let pausedUntil = 0;
+
+const queryCacheKey = (req: HttpRequest, uri: string): string | undefined => {
+    const method = req.method.toString().toUpperCase();
+    let path: string;
+    try {
+        path = new URL(uri).pathname;
+    } catch {
+        return undefined;
+    }
+    const isQuery =
+        method === "GET" || (method === "POST" && path.endsWith("/graphql"));
+    if (!isQuery) return undefined;
+    const body =
+        req.body && typeof req.body.val === "string" ? req.body.val : req.body ? undefined : "";
+    if (body === undefined) return undefined; // a binary body: not a query we know
+    const auth =
+        req.headers.find((h) => h.key.toLowerCase() === "authorization")?.value ??
+        guestBearerFor(req.uri) ??
+        "";
+    return [method, uri, auth, body].join("\n");
+};
+
+const recentAnswer = (key: string): HttpResponse | undefined => {
+    const now = Date.now();
+    if (now < pausedUntil) return undefined;
+    const kept = answers.get(key);
+    if (!kept) return undefined;
+    if (now - kept.at > ANSWER_GOOD_FOR_MS) {
+        answers.delete(key);
+        return undefined;
+    }
+    return { ...kept.response, headers: [...kept.response.headers] };
+};
+
+const keepAnswer = (key: string, response: HttpResponse) => {
+    if (Date.now() < pausedUntil) return;
+    if (answers.size > 200) answers.clear();
+    answers.set(key, { at: Date.now(), response });
+};
+
+const forgetAnswers = () => {
+    answers.clear();
+    pausedUntil = Date.now() + PAUSE_AFTER_WRITE_MS;
+};
+
 export class PluginHost implements HostInterface {
     private supervisor: Supervisor;
 
@@ -116,6 +178,23 @@ export class PluginHost implements HostInterface {
     // It is a typescript-ified version of the wasip2 browser http shim
     //    from BytecodeAlliance's JCO project.
     private sendRequest(
+        req: HttpRequest,
+        withCredentials: boolean = false,
+    ): HttpResponse {
+        const cacheKey = queryCacheKey(req, this.rewriteUriHook(req.uri));
+        if (cacheKey) {
+            const kept = recentAnswer(cacheKey);
+            if (kept) return kept;
+        } else {
+            // Anything that is not a query may change what queries answer.
+            forgetAnswers();
+        }
+        const response = this.sendRequestNow(req, withCredentials);
+        if (cacheKey && response.status === 200) keepAnswer(cacheKey, response);
+        return response;
+    }
+
+    private sendRequestNow(
         req: HttpRequest,
         withCredentials: boolean = false,
     ): HttpResponse {

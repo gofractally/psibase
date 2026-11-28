@@ -1,4 +1,3 @@
-import { generate } from "@bytecodealliance/jco/component";
 import * as cliNs from "@bytecodealliance/preview2-shim/cli";
 import * as clocksNs from "@bytecodealliance/preview2-shim/clocks";
 import * as filesystemNs from "@bytecodealliance/preview2-shim/filesystem";
@@ -7,10 +6,13 @@ import * as randomNs from "@bytecodealliance/preview2-shim/random";
 
 import { kebabToCamel, kebabToPascal } from "../case.js";
 import { HostInterface } from "../host-interface.js";
+import { dropPrepared, getPrepared, putPrepared } from "../plugin/prepared-cache.js";
 import { assert } from "../utils.js";
 import { ComponentAPI, Functions, Interface } from "../wit-extraction.js";
 
-type GenerateOptions = Parameters<typeof generate>[1];
+type GenerateOptions = Parameters<
+    typeof import("@bytecodealliance/jco/component").generate
+>[1];
 
 type PluginImports = Record<string, Record<string, unknown>>;
 
@@ -227,7 +229,20 @@ async function compileWasmComponent(
     wasmBytes: Uint8Array,
     imports: PluginImports,
     debugFileName: string,
+    preparedKey?: string,
 ): Promise<CompiledPlugin> {
+    // The translation of these exact bytes may be on the device already.
+    const kept = preparedKey ? await getPrepared(preparedKey) : undefined;
+    if (preparedKey && kept?.js && kept.wasm) {
+        try {
+            return await loadTranslated(kept.js, kept.wasm, imports, debugFileName);
+        } catch (e) {
+            // An entry that cannot be used is dropped and made again.
+            console.warn(`Discarding the kept translation of ${debugFileName}`, e);
+            await dropPrepared(preparedKey);
+        }
+    }
+
     const name = "component";
     const opts: GenerateOptions = {
         name,
@@ -240,6 +255,9 @@ async function compileWasmComponent(
         tracing: false,
     };
 
+    // The translator is megabytes of wasm; it is only fetched when a
+    // plugin actually has to be translated.
+    const { generate } = await import("@bytecodealliance/jco/component");
     const { files: transpiledFiles } = await generate(wasmBytes, opts);
 
     const coreWasmFiles: Array<[string, Uint8Array]> = [];
@@ -254,6 +272,20 @@ async function compileWasmComponent(
     }
 
     assert(jsSource !== null, "jco generate produced no JS file");
+    const compiled = await loadTranslated(jsSource, coreWasmFiles, imports, debugFileName);
+    if (preparedKey) {
+        void putPrepared(preparedKey, { js: jsSource, wasm: coreWasmFiles });
+    }
+    return compiled;
+}
+
+// Loads a translated component: its core modules and its JavaScript glue.
+async function loadTranslated(
+    jsSource: string,
+    coreWasmFiles: Array<[string, Uint8Array]>,
+    imports: PluginImports,
+    debugFileName: string,
+): Promise<CompiledPlugin> {
 
     // If a future jco version (or some adversarial input) ever caused it to emit a
     //   static `import`/`export ... from`, the browser would silently fetch it.
@@ -344,6 +376,7 @@ export async function compilePlugin(
     pluginHost: HostInterface,
     api: ComponentAPI,
     services: ServiceMap | null,
+    preparedKey?: string,
 ): Promise<CompiledPlugin> {
     const imports: PluginImports = {
         ...getWasiImports(),
@@ -356,7 +389,12 @@ export async function compilePlugin(
         api.importedFuncs,
         imports,
     );
-    return compileWasmComponent(wasmBytes, imports, `${service}.plugin.js`);
+    return compileWasmComponent(
+        wasmBytes,
+        imports,
+        `${service}.plugin.js`,
+        preparedKey,
+    );
 }
 
 // Loads a utility WASM component (not a plugin) with only WASI imports.

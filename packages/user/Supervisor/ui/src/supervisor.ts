@@ -91,7 +91,6 @@ export class Supervisor implements AppInterface {
 
     private inPreload = false;
 
-    parser: Promise<any>;
 
     parentOrigination: OriginationData | undefined;
 
@@ -280,7 +279,9 @@ export class Supervisor implements AppInterface {
 
     constructor() {
         this.plugins = new Plugins(this);
-        this.parser = parser();
+        // The parser is no longer loaded here: it and the translator are
+        // fetched only when a plugin turns up that this device has not
+        // prepared before (plugin/prepared-cache.ts).
         this.loader = new PluginLoader(this.plugins);
 
         // Without this, in some browsers (e.g. chromium), stale supervisor iframes persist

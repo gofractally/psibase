@@ -15,6 +15,7 @@ import {
 import { DownloadFailed } from "../errors";
 import { HostInterface } from "../host-interface";
 import { parser, wasmFromUrl } from "../utils";
+import { getPrepared, preparedKey, putPrepared } from "./prepared-cache";
 import { pluginUrl, takeBytes } from "./prefetch";
 import { ComponentAPI } from "../wit-extraction";
 import { InvalidCall, PluginDownloadFailed, PluginInvalid } from "./errors";
@@ -23,6 +24,7 @@ export class Plugin {
     private host: HostInterface;
 
     private componentAPI: ComponentAPI | undefined;
+    private preparedKey: string | undefined;
 
     private bytes: Uint8Array | undefined;
 
@@ -76,6 +78,14 @@ export class Plugin {
 
     private async doParse(): Promise<ComponentAPI> {
         const bin = await this.fetched;
+        // What was worked out from these exact bytes before is on the
+        // device; the parser is only loaded for a plugin not seen before.
+        this.preparedKey = await preparedKey(bin);
+        const kept = await getPrepared(this.preparedKey);
+        if (kept?.api) {
+            this.componentAPI = kept.api;
+            return this.componentAPI;
+        }
         const p = await parser();
         try {
             this.componentAPI = p.parse("comp", bin) as ComponentAPI;
@@ -83,6 +93,7 @@ export class Plugin {
             console.error(`Error parsing plugin: ${pluginString(this.id)}`);
             throw e;
         }
+        void putPrepared(this.preparedKey, { api: this.componentAPI });
 
         return this.componentAPI;
     }
@@ -125,6 +136,7 @@ export class Plugin {
             this.host,
             api,
             services,
+            this.preparedKey,
         );
     }
 
