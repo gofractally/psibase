@@ -1,5 +1,5 @@
 import {Transaction} from '@scure/btc-signer';
-import {custodyAddress,fetchSignetBlock,SIGNET_BATCH,scriptLength,leastFeeShare,quoteAlone,mostPayableAlone} from './bitcoin';
+import {custodyAddress,fetchSignetBlock,SIGNET_BATCH,scriptLength,quoteAlone,admitWithdrawal,feeMargin,mostReceivable} from './bitcoin';
 import QRCode from 'qrcode';
 import {createExplorer} from './explorer';
 import {mountAccountMenu,refreshAccountMenu} from './account-menu';
@@ -71,26 +71,40 @@ async function loadRecipient(){const target=recipient;recipientProfile=null;el('
 // The account menu's own buttons are not the page's to disable.
 const pageButtons=()=>Array.from(document.querySelectorAll<HTMLButtonElement>('button')).filter(b=>!b.closest('#account-menu,[data-radix-popper-content-wrapper]'));
 async function run(label:string,fn:()=>Promise<void>){if(busy)return;busy=true;pageButtons().forEach(b=>b.disabled=true);try{await fn();message(label);await load();}catch(e){message((e as Error).message,true);}finally{busy=false;pageButtons().forEach(b=>b.disabled=false);controls();}}
-// The withdraw form's figures, all from the current policy and custody outputs in the snapshot.
+// The withdraw form. The user enters one number: what the recipient receives. The page adds the
+// network fee and the bridge fee and shows the total that leaves the balance. Every figure comes
+// from the current policy and custody outputs in the snapshot, by the service's own rules.
 function withdrawFields(){const f=el<HTMLFormElement>('withdraw-form').elements,get=(n:string)=>(f.namedItem(n) as HTMLInputElement);return{address:get('address'),amount:get('amount'),max_fee:get('max_fee')};}
 function tryAtoms(s:string):number|null{try{return atoms(s);}catch{return null;}}
-// What the Max button fills in: the most that can be withdrawn now, after the fees taken with it.
+type WithdrawalReview={amount:number|null,allowance:number,own:number|null,script:number,balance:number,most:number,admission:ReturnType<typeof admitWithdrawal>|null,refusal:string};
+/// What the form would send and whether the service would take it; `refusal` is empty if it would.
+function reviewWithdrawal():WithdrawalReview{
+ const p=state.policy,f=withdrawFields(),outputs=state.utxos||[],script=scriptLength(p.network,f.address.value),amount=tryAtoms(f.amount.value);
+ // The advanced field, if the user filled it in; otherwise the fee alone plus the margin.
+ const own=f.max_fee.value.trim()?tryAtoms(f.max_fee.value):null,balance=account&&state.wallet?state.wallet.balance+state.wallet.incoming:0;
+ const most=mostReceivable(p,outputs,script,balance,own);
+ if(amount===null)return{amount,allowance:own??0,own,script,balance,most,admission:null,refusal:''};
+ const alone=quoteAlone(p,outputs,script,amount),allowance=own??(alone?alone.fee+feeMargin(p):0),admission=admitWithdrawal(p,outputs,script,amount,allowance);
+ let refusal='';
+ if(amount<p.min_withdrawal)refusal=`The smallest withdrawal is ${fmt(p.min_withdrawal)} BTC.`;
+ else if(!admission.ok&&admission.reason==='amount')refusal=admission.most?`The bridge can pay at most ${fmt(admission.most)} BTC to this address now, with a network fee of ${fmt(admission.fee)} BTC: it pays the fee from its Bitcoin outputs and keeps ${fmt(p.dust)} BTC as change. Enter ${fmt(Math.min(admission.most,most||admission.most))} BTC or less, or wait for more deposits.`:'The bridge\'s confirmed Bitcoin outputs cannot pay a withdrawal now. Wait for more deposits.';
+ else if(!admission.ok)refusal=`The network fee for this withdrawal is ${fmt(admission.least)} BTC; the maximum network fee is below it. Raise it to at least ${fmt(admission.least)} BTC, or leave it empty.`;
+ else if(amount+allowance+p.service_fee>balance)refusal=`This withdrawal takes ${fmt(amount+allowance+p.service_fee)} BTC from your balance: ${fmt(amount)} to the recipient, up to ${fmt(allowance)} network fee and the ${fmt(p.service_fee)} bridge fee. You have ${fmt(balance)} BTC${most?`; the most the recipient can receive is ${fmt(most)} BTC`:''}.`;
+ return{amount,allowance,own,script,balance,most,admission,refusal};
+}
+// What the Max button fills in: the most the recipient can receive now.
 let withdrawMost=0;
 function renderWithdrawQuote(){
- if(!state?.policy)return;const p=state.policy,f=withdrawFields();
- // Until the user sets one: an allowance that covers a request paid alone from three custody outputs.
- if(!f.max_fee.value&&document.activeElement!==f.max_fee)f.max_fee.value=fmt(p.fee_rate*400);
- const script=scriptLength(p.network,f.address.value),amount=tryAtoms(f.amount.value),allowance=tryAtoms(f.max_fee.value)??0;
- const balance=account&&state.wallet?state.wallet.balance+state.wallet.incoming:0;
- const most=Math.max(0,Math.min(mostPayableAlone(p,state.utxos||[],script),balance-p.service_fee-allowance));
- const quote=amount===null?null:quoteAlone(p,state.utxos||[],script,amount);
- el('minimum-withdrawal').textContent=`${fmt(p.min_withdrawal)} BTC`;
- el('withdraw-receives').textContent=amount===null?'The amount you enter':`${fmt(amount)} BTC`;
- el('withdraw-network-fee').textContent=amount===null?`From ${fmt(leastFeeShare(p,script))} BTC, at ${p.fee_rate} sat/vB`:quote?`${fmt(quote.fee)} BTC alone, less when batched`:'Decided when the bridge\'s reserve can pay it';
- el('withdraw-set-aside').textContent=amount===null?'Amount + maximum network fee + bridge fee':`${fmt(amount+allowance+p.service_fee)} BTC`;
- withdrawMost=most;el<HTMLButtonElement>('withdraw-max').disabled=!account||most<p.min_withdrawal;
- el('withdraw-most').textContent=account?`${fmt(most)} BTC`:'Sign in to see';
- el('withdraw-wait').hidden=amount===null||!!quote;el('withdraw-wait').textContent=`The bridge's reserve can pay at most ${fmt(mostPayableAlone(p,state.utxos||[],script))} BTC in one withdrawal now. A larger request is accepted and waits for the bridge's reserve: it is paid when deposits arrive, and you can cancel it meanwhile.`;
+ if(!state?.policy)return;const p=state.policy,r=reviewWithdrawal(),fee=r.admission?.ok?r.admission.fee:null;
+ el('minimum-withdrawal').textContent=`${fmt(p.min_withdrawal)} BTC`;el('withdraw-margin').textContent=fmt(feeMargin(p));
+ withdrawFields().max_fee.placeholder=r.amount!==null&&r.own===null&&r.allowance?fmt(r.allowance):'Fee alone + margin';
+ el('withdraw-receives').textContent=r.amount===null?'The amount you enter':`${fmt(r.amount)} BTC`;
+ el('withdraw-network-fee').textContent=fee===null?`At ${p.fee_rate} sat/vB`:`${fmt(fee)} BTC now, less if batched with others`;
+ el('withdraw-total').textContent=r.amount===null||!r.allowance?'Amount + network fee + bridge fee':`${fmt(r.amount+r.allowance+p.service_fee)} BTC`;
+ el('withdraw-returned').textContent=fee===null?'The unused part of the network fee':`${fmt(r.allowance-fee)} BTC or more`;
+ withdrawMost=r.most;el<HTMLButtonElement>('withdraw-max').disabled=!account||!r.most;
+ el('withdraw-most').textContent=account?`${fmt(r.most)} BTC`:'Sign in to see';
+ el('withdraw-refusal').hidden=!r.refusal||!account;el('withdraw-refusal').textContent=r.refusal;
 }
 function derivedAddress(index:number):string{return custodyAddress(state.policy.network,state.policy.xpubs,0,index);}
 async function load(){const owner=account,sequence=++loadSequence,next=await request(`/snapshot${owner?'?owner='+encodeURIComponent(owner):''}`);if(owner!==account||sequence!==loadSequence)return;if(!next.config)throw Error('BTC Bridge has not been initialized.');state={...next,owner};render();if(depositCandidate&&!checkingDeposit&&Date.now()-depositCheckAt>10000){depositCheckAt=Date.now();const txid=depositCandidate.txid;void findDeposit(txid).then(d=>{if(depositCandidate?.txid===txid){depositCandidate=d;renderDepositReview();}}).catch(()=>{});}}
@@ -204,7 +218,7 @@ el<HTMLAnchorElement>('manage-contacts').href=siblingUrl(null,'homepage','/conta
 for(const tab of ['deposit','withdraw'])el(`${tab}-tab`).onclick=()=>{el('deposit-recovery').hidden=tab!=='deposit';for(const name of ['deposit','withdraw']){el(`${name}-panel`).hidden=name!==tab;el(`${name}-tab`).setAttribute('aria-selected',String(name===tab));}};
 el('new-address').onclick=newAddress;el('fresh-address').onclick=newAddress;el('copy-address').onclick=()=>{void navigator.clipboard.writeText(el<HTMLInputElement>('deposit-address').value).then(()=>message('Deposit address copied.'));};el('refresh').onclick=()=>{void load().then(()=>explorer.refresh(true)).catch(e=>message(e.message,true));};el('sync').onclick=()=>{void sync();};
 el('save-endpoint').onclick=()=>{try{const url=new URL(el<HTMLInputElement>('endpoint').value);if(url.protocol!=='https:'&&!(['127.0.0.1','localhost'].includes(url.hostname)&&location.hostname.endsWith('.localhost')&&state.policy.network==='regtest'))throw Error('Use HTTPS for remote Bitcoin sources.');endpoint=url.href.replace(/\/$/,'');localStorage.setItem(`btcbridge-endpoint-${state.policy.network}`,endpoint);message('Bitcoin source updated. All proofs remain verified by the contract.');}catch(e){message((e as Error).message,true);}};
-el('withdraw-form').onsubmit=e=>{e.preventDefault();const data=new FormData(e.currentTarget as HTMLFormElement);void run('Withdrawal queued. Funds are locked until payment or cancellation.',async()=>{const amount=atoms(String(data.get('amount'))),max_fee=atoms(String(data.get('max_fee'))),locked=amount+max_fee+state.policy.service_fee,actions:any[]=[];if(amount<state.policy.min_withdrawal)throw Error(`The smallest withdrawal is ${fmt(state.policy.min_withdrawal)} BTC.`);{const p=state.policy,script=scriptLength(p.network,String(data.get('address'))),least=leastFeeShare(p,script);if(max_fee<least)throw Error(`The maximum network fee must be at least ${fmt(least)} BTC, the least share of a batch fee at ${p.fee_rate} sat/vB.`);}if(locked>state.wallet.balance+state.wallet.incoming)throw Error(`This withdrawal sets aside ${fmt(locked)} BTC (the amount, the maximum network fee and the bridge fee of ${fmt(state.policy.service_fee)} BTC); you have ${fmt(state.wallet.balance+state.wallet.incoming)} BTC. Lower the amount or the maximum network fee.`);const claim=Math.max(0,Math.min(state.wallet.incoming,locked-state.wallet.balance));if(claim)actions.push(action(account,'tokens','debit',{token_id:state.config.token,creditor:'btcbridge',amount:{value:claim},memo:'Receive bridge BTC'}));actions.push(action(account,'tokens','credit',{token_id:state.config.token,debitor:'btcbridge',amount:{value:locked},memo:'Authorize Bitcoin withdrawal'}));actions.push(action(account,'btcbridge','withdraw',{address:String(data.get('address')).trim(),amount,max_fee}));await transact(actions);});};
+el('withdraw-form').onsubmit=e=>{e.preventDefault();const data=new FormData(e.currentTarget as HTMLFormElement);void run('Withdrawal queued. Funds are locked until payment or cancellation.',async()=>{atoms(String(data.get('amount')));const r=reviewWithdrawal();if(r.own===null&&withdrawFields().max_fee.value.trim())throw Error('Enter the maximum network fee in BTC, or leave it empty.');if(r.refusal)throw Error(r.refusal);const amount=r.amount!,max_fee=r.allowance,locked=amount+max_fee+state.policy.service_fee,actions:any[]=[];const claim=Math.max(0,Math.min(state.wallet.incoming,locked-state.wallet.balance));if(claim)actions.push(action(account,'tokens','debit',{token_id:state.config.token,creditor:'btcbridge',amount:{value:claim},memo:'Receive bridge BTC'}));actions.push(action(account,'tokens','credit',{token_id:state.config.token,debitor:'btcbridge',amount:{value:locked},memo:'Authorize Bitcoin withdrawal'}));actions.push(action(account,'btcbridge','withdraw',{address:String(data.get('address')).trim(),amount,max_fee}));await transact(actions);});};
 el('withdraw-form').addEventListener('input',renderWithdrawQuote);
 el('withdraw-max').onclick=()=>{renderWithdrawQuote();if(withdrawMost>0){withdrawFields().amount.value=fmt(withdrawMost);renderWithdrawQuote();}};
 el('recover-form').onsubmit=e=>{e.preventDefault();if(checkingDeposit)return;checkingDeposit=true;const data=new FormData(e.currentTarget as HTMLFormElement);el('deposit-review').textContent='Fetching Bitcoin transaction bytes, public address bindings, and confirmation data…';void findDeposit(String(data.get('txid')).trim()).then(d=>{depositCandidate=d;renderDepositReview();}).catch(error=>{depositCandidate=null;el('deposit-review').textContent=(error as Error).message;}).finally(()=>checkingDeposit=false);};

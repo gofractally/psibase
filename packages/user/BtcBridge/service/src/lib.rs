@@ -475,12 +475,18 @@ pub mod service {
             ScriptTable::read().get_index_pk().get(&script).is_none(),
             "Withdraw to an external Bitcoin address"
         );
-        // An allowance below the least this request could ever be charged would be accepted
-        // and then set aside at every batch until its owner cancelled it.
-        assert!(
-            max_fee >= btc::least_fee_share(&p, destination.len()),
-            "Maximum network fee is below the least share of a batch fee"
-        );
+        // Accepted only if a batch of this request alone, made now from the available confirmed
+        // outputs, would pay it within its fee allowance. Otherwise refused with the figure
+        // that works: the amount and all fees are settled before anything is set aside.
+        let candidates: Vec<_> = UtxoTable::read()
+            .get_index_by_status()
+            .range((0, 0, String::new())..=(0, u32::MAX, "z".into()))
+            .take(256)
+            .map(|u| u.input())
+            .collect();
+        if let Err(refusal) = must(btc::admit_withdrawal(&p, &candidates, &script, amount, max_fee)) {
+            abort_message(&refusal.to_string());
+        }
         let locked = plus(plus(amount, max_fee), p.service_fee);
         Tokens::call().debit(
             c.token,

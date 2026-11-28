@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {HDKey} from '@scure/bip32';
-import {scriptLength,budgetedVsize,leastFeeShare,quoteAlone,mostPayableAlone,assembleSignetBlock,coinbaseBranch,rootFromBranch,txid,fromHex,toHex,fetchSignetBlock,custodyAddress,networkParams} from '../src/bitcoin.ts';
+import {admitWithdrawal,feeMargin,mostReceivable,scriptLength,budgetedVsize,leastFeeShare,quoteAlone,mostPayableAlone,assembleSignetBlock,coinbaseBranch,rootFromBranch,txid,fromHex,toHex,fetchSignetBlock,custodyAddress,networkParams} from '../src/bitcoin.ts';
 
 const fixture=JSON.parse(readFileSync(new URL('../../core/tests/fixtures/signet-blocks-bip325.json',import.meta.url),'utf8'));
 const listed=JSON.parse(readFileSync(new URL('./fixtures/signet-332639-txids.json',import.meta.url),'utf8'));
@@ -113,4 +113,50 @@ test('withdrawal figures equal the core library\'s (core/tests/policy.rs)',()=>{
  assert.deepEqual(quoteAlone(policy,three,22,4000),{inputs:2,fee:590,change:1410});
  assert.deepEqual(quoteAlone(policy,three,22,4500),{inputs:3,fee:800,change:3700});
  assert.equal(mostPayableAlone({...policy,max_inputs:1},three,22),3000-380-1000);
+});
+
+test('admission and Max give the service\'s figures (core/tests/admission.rs)',()=>{
+ const policy={network:'signet',fee_rate:2,service_fee:100,min_withdrawal:1000,dust:1000,batch_size:2,max_inputs:64};
+ const out=(n,value,status=0)=>({txid:String(n).repeat(64),vout:0,value,height:100+n,status});
+ const reserve=[out(1,10000)];
+ // The owner's two requests, each with a 100 sat allowance, against one 10,000 sat output.
+ assert.deepEqual(admitWithdrawal(policy,reserve,22,9000,100),{ok:false,reason:'amount',most:8620,fee:380});
+ assert.deepEqual(admitWithdrawal(policy,reserve,22,8000,100),{ok:false,reason:'allowance',least:380});
+ assert.deepEqual(admitWithdrawal(policy,reserve,22,8620,380),{ok:true,fee:380});
+ // One satoshi each side; taproot.
+ assert.equal(admitWithdrawal(policy,reserve,22,8621,380).ok,false);
+ assert.equal(admitWithdrawal(policy,reserve,22,8620,379).ok,false);
+ assert.deepEqual(admitWithdrawal(policy,reserve,34,8597,404),{ok:false,reason:'amount',most:8596,fee:404});
+ assert.deepEqual(admitWithdrawal(policy,reserve,34,8596,403),{ok:false,reason:'allowance',least:404});
+ // Several outputs and the input limit.
+ const small=[1,2,3,4,5].map(n=>out(n,3000));
+ assert.deepEqual(admitWithdrawal(policy,small,22,4000,589),{ok:false,reason:'allowance',least:590});
+ assert.deepEqual(admitWithdrawal(policy,small,22,12781,5000),{ok:false,reason:'amount',most:12780,fee:1220});
+ assert.deepEqual(admitWithdrawal({...policy,max_inputs:3},small,22,7201,5000),{ok:false,reason:'amount',most:7200,fee:800});
+ assert.deepEqual(admitWithdrawal(policy,[out(1,2379)],22,1000,1000),{ok:false,reason:'amount',most:0,fee:0});
+ assert.deepEqual(admitWithdrawal(policy,[out(1,2380)],22,1000,380),{ok:true,fee:380});
+ // The margin is one more input: 105 vB.
+ assert.equal(feeMargin(policy),210);
+ // Max, balance 9,990 and one 10,000 sat output: the reserve is the limit (8,620); it takes
+ // 8,620 + 590 + 100 = 9,310 from the balance and at least 210 comes back.
+ assert.equal(mostReceivable(policy,reserve,22,9990),8620);
+ assert.equal(mostReceivable(policy,reserve,34,9990),8596);
+ // With a larger reserve the balance is the limit: 9,990 - 100 - (380 + 210).
+ const roomy=[out(1,100000)];
+ assert.equal(mostReceivable(policy,roomy,22,9990),9300);
+ assert.deepEqual(admitWithdrawal(policy,roomy,22,9300,590),{ok:true,fee:380});
+ // The user's own allowance replaces fee + margin; one below the fee alone allows nothing.
+ assert.equal(mostReceivable(policy,roomy,22,9990,380),9510);
+ assert.equal(mostReceivable(policy,roomy,22,9990,379),0);
+ // Too little balance or reserve for the smallest withdrawal: nothing.
+ assert.equal(mostReceivable(policy,roomy,22,1689),0);
+ assert.equal(mostReceivable(policy,roomy,22,1690),1000);
+ assert.equal(mostReceivable(policy,[],22,9990),0);
+ // What Max gives is always admitted with the default allowance.
+ for(const [outputs,balance] of [[reserve,9990],[roomy,9990],[small,20000],[small,5000]]){
+  const most=mostReceivable(policy,outputs,22,balance);if(!most)continue;
+  const alone=admitWithdrawal(policy,outputs,22,most,1e9);assert.ok(alone.ok);
+  assert.ok(admitWithdrawal(policy,outputs,22,most,alone.fee+feeMargin(policy)).ok);
+  assert.ok(most+alone.fee+feeMargin(policy)+policy.service_fee<=balance);
+ }
 });

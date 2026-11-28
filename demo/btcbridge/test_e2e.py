@@ -118,16 +118,16 @@ class BridgeTests(unittest.TestCase):
    original=json.loads((STATE/('deposit-'+('alice' if i['index']==0 else 'bob')+'.json')).read_text()) if i['index']<2 else None
    if original:
     self.unchanged_failure(lambda:call('alice','btcbridge','deposit',**proof(original['txid']),vout=i['vout']))
- def test_04b_impossible_fee_cap_cannot_block_queue(self):
-  # An allowance below the least share a request could ever be charged is refused outright.
-  self.unchanged_failure(lambda:self.withdraw('alice',max_fee=1))
-  # 221 sat is that least share (two P2WPKH requests, one input, 2 sat/vB). Batched with a
-  # taproot payment the share is 233: admitted, then set aside when the batch is made.
-  low,_=self.withdraw('alice',max_fee=221);other,_=self.withdraw('bob',kind='bech32m')
-  self.assertEqual(call('alice','btcbridge','makeBatch'),0)
-  rows={r['id']:r for r in snapshot()['requests']}
-  self.assertEqual(rows[low]['status'],4);self.assertEqual(rows[other]['status'],0)
-  call('alice','btcbridge','cancel',request=low);call('bob','btcbridge','cancel',request=other)
+ def test_04b_withdrawal_that_could_not_be_paid_alone_is_refused(self):
+  # Refused at withdraw, with the figure that works; nothing is set aside or queued.
+  before=snapshot()['config']
+  with self.assertRaisesRegex(ValueError,'network fee for this withdrawal is 380 sat'):self.withdraw('alice',max_fee=379)
+  with self.assertRaisesRegex(ValueError,'network fee for this withdrawal is 404 sat'):self.withdraw('alice',max_fee=403,kind='bech32m')
+  free=sum(u['value'] for u in snapshot()['utxos'] if u['status']==0)
+  with self.assertRaisesRegex(ValueError,'The bridge can pay at most [0-9]+ sat to this address now'):self.withdraw('alice',amount=free)
+  self.assertEqual(before,snapshot()['config'])
+  # At exactly the fee it is accepted, and cancelled again.
+  request,_=self.withdraw('alice',max_fee=380);call('alice','btcbridge','cancel',request=request)
   self.assertEqual(snapshot()['config']['escrow'],0)
  def test_06_gateway_cross_origin_rejected(self):
   req=urllib.request.Request(f'http://127.0.0.1:{WEB_PORT}/api/actions',json.dumps({'account':'alice','actions':[]}).encode(),{'Origin':'https://attacker.example','Content-Type':'application/json'})
@@ -193,31 +193,32 @@ class BridgeTests(unittest.TestCase):
   self.assertEqual(after['deposit_fee_terms']['fee_bps'],10)
   self.assertEqual(after['deposit_fee_policy']['pending']['fee_bps'],20)
   self.assertGreaterEqual(after['deposit_fee_policy']['activates_at'],before['now']+86400)
- def test_10_request_the_reserve_cannot_pay_waits_and_blocks_nobody(self):
-  available=lambda:sum(u['value'] for u in snapshot()['utxos'] if u['status']==0)
+ def test_10_admitted_request_made_unpayable_by_another_batch_waits_and_blocks_nobody(self):
+  free=lambda:[u['value'] for u in snapshot()['utxos'] if u['status']==0]
   status=lambda owner,request:next(r['status'] for r in snapshot(owner)['requests'] if r['id']==request)
-  wallet=snapshot('liquidity')['wallet'];large=wallet['balance']+wallet['incoming']-20000
-  # Open batches reserve whole custody outputs, oldest first, until what is left cannot pay one large request.
+  wallet=snapshot('liquidity')['wallet'];funds=wallet['balance']+wallet['incoming']
+  # Open batches reserve whole custody outputs, oldest first, until the rest is within one account's means.
   for _ in range(12):
-   if available()<large:break
+   if sum(free())<funds-20000:break
    self.withdraw('alice',10000);self.withdraw('bob',10000);self.assertGreater(call('carol','btcbridge','makeBatch'),0)
-  self.assertLess(available(),large)
-  big,_=self.withdraw('liquidity',amount=large);small,_=self.withdraw('carol',10000)
-  # It heads the queue. makeBatch does not fail: the request waits for the reserve (5), in view of its owner.
+  outputs=free();self.assertGreater(sum(outputs),200000)
+  # Two small requests are queued first; then one that needs every available output. It is
+  # admitted: alone, now, it could be paid.
+  self.withdraw('alice',10000);self.withdraw('bob',10000)
+  fee=2*-(-(4*(10+31+43)+2+420*len(outputs))//4)
+  big,_=self.withdraw('liquidity',amount=sum(outputs)-fee-1000-5000)
+  # The batch of the two older requests reserves an output the large one needed.
+  self.assertGreater(call('carol','btcbridge','makeBatch'),0)
+  self.withdraw('carol',10000)
+  # It heads the queue now. makeBatch does not fail: the request waits for the reserve (5).
   call('alice','btcbridge','makeBatch')
-  self.assertEqual(status('liquidity',big),5);self.assertIn(status('carol',small),(0,1,5))
+  self.assertEqual(status('liquidity',big),5)
   self.unchanged_failure(lambda:call('bob','btcbridge','cancel',request=big))
   # The reserve grows: the next makeBatch puts the request back in its place and pays it.
   address=call('liquidity','btcbridge','newAddress');txid=rpc('sendtoaddress',address['address'],11,wallet='faucet');mine(7);relay_headers();prove_deposit(txid)
   self.withdraw('carol',10000)
   self.assertGreater(call('alice','btcbridge','makeBatch'),0)
   self.assertEqual(status('liquidity',big),1)
-  # A waiting request can be cancelled by its owner like a queued one.
-  wallet=snapshot('liquidity')['wallet'];huge,_=self.withdraw('liquidity',amount=wallet['balance']+wallet['incoming']-20000);self.withdraw('carol',10000)
-  call('alice','btcbridge','makeBatch')
-  if status('liquidity',huge)==5:
-   escrow=snapshot()['config']['escrow'];call('liquidity','btcbridge','cancel',request=huge)
-   self.assertEqual(status('liquidity',huge),3);self.assertLess(snapshot()['config']['escrow'],escrow)
  def test_99_deep_reorg_freezes_accepted_state(self):
   protected=snapshot()['relay']['protected_height'];old_height=rpc('getblockcount');rpc('invalidateblock',rpc('getblockhash',protected));mine(old_height-protected+2)
   relay_headers();self.assertTrue(snapshot()['relay']['paused'])

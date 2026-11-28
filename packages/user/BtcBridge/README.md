@@ -131,11 +131,36 @@ and the service fee, and the unused allowance comes back. A batch with one
 request and one custody input is budgeted at 190 vB to a P2WPKH address and 202
 vB to a P2TR or P2WSH address (380 and 404 sat at 2 sat/vB); a second request
 adds 31 or 43 vB and the fee is shared; each further input adds 105 vB.
-`withdraw` refuses an allowance below the least share the request could ever be
-charged (a full batch with one input: 221 sat to P2WPKH at 2 sat/vB with
-batches of two). A larger allowance that still proves too small when the batch
-is made sets the request aside for its owner to cancel; it does not hold up the
-queue.
+
+### Admission: a withdrawal that could not be paid now is refused
+
+`withdraw(address, amount, max_fee)` accepts a request only if a batch made of
+it alone, at that moment, from the available confirmed custody outputs, would
+pay it within its fee allowance (core library, `admit_withdrawal`; it asks the
+same planner the batch uses, so the two cannot disagree). Otherwise the
+transaction is refused and nothing is set aside, with the figure that works:
+
+- the outputs cannot pay the amount after the fee and the `dust` kept as
+  change: "The bridge can pay at most 8620 sat to this address now, with a
+  network fee of 380 sat";
+- the amount is payable but the allowance is below its fee alone: "The network
+  fee for this withdrawal is 380 sat; the maximum network fee given is below
+  it";
+- nothing at all can be paid: "The bridge's confirmed outputs cannot pay a
+  withdrawal now".
+
+Those are the answers for 9,000 and for 8,000 sat with a 100 sat allowance
+against a reserve of one 10,000 sat output; 8,620 with 380 is accepted. The
+user sends less, raises the allowance, or waits for the reserve.
+
+The page asks for one number, what the recipient receives, and shows the total
+that leaves the balance: that amount, the network fee allowance and the bridge
+fee. The allowance defaults to the fee the withdrawal costs alone plus the cost
+of one more custody input (105 vB; 210 sat at 2 sat/vB), in case another batch
+takes the output this one would have spent; the unused part is returned on
+completion. "Max" is the most the recipient can receive now: the smaller of
+what the outputs can pay and what the balance covers after those fees. The page
+refuses the same cases as the service, with the same figures, before sending.
 
 ### No request can hold up the queue
 
@@ -162,8 +187,12 @@ waits. From a reserve of one 10,000 sat output at most 10,000 - 380 - 1,000 =
 The last `dust` plus fee of a reserve therefore cannot leave through a
 withdrawal.
 
-`withdraw` does not refuse an amount for exceeding the present reserve: a later
-deposit may make it payable, and the request waits meanwhile.
+Since admission refuses what could not be paid alone, these two states arise
+only from what changes between a request and its batch: another batch reserves
+an output the request needed (it waits, state 5), or the batch has to spend
+more or different outputs than admission assumed and the fee share exceeds the
+allowance (state 4). A request admitted before this rule existed can be in
+either state as well.
 
 Request states: 0 queued, 1 in a batch, 2 complete, 3 cancelled, 4 fee
 allowance too low, 5 waiting for the reserve. The owner can cancel in states 0,

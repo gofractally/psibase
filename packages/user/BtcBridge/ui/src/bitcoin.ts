@@ -58,6 +58,32 @@ export function mostPayableAlone(policy:WithdrawalPolicy,outputs:CustodyOutput[]
  for(const o of available(policy,outputs)){value+=o.value;n++;most=Math.max(most,value-budgetedVsize(n,[script])*policy.fee_rate-policy.dust);}
  return most;
 }
+/// The service's admission rule (core `admit_withdrawal`): a withdrawal is accepted only if a batch
+/// of it alone, now, would pay it within its fee allowance. The figures are the service's.
+export type Admission={ok:true,fee:number}|{ok:false,reason:'amount',most:number,fee:number}|{ok:false,reason:'allowance',least:number};
+export function admitWithdrawal(policy:WithdrawalPolicy,outputs:CustodyOutput[],script:number,amount:number,allowance:number):Admission{
+ const quote=quoteAlone(policy,outputs,script,amount);
+ if(quote)return quote.fee<=allowance?{ok:true,fee:quote.fee}:{ok:false,reason:'allowance',least:quote.fee};
+ const most=mostPayableAlone(policy,outputs,script);
+ if(most<Math.max(policy.min_withdrawal,1000))return{ok:false,reason:'amount',most:0,fee:0};
+ return{ok:false,reason:'amount',most,fee:quoteAlone(policy,outputs,script,most)!.fee};
+}
+/// Added to the fee a withdrawal costs alone to make the default allowance: the cost of one more
+/// custody input (105 vB). Between the request and its batch another batch may take the output
+/// this one would have spent, and the batch then needs a further, smaller one. What is not used
+/// is returned when the batch completes.
+export const feeMargin=(policy:WithdrawalPolicy)=>Math.ceil(INPUT_WEIGHT*policy.fee_rate/4);
+/// The most the recipient can receive now: what the available outputs can pay alone, and what the
+/// balance covers once the allowance (fee alone + margin, or the user's own) and bridge fee are added.
+export function mostReceivable(policy:WithdrawalPolicy,outputs:CustodyOutput[],script:number,balance:number,ownAllowance:number|null=null):number{
+ let value=0,n=0,most=0;
+ for(const o of available(policy,outputs)){
+  value+=o.value;n++;const fee=budgetedVsize(n,[script])*policy.fee_rate;
+  if(ownAllowance!==null&&ownAllowance<fee)break;
+  most=Math.max(most,Math.min(value-fee-policy.dust,balance-policy.service_fee-(ownAllowance??fee+feeMargin(policy))));
+ }
+ return most>=Math.max(policy.min_withdrawal,1000)?most:0;
+}
 function available(policy:WithdrawalPolicy,outputs:CustodyOutput[]):CustodyOutput[]{
  return outputs.filter(o=>o.status===0).sort((a,b)=>a.height-b.height||(a.txid<b.txid?-1:a.txid>b.txid?1:0)||a.vout-b.vout).slice(0,policy.max_inputs);
 }

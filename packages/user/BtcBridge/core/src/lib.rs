@@ -578,6 +578,76 @@ fn build_plan_inner(
 /// the change the bridge keeps.
 pub const INSUFFICIENT: &str = "Insufficient confirmed UTXOs (including economical change and fees)";
 
+/// Why `withdraw` refuses a request, with the figure that would work.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Refusal {
+    /// The available confirmed outputs cannot pay this amount, even alone. `most` is the
+    /// largest amount they can pay to this destination (0 if none) and `fee` what that costs.
+    Amount { most: u64, fee: u64 },
+    /// The outputs can pay it, but its network fee alone is `least`, above the allowance.
+    Allowance { least: u64 },
+}
+impl std::fmt::Display for Refusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Refusal::Amount { most: 0, .. } => {
+                write!(f, "The bridge's confirmed outputs cannot pay a withdrawal now")
+            }
+            Refusal::Amount { most, fee } => write!(
+                f,
+                "The bridge can pay at most {most} sat to this address now, with a network fee of {fee} sat"
+            ),
+            Refusal::Allowance { least } => write!(
+                f,
+                "The network fee for this withdrawal is {least} sat; the maximum network fee given is below it"
+            ),
+        }
+    }
+}
+/// Admission of a withdrawal: it is accepted only if a batch made of it alone, now, from the
+/// available confirmed outputs, would pay it within its fee allowance. The planner decides
+/// (`quote_plan`, as `choose_batch` uses it), so admission and batching cannot disagree.
+///
+/// What changes after admission (other batches reserving outputs, a different set of inputs)
+/// is handled when the batch is made: the request waits for the reserve or is set aside.
+pub fn admit_withdrawal(
+    policy: &Policy,
+    candidates: &[Input],
+    script: &str,
+    amount: u64,
+    max_fee: u64,
+) -> Result<std::result::Result<(), Refusal>> {
+    let request = |amount| Payment {
+        id: 0,
+        script: script.to_string(),
+        amount,
+        max_fee,
+    };
+    match quote_plan(policy, 0, candidates, &[request(amount)]) {
+        Ok(quote) if quote.fee <= max_fee => Ok(Ok(())),
+        Ok(quote) => Ok(Err(Refusal::Allowance { least: quote.fee })),
+        Err(e) if e == INSUFFICIENT => {
+            // The largest amount some number of the oldest outputs can pay: their value less the
+            // budgeted fee and the change the bridge keeps. The planner confirms it.
+            let script_len = hex::decode(script).map_err(err)?.len();
+            let mut ordered = candidates.to_vec();
+            ordered.sort_by(|a, b| (a.height, &a.txid, a.vout).cmp(&(b.height, &b.txid, b.vout)));
+            let (mut value, mut most) = (0u64, 0u64);
+            for (n, input) in ordered.iter().take(policy.max_inputs as usize).enumerate() {
+                value = add(value, input.value)?;
+                let fee = budgeted_weight(n as u64 + 1, &[script_len]).div_ceil(4) * policy.fee_rate;
+                most = most.max(value.saturating_sub(fee + policy.dust));
+            }
+            if most < policy.min_withdrawal.max(MIN_PAYMENT) {
+                return Ok(Err(Refusal::Amount { most: 0, fee: 0 }));
+            }
+            let fee = quote_plan(policy, 0, candidates, &[request(most)])?.fee;
+            Ok(Err(Refusal::Amount { most, fee }))
+        }
+        Err(e) => Err(e),
+    }
+}
+
 /// Which of the requests offered for one batch are paid by it, and which are set aside.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BatchChoice {
