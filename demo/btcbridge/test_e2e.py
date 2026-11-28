@@ -124,7 +124,9 @@ class BridgeTests(unittest.TestCase):
   with self.assertRaisesRegex(ValueError,'network fee for this withdrawal is 380 sat'):self.withdraw('alice',max_fee=379)
   with self.assertRaisesRegex(ValueError,'network fee for this withdrawal is 404 sat'):self.withdraw('alice',max_fee=403,kind='bech32m')
   free=sum(u['value'] for u in snapshot()['utxos'] if u['status']==0)
-  with self.assertRaisesRegex(ValueError,'The bridge can pay at most [0-9]+ sat to this address now'):self.withdraw('alice',amount=free)
+  # More than every free custody output together: no account holds that much, so the helper's token
+  # credit would fail first. The action alone is refused by the bridge before any tokens move.
+  with self.assertRaisesRegex(ValueError,'The bridge can pay at most [0-9]+ sat to this address now'):call('alice','btcbridge','withdraw',address=rpc('getnewaddress',wallet='faucet'),amount=free,max_fee=10000)
   self.assertEqual(before,snapshot()['config'])
   # At exactly the fee it is accepted, and cancelled again.
   request,_=self.withdraw('alice',max_fee=380);call('alice','btcbridge','cancel',request=request)
