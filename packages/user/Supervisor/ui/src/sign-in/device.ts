@@ -169,9 +169,11 @@ export const passkeyLabel = (): PasskeyLabel | undefined => {
     const device = loadDevice();
     const first = device.current ?? device.accounts[0]?.name ?? device.pendingName;
     if (!first) return undefined;
-    const more = device.accounts.filter((a) => a.name !== first).length;
-    const name = more ? `${first} +${more}` : first;
-    return { name, displayName: device.displayName || name };
+    // The account name and nothing else: a password manager offers this
+    // text for the username field, so anything added to it (a count of
+    // further accounts was, once) gets typed in as if it were a name
+    // (gofractally/psibase#2316).
+    return { name: first, displayName: device.displayName || first };
 };
 
 /** Brings the password manager's label up to date, where the browser can. */

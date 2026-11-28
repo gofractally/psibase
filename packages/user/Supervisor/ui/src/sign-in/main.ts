@@ -32,6 +32,7 @@ import {
     loginFor,
     notePasskey,
     notesToWrite,
+    refreshPasskeyLabel,
     syncAccounts,
 } from "./device";
 import {
@@ -185,6 +186,46 @@ const forgetPasskeyHint = () => {
     window.localStorage.removeItem(WHO_KEY);
 };
 
+// The button says what it will do with the name as typed: "Log in" for a
+// name that is an account, "Sign up" for one that is free, and both while
+// that is not known.
+const NEUTRAL_BUTTON = "Sign up or log in";
+let labelSeq = 0;
+let labelTimer: number | undefined;
+
+/**
+ * A password manager may fill the name field with what an earlier version
+ * of this page labelled a passkey: the account name and a count of further
+ * accounts ("name +2"). Only the name is meant.
+ */
+const cleanName = (typed: string) =>
+    typed
+        .trim()
+        .toLowerCase()
+        .replace(/^@/, "")
+        .replace(/\s+\+\d+$/, "");
+
+const labelButtonForName = async (delay = 0) => {
+    const seq = ++labelSeq;
+    window.clearTimeout(labelTimer);
+    const name = cleanName($<HTMLInputElement>("start-name").value);
+    if (!ANY_NAME_RULE.test(name)) {
+        setButton(NEUTRAL_BUTTON);
+        return;
+    }
+    await new Promise((r) => (labelTimer = window.setTimeout(r, delay)));
+    if (seq !== labelSeq) return;
+    let label = NEUTRAL_BUTTON;
+    try {
+        const found = await lookUpName(name);
+        if (found.exists) label = "Log in";
+        else if (!found.problem && NAME_RULE.test(name) && !name.endsWith("-")) label = "Sign up";
+    } catch {
+        // Not known; the button stays neutral.
+    }
+    if (seq === labelSeq && !$("view-welcome").hidden) setButton(label);
+};
+
 const renderWelcome = () => {
     $("network").textContent = rootName;
     document.title = `Welcome · ${rootName}`;
@@ -198,7 +239,8 @@ const renderWelcome = () => {
     const name = $<HTMLInputElement>("start-name");
     if (!name.value && holder.name) name.value = holder.name;
     showPasswordField(passkeyNeedsPassword());
-    setButton("Sign up or log in");
+    setButton(NEUTRAL_BUTTON);
+    void labelButtonForName();
     if (accountStep) {
         // Asked to connect an account without being signed in: the passkey
         // comes first, and the older account-and-key prompt stays one
@@ -697,7 +739,7 @@ const lookUpName = async (
 /** Reads the first screen. Nothing (and a notice) when it cannot go on. */
 const readStart = async (): Promise<{ name: string; exists: boolean } | undefined> => {
     const input = $<HTMLInputElement>("start-name");
-    const name = input.value.trim().toLowerCase().replace(/^@/, "");
+    const name = cleanName(input.value);
     input.value = name;
     if (!name) {
         setNotice("Enter a username.");
@@ -768,6 +810,9 @@ const signIn = async (mode: Mode) => {
         } catch (e) {
             console.warn("Could not bring accounts to this browser", e);
         }
+        // A passkey labelled by an earlier version of this page ("name +2")
+        // is relabelled with the account name alone.
+        void refreshPasskeyLabel().catch((e) => console.warn(e));
         const held = heldAccounts();
 
         if (held.includes(name) || start.exists) unlocked.wipe();
@@ -830,6 +875,7 @@ const signIn = async (mode: Mode) => {
                 return;
             }
             nextMode = "create";
+            ++labelSeq; // The label below stands until the name changes.
             setButton("Create a passkey");
             setBelow("No passkey was used. New here? Create one.", {
                 label: "Look again",
@@ -1019,6 +1065,16 @@ const start = async () => {
         show("unsupported");
         return;
     }
+
+    const startName = $<HTMLInputElement>("start-name");
+    const onNameChange = () => {
+        // What a password manager filled in is corrected where it stands.
+        if (/\s\+\d+$/.test(startName.value)) startName.value = cleanName(startName.value);
+        nextMode = "auto";
+        void labelButtonForName(300);
+    };
+    startName.addEventListener("input", onNameChange);
+    startName.addEventListener("change", onNameChange);
 
     $("start-form").addEventListener("submit", (e) => {
         e.preventDefault();
