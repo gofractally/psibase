@@ -94,9 +94,7 @@ let
     "packages/local/XProxy/ui"
   ];
 
-  # .psi packages exposed as .#pkg-<Name>. Names must match the packages the
-  # root CMakeLists.txt builds (test packages are left out on purpose). The
-  # `pack` derivation fails if a name here is not produced.
+  # .psi packages exposed as .#pkg-<Name>; names must match what the root CMakeLists.txt builds.
   psiNames = [
     "Accounts" "AccountsService" "Aes" "AuthAny" "AuthNone" "AuthDyn"
     "AuthDelegate" "AuthDelegateService" "AuthRecover" "AuthSig" "AuthSigService"

@@ -18,6 +18,12 @@
     "reveal": "always"
   },
   {
+    "label": "Launch (Nix)",
+    "command": "$ZED_WORKTREE_ROOT/.editor-shared/scripts/launch-nix.sh 8080 myprod $HOST_IP",
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
     "label": "Launch Secure",
     "command": "$ZED_WORKTREE_ROOT/.editor-shared/scripts/slaunch.sh 8080 myprod $HOST_IP /usr/lib/softhsm/libsofthsm2.so",
     "allow_concurrent_runs": false,
