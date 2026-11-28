@@ -72,6 +72,14 @@ export const runAccountStep = async (ctx: PageContext) => {
     const params = new URLSearchParams(window.location.search);
     const intent = (params.get("intent") ?? "") as Intent;
     const subject = params.get("account") ?? "";
+    // The name typed on the first screen for an account one of the
+    // visitor's own accounts will create. It comes from the address, so it
+    // is checked like anything typed.
+    const askedName = params.get("name") ?? "";
+    const wantedName =
+        intent === "new" && NAME_RULE.test(askedName) && !askedName.endsWith("-")
+            ? askedName
+            : undefined;
 
     const api = async <T>(path: string, body?: unknown): Promise<T> => {
         const res = await fetch(signup + path, {
@@ -185,8 +193,8 @@ export const runAccountStep = async (ctx: PageContext) => {
     // has. With more than one, they say which.
     const showCreators = (accounts: string[]) => {
         frame(
-            "Which account creates it?",
-            "It pays for the new account and becomes its recovery partner, which you can change afterwards. That connects the two on the network, so pick one you don't mind being linked to the new account.",
+            "Which of your accounts creates the new one?",
+            "A new account is created by one you already have. That account pays for it and becomes its recovery partner, which you can change afterwards. That connects the two on the network, so pick one you don't mind being linked to the new account. You name the new account next.",
         );
         const list = $("acct-list");
         list.textContent = "";
@@ -200,6 +208,38 @@ export const runAccountStep = async (ctx: PageContext) => {
         }
         list.hidden = false;
         links(backLink);
+    };
+
+    // The visitor already said what the new account is called (the first
+    // screen). One screen says what will happen and who pays; the name is
+    // not asked for again.
+    const showCreateNamed = (name: string, accounts: string[]) => {
+        const only = accounts.length === 1 ? accounts[0] : undefined;
+        frame(
+            `Create ${name}`,
+            (only
+                ? `${name} is free. Your account ${only} creates it: ${only} pays for it and becomes its recovery partner, which you can change afterwards.`
+                : `${name} is free. One of your accounts creates it: that account pays for it and becomes its recovery partner, which you can change afterwards. That connects the two on the network, so pick one you don't mind being linked to ${name}.`) +
+                ` You'll be signed in to ${ctx.app} as ${name}. The name can't be changed later.`,
+        );
+        const list = $("acct-list");
+        list.textContent = "";
+        accounts.forEach((account, i) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = i === 0 && only ? "si-btn si-primary" : "si-btn si-provider";
+            button.textContent = `Create ${name} with ${account}`;
+            button.addEventListener("click", () => {
+                creator = account;
+                void create(name);
+            });
+            list.append(button);
+        });
+        list.hidden = false;
+        links(backLink, {
+            label: "Use a different name",
+            run: () => (only ? showName(undefined, only) : showCreators(accounts)),
+        });
     };
 
     const enter = async (name: string) => {
@@ -905,7 +945,11 @@ export const runAccountStep = async (ctx: PageContext) => {
         const held = heldAccounts();
         // One account creates the next; with several, the visitor says which.
         const ownAccount = () =>
-            held.length > 1 ? showCreators(held) : showName(undefined, held[0]);
+            wantedName
+                ? showCreateNamed(wantedName, held)
+                : held.length > 1
+                  ? showCreators(held)
+                  : showName(undefined, held[0]);
         if (status.link?.account) {
             // The provider sign-in already has its account. If this browser
             // does not hold it yet, bring it here first.

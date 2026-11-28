@@ -148,8 +148,10 @@ const setBelow = (text?: string, ...links: (BelowLink | undefined)[]) => {
 
 const HAS_PASSKEY_KEY = "psibase.has-passkey.v1";
 
-// Who the remembered passkey belongs to, kept after signing out so the
-// welcome can say whom it is welcoming back. Names only; nothing secret.
+// Who the remembered passkey belongs to, so that a browser whose session
+// has lapsed can say whom it is welcoming back. Names only; nothing secret.
+// Signing out removes it with the passkey hint: a browser that was signed
+// out knows nothing about who used it (gofractally/psibase#2316).
 const WHO_KEY = "psibase.passkey-holder.v1";
 
 interface Holder {
@@ -228,9 +230,8 @@ const renderWelcome = () => {
             },
         });
     } else {
-        // Awaiting the owner's word (#2275): someone with a passkey on
-        // another device who types a free name would otherwise be given a
-        // second passkey where the browser cannot look for one silently.
+        // A free name gets a new passkey. Someone who wants a further
+        // account under a passkey they already have says so here.
         setBelow("", {
             label: "I already have a passkey for this site",
             run: () => {
@@ -324,7 +325,10 @@ const signOutEverywhere = async () => {
         await forgetAccount(account.name).catch((e) => console.warn(e));
     }
     window.localStorage.removeItem(APPS_KEY);
-    rememberHolder();
+    // Nothing is kept that says who was here: not the name, and not which
+    // passkey they used. The next visitor is a stranger, and a new name
+    // typed here gets a passkey of its own.
+    forgetPasskeyHint();
     clearDevice();
     clearGuestSession();
     await dropHeld();
@@ -499,13 +503,18 @@ const newPasskey = () => {
 class NoPasskeyChosen extends Error {}
 
 /**
- * One button signs a visitor up or in.
+ * One button signs a visitor up or in. `signIn` decides the mode from the
+ * name: a name that is an account uses a passkey its holder already has
+ * ("existing"); a free name on a browser that remembers no passkey is a new
+ * user and gets a new passkey ("create").
  *
- * - This browser has signed in before: use that passkey.
+ * What is left for "auto" here is a browser that remembers a passkey (its
+ * session lapsed; it was not signed out), which uses that passkey, and the
+ * callers that take over an account by recovery or a key file:
+ *
  * - The browser can look without a dialog: use a passkey if the device has
  *   one, otherwise create one.
- * - Otherwise ask the browser for an existing passkey first, so a returning
- *   visitor on a new browser is not given a second identity. If none is
+ * - Otherwise ask the browser for an existing passkey first. If none is
  *   chosen, the button becomes "Create a passkey".
  */
 const obtainPasskey = async (mode: Mode): Promise<PrfResult> => {
@@ -744,7 +753,16 @@ const signIn = async (mode: Mode) => {
         chosenLabel = { account: name, name, displayName: name };
         // An existing account is signed in to with a passkey its holder
         // already has; a passkey is never created for a name that is taken.
-        const prf = await obtainPasskey(start.exists && mode !== "existing" ? "existing" : mode);
+        // A free name is a new user: unless this browser remembers a
+        // passkey, or the visitor said they have one, a passkey is made
+        // for the name without looking for another first (#2316).
+        const prf = await obtainPasskey(
+            start.exists
+                ? "existing"
+                : mode === "auto" && !loadRememberedCredential()
+                  ? "create"
+                  : mode,
+        );
         working("Signing you in", "Deriving your keys on this device.");
         unlocked = await unlockWith(prf);
         const session = await guestLogin(unlocked);
@@ -801,7 +819,9 @@ const signIn = async (mode: Mode) => {
         // so the visitor is not asked for it again a page later.
         await holdRoot(unlocked);
         unlocked.wipe();
-        go("account", held.length ? { intent: "new" } : {});
+        // The name goes along, so the next step creates that account
+        // instead of asking what to call it.
+        go("account", held.length ? { intent: "new", name } : {});
     } catch (e) {
         unlocked?.wipe();
         if (e instanceof Unsupported) {
@@ -1002,6 +1022,11 @@ const start = async () => {
         await signOutEverywhere();
         forget.hidden = true;
         $("foot-id").textContent = "";
+        $<HTMLInputElement>("start-name").value = "";
+        $<HTMLInputElement>("start-pass").value = "";
+        wanted = undefined;
+        chosenLabel = undefined;
+        nextMode = "auto";
         renderWelcome();
         // A passkey that never became an account is only clutter in the
         // password manager; offer to take it out.
