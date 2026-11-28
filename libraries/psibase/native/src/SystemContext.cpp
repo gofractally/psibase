@@ -1,4 +1,5 @@
 #include <psibase/ActionContext.hpp>
+#include <psibase/FileStore.hpp>
 #include <psibase/Mount.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/UsageMeter.hpp>
@@ -19,6 +20,7 @@ namespace psibase
       std::shared_ptr<Sockets>                    sockets;
       std::shared_ptr<Mount>                      mountpoints;
       std::shared_ptr<UsageMeter>                 usage;
+      std::shared_ptr<FileStore>                  files;
 
       // TODO: This assumes that systemContexts are always returned to the cache
       std::vector<SystemContext*> allSystemContexts;
@@ -29,7 +31,8 @@ namespace psibase
             watchdogManager(std::make_shared<WatchdogManager>()),
             sockets(std::make_shared<Sockets>(this->db)),
             mountpoints(std::make_shared<Mount>()),
-            usage(std::make_shared<UsageMeter>())
+            usage(std::make_shared<UsageMeter>()),
+            files(std::make_shared<FileStore>(this->db.directory() / "files"))
       {
       }
    };
@@ -80,6 +83,11 @@ namespace psibase
       return impl->usage;
    }
 
+   std::shared_ptr<FileStore> SharedState::files()
+   {
+      return impl->files;
+   }
+
    bool SharedState::needGenesis() const
    {
       auto sharedDb = [&]
@@ -111,7 +119,8 @@ namespace psibase
                                                                      impl->watchdogManager,
                                                                      impl->sockets,
                                                                      impl->mountpoints,
-                                                                     impl->usage});
+                                                                     impl->usage,
+                                                                     impl->files});
          impl->allSystemContexts.push_back(result.get());
          return result;
       }

@@ -5,6 +5,7 @@
 #include <boost/beast/http/message.hpp>
 #include <boost/beast/http/parser.hpp>
 #include <boost/beast/http/vector_body.hpp>
+#include "range_file_body.hpp"
 #include <boost/beast/websocket/stream_base.hpp>
 #include <chrono>
 #include <functional>
@@ -31,6 +32,8 @@ namespace psibase::http
      public:
       using message_type = boost::beast::http::response<boost::beast::http::vector_body<char>>;
       using request_type = boost::beast::http::request<boost::beast::http::vector_body<char>>;
+      // A response whose body is part of a file
+      using file_message_type = boost::beast::http::response<range_file_body>;
 
      protected:
       ~http_session_base();
@@ -111,6 +114,7 @@ namespace psibase::http
 
       // Called by the HTTP handler to send a response.
       void operator()(message_type&& msg);
+      void operator()(file_message_type&& msg);
       void operator()(websocket_upgrade,
                       request_type&&                                    msg,
                       accept_p2p_websocket_t                            f,
@@ -118,6 +122,7 @@ namespace psibase::http
                           boost::beast::websocket::stream_base::decorator([](auto&) {}));
 
       virtual void write_response(message_type&& msg) = 0;
+      virtual void write_response(file_message_type&& msg) = 0;
       virtual void accept_websocket(
           request_type&&                                    request,
           accept_p2p_websocket_t&&                          next,

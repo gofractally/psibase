@@ -255,6 +255,42 @@ namespace psibase::http
       }
    }
 
+   void http_session_base::operator()(file_message_type&& msg)
+   {
+      // This holds a work item
+      struct work_impl : work
+      {
+         http_session_base& self;
+         file_message_type  msg;
+
+         work_impl(http_session_base& self, file_message_type&& msg) : self(self), msg(std::move(msg)) {}
+
+         void operator()() { self.write_response(std::move(msg)); }
+      };
+
+      {
+         BOOST_LOG_SCOPED_LOGGER_TAG(logger, "ResponseStatus",
+                                     static_cast<unsigned>(msg.result_int()));
+         BOOST_LOG_SCOPED_LOGGER_ATTR(logger, "ResponseBytes",
+                                      boost::log::attributes::constant<std::uint64_t>(
+                                          msg.payload_size() ? *msg.payload_size() : 0));
+         PSIBASE_LOG(logger, info) << "Handled HTTP request";
+         request_attrs.reset();
+      }
+
+      // Allocate and store the work
+      items.push_back(boost::make_unique<work_impl>(*this, std::move(msg)));
+      items.back()->usage = reply_usage ? std::move(reply_usage) : usage;
+      reply_usage.reset();
+
+      // If there was no previous work, start this one
+      if (items.size() == 1)
+      {
+         start_socket_timer();
+         (*items.front())();
+      }
+   }
+
    void http_session_base::operator()(websocket_upgrade,
                                       request_type&&                                    msg,
                                       accept_p2p_websocket_t                            f,

@@ -33,6 +33,13 @@ namespace psibase::http
              boost::beast::bind_front_handler(
                  &http_session::on_write, derived_session().shared_from_this(), msg.need_eof()));
       }
+      void write_response(file_message_type&& msg) override
+      {
+         boost::beast::http::async_write(
+             derived_session().stream, msg,
+             boost::beast::bind_front_handler(
+                 &http_session::on_write, derived_session().shared_from_this(), msg.need_eof()));
+      }
       void accept_websocket(request_type&&                                    request,
                             accept_p2p_websocket_t&&                          next,
                             boost::beast::websocket::stream_base::decorator&& decorator) override

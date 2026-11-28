@@ -58,5 +58,12 @@ namespace psibase
       int32_t socketSetFlags(int32_t fd, std::uint32_t mask, std::uint32_t value);
 
       std::uint32_t readFile(std::span<const char> path);
+
+      // Plain files of the calling node-local service (FileStore.hpp)
+      std::int32_t  fileAppend(std::span<const char> name, std::span<const char> data);
+      std::int32_t  fileCommit(std::span<const char> pending, std::span<const char> name);
+      std::int32_t  fileRemove(std::span<const char> name, std::uint32_t pending);
+      std::uint32_t fileSize(std::span<const char> name, std::uint32_t pending);
+      std::uint32_t fileRead(std::span<const char> name, std::uint64_t offset, std::uint32_t length);
    };  // NativeFunctions
 }  // namespace psibase

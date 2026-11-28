@@ -8,6 +8,8 @@
 #include <boost/type_erasure/is_empty.hpp>
 #include <fstream>
 #include <psibase/BlockContext.hpp>
+#include <psibase/FileStore.hpp>
+#include <sys/stat.h>
 #include <psibase/UsageMeter.hpp>
 #include <psibase/HttpHeaders.hpp>
 #include <psibase/Rpc.hpp>
@@ -402,8 +404,65 @@ namespace psibase::http
              });
       }
       void onLock(CloseLock&&) override { assert(!"Incoming HttpSocket should not call onLock"); }
+      // A reply whose body is part of a file in the node's file store
+      // (HttpFileReply in Rpc.hpp). The headers come from the service; the
+      // bytes go from the file to the connection without passing through a
+      // service, a piece at a time.
+      void sendFile(std::span<const char> data)
+      {
+         if (replySent.exchange(true))
+            return;
+         auto file = psio::from_pssz<HttpFileReply>(data);
+         auto self = this->shared_from_this();
+         auto fail = [&](HttpStatus status, std::string_view message)
+         {
+            HttpReply result{.status      = status,
+                             .contentType = "text/plain",
+                             .body        = std::vector<char>(message.begin(), message.end())};
+            session->post(
+                [self, result = std::move(result)]() mutable
+                {
+                   self->sendImpl([result = std::move(result)](HttpSocket* self) mutable
+                                  { return self->callback(std::move(result)); });
+                });
+         };
+         auto code = static_cast<std::uint16_t>(file.reply.status);
+         if (code < 200 || code > 599)
+            return fail(HttpStatus::internalServerError, "Invalid status code");
+         auto store = session->server.sharedState->files();
+         int  fd    = store ? store->open(file.service, file.file) : -1;
+         if (fd < 0)
+            return fail(HttpStatus::notFound, "The file is not on this node");
+         auto body = std::make_shared<range_file_body::value_type>(fd, file.offset, file.length);
+         struct stat st;
+         if (::fstat(fd, &st) < 0 || file.offset > static_cast<std::uint64_t>(st.st_size) ||
+             file.length > static_cast<std::uint64_t>(st.st_size) - file.offset)
+            return fail(HttpStatus::internalServerError, "The file is shorter than expected");
+
+         auto res = std::make_shared<http_session_base::file_message_type>(
+             bhttp::int_to_status(code), req.version());
+         res->set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
+         for (auto& h : file.reply.headers)
+         {
+            if (boost::beast::iequals(h.name, "set-cookie"))
+               res->insert(h.name, h.value);
+            else
+               res->set(h.name, h.value);
+         }
+         if (!file.reply.contentType.empty())
+            res->set(bhttp::field::content_type, file.reply.contentType);
+         res->keep_alive(req.keep_alive());
+         res->body() = std::move(*body);
+         res->content_length(file.length);
+         session->post([self, res]() mutable
+                       {
+                          self->sendImpl([res](HttpSocket*) mutable { return std::move(*res); });
+                       });
+      }
       void send(Writer& writer, std::span<const char> data, std::uint32_t flags) override
       {
+         if (flags == sendFileFlag)
+            return sendFile(data);
          if (flags != 0)
             abortMessage("Invalid flags for HttpSocket: " + std::to_string(flags));
          if (replySent.exchange(true))

@@ -1,5 +1,5 @@
-// x-ipfs: blocks stored by content id, and files and directories served
-// from them. The content ids used here are the ones the IPFS tools give the
+// x-ipfs: files stored by content id in the node's file store, and files and
+// directories served from them. The content ids used here are the ones the IPFS tools give the
 // same bytes (CIDv1, sha2-256, raw leaves).
 #include <services/local/IpfsFormat.hpp>
 #include <services/local/XIpfs.hpp>
@@ -126,12 +126,81 @@ TEST_CASE("x-ipfs: a block is stored only under the id of its bytes")
    // A block that says it is a node has to be one
    auto junk = chars("\xff\xff\xff");
    CHECK(s.put(idOf(codecDagPb, junk), junk) == HttpStatus::badRequest);
-   // Too large
-   std::vector<char> big(XIpfs::maxBlockSize + 1, 'x');
+   // A file larger than one part does not go in as one block
+   std::vector<char> big(XIpfs::partSize + 1, 'x');
    CHECK(s.put(idOf(codecRaw, big), big) == HttpStatus::contentTooLarge);
 }
 
-TEST_CASE("x-ipfs: files and directories are served from their blocks")
+TEST_CASE("x-ipfs: a larger file is uploaded in parts, in order, each checked")
+{
+   Store             s;
+   std::vector<char> partA(XIpfs::partSize, 'a');
+   auto              partB = chars("tail");
+   auto              idA   = idOf(codecRaw, partA);
+   auto              idB   = idOf(codecRaw, partB);
+   auto              root  = node({{idA, "", partA.size()}, {idB, "", partB.size()}}, UnixFsType::file);
+   auto              cid   = idOf(codecDagPb, root);
+   auto              base  = "/file/" + cidToString(cid);
+   auto part = [&](unsigned i, const std::vector<char>& data)
+   { return s.client().put<HttpReply>(base + "/" + std::to_string(i), Bytes{data}); };
+   auto textOf = [](const HttpReply& r) { return std::string(r.body.begin(), r.body.end()); };
+
+   // Nothing can be said about a file whose list of parts is not here
+   CHECK(s.get(base).status == HttpStatus::notFound);
+   CHECK(part(0, partA).status == HttpStatus::notFound);
+   CHECK(s.put(cid, root) == HttpStatus::created);
+   CHECK(textOf(s.get(base)) == "0");
+   CHECK(s.get("/ipfs/" + cidToString(cid)).status == HttpStatus::notFound);
+
+   // Out of order, and wrong bytes
+   auto reply = part(1, partB);
+   CHECK(reply.status == HttpStatus::conflict);
+   CHECK(textOf(reply) == "0");
+   CHECK(part(0, std::vector<char>(XIpfs::partSize, 'b')).status == HttpStatus::badRequest);
+   CHECK(part(0, chars("short")).status == HttpStatus::badRequest);
+   CHECK(part(2, partB).status == HttpStatus::badRequest);
+   CHECK(textOf(s.get(base)) == "0");
+
+   reply = part(0, partA);
+   CHECK(reply.status == HttpStatus::ok);
+   CHECK(textOf(reply) == "1");
+   CHECK(textOf(s.get(base)) == "1");
+   // The same part again is not the next one
+   CHECK(part(0, partA).status == HttpStatus::conflict);
+   // Not served until it is whole
+   CHECK(s.get("/ipfs/" + cidToString(cid)).status == HttpStatus::notFound);
+
+   reply = part(1, partB);
+   CHECK(reply.status == HttpStatus::created);
+   CHECK(textOf(s.get(base)) == "complete");
+   CHECK(part(1, partB).status == HttpStatus::ok);
+
+   reply = s.get("/ipfs/" + cidToString(cid));
+   CHECK(reply.status == HttpStatus::ok);
+   REQUIRE(reply.body.size() == partA.size() + partB.size());
+   CHECK(std::equal(partA.begin(), partA.end(), reply.body.begin()));
+   CHECK(std::string(reply.body.end() - 4, reply.body.end()) == "tail");
+   CHECK(s.header(reply, "accept-ranges") == "bytes");
+
+   // A range across the two parts
+   auto ranged = s.client();
+   auto range  = s.t.http(XIpfs::service, {{"Range", "bytes=1048574-1048577"}})
+                    .get<HttpReply>("/ipfs/" + cidToString(cid));
+   CHECK(range.status == HttpStatus::partialContent);
+   CHECK(std::string(range.body.begin(), range.body.end()) == "aata");
+   CHECK(s.header(range, "content-range") == "bytes 1048574-1048577/1048580");
+   range = s.t.http(XIpfs::service, {{"Range", "bytes=-4"}})
+              .get<HttpReply>("/ipfs/" + cidToString(cid));
+   CHECK(std::string(range.body.begin(), range.body.end()) == "tail");
+
+   // Parts of another size are not this node's layout
+   std::vector<char> quarter(262144, 'q');
+   auto              idQ = idOf(codecRaw, quarter);
+   auto other = node({{idQ, "", quarter.size()}, {idQ, "", quarter.size()}}, UnixFsType::file);
+   CHECK(s.put(idOf(codecDagPb, other), other) == HttpStatus::badRequest);
+}
+
+TEST_CASE("x-ipfs: files and directories are served from the file store")
 {
    Store s;
    auto  hello = s.add(codecRaw, chars("hello world\n"));
@@ -141,16 +210,10 @@ TEST_CASE("x-ipfs: files and directories are served from their blocks")
    CHECK(reply.status == HttpStatus::ok);
    CHECK(reply.body == chars("hello world\n"));
 
-   // A file in two parts
-   auto partA = s.add(codecRaw, chars("first part, "));
-   auto partB = s.add(codecRaw, chars("second part"));
-   auto file  = s.add(codecDagPb, node({{partA, "", 12}, {partB, "", 11}}, UnixFsType::file));
-   CHECK(s.get("/ipfs/" + cidToString(file)).body == chars("first part, second part"));
-
    // Directories
    auto page = s.add(codecRaw, chars("<html>index</html>"));
    auto sub  = s.add(codecDagPb,
-                     node({{file, "joined.txt", 23}, {page, "index.html", 18}},
+                     node({{hello, "copy.txt", 12}, {page, "index.html", 18}},
                           UnixFsType::directory));
    auto root = s.add(codecDagPb,
                      node({{hello, "hello.txt", 12}, {sub, "sub", 0}}, UnixFsType::directory));
@@ -162,8 +225,10 @@ TEST_CASE("x-ipfs: files and directories are served from their blocks")
    CHECK(reply.contentType == "text/plain");
    CHECK(s.header(reply, "cache-control") == "public, max-age=31536000, immutable");
    CHECK(s.header(reply, "access-control-allow-origin") == "*");
+   // The header that asks the node to send the file does not reach the client
+   CHECK(s.header(reply, "x-psibase-send-file").empty());
 
-   CHECK(s.get(base + "/sub/joined.txt").body == chars("first part, second part"));
+   CHECK(s.get(base + "/sub/copy.txt").body == chars("hello world\n"));
    // A directory stands for its index.html
    reply = s.get(base + "/sub/");
    CHECK(reply.body == chars("<html>index</html>"));

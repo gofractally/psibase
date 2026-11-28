@@ -217,6 +217,7 @@ function(add suffix)
             native/src/log.cpp
             native/src/LogSocket.cpp
             native/src/Mount.cpp
+            native/src/FileStore.cpp
             native/src/NativeFunctions.cpp
             native/src/PsizamPolicy.cpp
             native/src/NativeAotCache.cpp

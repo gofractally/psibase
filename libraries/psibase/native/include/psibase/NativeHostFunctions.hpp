@@ -52,7 +52,12 @@
    X(socketOpen)                         \
    X(socketSend)                         \
    X(socketSetFlags)                     \
-   X(readFile)
+   X(readFile)                           \
+   X(fileAppend)                         \
+   X(fileCommit)                         \
+   X(fileRemove)                         \
+   X(fileSize)                           \
+   X(fileRead)
 
 namespace psibase
 {

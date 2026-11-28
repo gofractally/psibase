@@ -1,3 +1,4 @@
+#include <psibase/FileStore.hpp>
 #include <psibase/NativeFunctions.hpp>
 
 #include <psibase/ActionContext.hpp>
@@ -1119,6 +1120,65 @@ namespace psibase
       {
          return clearResult(*this);
       }
+   }
+
+
+   namespace
+   {
+      // The files of a node-local service. They are node state, not chain
+      // state, so they exist only where subjective data does.
+      FileStore& filesOf(NativeFunctions& self)
+      {
+         check(isSubjectiveContext(self), "Files are only available during subjective execution");
+         check(self.code.flags & ExecutionContext::isLocal, "Service is not allowed to keep files");
+         auto& files = self.transactionContext.blockContext.systemContext.files;
+         check(!!files, "This node has no file store");
+         return *files;
+      }
+      std::string_view text(std::span<const char> s)
+      {
+         return {s.data(), s.size()};
+      }
+   }  // namespace
+
+   std::int32_t NativeFunctions::fileAppend(std::span<const char> name, std::span<const char> data)
+   {
+      return filesOf(*this).append(code.codeNum, text(name), data) ? 0 : -1;
+   }
+
+   std::int32_t NativeFunctions::fileCommit(std::span<const char> pending,
+                                            std::span<const char> name)
+   {
+      return filesOf(*this).commit(code.codeNum, text(pending), text(name)) ? 0 : -1;
+   }
+
+   std::int32_t NativeFunctions::fileRemove(std::span<const char> name, std::uint32_t pending)
+   {
+      return filesOf(*this).remove(code.codeNum, text(name), pending != 0) ? 0 : -1;
+   }
+
+   // The size as 8 bytes, little-endian, in the result buffer
+   std::uint32_t NativeFunctions::fileSize(std::span<const char> name, std::uint32_t pending)
+   {
+      auto size = filesOf(*this).size(code.codeNum, text(name), pending != 0);
+      if (!size)
+         return clearResult(*this);
+      std::vector<char> out(8);
+      for (int i = 0; i < 8; ++i)
+         out[i] = static_cast<char>(*size >> (8 * i));
+      return setResult(*this, std::move(out));
+   }
+
+   std::uint32_t NativeFunctions::fileRead(std::span<const char> name,
+                                           std::uint64_t         offset,
+                                           std::uint32_t         length)
+   {
+      // What one call returns is bounded like any other value a service reads.
+      constexpr std::uint32_t maxRead = 8 * 1024 * 1024;
+      auto data = filesOf(*this).read(code.codeNum, text(name), offset, std::min(length, maxRead));
+      if (!data)
+         return clearResult(*this);
+      return setResult(*this, std::move(*data));
    }
 
 }  // namespace psibase

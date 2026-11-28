@@ -349,6 +349,39 @@ namespace psibase
       /// Returns -1 if the file cannot be opened for any reason
       PSIBASE_NATIVE(readFile)
       std::uint32_t readFile(const char* name, std::uint32_t len);
+
+      /// Plain files of the calling node-local service
+      /// (gofractally/psibase#2312). A name is 1 to 128 characters of a-z
+      /// and 0-9. A file is written front to back under one name and then
+      /// committed under another; nothing can be read before the commit.
+      ///
+      /// Adds `data` to the file being written under `name`, starting it if
+      /// there is none. Returns 0, or -1 on failure.
+      PSIBASE_NATIVE(fileAppend)
+      std::int32_t fileAppend(const char* name,
+                              uint32_t    nameLen,
+                              const char* data,
+                              uint32_t    dataLen);
+      /// Makes the file being written under `pending` readable as `name`.
+      /// If `name` exists it is kept and what was written is dropped.
+      /// Returns 0, or -1 on failure.
+      PSIBASE_NATIVE(fileCommit)
+      std::int32_t fileCommit(const char* pending,
+                              uint32_t    pendingLen,
+                              const char* name,
+                              uint32_t    nameLen);
+      /// Removes a committed file, or (`pending` non-zero) one being written.
+      PSIBASE_NATIVE(fileRemove)
+      std::int32_t fileRemove(const char* name, uint32_t nameLen, uint32_t pending);
+      /// Sets result to the size of the file as 8 little-endian bytes and
+      /// returns 8. Returns -1 if there is no such file.
+      PSIBASE_NATIVE(fileSize)
+      uint32_t fileSize(const char* name, uint32_t nameLen, uint32_t pending);
+      /// Sets result to at most `length` bytes of a committed file from
+      /// `offset` and returns their number. Returns -1 if there is no such
+      /// file. One call returns at most 8 MiB.
+      PSIBASE_NATIVE(fileRead)
+      uint32_t fileRead(const char* name, uint32_t nameLen, uint64_t offset, uint32_t length);
    }  // namespace raw
 
    /// Get result

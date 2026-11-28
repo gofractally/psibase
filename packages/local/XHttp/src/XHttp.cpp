@@ -476,6 +476,49 @@ void XHttp::asyncClose(std::int32_t socket)
    }
 }
 
+namespace
+{
+   // Sends a node-local service's reply. A reply that carries the send-file
+   // header has no body of its own: the header names one of the service's
+   // files in the node's file store and the part of it to send, and the node
+   // sends those bytes itself. Only replies of local services come through
+   // here; a chain service cannot ask for a file.
+   void sendLocalReply(std::int32_t sock, AccountNumber service, HttpReply&& reply)
+   {
+      auto pos = std::ranges::find_if(reply.headers,
+                                      [](const HttpHeader& h) { return h.matches(sendFileHeader); });
+      if (pos == reply.headers.end())
+      {
+         psibase::socketSend(sock, psio::to_pssz(std::move(reply)));
+         return;
+      }
+      // "<name>;<offset>;<length>"
+      std::string_view value  = pos->value;
+      auto             first  = value.find(';');
+      auto             second = first == std::string_view::npos ? first : value.find(';', first + 1);
+      check(second != std::string_view::npos, "malformed send-file header");
+      auto number = [](std::string_view text)
+      {
+         std::uint64_t result = 0;
+         check(!text.empty() && text.size() <= 19, "malformed send-file header");
+         for (char ch : text)
+         {
+            check(ch >= '0' && ch <= '9', "malformed send-file header");
+            result = result * 10 + static_cast<std::uint64_t>(ch - '0');
+         }
+         return result;
+      };
+      HttpFileReply file{.service = service,
+                         .file    = std::string{value.substr(0, first)},
+                         .offset  = number(value.substr(first + 1, second - first - 1)),
+                         .length  = number(value.substr(second + 1))};
+      reply.headers.erase(pos);
+      reply.body.clear();
+      file.reply = std::move(reply);
+      psibase::socketSend(sock, psio::to_pssz(std::move(file)), sendFileFlag);
+   }
+}  // namespace
+
 void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
 {
    auto sender = getSender();
@@ -898,6 +941,9 @@ extern "C" [[clang::export_name("serve")]] void serve()
          server = {service, service};
 
       std::optional<HttpReply> reply;
+      // The local service whose reply this is: a reply may ask for one of
+      // that service's own files to be sent as its body.
+      AccountNumber replier;
 
       // Handle registered servers
       if (server)
@@ -905,6 +951,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
          auto service =
              (req.target.starts_with(XHttp::commonPrefix) ? XHttp::commonService : server->server);
          owned.put({.socket = sock, .owner = service});
+         replier = service;
          reply = psibase::Actor<ServerInterface>(XHttp::service, service)
                      .serveSys(req, std::optional{sock}, std::nullopt);
          if (!owned.get(sock))
@@ -921,6 +968,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
          if (code)
          {
             owned.put({.socket = sock, .owner = XSites::service});
+            replier = XSites::service;
             reply = psibase::Actor<ServerInterface>(XHttp::service, XSites::service)
                         .serveSys(req, std::optional{sock}, std::nullopt);
 
@@ -936,7 +984,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
       }
       if (reply)
       {
-         psibase::socketSend(sock, psio::to_pssz(std::move(*reply)));
+         sendLocalReply(sock, replier, std::move(*reply));
          return;
       }
    }

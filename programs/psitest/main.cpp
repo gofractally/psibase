@@ -1,5 +1,7 @@
+#include <atomic>
 #include <boost/filesystem/operations.hpp>
 #include <psibase/ActionContext.hpp>
+#include <psibase/FileStore.hpp>
 #include <psibase/LogSocket.hpp>
 #include <psibase/NativeAotCache.hpp>
 #include <psibase/NativeFunctions.hpp>
@@ -421,6 +423,13 @@ struct test_chain
                                  {},
                                  state.watchdogManager,
                                  std::make_shared<psibase::Sockets>(this->db)});
+      // Plain files of node-local services live beside the chain's data.
+      // Chains of one test process can share a database directory (one is
+      // cloned from another), and files are not part of a database, so each
+      // chain gets a directory of its own.
+      static std::atomic<unsigned> nextFileStore{0};
+      sys->files = std::make_shared<psibase::FileStore>(
+          this->db.directory() / "files" / std::to_string(nextFileStore++));
       state.shared_memory_cache.init(*sys);
       head = this->db.getHead();
    }
@@ -739,6 +748,25 @@ struct HttpSocket : psibase::AutoCloseSocket
    }
    void send(psibase::Writer&, std::span<const char> data, std::uint32_t flags) override
    {
+      if (flags == psibase::sendFileFlag)
+      {
+         // A reply whose body is part of a file. A node sends it from the
+         // file as the client takes it; a test gets it whole.
+         if (!response.empty())
+            return;
+         auto file = psio::from_pssz<psibase::HttpFileReply>(data);
+         auto body = files ? files->read(file.service, file.file, file.offset, file.length)
+                           : std::nullopt;
+         if (!body || body->size() != file.length)
+         {
+            file.reply = psibase::HttpReply{.status      = psibase::HttpStatus::notFound,
+                                            .contentType = "text/plain"};
+            body       = std::vector<char>{};
+         }
+         file.reply.body = std::move(*body);
+         sendImpl(psio::to_pssz(file.reply));
+         return;
+      }
       if (flags != 0)
          psibase::abortMessage("Invalid flags for HttpSocket: " + std::to_string(flags));
       if (!response.empty())
@@ -786,6 +814,7 @@ struct HttpSocket : psibase::AutoCloseSocket
       PSIBASE_LOG(chain->logger, info) << "Handled HTTP request";
    }
    std::vector<char>         response;
+   std::shared_ptr<psibase::FileStore> files;
    psibase::TransactionTrace trace;
    QueryTimes                queryTimes;
    test_chain*               chain = nullptr;
@@ -1609,6 +1638,7 @@ struct callbacks
       std::int32_t fd;
 
       auto socket = std::make_shared<HttpSocket>();
+      socket->files = chain.sys->files;
       if (auto pos = std::ranges::find(state.sockets, nullptr); pos != state.sockets.end())
       {
          *pos = socket;

@@ -252,4 +252,24 @@ namespace psibase
    using HttpReply = BasicHttpReply<std::vector<char>>;
 
    using HttpReplyRef = BasicHttpReply<std::span<const char>>;
+
+   /// A reply whose body is part of a file in the node's file store.
+   ///
+   /// A node-local service does not build such a body: it answers with a
+   /// reply that has no body and the header `sendFileHeader`, whose value is
+   /// "<name>;<offset>;<length>". The HTTP service takes the header off and
+   /// hands the node this record; the node sends the reply's headers and
+   /// then those bytes of the service's file, as fast as the client takes
+   /// them. Used with socketSend and `sendFileFlag`.
+   struct HttpFileReply
+   {
+      HttpReply     reply;
+      AccountNumber service;
+      std::string   file;
+      std::uint64_t offset = 0;
+      std::uint64_t length = 0;
+      PSIO_REFLECT(HttpFileReply, reply, service, attr(file, utf8), offset, length)
+   };
+   inline constexpr std::string_view sendFileHeader = "X-Psibase-Send-File";
+   inline constexpr std::uint32_t    sendFileFlag   = 1;
 }  // namespace psibase
