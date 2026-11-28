@@ -176,6 +176,61 @@ export const passkeyLabel = (): PasskeyLabel | undefined => {
     return { name: first, displayName: device.displayName || first };
 };
 
+/**
+ * Whether this passkey controls `name` on the chain now, whatever any list
+ * says; if it does, the account is brought to this browser. This is the
+ * test that decides a sign-in by name: the lists of names a passkey or the
+ * node carries are only hints for which names to try.
+ */
+export const claimByName = async (
+    net: Network,
+    unlocked: Unlocked,
+    name: string,
+): Promise<"held" | "not-usable" | "not-ours"> => {
+    const found = await keysFor(net, unlocked, name);
+    if (!found) return "not-ours";
+    found.keys.ownerSecret.fill(0);
+    const entry = { name, ownerSeq: found.keys.owner.seq, activeSeq: found.keys.active.seq };
+    if (found.record.state !== "normal") {
+        rememberOnDevice(entry, false, false);
+        return "not-usable";
+    }
+    await adoptFor("supervisor", name, found.keys.activePem);
+    rememberOnDevice(entry, false);
+    // So that the next sign-in finds it without the name being typed.
+    await recordAccount(net, unlocked, entry).catch((e) => console.warn(e));
+    return "held";
+};
+
+/**
+ * Checks the accounts this browser lists against the chain without the
+ * passkey: one that is gone is dropped, and one whose keys were replaced
+ * since is marked as not held, so it is not offered as a way in.
+ */
+export const recheckDevice = async (net: Network) => {
+    for (const entry of loadDevice().accounts) {
+        const record = await fetchRecord(net.siblingOrigin("auth-sig"), entry.name, net.token).catch(
+            () => "unknown" as const,
+        );
+        if (record === "unknown") continue; // Could not ask; leave it.
+        if (!record) {
+            dropFromDevice(entry.name);
+            continue;
+        }
+        if (entry.source === "imported" || entry.held === false) continue;
+        if (
+            String(record.owner.seq) !== String(entry.ownerSeq) ||
+            String(record.active.seq) !== String(entry.activeSeq)
+        ) {
+            rememberOnDevice(
+                { name: entry.name, ownerSeq: entry.ownerSeq, activeSeq: entry.activeSeq },
+                false,
+                false,
+            );
+        }
+    }
+};
+
 /** Brings the password manager's label up to date, where the browser can. */
 export const refreshPasskeyLabel = async () => {
     const device = loadDevice();
@@ -438,12 +493,17 @@ export const syncAccounts = async (
     net: Network,
     unlocked: Unlocked,
 ): Promise<string[]> => {
-    // The passkey's own notes first; the node's list for a passkey that
-    // carries none. Sequence values always come from the chain.
+    // Names come from the passkey's own notes and from the node's list.
+    // Both are asked: an account made without a passkey prompt is in the
+    // list only, and one made where the node could not be reached is in the
+    // notes only. Neither is believed: each name is offered only if this
+    // passkey derives its key on the chain now (`keysFor`). Sequence values
+    // always come from the chain.
     const carried = unlocked.notes?.accounts ?? [];
-    const names = carried.length
-        ? carried
-        : (await fetchList(listStore(net, unlocked))).accounts.map((a) => a.name);
+    const listed = await fetchList(listStore(net, unlocked))
+        .then((list) => list.accounts.map((a) => a.name))
+        .catch(() => [] as string[]);
+    const names = [...new Set([...carried, ...listed])];
     notePasskey({ userId: unlocked.userId, displayName: unlocked.notes?.displayName });
     const device = loadDevice();
     for (const entry of names.map((name) => ({ name }))) {

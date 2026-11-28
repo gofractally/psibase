@@ -22,6 +22,7 @@ import { dropHeld, holdRoot, sweepHeld, takeHeldRoot } from "./held-root";
 import {
     type Network,
     choiceFor,
+    claimByName,
     clearDevice,
     dropFromDevice,
     forgetAccount,
@@ -813,6 +814,17 @@ const signIn = async (mode: Mode) => {
         // A passkey labelled by an earlier version of this page ("name +2")
         // is relabelled with the account name alone.
         void refreshPasskeyLabel().catch((e) => console.warn(e));
+        // The name that was typed is checked directly: this passkey
+        // controls it if it derives the account's key on the chain now,
+        // whether or not any list of the passkey's accounts mentions it.
+        let unusable = false;
+        if (start.exists && !heldAccounts().includes(name)) {
+            try {
+                unusable = (await claimByName(network(session), unlocked, name)) === "not-usable";
+            } catch (e) {
+                console.warn("Could not check the account against the chain", e);
+            }
+        }
         const held = heldAccounts();
 
         if (held.includes(name) || start.exists) unlocked.wipe();
@@ -827,6 +839,12 @@ const signIn = async (mode: Mode) => {
             }
             rememberChoice(destination.app, name);
             await goToDestination(session, true);
+            return;
+        }
+        if (start.exists && unusable) {
+            // Theirs, but paused or frozen: the manage step says what can
+            // be done.
+            go("manage", { account: name });
             return;
         }
         if (start.exists) {

@@ -34,6 +34,7 @@ import {
     loadDevice,
     loginFor,
     recordAccount,
+    recheckDevice,
     refreshPasskeyLabel,
     rememberOnDevice,
     sameKey,
@@ -939,6 +940,10 @@ export const runAccountStep = async (ctx: PageContext) => {
     const refresh = async () => {
         if (intent === "recover") return showRecoverName();
         if (intent === "import") return showImport(params.get("convert") === "1");
+        // What this browser lists is checked against the chain before it
+        // is offered: an account that is gone, or whose keys were replaced
+        // since the last sign-in, is not a way in.
+        await recheckDevice(net);
         if (intent !== "new" && loadDevice().accounts.length) return showChooser();
         const status = await api<Status>("/status");
         const device = loadDevice();
