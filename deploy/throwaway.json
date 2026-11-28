@@ -1,0 +1,18 @@
+{
+  "name": "throwaway",
+  "host": "psibase.localhost",
+  "network_name": "throwaway1",
+  "producer": "prod",
+  "guest": true,
+  "paths": {
+    "root": "~/claude-psitri-x86/throwaway",
+    "build": "~/claude-psitri-x86/build-cm",
+    "source": "~/claude-psitri-x86/psibase-wt",
+    "secrets": "~/claude-psitri-x86/throwaway-secrets",
+    "backups": "~/claude-psitri-x86/throwaway-backups"
+  },
+  "node": { "listen": "127.0.0.1:8691", "http_timeout": 30 },
+  "packages": { "boot": ["DevDefault"], "after_boot": [] },
+  "local_packages": ["XSignup", "XAdmin", "XPackages", "XProxy", "XHttp", "XBasic", "XKeys"],
+  "install_together": [["Supervisor", "CommonApi"], ["HttpServer", "XSignup", "Supervisor"]]
+}
