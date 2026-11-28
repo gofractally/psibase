@@ -26,6 +26,16 @@ def die(message):
     sys.exit(1)
 
 
+class BridgeUnreachable(Exception):
+    pass
+
+
+# Withdrawal request states: 0 queued, 1 in a batch, 2 paid, 3 cancelled, 4 fee allowance too low,
+# 5 waiting for the reserve. Batch states: 0 open, 1 completed.
+FINAL_REQUEST = (2, 3)
+FINAL_BATCH = (1,)
+
+
 class Deployment:
     def __init__(self, config_path):
         self.config = json.loads(Path(config_path).read_text())
@@ -124,13 +134,13 @@ class Deployment:
 
     def start(self, names=None):
         self.write_units()
-        for name in names or self.processes():
+        for name in (self.processes() if names is None else names):
             self.run(["systemctl", "--user", "enable", "--now", "--quiet", self.unit(name)], check=True)
             if name == "node":
                 self.wait_node()
 
     def stop(self, names=None):
-        for name in reversed(list(names or self.processes())):
+        for name in reversed(list(self.processes() if names is None else names)):
             self.run(["systemctl", "--user", "disable", "--now", "--quiet", self.unit(name)])
 
     def wait_node(self, seconds=60):
@@ -151,10 +161,55 @@ class Deployment:
 
     # ---- checks --------------------------------------------------------------------------
     def bridge(self):
+        """The bridge's snapshot; None when no bridge is configured. A bridge that is configured
+        and cannot be asked is an error, never 'nothing there'."""
         if "bridge" not in self.config:
             return None
-        status, body = self.get("btcbridge", f"/snapshot?owner={self.config['bridge']['treasury']}")
-        return json.loads(body) if status == 200 else None
+        try:
+            status, body = self.get("btcbridge", f"/snapshot?owner={self.config['bridge']['treasury']}")
+        except OSError as error:
+            raise BridgeUnreachable(str(error))
+        if status != 200:
+            raise BridgeUnreachable(f"snapshot answered {status}")
+        return json.loads(body)
+
+    @staticmethod
+    def held(b):
+        """What a bridge still holds or owes, in words; empty when it holds nothing."""
+        c, found = b["config"], []
+        for field in ("reserve", "liability", "escrow"):
+            if c[field]:
+                found.append(f"{field} {c[field]}")
+        unspent = [u for u in b["utxos"] if u["status"] != 2]
+        if unspent:
+            found.append(f"{len(unspent)} custody output(s) not spent, {sum(u['value'] for u in unspent)} sat")
+        open_requests = [r for r in b["requests"] if r["status"] not in FINAL_REQUEST]
+        if open_requests:
+            found.append(f"{len(open_requests)} withdrawal request(s) not final")
+        open_batches = [x for x in b["batches"] if x["status"] not in FINAL_BATCH]
+        if open_batches:
+            found.append(f"{len(open_batches)} batch(es) not final")
+        return found
+
+    @staticmethod
+    def books(b):
+        """What an upgrade may not change (relay height may advance; final records may only
+        disappear, which is not compared here)."""
+        c = b["config"]
+        return json.dumps({
+            "policy": c["policy"], "counters": [c["next_request"], c["next_batch"], c["next_address"]],
+            "totals": [c["reserve"], c["liability"], c["escrow"]],
+            "unspent": sorted((u["id"], u["value"], u["status"]) for u in b["utxos"] if u["status"] != 2),
+            "requests": sorted(json.dumps(r, sort_keys=True) for r in b["requests"] if r["status"] not in FINAL_REQUEST),
+            "batches": sorted(json.dumps(x, sort_keys=True) for x in b["batches"] if x["status"] not in FINAL_BATCH),
+        }, sort_keys=True)
+
+    def node_answers(self):
+        try:
+            self.get("accounts", "/common/chainid", timeout=3)
+            return True
+        except OSError:
+            return False
 
     def verify(self):
         ok = True
@@ -167,8 +222,9 @@ class Deployment:
         check("node answers", status == 200, body.decode()[:20] if status == 200 else str(status))
         # A chain booted without a block key takes unsigned transactions from root.
         r = self.run([self.cli, "push", *self.api(), "--console=false", "--trace", "error", "-"], capture_output=True, text=True, timeout=60,
+                     # The producer's own account, which exists: accepted, this changes nothing.
                      input=json.dumps([{"sender": "root", "service": "accounts", "method": "newAccount",
-                                        "data": {"name": "zzunsigned1", "authService": "auth-any", "requireNew": False}}]))
+                                        "data": {"name": self.producer, "authService": "auth-sig", "requireNew": False}}]))
         check("an unsigned transaction from root is refused", r.returncode != 0)
         name = self.graphql("branding", "{ networkName }")["networkName"]
         check("network name", name == self.config["network_name"], name)
@@ -185,12 +241,22 @@ class Deployment:
             check("sign-in page is served through the proxy", code == "200", code)
             code, where = outside(f"{self.config['network_name']}.{self.host}")
             check("a signed-out visit is sent to sign-in", code == "302" and "sign-in" in where, f"{code} {where}")
+            r = self.run(["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "-H", "X-Psibase-Local: 1",
+                          "--resolve", f"tokens.{self.host}:443:{proxy['public_ip']}", f"https://tokens.{self.host}/graphql",
+                          "-H", "Content-Type: application/graphql", "-d", "{__typename}"], capture_output=True, text=True, timeout=30)
+            check("the operator header gets nothing past the gate through the proxy", r.stdout in ("401", "302", "403"), r.stdout)
             for host in proxy["operator_hosts"]:
                 code, _ = outside(f"{host}.{self.host}")
                 check(f"{host} is not reachable from outside", code == "404", code)
-        b = self.bridge()
-        if "bridge" in self.config:
-            check("bridge answers", b is not None)
+        try:
+            b = self.bridge()
+        except BridgeUnreachable as error:
+            b = None
+            check("bridge answers", False, str(error))
+        signers = self.signer_secrets()
+        if signers is not None:
+            files = [f for f in signers.rglob("*") if f.is_file()]
+            check("signer secrets are present and private", bool(files) and not any(f.stat().st_mode & 0o077 for f in files), f"{len(files)} files")
         if b:
             check("relay is not paused", not b["relay"]["paused"])
             check("bridge is not paused", not b["config"]["paused"])
@@ -204,6 +270,10 @@ class Deployment:
             check(f"{name} runs under its unit", self.running(name))
         return ok
 
+    def signer_secrets(self):
+        path = self.config.get("bridge", {}).get("signer_secrets")
+        return Path(os.path.expanduser(path.replace("{root}", str(self.root)))) if path else None
+
     # ---- backup --------------------------------------------------------------------------
     def backup(self, with_db=False):
         target = Path(os.path.expanduser(self.config["paths"]["backups"])) / time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
@@ -215,13 +285,27 @@ class Deployment:
                 shutil.copytree(source, target / source.name)
             elif source.exists():
                 shutil.copy2(source, target / source.name)
-        b = self.bridge()
-        if b:
-            (target / "bridge-snapshot.json").write_text(json.dumps(b))
+        signers = self.signer_secrets()
+        if signers is not None:
+            if not signers.is_dir():
+                die(f"the bridge's signer secrets are not at {signers}")
+            shutil.copytree(signers, target / "signer-secrets")
+        try:
+            b = self.bridge()
+            if b:
+                (target / "bridge-snapshot.json").write_text(json.dumps(b))
+        except BridgeUnreachable as error:
+            print(f"bridge snapshot not taken: {error}")
         if with_db:
-            # A copy of a running node's files is not a snapshot: stop, copy, start.
+            # A copy of a running node's files is not a snapshot: stop, copy, start. Everything
+            # else first, the node last, and the copy only once the node no longer answers.
             others = [n for n in self.processes() if n != "node"]
-            self.stop(others + ["node"])
+            self.stop(others)
+            self.stop(["node"])
+            time.sleep(2)
+            if self.node_answers():
+                self.start(others)
+                die("the node still answers after its unit was stopped (it is not run by this script): no database copy was made")
             # Not the node's socket, which is not a file.
             shutil.copytree(self.root / "db", target / "db", ignore=lambda d, names: [n for n in names if (Path(d) / n).is_socket()])
             self.start(["node"] + others)
@@ -245,6 +329,9 @@ class Deployment:
                       "--package-source", self.packages, *(["--local"] if local else []), "--reinstall", "-y", *names],
                      capture_output=True, text=True, timeout=900)
         if r.returncode:
+            for name in names:   # the directory again says what is installed
+                if (kept / f"{name}.psi").exists():
+                    shutil.copy2(kept / f"{name}.psi", self.packages / f"{name}.psi")
             die(f"installing {' '.join(names)} failed: " + (r.stderr or r.stdout)[-600:])
         print("installed " + " ".join(names))
 
@@ -257,22 +344,40 @@ class Deployment:
             if names & set(group) and not set(group) <= names:
                 print(f"adding {sorted(set(group) - names)}: installed together with {sorted(names & set(group))}")
                 names |= set(group)
-        before = self.bridge()
-        local = [n for n in sorted(names) if n in self.config.get("local_packages", [])]
-        chain = [n for n in sorted(names) if n not in local]
-        if local:
-            self.install(local, local=True)   # a local package is refused in an install with chain packages
-        if chain:
-            self.install(chain)
-        if "Homepage" in names:
-            # Its install script sets the network name back to "network".
-            self.set_network_name()
-        after = self.bridge()
-        if before and after:
-            keep = lambda s: json.dumps({k: s[k] for k in ("config", "requests", "batches", "utxos")}, sort_keys=True)
-            if keep(before) != keep(after):
-                die("the bridge's books changed across the upgrade: stop and look")
-            print("bridge books identical before and after")
+        try:
+            before = self.bridge()
+        except BridgeUnreachable as error:
+            die(f"the bridge cannot be asked for its books ({error}): no upgrade while it is unknown what it holds")
+        if names & set(self.config.get("backup_before", [])):
+            print("backup before an upgrade of a custody or account package:")
+            self.backup()
+        # Nothing may push bridge actions while its books are compared.
+        pushers = [n for n in self.config.get("bridge", {}).get("pushers", []) if self.running(n)] if before else []
+        self.stop(pushers)
+        try:
+            if before:
+                before = self.bridge()
+            local = [n for n in sorted(names) if n in self.config.get("local_packages", [])]
+            chain = [n for n in sorted(names) if n not in local]
+            if local:
+                self.install(local, local=True)   # a local package is refused in an install with chain packages
+            if chain:
+                self.install(chain)
+            if "Homepage" in names:
+                # Its install script sets the network name back to "network".
+                self.set_network_name()
+            if before:
+                try:
+                    after = self.bridge()
+                except BridgeUnreachable as error:
+                    die(f"the bridge does not answer after the upgrade ({error}): stop and look")
+                if self.books(before) != self.books(after):
+                    die("the bridge's books changed across the upgrade: stop and look (its relayer and bots are left stopped)")
+                print("bridge books unchanged: policy, counters, reserve, liability, escrow, unspent outputs, open requests and batches")
+        except SystemExit:
+            raise
+        else:
+            self.start(pushers)
         self.record("upgrade " + " ".join(sorted(names)))
 
     def set_network_name(self):
@@ -284,14 +389,22 @@ class Deployment:
     # ---- boot ----------------------------------------------------------------------------
     def boot(self, force=False):
         if (self.root / "db").exists() and any((self.root / "db").iterdir()):
-            b = self.bridge() if self.running("node") else None
-            holds = b and (b["config"]["reserve"] or b["config"]["escrow"] or any(r["status"] in (0, 1, 4, 5) for r in b["requests"]))
-            if holds:
-                die("the bridge of the existing chain holds a reserve or open withdrawals: withdraw or sweep it first (README, 'Moving to a new chain')")
+            if "bridge" in self.config:
+                # Only a snapshot that was read and shows nothing held lifts the refusal.
+                if not self.node_answers():
+                    die("a chain exists here and its node does not answer, so its bridge cannot be asked what it holds: start it first")
+                try:
+                    found = self.held(self.bridge())
+                except BridgeUnreachable as error:
+                    die(f"a chain exists here and its bridge cannot be asked what it holds ({error}): refusing")
+                if found:
+                    die("the bridge of the existing chain still holds: " + "; ".join(found) + ". Withdraw or sweep it first (README, 'Moving to a new chain')")
             if not force:
                 die("a chain already exists here; boot --replace-existing-chain to discard it")
             self.backup(with_db=True)
             self.stop()
+            if self.node_answers():
+                die("the node still answers after its unit was stopped: it is not run by this script; stop it yourself")
             shutil.move(str(self.root / "db"), str(self.root / f"db.replaced-{int(time.time())}"))
         block, producer = self.secret("block.key.pem"), self.secret(f"{self.producer}.key.pem")
         for d in ("bin", "share"):

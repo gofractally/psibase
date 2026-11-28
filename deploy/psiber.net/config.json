@@ -13,22 +13,62 @@
     "secrets": "~/claude-psitri-x86/demo/keys",
     "backups": "~/claude-psitri-x86/backups"
   },
-  "node": { "listen": "127.0.0.1:8080", "http_timeout": 75 },
-  "packages": {
-    "boot": ["DevDefault"],
-    "after_boot": ["FaucetTok", "Favor", "AuthRecover", "DevNameMarkets"]
+  "node": {
+    "listen": "127.0.0.1:8080",
+    "http_timeout": 75
   },
-  "local_packages": ["XSignup", "XAdmin", "XPackages", "XProxy", "XHttp", "XBasic", "XKeys"],
-  "install_together": [
-    ["Supervisor", "CommonApi"],
-    ["HttpServer", "XSignup", "Supervisor"]
+  "packages": {
+    "boot": [
+      "DevDefault"
+    ],
+    "after_boot": [
+      "FaucetTok",
+      "Favor",
+      "AuthRecover",
+      "DevNameMarkets"
+    ]
+  },
+  "local_packages": [
+    "XSignup",
+    "XAdmin",
+    "XPackages",
+    "XProxy",
+    "XHttp",
+    "XBasic",
+    "XKeys"
   ],
-  "signup": { "config_secret": "signup-config.json" },
+  "install_together": [
+    [
+      "Supervisor",
+      "CommonApi"
+    ],
+    [
+      "HttpServer",
+      "XSignup",
+      "Supervisor"
+    ]
+  ],
+  "signup": {
+    "config_secret": "signup-config.json"
+  },
   "proxy": {
     "caddy": "~/claude-psitri-x86/demo/proxy/pkg/caddy",
-    "public_ip": "127.0.0.1",
+    "public_ip": "45.76.30.199",
     "operator_port": 8081,
-    "operator_hosts": ["x-admin", "x-packages", "x-peers", "x-keys", "x-db", "x-run", "x-timer", "x-transact", "x-proxy", "x-http", "x-basic", "x-sites"]
+    "operator_hosts": [
+      "x-admin",
+      "x-packages",
+      "x-peers",
+      "x-keys",
+      "x-db",
+      "x-run",
+      "x-timer",
+      "x-transact",
+      "x-proxy",
+      "x-http",
+      "x-basic",
+      "x-sites"
+    ]
   },
   "bridge": {
     "network": "signet",
@@ -39,16 +79,80 @@
     "treasury": "liquidity",
     "relayer": "btcrelayer",
     "bitcoin_api": "https://mempool.space/signet/api",
-    "tip_command": "~/psibase-migration-20261121/deps/bitcoin-32.1/bin/bitcoin-cli -signet -datadir=$HOME/claude-psitri-x86/signet-node -rpcport=38442 getblockcount"
+    "tip_command": "~/psibase-migration-20261121/deps/bitcoin-32.1/bin/bitcoin-cli -signet -datadir=$HOME/claude-psitri-x86/signet-node -rpcport=38442 getblockcount",
+    "signer_secrets": "{root}/bridge-state/secrets",
+    "pushers": [
+      "relayer",
+      "bot"
+    ]
   },
   "services": {
-    "bitcoind": { "command": ["~/claude-psitri-x86/signet-node/start.sh"] },
-    "signer-0": { "command": ["~/claude-psitri-x86/signet-src/packages/user/target/x86_64-unknown-linux-gnu/debug/signing-daemon", "watch", "{root}/bridge-state/signer-0.json"] },
-    "signer-1": { "command": ["~/claude-psitri-x86/signet-src/packages/user/target/x86_64-unknown-linux-gnu/debug/signing-daemon", "watch", "{root}/bridge-state/signer-1.json"] },
-    "signer-2": { "command": ["~/claude-psitri-x86/signet-src/packages/user/target/x86_64-unknown-linux-gnu/debug/signing-daemon", "watch", "{root}/bridge-state/signer-2.json"] },
-    "relayer": { "command": ["/usr/bin/env", "python3", "relayer.py", "--state", "{root}/bridge-state"], "cwd": "~/claude-psitri-x86/signet-src/demo/btcbridge", "environment_file": "{root}/bridge/env.systemd" },
-    "bot": { "command": ["{root}/market/keep-bot.sh"], "cwd": "{root}/market" },
-    "welcome": { "command": ["/usr/bin/env", "python3", "welcome.py"], "cwd": "{root}/market" }
+    "bitcoind": {
+      "command": [
+        "~/claude-psitri-x86/signet-node/start.sh"
+      ]
+    },
+    "signer-0": {
+      "command": [
+        "~/claude-psitri-x86/signet-src/packages/user/target/x86_64-unknown-linux-gnu/debug/signing-daemon",
+        "watch",
+        "{root}/bridge-state/signer-0.json"
+      ]
+    },
+    "signer-1": {
+      "command": [
+        "~/claude-psitri-x86/signet-src/packages/user/target/x86_64-unknown-linux-gnu/debug/signing-daemon",
+        "watch",
+        "{root}/bridge-state/signer-1.json"
+      ]
+    },
+    "signer-2": {
+      "command": [
+        "~/claude-psitri-x86/signet-src/packages/user/target/x86_64-unknown-linux-gnu/debug/signing-daemon",
+        "watch",
+        "{root}/bridge-state/signer-2.json"
+      ]
+    },
+    "relayer": {
+      "command": [
+        "/usr/bin/env",
+        "python3",
+        "relayer.py",
+        "--state",
+        "{root}/bridge-state"
+      ],
+      "cwd": "~/claude-psitri-x86/signet-src/demo/btcbridge",
+      "environment_file": "{root}/bridge/env.systemd"
+    },
+    "bot": {
+      "command": [
+        "{root}/market/keep-bot.sh"
+      ],
+      "cwd": "{root}/market"
+    },
+    "welcome": {
+      "command": [
+        "/usr/bin/env",
+        "python3",
+        "welcome.py"
+      ],
+      "cwd": "{root}/market"
+    }
   },
-  "backup": ["{root}/bridge-state", "{root}/proxy/Caddyfile", "{root}/market/seed.json", "{root}/market/welcome.done.json"]
+  "backup": [
+    "{root}/bridge-state",
+    "{root}/proxy/Caddyfile",
+    "{root}/market/seed.json",
+    "{root}/market/welcome.done.json"
+  ],
+  "backup_before": [
+    "BtcBridge",
+    "Signing",
+    "AuthSigService",
+    "Accounts",
+    "AccountsService",
+    "Tokens",
+    "Transact",
+    "TransactService"
+  ]
 }
