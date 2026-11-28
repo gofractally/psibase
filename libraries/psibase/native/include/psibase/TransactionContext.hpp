@@ -94,7 +94,12 @@ namespace psibase
       // waited for, up to a bound, in a speculative run; and never while a
       // producer runs a transaction from its queue, which is deferred
       // instead (BlockContext::deferUncompiledCode).
-      void admitCode(const Checksum256& hash, std::span<const char> code, std::uint8_t vmVersion);
+      // `local`: code of a node-local service, which may also import the
+      // host functions of local services (localHostFunctions).
+      void admitCode(const Checksum256&    hash,
+                     std::span<const char> code,
+                     std::uint8_t          vmVersion,
+                     bool                  local = false);
 
       // For an engine adapter, with billing paused: this context is about to
       // execute code the engine has not compiled, in memory or stored.

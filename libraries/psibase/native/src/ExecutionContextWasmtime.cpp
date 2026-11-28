@@ -292,7 +292,11 @@ namespace psibase::vm_wasmtime
             return *ready;
          if (compileHook)
             compileHook(hash);
-         const auto                          admitted = admitNativeWasm(wasm, vmOptions, vmVersion);
+         const auto                          admitted =
+             // Chain code reached here through the chain's own rule
+             // (TransactionContext::admitCode); what this must also let
+             // through is the code of node-local services.
+             admitNativeWasm(wasm, vmOptions, vmVersion, true);
          Compiled result = [&]
          {
             try
@@ -814,7 +818,7 @@ namespace psibase::vm_wasmtime
    check(wt::detail::make_import<ExecutionContextImpl, &ExecutionContextImpl::name>( \
        &ExecutionContextImpl::name, "env", #name));                                  \
    ++count;
-         PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+         PSIBASE_ALL_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
 #undef PSIBASE_HOST_FUNCTION
          checkNativeHostFunctionCount("wasmtime", count);
          // Both engines of a profile import the same host functions.
@@ -823,7 +827,7 @@ namespace psibase::vm_wasmtime
          {
             auto& rt = *runtime;
 #define PSIBASE_HOST_FUNCTION(name) rt.add<&ExecutionContextImpl::name>("env", #name);
-            PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+            PSIBASE_ALL_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
 #undef PSIBASE_HOST_FUNCTION
             rt.link();
          }

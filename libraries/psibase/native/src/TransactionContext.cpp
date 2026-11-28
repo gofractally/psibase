@@ -671,10 +671,11 @@ namespace psibase
 
    void TransactionContext::admitCode(const Checksum256&    hash,
                                       std::span<const char> code,
-                                      std::uint8_t          vmVersion)
+                                      std::uint8_t          vmVersion,
+                                      bool                  local)
    {
       admitNativeWasm({reinterpret_cast<const std::uint8_t*>(code.data()), code.size()},
-                      impl->wasmConfig.vmOptions, vmVersion);
+                      impl->wasmConfig.vmOptions, vmVersion, local);
       BillingPause unbilled{*this};
       prepareCode(hash, vmVersion, [&] { return code; }, true);
    }

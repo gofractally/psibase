@@ -635,7 +635,7 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
       // The list every engine registers and admission checks imports
       // against (NativeHostFunctions.hpp).
 #define PSIBASE_HOST_FUNCTION(name) rhf_t::add<&ExecutionContextImpl::name>("env", #name);
-      PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+      PSIBASE_ALL_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
 #undef PSIBASE_HOST_FUNCTION
       // What was registered is exactly the admission table, or the node
       // does not start.

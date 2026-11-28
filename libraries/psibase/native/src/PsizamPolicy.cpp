@@ -536,28 +536,54 @@ namespace psibase
          }
       }
    }
-   const std::vector<NativeHostFunction>& nativeHostFunctions()
+   namespace
    {
       // psizam derives each wasm signature from the C++ member function, the
-      // same way for this table as for the psizam engines' own registration.
-      static const std::vector<NativeHostFunction> table = []
+      // same way for these tables as for the psizam engines' own
+      // registration. Both lists are registered once.
+      struct HostTables
       {
-         using Derive = psizam::registered_host_functions<NativeFunctions>;
+         std::vector<NativeHostFunction> consensus;
+         std::vector<NativeHostFunction> local;
+      };
+      const HostTables& hostTables()
+      {
+         static const HostTables tables = []
+         {
+            using Derive = psizam::registered_host_functions<NativeFunctions>;
 #define PSIBASE_HOST_FUNCTION(name) Derive::add<&NativeFunctions::name>("env", #name);
-         PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+            PSIBASE_ALL_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
 #undef PSIBASE_HOST_FUNCTION
-         auto&                           derived = Derive::mappings::get();
-         std::vector<NativeHostFunction> result;
+            auto&      derived = Derive::mappings::get();
+            HostTables result;
 #define PSIBASE_HOST_FUNCTION(name)                                              \
    {                                                                             \
       const auto& types = derived.host_functions[derived.named_mapping.at({"env", #name})]; \
-      result.push_back({"env", #name, types.params, types.ret});                 \
+      result.consensus.push_back({"env", #name, types.params, types.ret});       \
    }
-         PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+            PSIBASE_NATIVE_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
 #undef PSIBASE_HOST_FUNCTION
-         return result;
-      }();
-      return table;
+#define PSIBASE_HOST_FUNCTION(name)                                              \
+   {                                                                             \
+      const auto& types = derived.host_functions[derived.named_mapping.at({"env", #name})]; \
+      result.local.push_back({"env", #name, types.params, types.ret});           \
+   }
+            PSIBASE_LOCAL_HOST_FUNCTIONS(PSIBASE_HOST_FUNCTION)
+#undef PSIBASE_HOST_FUNCTION
+            return result;
+         }();
+         return tables;
+      }
+   }  // namespace
+
+   const std::vector<NativeHostFunction>& nativeHostFunctions()
+   {
+      return hostTables().consensus;
+   }
+
+   const std::vector<NativeHostFunction>& localHostFunctions()
+   {
+      return hostTables().local;
    }
 
    void checkNativeHostFunction(std::string_view              engine,
@@ -565,7 +591,8 @@ namespace psibase
                                 std::span<const std::uint8_t> params,
                                 std::span<const std::uint8_t> results)
    {
-      for (const auto& function : nativeHostFunctions())
+      for (const auto* table : {&nativeHostFunctions(), &localHostFunctions()})
+       for (const auto& function : *table)
          if (function.name == name)
          {
             if (!std::ranges::equal(function.params, params) ||
@@ -581,10 +608,11 @@ namespace psibase
 
    void checkNativeHostFunctionCount(std::string_view engine, std::size_t registered)
    {
-      if (registered != nativeHostFunctions().size())
+      const auto expected = nativeHostFunctions().size() + localHostFunctions().size();
+      if (registered != expected)
          throw std::runtime_error("the " + std::string(engine) + " engine registers " +
                                   std::to_string(registered) + " host functions; the admission " +
-                                  "table has " + std::to_string(nativeHostFunctions().size()));
+                                  "tables have " + std::to_string(expected));
    }
 
    namespace
@@ -592,7 +620,9 @@ namespace psibase
       // Every import must be a function the node provides, with the node's
       // signature. (validateNativeWasm has already refused imports that are
       // not functions.) Importing a function more than once is allowed.
-      void checkImports(const psizam::module& module)
+      // `allowLocal`: the functions of node-local services are accepted
+      // too. Never for code a transaction puts on chain.
+      void checkImports(const psizam::module& module, bool allowLocal)
       {
          auto text = [](const std::vector<std::uint8_t>& bytes)
          { return std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()); };
@@ -607,6 +637,11 @@ namespace psibase
                if (function.module == text(import.module_str) &&
                    function.name == text(import.field_str))
                   found = &function;
+            if (!found && allowLocal)
+               for (const auto& function : localHostFunctions())
+                  if (function.module == text(import.module_str) &&
+                      function.name == text(import.field_str))
+                     found = &function;
             if (!found)
                throw std::runtime_error("native WASM imports " + name +
                                         ", which is not a host function");
@@ -969,13 +1004,14 @@ namespace psibase
 
    NativeAdmission admitNativeWasm(std::span<const std::uint8_t> code,
                                    const VMOptions&              options,
-                                   std::uint8_t                  vmVersion)
+                                   std::uint8_t                  vmVersion,
+                                   bool                          allowLocal)
    {
       NativeAdmission result;
       admit(code, NativeVMOptions{options, {}, vmVersion},
             [&](const psizam::module& module)
             {
-               checkImports(module);
+               checkImports(module, allowLocal);
                result.entryPoints = nativeEntryPoints(module);
                result.costs       = costsOf(module);
             });

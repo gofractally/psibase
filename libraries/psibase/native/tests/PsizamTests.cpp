@@ -1362,6 +1362,31 @@ TEST_CASE("The host functions a service may import are a fixed table")
    CHECK_NOTHROW(fixture.called(writer.transaction, account));
 }
 
+TEST_CASE("The host functions of node-local services are not part of the chain's rule")
+{
+   // What only a node-local service may import (the node's file store) is
+   // a separate list: code that a transaction puts on chain is refused if
+   // it imports any of them, as it would be for a function that does not
+   // exist, so the list can grow without changing which code is valid.
+   std::string names;
+   for (const auto& function : psibase::localHostFunctions())
+      names += std::string(function.name) + " ";
+   CHECK(names == "fileAppend fileCommit fileRemove fileSize fileRead ");
+
+   for (const auto& function : psibase::localHostFunctions())
+   {
+      for (const auto& other : psibase::nativeHostFunctions())
+         CHECK(other.name != function.name);
+      std::vector<Import> one{{std::string(function.module), std::string(function.name),
+                               function.params, function.results}};
+      // The chain's rule
+      CHECK_THROWS_WITH(psibase::admitNativeWasm(importing(one), {}, 0),
+                        Catch::Matchers::ContainsSubstring("is not a host function"));
+      // A node-local service
+      CHECK_NOTHROW(psibase::admitNativeWasm(importing(one), {}, 0, true));
+   }
+}
+
 TEST_CASE("Code that imports what the node does not provide is refused when it is stored")
 {
    struct Refused

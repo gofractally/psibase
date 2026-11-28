@@ -52,12 +52,24 @@
    X(socketOpen)                         \
    X(socketSend)                         \
    X(socketSetFlags)                     \
-   X(readFile)                           \
-   X(fileAppend)                         \
-   X(fileCommit)                         \
-   X(fileRemove)                         \
-   X(fileSize)                           \
+   X(readFile)
+
+// Host functions that only a node-local service may import. They are not
+// part of the chain's rules: a chain service that imports one is refused
+// exactly as if the function did not exist, so adding to this list changes
+// nothing about which code is valid on chain. Every engine registers them
+// beside the list above.
+#define PSIBASE_LOCAL_HOST_FUNCTIONS(X) \
+   X(fileAppend)                        \
+   X(fileCommit)                        \
+   X(fileRemove)                        \
+   X(fileSize)                          \
    X(fileRead)
+
+// Everything an engine registers
+#define PSIBASE_ALL_HOST_FUNCTIONS(X) \
+   PSIBASE_NATIVE_HOST_FUNCTIONS(X)   \
+   PSIBASE_LOCAL_HOST_FUNCTIONS(X)
 
 namespace psibase
 {
@@ -73,6 +85,10 @@ namespace psibase
 
    /// The table: PSIBASE_NATIVE_HOST_FUNCTIONS with signatures, in list order.
    const std::vector<NativeHostFunction>& nativeHostFunctions();
+
+   /// PSIBASE_LOCAL_HOST_FUNCTIONS with signatures: what a node-local
+   /// service may import in addition. Not a consensus rule.
+   const std::vector<NativeHostFunction>& localHostFunctions();
 
    /// An engine reports each function it has registered, and then how many.
    /// Both throw if the engine does not provide exactly the table: a node

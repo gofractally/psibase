@@ -153,9 +153,12 @@ namespace psibase
       // A code row is being written: service code must pass the chain's
       // admission rule now, or the write (and the transaction) fails. See
       // TransactionContext::admitCode.
+      // `local`: the row belongs to the node (a node-local service), not to
+      // the chain, so the host functions of local services may be imported.
       void admitStoredCode(TransactionContext&   context,
                            std::span<const char> key,
-                           std::span<const char> value)
+                           std::span<const char> value,
+                           bool                  local)
       {
          NativeTableNum table;
          if (key.size() < sizeof(table))
@@ -174,7 +177,8 @@ namespace psibase
          // billed time.
          const auto billed = context.getBillableTime();
          const auto start  = std::chrono::steady_clock::now();
-         context.admitCode(code.codeHash(), {bytes.data(), bytes.size()}, code.vmVersion());
+         context.admitCode(code.codeHash(), {bytes.data(), bytes.size()}, code.vmVersion(),
+                           local);
          context.databaseTime -= (std::chrono::steady_clock::now() - start) -
                                  (context.getBillableTime() - billed);
       }
@@ -885,7 +889,7 @@ namespace psibase
                    {
                       verifyWriteConstrained(transactionContext, fullKey,
                                              {value.data(), value.size()}, existing);
-                      admitStoredCode(transactionContext, fullKey, {value.data(), value.size()});
+                      admitStoredCode(transactionContext, fullKey, {value.data(), value.size()}, false);
                    }
                    notifyKvMut(*this, bucketDb, fullKey.size(),
                                existing ? existing->size() : -1, value.size());
@@ -898,7 +902,7 @@ namespace psibase
              else if (bucketDb == DbId::nativeSubjective)
              {
                 verifyWriteSubjective(database, fullKey, {value.data(), value.size()});
-                admitStoredCode(transactionContext, fullKey, {value.data(), value.size()});
+                admitStoredCode(transactionContext, fullKey, {value.data(), value.size()}, true);
                 noteRunPosted(transactionContext, fullKey);
              }
              else if (bucketDb == DbId::nativeSession)

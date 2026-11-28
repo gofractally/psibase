@@ -84,7 +84,10 @@ void load_local_packages(TransactionContext&           tc,
          };
          // A local service is admitted like any other stored code; one that
          // is not admissible stops the load with the reason.
-         tc.admitCode(codeHash, {reinterpret_cast<const char*>(code.data()), code.size()}, 0);
+         // Code of a node-local service: it may import the host functions
+         // of local services.
+         tc.admitCode(codeHash, {reinterpret_cast<const char*>(code.data()), code.size()}, 0,
+                      true);
          tc.blockContext.db.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);
          CodeByHashRow codeByHashRow{
              .codeHash = codeHash,

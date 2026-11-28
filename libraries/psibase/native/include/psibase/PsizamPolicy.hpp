@@ -455,8 +455,15 @@ namespace psibase
    /// fault of that node's engine, never a property of the transaction.
    ///
    /// Throws std::runtime_error with the reason.
+   ///
+   /// `allowLocal` also accepts the host functions of node-local services
+   /// (localHostFunctions). It is false wherever the chain's rule is being
+   /// applied: a transaction that sets code is checked without it. An engine
+   /// about to compile passes true, because by then chain code has passed
+   /// the chain's rule and what remains to be allowed is local code.
    NativeAdmission admitNativeWasm(std::span<const std::uint8_t> code,
                                    const VMOptions&              options,
-                                   std::uint8_t                  vmVersion);
+                                   std::uint8_t                  vmVersion,
+                                   bool                          allowLocal = false);
 
 }  // namespace psibase
