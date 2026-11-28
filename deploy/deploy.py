@@ -17,7 +17,7 @@ The configuration (inputs, in the repository) names a directory of secrets that 
 repository. This script reads secrets, never prints them and never creates them silently: `boot`
 stops and says which file is missing.
 """
-import json, os, shutil, subprocess, sys, time, urllib.request, urllib.error
+import http.client, json, os, shutil, subprocess, sys, time
 from pathlib import Path
 
 
@@ -62,12 +62,15 @@ class Deployment:
         header and no forwarding headers past the sign-in gate."""
         h = {"Host": f"{service}.{self.host}" if service else self.host, "X-Psibase-Local": "1"}
         h.update(headers or {})
-        req = urllib.request.Request(f"http://{self.listen}{path}", data=body, headers=h, method=method)
+        # No redirects are followed: a node that is not booted yet answers with one.
+        host, port = self.listen.split(":")
+        connection = http.client.HTTPConnection(host, int(port), timeout=timeout)
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return r.status, r.read()
-        except urllib.error.HTTPError as e:
-            return e.code, e.read()
+            connection.request(method, path, body=body, headers=h)
+            reply = connection.getresponse()
+            return reply.status, reply.read()
+        finally:
+            connection.close()
 
     def graphql(self, service, query):
         status, body = self.get(service, "/graphql", "POST", query.encode(), {"Content-Type": "application/graphql"})
@@ -159,7 +162,8 @@ class Deployment:
             nonlocal ok
             ok = ok and passed
             print(f"  {'ok  ' if passed else 'FAIL'} {what}{(': ' + detail) if detail else ''}")
-        status, body = self.get("", "/common/chainid")
+        # Asked of a service's host: the root host only redirects to the network's home.
+        status, body = self.get("accounts", "/common/chainid")
         check("node answers", status == 200, body.decode()[:20] if status == 200 else str(status))
         # A chain booted without a block key takes unsigned transactions from root.
         r = self.run([self.cli, "push", *self.api(), "--console=false", "--trace", "error", "-"], capture_output=True, text=True, timeout=60,
@@ -218,7 +222,8 @@ class Deployment:
             # A copy of a running node's files is not a snapshot: stop, copy, start.
             others = [n for n in self.processes() if n != "node"]
             self.stop(others + ["node"])
-            shutil.copytree(self.root / "db", target / "db")
+            # Not the node's socket, which is not a file.
+            shutil.copytree(self.root / "db", target / "db", ignore=lambda d, names: [n for n in names if (Path(d) / n).is_socket()])
             self.start(["node"] + others)
         for path in target.rglob("*"):
             path.chmod(0o700 if path.is_dir() else 0o600)
