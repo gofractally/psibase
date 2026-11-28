@@ -36,6 +36,7 @@ Some pages of the book are out of date: anything showing `#[derive(Pack, Unpack,
 8. Reads are served by a GraphQL query service on the `<service>+1` account. Lists are connections. Every query is bounded.
 9. A private query checks only that the request's user is the user asked about. What another app may learn is decided by the owning app's plugin, which returns the least that serves.
 10. A hand-written mirror of a service interface (Rust under `rust/psibase/src/services/`, C++ under `include/services/`) is always added together with its schema test (`verify_schema`, `CHECK_SCHEMA`).
+11. Chain state holds only what an objective action will read again. A row that has reached its final state, is read by no action and guards nothing is retired: emit a history event carrying what a reader needs, erase the row, and serve its history from events, which a node may prune. What guards against value being credited or spent twice stays, however old.
 
 ## How to work
 
@@ -44,6 +45,8 @@ Some pages of the book are out of date: anything showing `#[derive(Pack, Unpack,
 **Order.** Service and tables, then the query service, then the plugin (WIT first, then Rust), then the UI. Each layer depends only on the ones before it.
 
 **New package.** Create the layout in the guide, then register it in three places: `packages/user/Cargo.toml` (each crate), `packages/package.json` (the UI), and the root `CMakeLists.txt` (`cargo_psibase_package`, and the package lists that should include it).
+
+**Every table, before it ships.** For each row ask: once it reaches its final state, which action reads it again, and what goes wrong if it is gone? "None, nothing" means the record is history, not state: declare an event for it (`#[event(history)]`, indexed by what it will be asked for), emit it and erase the row in the action that finishes it, and add a bounded action that does the same for rows already stored. Ids must come from a counter that stays in state, so a retired id is never issued again. Keep, permanently, anything an action consults to refuse doing something twice. Example (`packages/user/BtcBridge`): `cancel` refunds a withdrawal, emits `withdrawalRetired` and erases the request, because nothing reads a cancelled request; the spent custody output it never used stays in `UtxoTable` for good, because that row is what stops the same Bitcoin deposit being credited again. A history-only table (a receipt written once and only ever listed) should have been an event from the start.
 
 **Changing a deployed service.** Never renumber a table, reorder its keys, or change a stored record's layout without a migration action. Ask before changing an action's signature: every mirror, plugin and UI that uses it changes with it.
 
